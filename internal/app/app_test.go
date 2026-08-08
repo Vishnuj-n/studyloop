@@ -789,7 +789,7 @@ func TestCalculateFlashcardBudgets(t *testing.T) {
 
 func TestAggregateQueueTasks(t *testing.T) {
 	t.Run("empty inputs", func(t *testing.T) {
-		tasks, topics, minutes, actions := aggregateQueueTasks(nil, nil)
+		tasks, topics, minutes, actions := aggregateQueueTasks(nil, nil, nil)
 		if len(tasks) != 0 {
 			t.Errorf("expected 0 tasks, got %d", len(tasks))
 		}
@@ -811,7 +811,7 @@ func TestAggregateQueueTasks(t *testing.T) {
 		pending := []models.StudyQueueTask{
 			{ID: "p1", TaskType: models.StudyTaskTypeQuiz, Status: models.StudyTaskStatusPending, Title: "Topic B", StartPage: 1, EndPage: 3},
 		}
-		tasks, topics, minutes, actions := aggregateQueueTasks(active, pending)
+		tasks, topics, minutes, actions := aggregateQueueTasks(nil, active, pending)
 
 		if len(tasks) != 2 {
 			t.Fatalf("expected 2 tasks, got %d", len(tasks))
@@ -831,7 +831,7 @@ func TestAggregateQueueTasks(t *testing.T) {
 		active := []models.StudyQueueTask{
 			{ID: "a1", TaskType: models.StudyTaskTypeReading, Status: models.StudyTaskStatusActive, Title: "", StartPage: 1, EndPage: 5},
 		}
-		tasks, _, _, _ := aggregateQueueTasks(active, nil)
+		tasks, _, _, _ := aggregateQueueTasks(nil, active, nil)
 		if tasks[0].Title != "Read: Task" {
 			t.Errorf("expected 'Read: Task', got %q", tasks[0].Title)
 		}

@@ -82,7 +82,14 @@
       >
         Activate
       </button>
-      <button class="btn-delete" @click="$emit('delete', notebook.id)">Delete</button>
+      <button
+        class="btn-delete"
+        :disabled="isCloudProfile"
+        :title="isCloudProfile ? 'Classroom assignments cannot be deleted locally while linked to a cloud profile' : 'Delete notebook'"
+        @click="!isCloudProfile && $emit('delete', notebook.id)"
+      >
+        Delete
+      </button>
     </div>
   </div>
 </template>
@@ -95,6 +102,7 @@ const props = defineProps({
   availableTopics: { type: Array, default: () => [] },
   ragEnabled: { type: Boolean, default: false },
   ragNotebookChapter: { type: Boolean, default: true },
+  isCloudProfile: { type: Boolean, default: false },
   variant: {
     type: String,
     default: 'dormant',

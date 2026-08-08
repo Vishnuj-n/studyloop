@@ -158,7 +158,7 @@ func (s *service) BuildTodayPlan(now time.Time) (*models.TodayPlan, error) {
 	activeTopics := make([]string, 0, 1)
 
 	if foundReadingTopic {
-		startPage, endPage, ok, tokenMap := resolvePageWindow(
+		startPage, endPage, ok, tokenMap := db.ResolvePageWindow(
 			readingTopic,
 			tokenBudget,
 			s.queryTokensPerPageMap,
@@ -248,79 +248,12 @@ func (s *service) BuildTodayPlan(now time.Time) (*models.TodayPlan, error) {
 	}, nil
 }
 
-func resolvePageWindow(
+func ResolvePageWindow(
 	topic models.ReadingTopicCursor,
 	tokenBudget int,
 	queryTokensPerPageMap queryTokensPerPageMapFn,
 ) (int, int, bool, map[int]int) {
-
-	if topic.EndPage <= 0 {
-		return 0, 0, false, nil
-	}
-
-	if tokenBudget <= 0 {
-		return 0, 0, false, nil
-	}
-
-	startPage := topic.CurrentPageCursor
-	if startPage < 1 {
-		startPage = max(1, topic.StartPage)
-	}
-	if topic.StartPage > 0 && startPage < topic.StartPage {
-		startPage = topic.StartPage
-	}
-
-	if startPage > topic.EndPage {
-		return 0, 0, false, nil
-	}
-
-	endPage := startPage
-	accumulatedWords := 0
-
-	// Batch fetch all page tokens in a single query to avoid N+1 problem
-	tokenMap, err := queryTokensPerPageMap(topic.ID, startPage, topic.EndPage)
-	if err != nil {
-		// On error, initialize an empty tokenMap so the subsequent logic will use
-		// FallbackWordsPerPage for all pages instead of performing single-page queries
-		tokenMap = make(map[int]int)
-	}
-
-	for page := startPage; page <= topic.EndPage; page++ {
-
-		if page-startPage >= MaxPageScanLimit {
-			break
-		}
-
-		pageWords, ok := tokenMap[page]
-		if !ok || pageWords <= 0 {
-			pageWords = FallbackWordsPerPage
-		}
-
-		// Check if adding this page would exceed budget BEFORE adding it
-		if accumulatedWords+pageWords > tokenBudget && accumulatedWords > 0 {
-			break
-		}
-
-		accumulatedWords += pageWords
-		endPage = page
-
-		// Structured debug logging for page-by-page resolution
-		// Use utils.Debugf if available, otherwise comment out for production
-		// TODO: Add utils.Debugf support when debug logging is needed
-		// utils.Debugf("[RESOLVE_PAGE_WINDOW] page=%d pageWords=%d accumulatedWords=%d tokenBudget=%d useFallback=%v",
-		// 	page, pageWords, accumulatedWords, tokenBudget, useFallback)
-	}
-
-	// Preserve original near-end behavior
-	if topic.EndPage-endPage <= ClampWindowPages {
-		endPage = topic.EndPage
-	}
-
-	if endPage < startPage {
-		return 0, 0, false, nil
-	}
-
-	return startPage, endPage, true, tokenMap
+	return db.ResolvePageWindow(topic, tokenBudget, queryTokensPerPageMap)
 }
 
 // estimateTaskMinutes calculates realistic workload using token counts.

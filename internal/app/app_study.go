@@ -52,14 +52,14 @@ func calculateFlashcardBudgets(dueCards, maxFlashcards int) (int, int, int) {
 	return materializedCards, deferredCards, safeReviewBudget
 }
 
-func aggregateQueueTasks(active, pending []models.StudyQueueTask) ([]models.ScheduledTask, []string, int, map[string]int) {
+func aggregateQueueTasks(repo *db.Repository, active, pending []models.StudyQueueTask) ([]models.ScheduledTask, []string, int, map[string]int) {
 	queueTasks := make([]models.ScheduledTask, 0, len(active)+len(pending))
 	actionCounts := make(map[string]int)
 	activeTopicsMap := make(map[string]bool)
 
 	processTasks := func(tasks []models.StudyQueueTask) {
 		for _, q := range tasks {
-			task := queueTaskToScheduledTask(q)
+			task := queueTaskToScheduledTask(q, repo)
 			queueTasks = append(queueTasks, task)
 			actionCounts[task.ActionType]++
 			if q.Title != "" {
@@ -238,7 +238,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 
 	dailyStudyMinutes := calculateDailyStudyMinutes(settings.StudyStartTime, settings.StudyEndTime)
 	materializedCards, deferredCards, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
-	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(activeQueueTasks, pendingQueueTasks)
+	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(repo, activeQueueTasks, pendingQueueTasks)
 
 	if reviewTask, ok := buildReviewTaskForPlan(repo, now, materializedCards, safeReviewBudget); ok {
 		queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
@@ -311,7 +311,7 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 	}, true
 }
 
-func queueTaskToScheduledTask(task models.StudyQueueTask) models.ScheduledTask {
+func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) models.ScheduledTask {
 	actionType := strings.ToLower(string(task.TaskType))
 	titleBase := strings.TrimSpace(task.Title)
 	if titleBase == "" {
@@ -343,17 +343,42 @@ func queueTaskToScheduledTask(task models.StudyQueueTask) models.ScheduledTask {
 	if task.StartPage > 0 && task.EndPage > 0 {
 		meta = fmt.Sprintf("Pages %d-%d", task.StartPage, task.EndPage)
 	}
+
 	estimateMinutes := 10
-	if task.TaskType == models.StudyTaskTypeFlashcardGenerate {
+	switch {
+	case task.TaskType == models.StudyTaskTypeFlashcardGenerate:
 		estimateMinutes = 0
-	} else if task.TaskType == models.StudyTaskTypeFlashcardReview {
-		// Use card count from payload if available
+	case task.TaskType == models.StudyTaskTypeFlashcardReview:
 		var payload models.ReviewSessionPayload
 		if err := json.Unmarshal([]byte(task.PayloadJSON), &payload); err == nil && payload.CardCount > 0 {
 			estimateMinutes = int(math.Ceil(float64(payload.CardCount) * scheduler.ReviewMinutesPerCard))
 		}
-	} else if task.StartPage > 0 && task.EndPage >= task.StartPage {
-		estimateMinutes = int(float64(task.EndPage-task.StartPage+1) * scheduler.MinutesPerPage)
+	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
+		// Word-count based estimation (words / 200 WPM).
+		// Falls back to page-count if chunks have not been ingested yet.
+		totalWords := 0
+		if tokenMap, err := repo.GetTokensPerPageMap(task.TopicID, task.StartPage, task.EndPage); err == nil {
+			for _, w := range tokenMap {
+				totalWords += w
+			}
+		}
+		pageCount := task.EndPage - task.StartPage + 1
+		estimationSource := "word_count"
+		if totalWords > 0 {
+			estimateMinutes = int(math.Ceil(float64(totalWords) / float64(scheduler.WordsPerMinute)))
+			// safety floor: at least 1 min/page
+			if pageFloor := pageCount; estimateMinutes < pageFloor {
+				estimateMinutes = pageFloor
+			}
+		} else {
+			// Chunks not ingested yet — use page-count until they are.
+			estimationSource = "no_chunks_yet"
+			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinutesPerPage))
+		}
+		utils.Warnf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
+			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
+	case task.StartPage > 0 && task.EndPage >= task.StartPage:
+		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinutesPerPage))
 	}
 
 	return models.ScheduledTask{
