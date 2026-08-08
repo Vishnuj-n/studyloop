@@ -12,10 +12,7 @@ import (
 )
 
 const (
-	ReviewMinutesPerCard     = 0.5
-
-	// Legacy fallback only
-	MinutesPerPage = 2.5
+	ReviewMinutesPerCard = 0.5
 
 	ClampWindowPages = 4
 
@@ -292,35 +289,17 @@ func (s *service) estimateTaskMinutes(
 		}
 	}
 
-	// Primary token-aware estimation
+	pageFloor := int(math.Ceil(float64(pageCount) * MinMinutesPerPage))
+
 	if err == nil && totalWords > 0 {
-
-		minutes := int(
-			math.Ceil(
-				float64(totalWords) / float64(WordsPerMinute),
-			),
-		)
-
-		// Safety floor for sparse pages
-		pageFloor := int(
-			math.Ceil(
-				float64(pageCount) * MinMinutesPerPage,
-			),
-		)
-
+		minutes := int(math.Ceil(float64(totalWords) / float64(WordsPerMinute)))
 		if minutes < pageFloor {
 			return pageFloor
 		}
-
 		return minutes
 	}
 
-	// Legacy fallback
-	return int(
-		math.Ceil(
-			float64(pageCount) * MinutesPerPage,
-		),
-	)
+	return pageFloor
 }
 
 func parseTimeToMinutes(t string) (int, bool) {

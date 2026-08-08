@@ -371,14 +371,13 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 				estimateMinutes = pageFloor
 			}
 		} else {
-			// Chunks not ingested yet — use page-count until they are.
 			estimationSource = "no_chunks_yet"
-			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinutesPerPage))
+			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinMinutesPerPage))
 		}
 		utils.Warnf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
 			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
 	case task.StartPage > 0 && task.EndPage >= task.StartPage:
-		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinutesPerPage))
+		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinMinutesPerPage))
 	}
 
 	return models.ScheduledTask{

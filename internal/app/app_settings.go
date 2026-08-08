@@ -504,7 +504,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 		}
 	}
 
-	// 2. Fallback: query Supabase REST user_accounts table or mock server directly
+	// 2. Fallback: query Supabase REST user_accounts table directly if cloud server unreachable
 	if !authenticated {
 		tableURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=*", baseURL, url.QueryEscape(username))
 		req, err := http.NewRequest("GET", tableURL, nil)
@@ -654,7 +654,7 @@ func (a *App) SignUpStudent(username, password, classroomCode string) map[string
 		}
 	}
 
-	// Fallback to direct Supabase REST table insert if cloud-server unreachable
+	// Fallback: direct Supabase REST table insert if cloud server unreachable (WIP server / free tier)
 	if !signedUp {
 		syncURL := study.ResolveCloudSyncURL(settings.CloudSyncURL)
 		if syncURL == "" {

@@ -45,7 +45,7 @@ func main() {
 	_ = godotenv.Load(".env")
 
 	// Load config like the app does
-	config := llm.LoadConfigFromEnv()
+	config := llm.LoadConfigFromEnvForPrefix("")
 
 	fmt.Printf("Loaded LLM Configuration:\n")
 	fmt.Printf("  Base URL: %s\n", config.BaseURL)

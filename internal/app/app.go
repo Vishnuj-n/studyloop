@@ -439,9 +439,14 @@ func (a *App) performAsyncRAGSetup() {
 		return
 	}
 
-	newRepo, err := a.loadVectorDBWithFallback(dbPath, am.Vec0DllPath())
+	newRepo, err := db.Init(dbPath, am.Vec0DllPath())
 	if err != nil {
-		emitRagSetupFailed(a, err.Error())
+		emitRagSetupFailed(a, fmt.Sprintf("failed to initialize vector DB: %v", err))
+		return
+	}
+	if !newRepo.IsVecExtensionLoaded() {
+		_ = newRepo.Close()
+		emitRagSetupFailed(a, "sqlite-vec extension is missing or failed to load (requires CGO and vec0 binary)")
 		return
 	}
 
@@ -532,53 +537,6 @@ func (a *App) acquireAndStageAssets(am *runtime.AssetManager) error {
 	return nil
 }
 
-func (a *App) loadVectorDBWithFallback(dbPath, vecDllPath string) (*db.Repository, error) {
-	newRepo, err := db.Init(dbPath, vecDllPath)
-	if err != nil {
-		return nil, a.fallbackToNonVectorDB(dbPath, fmt.Sprintf("failed to reload DB with vector extension: %v", err))
-	}
-
-	if !newRepo.IsVecExtensionLoaded() {
-		_ = newRepo.Close()
-		return nil, a.fallbackToNonVectorDB(dbPath, "sqlite-vec extension is missing or failed to load (requires CGO and vec0 binary)")
-	}
-
-	return newRepo, nil
-}
-
-func (a *App) fallbackToNonVectorDB(dbPath string, originalErrMsg string) error {
-	repo := a.getRepo()
-	fbRepo, fbErr := db.Init(dbPath, "")
-	if fbErr != nil {
-		return fmt.Errorf("%s, and fallback non-vector initialization also failed: %v", originalErrMsg, fbErr)
-	}
-
-	a.repoMutex.Lock()
-	oldDB := repo.SwapDB(fbRepo)
-	if oldDB != nil {
-		_ = oldDB.Close()
-	}
-	a.scheduler = scheduler.New(repo, scheduler.Dependencies{})
-	a.repoMutex.Unlock()
-
-	a.aiMutex.Lock()
-	a.aiReady = false
-	if a.indexQueue != nil {
-		a.indexQueue.Stop()
-		a.indexQueue = nil
-	}
-	a.embedder = nil
-	a.retrievalEngine = nil
-	a.studyService = study.NewStudyService(study.Config{
-		Repo:             repo,
-		FastLLMProvider:  a.fastLLMProvider,
-		HeavyLLMProvider: a.heavyLLMProvider,
-		RetrievalEngine:  nil,
-	})
-	a.aiMutex.Unlock()
-
-	return fmt.Errorf("%s", originalErrMsg)
-}
 
 func (a *App) initEmbedder(am *runtime.AssetManager) (*embeddings.OnnxEmbedder, error) {
 	emb, err := embeddings.NewOnnxEmbedder(am.ModelPath(), am.TokenizerPath(), am.OnnxRuntimePath())

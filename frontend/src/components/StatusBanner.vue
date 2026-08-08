@@ -1,9 +1,9 @@
 <template>
-  <article :class="['banner', `banner--${variant}`, `${legacyPrefix}-banner`, 'card']">
+  <article :class="['banner', `banner--${variant}`, 'card']">
     <div class="banner-content">
       <span class="banner-icon">{{ icon }}</span>
       <div class="banner-text">
-        <p :class="['banner-title', `${legacyPrefix}-title`]">{{ title }}</p>
+        <p class="banner-title">{{ title }}</p>
         <p v-if="subtitle" class="banner-subtitle">{{ subtitle }}</p>
       </div>
       <button v-if="actionLabel" class="banner-action-btn" @click="$emit('action')">
@@ -14,8 +14,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-
 const props = defineProps({
   /** 'info' | 'rescue' | 'success' | 'error' | 'warning' */
   variant: { type: String, required: true },
@@ -26,15 +24,6 @@ const props = defineProps({
 })
 
 defineEmits(['action'])
-
-const LEGACY_PREFIXES = {
-  info: 'info',
-  rescue: 'rescue',
-  success: 'flashcard-success',
-  error: 'error',
-  warning: 'info',
-}
-const legacyPrefix = computed(() => LEGACY_PREFIXES[props.variant] || props.variant)
 </script>
 
 <style scoped>

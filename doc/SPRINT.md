@@ -1,7 +1,7 @@
 # Sprint Roadmap — AI Tutor
 
 **Status:** Active roadmap
-**Last Updated:** 2026-07-11
+**Last Updated:** 2026-08-08
 **Architecture:** SQLite-backed deterministic queue (NOT autonomous orchestration)
 
 ---
@@ -9,8 +9,8 @@
 ## Active Roadmap
 
 ### Sprint 10: RAG Setup, Asset Management & Environment Verification [DONE]
-- [ ] Dynamic CGO/vec0 verification at startup
-- [ ] Asset downloader script for missing embedding models
+- [x] Dynamic CGO/vec0 verification at startup
+- [x] Asset downloader script for missing embedding models
 
 ### Sprint 11: 2-Strike Socratic Rescue Pipeline [DONE]
 - [x] Track consecutive quiz failures via `reread_attempts`
@@ -19,10 +19,20 @@
 - [x] Dual-lane rescue UI (in-app + external prompt)
 - [x] Dev bypass endpoint + tests
 
-### Sprint 12: Cloud Dashboard Handover
-- [ ] Schema audit: UUID keys (no auto-increment)
-- [ ] Dirty flags + `updated_at` on core tables
-- [ ] Handover payload endpoint (JSON export/import)
+### Sprint 12: Cloud Dashboard & Sync [DONE]
+- [x] Schema audit: UUID keys, `is_locked` column on `user_accounts`
+- [x] Dirty flags + `updated_at` on core tables
+- [x] Delta sync + handover payload endpoint
+- [x] Student account creation and cloud sync
+- [x] Classroom lock/unlock and student removal
+- [x] PDF page-range ingestion from cloud dashboard
+- [x] Ingestion notification banner + one-click ingestion workflow
+- [x] Multi-source data fetching for classroom dashboard and assignments
+- [x] Cloud assignment metadata integration
+- [x] Automatic classroom study profile isolation and lifecycle management
+- [x] Cloud dashboard refactored into multi-page application
+- [x] Design system + theme support for cloud dashboard
+- [x] `cmd/cloud-server` — Go proxy server for Supabase service-role operations
 
 ### Sprint 13: User Asset Provisioning [DONE]
 - [x] Detect missing RAG assets, download from GitHub Releases, progress UI, hash verification

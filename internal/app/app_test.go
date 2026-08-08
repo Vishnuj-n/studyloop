@@ -108,7 +108,7 @@ func initTestProvider(t *testing.T) *llm.Provider {
 	t.Setenv("LLM_API_KEY", "test-key")
 	t.Setenv("LLM_MODEL", "test-model")
 
-	return llm.NewProvider(llm.LoadConfigFromEnv())
+	return llm.NewProvider(llm.LoadConfigFromEnvForPrefix(""))
 }
 
 // newTestApp provides canonical test App initialization with all dependencies wired.
