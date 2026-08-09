@@ -60,7 +60,7 @@
         <div class="loading-spinner"></div>
         <p class="muted" style="margin-top: 1rem; font-size: 0.85rem;">Fetching classroom database...</p>
       </div>
-      <div v-else-if="filteredStudents.length === 0" class="text-center" style="padding: 3rem 2rem; border: 1px dashed var(--ds-border-hi); border-radius: 12px; background: var(--ds-surface-low);">
+      <div v-else-if="students.length === 0" class="text-center" style="padding: 3rem 2rem; border: 1px dashed var(--ds-border-hi); border-radius: 12px; background: var(--ds-surface-low);">
         <h3 style="margin-top: 0.75rem; margin-bottom: 0.35rem; color: var(--ds-fg);">No students synced yet for "{{ classroomCode }}"</h3>
         <p class="muted" style="margin-bottom: 1.25rem; font-size: 0.82rem; max-width: 460px; margin-left: auto; margin-right: auto;">
           Students connect to your analytical workspace using your classroom code. Once connected, their flashcard review logs and study progress will stream here live.
@@ -76,6 +76,18 @@
             <li>Click <strong>Sign Up & Sync</strong></li>
           </ol>
         </div>
+      </div>
+
+      <div v-else-if="filteredStudents.length === 0" class="text-center" style="padding: 3rem 2rem; border: 1px dashed var(--ds-border-hi); border-radius: 12px; background: var(--ds-surface-low);">
+        <h3 style="margin-top: 0.75rem; margin-bottom: 0.35rem; color: var(--ds-fg);">
+          {{ filterAlerts ? 'No active student alerts' : 'No matching students found' }}
+        </h3>
+        <p class="muted" style="margin-bottom: 1.25rem; font-size: 0.85rem; max-width: 460px; margin-left: auto; margin-right: auto;">
+          {{ filterAlerts ? 'All connected students are currently progressing without flagged issues.' : `No students match your search filter.` }}
+        </p>
+        <button v-if="filterAlerts || searchQuery" class="btn-ghost" @click="filterAlerts = false; searchQuery = '';" style="font-size: 0.8rem;">
+          Clear Filters
+        </button>
       </div>
 
       <div v-else class="student-list">
@@ -101,7 +113,7 @@
                 {{ student.token.substring(0, 2).toUpperCase() }}
               </div>
               <div>
-                <div class="student-name">token:{{ student.token.substring(0, 12) }}...</div>
+                <div class="student-name">{{ student.token }}</div>
                 <div class="student-meta">
                   {{ student.notebooks.length }} Notebooks &bull; {{ student.logs.length }} reviews synced &bull; Updated {{ formatRelativeTime(student.lastUpdate) }}
                 </div>

@@ -1186,3 +1186,79 @@ func TestEnsurePendingReadingTask_SemanticExtensionFallback(t *testing.T) {
 	}
 }
 
+func TestStudyQueueRoundRobinInterleaving(t *testing.T) {
+	initDBForTest(t, false, 0)
+	profileID := "prof-rr-test"
+
+	// Create 2 notebooks with equal priority (5)
+	nbA := "nb-rr-a"
+	topicA := "topic-rr-a"
+	_ = testRepo.EnsureTopic(topicA, "Topic A")
+	_ = testRepo.UpdateTopicPageBounds(topicA, 1, 5)
+	_ = testRepo.CreateNotebook(nbA, "Book A (Alpha)", "/tmp/a.pdf", "pdf", topicA, profileID, 5)
+	_ = testRepo.LinkNotebookTopics(nbA, []string{topicA})
+	_ = testRepo.UpdateNotebookStatus(nbA, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbA, "active")
+
+	nbB := "nb-rr-b"
+	topicB := "topic-rr-b"
+	_ = testRepo.EnsureTopic(topicB, "Topic B")
+	_ = testRepo.UpdateTopicPageBounds(topicB, 1, 5)
+	_ = testRepo.CreateNotebook(nbB, "Book B (Beta)", "/tmp/b.pdf", "pdf", topicB, profileID, 5)
+	_ = testRepo.LinkNotebookTopics(nbB, []string{topicB})
+	_ = testRepo.UpdateNotebookStatus(nbB, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbB, "active")
+
+	// Insert READING tasks for both notebooks
+	taskA1 := models.StudyQueueTask{
+		ID:         "task-rr-a1",
+		NotebookID: nbA,
+		TopicID:    topicA,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+	}
+	taskB1 := models.StudyQueueTask{
+		ID:         "task-rr-b1",
+		NotebookID: nbB,
+		TopicID:    topicB,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+	}
+	_ = testRepo.InsertStudyTask(taskA1)
+	_ = testRepo.InsertStudyTask(taskB1)
+
+	// Initially, get next task
+	next1, err := testRepo.GetNextTask("")
+	if err != nil {
+		t.Fatalf("GetNextTask 1 failed: %v", err)
+	}
+
+	// Activate and complete next1
+	_ = testRepo.ActivateTask(next1.ID)
+	_ = testRepo.CompleteTask(next1.ID, models.CompletionResult{Status: models.StudyTaskStatusCompleted})
+
+	// Insert follow-up READING task for the notebook that was just completed
+	taskFollowup := models.StudyQueueTask{
+		ID:         "task-rr-followup",
+		NotebookID: next1.NotebookID,
+		TopicID:    next1.TopicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+	}
+	_ = testRepo.InsertStudyTask(taskFollowup)
+
+	// Next task retrieved MUST be for the other notebook (round-robin rotation)
+	next2, err := testRepo.GetNextTask("")
+	if err != nil {
+		t.Fatalf("GetNextTask 2 failed: %v", err)
+	}
+
+	if next2.NotebookID == next1.NotebookID {
+		t.Fatalf("expected round-robin rotation to different notebook, but got same notebook %s twice", next1.NotebookID)
+	}
+}
+
+

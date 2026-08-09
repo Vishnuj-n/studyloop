@@ -692,6 +692,7 @@ const stats = computed(() => {
   let totalReviews = 0;
   let totalPassingReviews = 0;
   let alertsCount = 0;
+  let ratingCounts = { easy: 0, good: 0, hard: 0, fail: 0 };
 
   students.value.forEach(s => {
     totalReviews += s.logs.length;
@@ -701,38 +702,51 @@ const stats = computed(() => {
       if (log.rating > 1) {
         totalPassingReviews++;
       }
+      if (log.rating === 4) ratingCounts.easy++;
+      else if (log.rating === 3) ratingCounts.good++;
+      else if (log.rating === 2) ratingCounts.hard++;
+      else if (log.rating === 1) ratingCounts.fail++;
     });
   });
 
   const passRate = totalReviews > 0 ? Math.round((totalPassingReviews / totalReviews) * 100) : 0;
 
+  const ratingBreakdown = {
+    easyPct: totalReviews > 0 ? Math.round((ratingCounts.easy / totalReviews) * 100) : 0,
+    goodPct: totalReviews > 0 ? Math.round((ratingCounts.good / totalReviews) * 100) : 0,
+    hardPct: totalReviews > 0 ? Math.round((ratingCounts.hard / totalReviews) * 100) : 0,
+    failPct: totalReviews > 0 ? Math.round((ratingCounts.fail / totalReviews) * 100) : 0,
+    easyCount: ratingCounts.easy,
+    goodCount: ratingCounts.good,
+    hardCount: ratingCounts.hard,
+    failCount: ratingCounts.fail
+  };
+
   return {
     studentsCount: count,
     totalLogs: totalReviews,
     passRate,
-    alertsCount
+    alertsCount,
+    ratingBreakdown
   };
 });
 
 const filteredStudents = computed(() => {
   return students.value.filter(student => {
-    if (filterAlerts.value && student.alertsCount === 0) {
+    if (filterAlerts.value && !student.alertsCount) {
       return false;
     }
 
     const query = searchQuery.value.trim().toLowerCase();
     if (!query) return true;
 
-    if (student.token.toLowerCase().includes(query)) {
-      return true;
-    }
-
-    const matchesNotebook = student.notebooks.some(nb =>
-      nb.title.toLowerCase().includes(query) || nb.filename.toLowerCase().includes(query)
+    const tokenMatch = (student.token || '').toLowerCase().includes(query);
+    const notebookMatch = student.notebooks?.some(nb =>
+      (nb.title || '').toLowerCase().includes(query) ||
+      (nb.filename || '').toLowerCase().includes(query)
     );
-    if (matchesNotebook) return true;
 
-    return false;
+    return tokenMatch || notebookMatch;
   });
 });
 

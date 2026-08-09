@@ -156,7 +156,9 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 3
 	`
@@ -186,6 +188,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 				sq.start_page, sq.end_page,
 				t.start_page AS topic_start_page, t.end_page AS topic_end_page,
 				t.title AS topic_title, n.title AS notebook_title, n.priority AS notebook_priority,
+				(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') AS last_completed_at,
 				ROW_NUMBER() OVER (
 					PARTITION BY sq.notebook_id
 					ORDER BY
@@ -205,7 +208,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 			  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
 		) ranked_tasks
 		WHERE rn = 1
-		ORDER BY COALESCE(notebook_priority, 5) DESC, notebook_title ASC, id ASC
+		ORDER BY COALESCE(notebook_priority, 5) DESC, last_completed_at ASC, notebook_title ASC, id ASC
 		LIMIT 1
 	`
 	rows, err := r.db.Query(query, activeProfileID, activeProfileID, activeProfileID)
@@ -327,7 +330,9 @@ func (r *Repository) getNextTaskNoProfile(notebookID string) (*models.StudyQueue
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`
@@ -369,7 +374,9 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC, n.title ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC, n.title ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`
@@ -1548,9 +1555,9 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			}
 
 			if endPage > baseEndPage {
-				utils.Infof("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, stopReason)
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, stopReason)
 			} else {
-				utils.Infof("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d reason=%s", topicID, baseEndPage, currentWords, stopReason)
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d reason=%s", topicID, baseEndPage, currentWords, stopReason)
 			}
 		}
 

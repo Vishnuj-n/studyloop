@@ -98,33 +98,33 @@
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span style="width: 50px; font-size: 0.78rem; font-weight: 600; color: var(--ds-primary);">Easy</span>
           <div style="flex: 1; height: 10px; background: var(--ds-surface-hi); border-radius: 999px; overflow: hidden;">
-            <div style="height: 100%; width: 38%; background: var(--ds-primary); border-radius: 999px; transition: width 0.5s ease;"></div>
+            <div :style="{ width: (stats.ratingBreakdown?.easyPct || 0) + '%' }" style="height: 100%; background: var(--ds-primary); border-radius: 999px; transition: width 0.5s ease;"></div>
           </div>
-          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">38%</span>
+          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">{{ stats.ratingBreakdown?.easyPct || 0 }}%</span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span style="width: 50px; font-size: 0.78rem; font-weight: 600; color: var(--ds-success);">Good</span>
           <div style="flex: 1; height: 10px; background: var(--ds-surface-hi); border-radius: 999px; overflow: hidden;">
-            <div style="height: 100%; width: 40%; background: var(--ds-success); border-radius: 999px; transition: width 0.5s ease;"></div>
+            <div :style="{ width: (stats.ratingBreakdown?.goodPct || 0) + '%' }" style="height: 100%; background: var(--ds-success); border-radius: 999px; transition: width 0.5s ease;"></div>
           </div>
-          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">40%</span>
+          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">{{ stats.ratingBreakdown?.goodPct || 0 }}%</span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span style="width: 50px; font-size: 0.78rem; font-weight: 600; color: var(--ds-warning);">Hard</span>
           <div style="flex: 1; height: 10px; background: var(--ds-surface-hi); border-radius: 999px; overflow: hidden;">
-            <div style="height: 100%; width: 12%; background: var(--ds-warning); border-radius: 999px; transition: width 0.5s ease;"></div>
+            <div :style="{ width: (stats.ratingBreakdown?.hardPct || 0) + '%' }" style="height: 100%; background: var(--ds-warning); border-radius: 999px; transition: width 0.5s ease;"></div>
           </div>
-          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">12%</span>
+          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">{{ stats.ratingBreakdown?.hardPct || 0 }}%</span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span style="width: 50px; font-size: 0.78rem; font-weight: 600; color: var(--ds-danger);">Fail</span>
           <div style="flex: 1; height: 10px; background: var(--ds-surface-hi); border-radius: 999px; overflow: hidden;">
-            <div style="height: 100%; width: 10%; background: var(--ds-danger); border-radius: 999px; transition: width 0.5s ease;"></div>
+            <div :style="{ width: (stats.ratingBreakdown?.failPct || 0) + '%' }" style="height: 100%; background: var(--ds-danger); border-radius: 999px; transition: width 0.5s ease;"></div>
           </div>
-          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">10%</span>
+          <span style="width: 40px; text-align: right; font-size: 0.78rem; font-family: var(--ds-mono); color: var(--ds-muted);">{{ stats.ratingBreakdown?.failPct || 0 }}%</span>
         </div>
       </div>
     </section>
