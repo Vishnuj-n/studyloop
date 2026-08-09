@@ -1406,10 +1406,14 @@ func (r *Repository) GetQuestionsForQuizAttempts(attemptIDs []string) ([]models.
 }
 
 // EnsurePendingReadingTaskForNotebook ensures at least one PENDING/ACTIVE READING task exists in study_queue for an active notebook.
-func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) error {
+func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targetSessionWords int) error {
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
 		return fmt.Errorf("notebook id is required")
+	}
+
+	if targetSessionWords <= 0 {
+		targetSessionWords = 5000
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
@@ -1426,7 +1430,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 		}
 
 		var topicID, topicTitle, notebookTitle string
-		var startPage, endPage int
+		var topicStartPage, topicEndPage int
 		err = tx.QueryRow(`
 			SELECT
 				t.id,
@@ -1440,12 +1444,53 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 			WHERE nt.notebook_id = ? AND COALESCE(t.status, 'unseen') != 'completed'
 			ORDER BY t.start_page ASC, t.id ASC
 			LIMIT 1
-		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &startPage, &endPage)
+		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &topicStartPage, &topicEndPage)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil // No uncompleted topics found
 		}
 		if err != nil {
 			return err
+		}
+
+		// Calculate soft-capped page window based on targetSessionWords
+		topicCursor := models.ReadingTopicCursor{
+			ID:         topicID,
+			Title:      topicTitle,
+			StartPage:  topicStartPage,
+			EndPage:    topicEndPage,
+			NotebookID: notebookID,
+		}
+
+		startPage, endPage, ok, _ := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
+			query := `
+				SELECT page_num, COALESCE(token_count, 0), COALESCE(chunk_text, '')
+				FROM chunks
+				WHERE topic_id = ? AND page_num BETWEEN ? AND ?
+				ORDER BY page_num
+			`
+			rows, qErr := tx.Query(query, tID, sp, ep)
+			if qErr != nil {
+				return nil, qErr
+			}
+			defer func() { _ = rows.Close() }()
+
+			tokenMap := make(map[int]int)
+			for rows.Next() {
+				var pNum, tCount int
+				var cText string
+				if sErr := rows.Scan(&pNum, &tCount, &cText); sErr == nil {
+					if tCount <= 0 {
+						tCount = len(cText) / 4
+					}
+					tokenMap[pNum] += tCount
+				}
+			}
+			return tokenMap, nil
+		})
+
+		if !ok {
+			startPage = topicStartPage
+			endPage = topicEndPage
 		}
 
 		taskID := fmt.Sprintf("task-read-%s-%s", notebookID, topicID)
@@ -1470,6 +1515,11 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 
 // EnsurePendingReadingTasksForActiveNotebooks ensures all active notebooks for a profile have at least one PENDING/ACTIVE task.
 func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID string) error {
+	targetWords := 5000
+	if settings, err := r.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
+		targetWords = settings.TargetSessionWords
+	}
+
 	rows, err := r.db.Query(`
 		SELECT id FROM notebooks
 		WHERE study_status = 'active'
@@ -1494,7 +1544,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 	}
 
 	for _, nID := range notebookIDs {
-		if err := r.EnsurePendingReadingTaskForNotebook(nID); err != nil {
+		if err := r.EnsurePendingReadingTaskForNotebook(nID, targetWords); err != nil {
 			utils.Warnf("[QUEUE] failed to ensure reading task for active notebook %s: %v", nID, err)
 		}
 	}

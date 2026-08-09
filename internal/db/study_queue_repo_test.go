@@ -1021,7 +1021,7 @@ func TestEnsurePendingReadingTaskForNotebook(t *testing.T) {
 	}
 
 	// First call should create the READING task in study_queue
-	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID); err != nil {
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, 5000); err != nil {
 		t.Fatalf("EnsurePendingReadingTaskForNotebook failed: %v", err)
 	}
 
@@ -1035,7 +1035,7 @@ func TestEnsurePendingReadingTaskForNotebook(t *testing.T) {
 	}
 
 	// Second call should be idempotent and not create duplicate task
-	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID); err != nil {
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, 5000); err != nil {
 		t.Fatalf("EnsurePendingReadingTaskForNotebook second call failed: %v", err)
 	}
 
@@ -1048,7 +1048,7 @@ func TestEnsurePendingReadingTaskForNotebook(t *testing.T) {
 	}
 
 	// Call EnsurePendingReadingTaskForNotebook again; should replenish without PK collision
-	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID); err != nil {
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, 5000); err != nil {
 		t.Fatalf("EnsurePendingReadingTaskForNotebook after completion failed: %v", err)
 	}
 

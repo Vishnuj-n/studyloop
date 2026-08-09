@@ -421,13 +421,16 @@ func (a *App) UpdateNotebookStudyStatus(notebookID, studyStatus string) map[stri
 func (a *App) IsOnboarded() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
+		utils.QueueLogger.Warn("onboarding_check", "status", "failed", "reason", "database_not_initialized")
 		return map[string]interface{}{"error": errDatabaseNotInitialized, "onboarded": false}
 	}
 	profiles, err := repo.GetProfiles()
 	if err != nil {
+		utils.QueueLogger.Error("onboarding_check", "status", "failed", "error", err.Error())
 		return map[string]interface{}{"error": err.Error(), "onboarded": false}
 	}
 	onboarded := len(profiles) > 0
+	utils.QueueLogger.Info("onboarding_check", "status", "success", "onboarded", onboarded, "profile_count", len(profiles))
 	return map[string]interface{}{"onboarded": onboarded}
 }
 
