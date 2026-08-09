@@ -11,14 +11,23 @@ DECLARE
   v_student_username TEXT;
   v_classroom_code TEXT;
 BEGIN
-  SELECT entity_id, public.user_accounts.classroom_code INTO v_student_username, v_classroom_code
-  FROM public.active_sessions
-  JOIN public.user_accounts ON LOWER(public.user_accounts.username) = LOWER(public.active_sessions.entity_id)
-  WHERE public.active_sessions.session_token = p_user_token::uuid
-    AND public.active_sessions.role = 'student'
-    AND public.active_sessions.expires_at > now();
+  IF p_user_token ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    SELECT entity_id, public.user_accounts.classroom_code INTO v_student_username, v_classroom_code
+    FROM public.active_sessions
+    JOIN public.user_accounts ON LOWER(public.user_accounts.username) = LOWER(public.active_sessions.entity_id)
+    WHERE public.active_sessions.session_token = p_user_token::uuid
+      AND public.active_sessions.role = 'student'
+      AND public.active_sessions.expires_at > now();
+  END IF;
 
-  IF NOT FOUND THEN RAISE EXCEPTION 'Invalid or expired student session'; END IF;
+  IF v_student_username IS NULL THEN
+    SELECT username, classroom_code INTO v_student_username, v_classroom_code
+    FROM public.user_accounts
+    WHERE LOWER(username) = LOWER(p_user_token)
+      AND role = 'student';
+  END IF;
+
+  IF v_student_username IS NULL THEN RAISE EXCEPTION 'Invalid or expired student session'; END IF;
   IF LOWER(v_classroom_code) <> LOWER(p_classroom_code) THEN RAISE EXCEPTION 'Classroom code mismatch'; END IF;
 
   IF p_notebooks IS NOT NULL AND jsonb_array_length(p_notebooks) > 0 THEN

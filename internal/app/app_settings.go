@@ -537,8 +537,36 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 								role, _ := user["role"].(string)
 								classCode, _ := user["classroom_code"].(string)
 								uname, _ := user["username"].(string)
-								sessToken := fmt.Sprintf("%v", user["id"])
-								if sessToken == "" || sessToken == "<nil>" {
+
+								sessToken := ""
+								sessReqPayload, _ := json.Marshal(map[string]interface{}{
+									"entity_id":  strings.ToLower(uname),
+									"role":       role,
+									"expires_at": time.Now().AddDate(10, 0, 0).Format(time.RFC3339),
+								})
+								sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", baseURL), bytes.NewBuffer(sessReqPayload))
+								if sErr == nil {
+									sessReq.Header.Set("Content-Type", "application/json")
+									if anonKey != "" {
+										sessReq.Header.Set("apikey", anonKey)
+										if strings.Count(anonKey, ".") == 2 {
+											sessReq.Header.Set("Authorization", "Bearer "+anonKey)
+										}
+									}
+									sessReq.Header.Set("Prefer", "return=representation")
+									if sessRes, sDoErr := client.Do(sessReq); sDoErr == nil {
+										defer sessRes.Body.Close()
+										if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
+											var createdSess []map[string]interface{}
+											if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
+												if tok, ok := createdSess[0]["session_token"].(string); ok && tok != "" {
+													sessToken = tok
+												}
+											}
+										}
+									}
+								}
+								if sessToken == "" {
 									sessToken = uname
 								}
 								loginResp.SessionToken = sessToken
