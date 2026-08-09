@@ -160,7 +160,7 @@ describe('Dashboard.vue Integration', () => {
     const wrapper = mount(Dashboard)
     await flushPromises()
 
-    expect(wrapper.find('.rescue-banner').exists()).toBe(true)
-    expect(wrapper.find('.rescue-title').text()).toBe('Concept Rescue Active')
+    expect(wrapper.find('.banner--rescue').exists()).toBe(true)
+    expect(wrapper.find('.banner-title').text()).toBe('Concept Rescue Active')
   })
 })

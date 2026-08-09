@@ -335,7 +335,7 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 	// Check if already registered
 	if existing, _ := repo.GetNotebookByID(nb.ID); existing != nil {
 		utils.Warnf("[SYNC] Assignment %q (%s) already exists in database, skipping download", nb.Title, nb.ID)
-		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" && (existing.ProfileID == "" || existing.ProfileID == "NULL") {
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" && existing.ProfileID != settings.ActiveProfileID {
 			if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr == nil {
 				utils.Warnf("[SYNC] Associated existing notebook %s with active profile %s", nb.ID, settings.ActiveProfileID)
 			}

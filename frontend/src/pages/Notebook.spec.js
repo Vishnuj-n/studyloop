@@ -24,6 +24,7 @@ vi.mock('../services/appApi', () => ({
   updateNotebookChapterRange: vi.fn(),
   resetNotebookIngestionStatus: vi.fn(),
   getTodayPlan: vi.fn(),
+  getAvailableTopics: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
