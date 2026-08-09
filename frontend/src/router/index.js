@@ -9,7 +9,7 @@ import SocraticRescue from '../pages/SocraticRescue.vue'
 import Settings from '../pages/Settings.vue'
 import Notebook from '../pages/Notebook.vue'
 import Onboarding from '../pages/Onboarding.vue'
-import { isOnboarded } from '../services/appApi'
+import { isOnboarded, logFrontendEvent } from '../services/appApi'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -43,11 +43,13 @@ router.beforeEach(async (to, from, next) => {
   try {
     const res = await isOnboarded()
     if (res && res.onboarded === false) {
+      logFrontendEvent('info', 'Router', 'onboarding_redirect', JSON.stringify({ target: to.path, res }))
       next('/onboarding')
     } else {
       next()
     }
   } catch (err) {
+    logFrontendEvent('error', 'Router', 'onboarding_check_error', JSON.stringify({ target: to.path, error: String(err) }))
     next()
   }
 })

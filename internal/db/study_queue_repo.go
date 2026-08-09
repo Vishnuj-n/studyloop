@@ -1491,6 +1491,54 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		if !ok {
 			startPage = topicStartPage
 			endPage = topicEndPage
+		} else {
+			// Calculate current total word count for startPage..endPage
+			var currentWords int
+			for p := startPage; p <= endPage; p++ {
+				var pWords int
+				_ = tx.QueryRow(`
+					SELECT COALESCE(SUM(CASE WHEN token_count > 0 THEN token_count ELSE LENGTH(chunk_text)/4 END), 0)
+					FROM chunks WHERE topic_id = ? AND page_num = ?
+				`, topicID, p).Scan(&pWords)
+				currentWords += pWords
+			}
+
+			// Semantic extension: check up to +3 additional pages
+			const maxExtensionPages = 3
+			const maxTotalWords = 6500
+			const minSimilarityThreshold = 0.85
+
+			baseEndPage := endPage
+			for ext := 1; ext <= maxExtensionPages; ext++ {
+				nextPage := endPage + 1
+				if nextPage > topicEndPage {
+					break
+				}
+
+				// Get word count for nextPage
+				var nextPageWords int
+				_ = tx.QueryRow(`
+					SELECT COALESCE(SUM(CASE WHEN token_count > 0 THEN token_count ELSE LENGTH(chunk_text)/4 END), 0)
+					FROM chunks WHERE topic_id = ? AND page_num = ?
+				`, topicID, nextPage).Scan(&nextPageWords)
+
+				if currentWords+nextPageWords > maxTotalWords {
+					break
+				}
+
+				sim, simErr := r.GetPageBoundaryCosineSimilarityTx(tx, topicID, endPage, nextPage)
+				if simErr != nil || sim < minSimilarityThreshold {
+					break
+				}
+
+				// Absorbed! Extend endPage
+				endPage = nextPage
+				currentWords += nextPageWords
+			}
+
+			if endPage > baseEndPage {
+				utils.Infof("[SEMANTIC_EXTENSION] Absorbed %d extra page(s) into reading task for topicID=%q (baseEnd=%d -> extendedEnd=%d, totalWords=%d)", endPage-baseEndPage, topicID, baseEndPage, endPage, currentWords)
+			}
 		}
 
 		taskID := fmt.Sprintf("task-read-%s-%s", notebookID, topicID)

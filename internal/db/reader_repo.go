@@ -479,3 +479,45 @@ func (r *Repository) GetAllChunks() ([]models.Chunk, error) {
 	}
 	return chunks, nil
 }
+
+// GetPageBoundaryCosineSimilarityTx computes the cosine similarity between the last chunk of pageA and the first chunk of pageB for a topic.
+// Returns 0.0 (no error) if vectors or sqlite-vec function are unavailable.
+func (r *Repository) GetPageBoundaryCosineSimilarityTx(tx *sql.Tx, topicID string, pageA, pageB int) (float64, error) {
+	var rowIDA, rowIDB int64
+	errA := tx.QueryRow(`
+		SELECT rowid FROM chunks 
+		WHERE topic_id = ? AND page_num = ? 
+		ORDER BY id DESC LIMIT 1
+	`, topicID, pageA).Scan(&rowIDA)
+
+	errB := tx.QueryRow(`
+		SELECT rowid FROM chunks 
+		WHERE topic_id = ? AND page_num = ? 
+		ORDER BY id ASC LIMIT 1
+	`, topicID, pageB).Scan(&rowIDB)
+
+	if errA != nil || errB != nil {
+		return 0.0, nil
+	}
+
+	var distance float64
+	query := `
+		SELECT vec_distance_cosine(cvA.embedding, cvB.embedding)
+		FROM chunk_vectors cvA
+		JOIN chunk_vectors cvB ON cvB.rowid = ?
+		WHERE cvA.rowid = ?
+	`
+	err := tx.QueryRow(query, rowIDB, rowIDA).Scan(&distance)
+	if err != nil {
+		return 0.0, nil // Safe fallback on error or missing vec extension
+	}
+
+	similarity := 1.0 - distance
+	if similarity < 0 {
+		similarity = 0
+	} else if similarity > 1.0 {
+		similarity = 1.0
+	}
+	return similarity, nil
+}
+

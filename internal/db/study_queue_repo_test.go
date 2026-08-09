@@ -1138,3 +1138,51 @@ func TestMarkTopicCompletedTx(t *testing.T) {
 		t.Fatalf("expected topic status to be 'completed', got %q", status)
 	}
 }
+
+func TestEnsurePendingReadingTask_SemanticExtensionFallback(t *testing.T) {
+	initDBForTest(t, false, 0)
+	notebookID := "nb-semantic-ext-fallback"
+	topicID := "topic-semantic-ext-fallback"
+
+	if err := testRepo.EnsureTopic(topicID, "Chapter 1"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topicID, 1, 10); err != nil {
+		t.Fatalf("UpdateTopicPageBounds failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(notebookID, "Ensure Test Book", "/tmp/test.pdf", "pdf", topicID, "", 10); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if err := testRepo.LinkNotebookTopics(notebookID, []string{topicID}); err != nil {
+		t.Fatalf("LinkNotebookTopics failed: %v", err)
+	}
+	if err := testRepo.UpdateNotebookStatus(notebookID, "chunked"); err != nil {
+		t.Fatalf("UpdateNotebookStatus failed: %v", err)
+	}
+	if err := testRepo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
+		t.Fatalf("UpdateNotebookStudyStatus failed: %v", err)
+	}
+
+	// Create 10 pages with 600 words each (default 5000 target => ~8-9 pages cutoff)
+	for p := 1; p <= 10; p++ {
+		cID := fmt.Sprintf("chunk-ext-fallback-p%d", p)
+		_, _ = testRepo.db.Exec("INSERT INTO chunks (id, topic_id, page_num, token_count, chunk_text) VALUES (?, ?, ?, 600, 'sample text')", cID, topicID, p)
+		_, _ = testRepo.db.Exec("INSERT INTO notebook_chunks (id, notebook_id, chunk_id, page_num) VALUES (?, ?, ?, ?)", cID+"-nc", notebookID, cID, p)
+	}
+
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, 5000); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook failed: %v", err)
+	}
+
+	tasks, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(tasks) == 0 {
+		t.Fatalf("failed to fetch created task: %v", err)
+	}
+	task := tasks[0]
+
+	// Without chunk_vectors, semantic extension gracefully falls back and creates a valid task bounds
+	if task.StartPage != 1 || task.EndPage < 1 || task.EndPage > 10 {
+		t.Fatalf("unexpected task page bounds fallback: start=%d end=%d", task.StartPage, task.EndPage)
+	}
+}
+
