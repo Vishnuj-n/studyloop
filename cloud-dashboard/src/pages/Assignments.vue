@@ -111,7 +111,7 @@
                     Pages {{ asm.start_page || 1 }}–{{ asm.end_page || 'End' }}
                   </span>
                 </h4>
-                <a :href="asm.download_url" target="_blank" style="font-size: 0.75rem; color: var(--ds-muted); text-decoration: none; word-break: break-all; display: block; margin-bottom: 0.25rem;" :title="asm.download_url">
+                <a :href="asm.download_url" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: var(--ds-muted); text-decoration: none; word-break: break-all; display: block; margin-bottom: 0.25rem;" :title="asm.download_url">
                   {{ asm.download_url }}
                 </a>
                 <div style="font-size: 0.7rem; color: var(--ds-muted); font-family: var(--ds-mono);">Published {{ formatDate(asm.created_at) }}</div>
@@ -148,7 +148,7 @@
             <span>📄 {{ previewTitle }}</span>
             <button class="btn-ghost" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;" @click="previewUrl = null">✕ Close</button>
           </div>
-          <iframe :src="previewUrl" class="modal-pdf" title="PDF Preview"></iframe>
+          <iframe :src="previewUrl" class="modal-pdf" title="PDF Preview" sandbox="allow-scripts allow-same-origin"></iframe>
         </div>
       </div>
     </Teleport>

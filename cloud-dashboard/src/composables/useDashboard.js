@@ -104,69 +104,23 @@ async function signupTeacher(router) {
   }
 
   try {
-    let success = false;
-    if (apiBaseUrl.value) {
-      try {
-        const res = await fetch(`${apiBaseUrl.value}/api/auth/signup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: loginUsername.value.trim(),
-            password: loginPassword.value.trim(),
-            role: 'teacher',
-            classroom_code: loginClassroom.value.trim().toUpperCase()
-          })
-        });
-        if (res.ok) {
-          success = true;
-        } else {
-          const errText = await res.text();
-          let parsed; try { parsed = JSON.parse(errText); } catch(_) {}
-          throw new Error(parsed?.error || parsed?.message || errText);
-        }
-      } catch (e) {
-        if (e.message.includes('already exists') || e.message.includes('Signup error')) throw e;
-        console.warn('Go API server signup unavailable, falling back to direct Supabase REST insert:', e);
-      }
+    if (!apiBaseUrl.value) {
+      throw new Error('Authentication service URL not configured.');
     }
-
-    if (!success && supabaseUrl.value && supabaseKey.value) {
-      const checkUrl = `${supabaseUrl.value}/rest/v1/user_accounts?username=eq.${encodeURIComponent(loginUsername.value.trim())}&select=id`;
-      const cRes = await fetch(checkUrl, {
-        headers: {
-          'apikey': supabaseKey.value,
-          'Authorization': `Bearer ${supabaseKey.value}`
-        }
-      });
-      if (cRes.ok) {
-        const existing = await cRes.json();
-        if (existing && existing.length > 0) {
-          throw new Error('Username already exists');
-        }
-      }
-
-      const res = await fetch(`${supabaseUrl.value}/rest/v1/user_accounts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseKey.value,
-          'Authorization': `Bearer ${supabaseKey.value}`,
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify({
-          username: loginUsername.value.trim(),
-          password_hash: loginPassword.value.trim(),
-          role: 'teacher',
-          classroom_code: loginClassroom.value.trim().toUpperCase()
-        })
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        let parsedErr; try { parsedErr = JSON.parse(errText); } catch (_) {}
-        throw new Error(parsedErr?.message || errText || `Server returned status ${res.status}`);
-      }
-      success = true;
+    const res = await fetch(`${apiBaseUrl.value}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: loginUsername.value.trim(),
+        password: loginPassword.value.trim(),
+        role: 'teacher',
+        classroom_code: loginClassroom.value.trim().toUpperCase()
+      })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      let parsed; try { parsed = JSON.parse(errText); } catch(_) {}
+      throw new Error(parsed?.error || parsed?.message || errText || 'Failed to sign up.');
     }
 
     showToast('Teacher account created successfully! Logging in...');
@@ -191,54 +145,24 @@ async function loginTeacher(router) {
   }
 
   try {
-    let loginData = null;
-    if (apiBaseUrl.value) {
-      try {
-        const res = await fetch(`${apiBaseUrl.value}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: loginUsername.value.trim(),
-            password: loginPassword.value.trim(),
-            is_desktop: false
-          })
-        });
-        if (res.ok) {
-          loginData = await res.json();
-        }
-      } catch (e) {
-        console.warn('Go API server login unavailable, falling back to direct Supabase REST table query:', e);
-      }
+    if (!apiBaseUrl.value) {
+      throw new Error('Authentication service URL not configured.');
     }
-
-    if (!loginData && supabaseUrl.value && supabaseKey.value) {
-      const targetUrl = `${supabaseUrl.value}/rest/v1/user_accounts?username=eq.${encodeURIComponent(loginUsername.value.trim())}&select=*`;
-      const res = await fetch(targetUrl, {
-        headers: {
-          'apikey': supabaseKey.value,
-          'Authorization': `Bearer ${supabaseKey.value}`
-        }
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || `Server returned status ${res.status}`);
-      }
-      const users = await res.json();
-      if (!users || users.length === 0) {
-        throw new Error('Invalid username or password');
-      }
-      const user = users[0];
-      const pwd = user.password_hash || user.password;
-      if (pwd !== loginPassword.value.trim()) {
-        throw new Error('Invalid username or password');
-      }
-      loginData = {
-        role: user.role,
-        session_token: user.id || user.username,
-        classroom_code: user.classroom_code,
-        username: user.username
-      };
+    const res = await fetch(`${apiBaseUrl.value}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: loginUsername.value.trim(),
+        password: loginPassword.value.trim(),
+        is_desktop: false
+      })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      let parsed; try { parsed = JSON.parse(errText); } catch(_) {}
+      throw new Error(parsed?.error || parsed?.message || errText || 'Authentication failed.');
     }
+    const loginData = await res.json();
 
     if (!loginData) {
       throw new Error('Failed to connect to authentication service.');
@@ -442,21 +366,25 @@ async function removeStudent(studentToken) {
   if (!confirm(`Are you sure you want to remove student "${studentToken}" from classroom ${classroomCode.value}?`)) return;
 
   try {
-    await fetch(`${supabaseUrl.value}/rest/v1/student_notebooks?student_token=eq.${encodeURIComponent(studentToken)}&classroom_code=eq.${encodeURIComponent(classroomCode.value)}`, {
+    const res1 = await fetch(`${supabaseUrl.value}/rest/v1/student_notebooks?student_token=eq.${encodeURIComponent(studentToken)}&classroom_code=eq.${encodeURIComponent(classroomCode.value)}`, {
       method: 'DELETE',
       headers: {
         'apikey': supabaseKey.value,
         'Authorization': `Bearer ${supabaseKey.value}`
       }
     });
-    await fetch(`${supabaseUrl.value}/rest/v1/student_review_logs?student_token=eq.${encodeURIComponent(studentToken)}&classroom_code=eq.${encodeURIComponent(classroomCode.value)}`, {
+    if (!res1.ok) throw new Error(`Failed to delete student notebooks (${res1.status})`);
+
+    const res2 = await fetch(`${supabaseUrl.value}/rest/v1/student_review_logs?student_token=eq.${encodeURIComponent(studentToken)}&classroom_code=eq.${encodeURIComponent(classroomCode.value)}`, {
       method: 'DELETE',
       headers: {
         'apikey': supabaseKey.value,
         'Authorization': `Bearer ${supabaseKey.value}`
       }
     });
-    await fetch(`${supabaseUrl.value}/rest/v1/user_accounts?username=eq.${encodeURIComponent(studentToken)}&role=eq.student`, {
+    if (!res2.ok) throw new Error(`Failed to delete student review logs (${res2.status})`);
+
+    const res3 = await fetch(`${supabaseUrl.value}/rest/v1/user_accounts?username=eq.${encodeURIComponent(studentToken)}&role=eq.student`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -465,6 +393,8 @@ async function removeStudent(studentToken) {
       },
       body: JSON.stringify({ classroom_code: '' })
     });
+    if (!res3.ok) throw new Error(`Failed to update student user account (${res3.status})`);
+
     showToast(`Student ${studentToken} removed from classroom.`);
     fetchData();
   } catch (err) {
@@ -607,8 +537,8 @@ async function publishAssignment() {
   if (!newTitle.value.trim() || !newUrl.value.trim()) return;
 
   const trimmedUrl = newUrl.value.trim();
-  if (!trimmedUrl.toLowerCase().startsWith('http://') && !trimmedUrl.toLowerCase().startsWith('https://')) {
-    error.value = 'Failed to publish assignment: URL must use http or https scheme.';
+  if (!trimmedUrl.toLowerCase().startsWith('https://')) {
+    error.value = 'Failed to publish assignment: URL must use secure https scheme.';
     return;
   }
 

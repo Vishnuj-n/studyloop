@@ -54,13 +54,9 @@ DROP POLICY IF EXISTS "No direct client access to active_sessions" ON public.act
 CREATE POLICY "No direct client access to active_sessions" ON public.active_sessions FOR ALL USING (false);
 DROP POLICY IF EXISTS "No direct client access to user_accounts" ON public.user_accounts;
 DROP POLICY IF EXISTS "Allow REST access user_accounts" ON public.user_accounts;
-CREATE POLICY "Allow REST access user_accounts" ON public.user_accounts FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow REST access student_notebooks" ON public.student_notebooks;
-CREATE POLICY "Allow REST access student_notebooks" ON public.student_notebooks FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow REST access student_review_logs" ON public.student_review_logs;
-CREATE POLICY "Allow REST access student_review_logs" ON public.student_review_logs FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Allow REST access teacher_assignments" ON public.teacher_assignments;
-CREATE POLICY "Allow REST access teacher_assignments" ON public.teacher_assignments FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "No direct client access to teacher_signup_invites" ON public.teacher_signup_invites;
 CREATE POLICY "No direct client access to teacher_signup_invites" ON public.teacher_signup_invites FOR ALL USING (false);
 
@@ -70,8 +66,14 @@ ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, allow
 
 DROP POLICY IF EXISTS "Teacher PDF Upload Policy" ON storage.objects;
 DROP POLICY IF EXISTS "Allow Public Upload to Assignments Bucket" ON storage.objects;
-CREATE POLICY "Allow Public Upload to Assignments Bucket" ON storage.objects FOR INSERT TO public
-WITH CHECK (bucket_id = 'assignments');
+CREATE POLICY "Teacher PDF Upload Policy" ON storage.objects FOR INSERT TO authenticated, anon
+WITH CHECK (
+  bucket_id = 'assignments' AND
+  EXISTS (
+    SELECT 1 FROM public.active_sessions s JOIN public.user_accounts u ON LOWER(u.username) = LOWER(s.entity_id)
+    WHERE s.session_token = get_current_session_token() AND s.expires_at > now() AND s.role = 'teacher' AND LOWER(u.classroom_code) = LOWER((storage.foldername(name))[1])
+  )
+);
 
 DROP POLICY IF EXISTS "Public Read Assignments Policy" ON storage.objects;
 CREATE POLICY "Public Read Assignments Policy" ON storage.objects FOR SELECT TO public USING (bucket_id = 'assignments');

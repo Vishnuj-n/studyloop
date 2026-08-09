@@ -54,13 +54,14 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.user_accounts WHERE LOWER(username) = LOWER(p_username)) THEN RAISE EXCEPTION 'Username is already registered'; END IF;
 
   IF p_role = 'teacher' THEN
-    IF EXISTS (
+    IF NOT EXISTS (
       SELECT 1 FROM public.teacher_signup_invites
       WHERE classroom_code = UPPER(p_classroom_code) AND LOWER(invite_email_or_username) = LOWER(p_username) AND is_used = FALSE
     ) THEN
-      UPDATE public.teacher_signup_invites SET is_used = TRUE
-      WHERE classroom_code = UPPER(p_classroom_code) AND LOWER(invite_email_or_username) = LOWER(p_username);
+      RAISE EXCEPTION 'No valid unused invite found for this teacher username and classroom code';
     END IF;
+    UPDATE public.teacher_signup_invites SET is_used = TRUE
+    WHERE classroom_code = UPPER(p_classroom_code) AND LOWER(invite_email_or_username) = LOWER(p_username);
   ELSIF p_role = 'student' THEN
     IF NOT EXISTS (SELECT 1 FROM public.user_accounts WHERE classroom_code = UPPER(p_classroom_code) AND role = 'teacher') THEN
       RAISE EXCEPTION 'Classroom code must belong to an existing registered teacher';

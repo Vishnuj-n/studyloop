@@ -37,7 +37,7 @@ BEGIN
       INSERT INTO student_notebooks (
         student_token, classroom_code, file_hash, filename, title, study_status, external_help_required, updated_at
       ) VALUES (
-        v_student_username, p_classroom_code, nb_record.file_hash, nb_record.filename, nb_record.title, nb_record.study_status, COALESCE(nb_record.external_help_required, FALSE), now()
+        v_student_username, UPPER(p_classroom_code), nb_record.file_hash, nb_record.filename, nb_record.title, nb_record.study_status, COALESCE(nb_record.external_help_required, FALSE), now()
       ) ON CONFLICT (student_token, file_hash) DO UPDATE SET
         classroom_code = EXCLUDED.classroom_code, filename = EXCLUDED.filename, title = EXCLUDED.title, study_status = EXCLUDED.study_status, external_help_required = EXCLUDED.external_help_required, updated_at = now();
     END LOOP;
@@ -50,7 +50,7 @@ BEGIN
       INSERT INTO student_review_logs (
         id, student_token, classroom_code, file_hash, page_number, activity_type, reference_id, reviewed_at, rating, scheduled_days, state_before_json, state_after_json
       ) VALUES (
-        log_record.id, v_student_username, p_classroom_code, log_record.file_hash, log_record.page_number, log_record.activity_type, log_record.reference_id, log_record.reviewed_at, log_record.rating, log_record.scheduled_days, log_record.state_before_json, log_record.state_after_json
+        log_record.id, v_student_username, UPPER(p_classroom_code), log_record.file_hash, log_record.page_number, log_record.activity_type, log_record.reference_id, log_record.reviewed_at, log_record.rating, log_record.scheduled_days, log_record.state_before_json, log_record.state_after_json
       ) ON CONFLICT (id) DO NOTHING;
     END LOOP;
   END IF;
@@ -58,7 +58,7 @@ BEGIN
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
     'id', id, 'title', title, 'download_url', download_url, 'start_page', start_page, 'end_page', end_page
   )), '[]'::jsonb) INTO ret_notebooks
-  FROM teacher_assignments WHERE classroom_code = p_classroom_code;
+  FROM teacher_assignments WHERE UPPER(classroom_code) = UPPER(p_classroom_code);
 
   RETURN jsonb_build_object('new_notebooks', ret_notebooks);
 END;
@@ -87,17 +87,17 @@ begin
 
     with student_nbs as (
         select student_token, json_agg(n order by updated_at desc) as notebooks, count(*) filter (where external_help_required = true) as alerts_count, max(extract(epoch from updated_at) * 1000) as max_nb_update
-        from student_notebooks n where classroom_code = p_classroom_code group by student_token
+        from student_notebooks n where UPPER(classroom_code) = UPPER(p_classroom_code) group by student_token
     ),
     student_logs as (
         select student_token, json_agg(l order by reviewed_at desc) as logs, max(reviewed_at * 1000) as max_log_update
-        from student_review_logs l where classroom_code = p_classroom_code group by student_token
+        from student_review_logs l where UPPER(classroom_code) = UPPER(p_classroom_code) group by student_token
     ),
     all_students as (
         select distinct student_token from (
-            select student_token from student_notebooks where classroom_code = p_classroom_code
+            select student_token from student_notebooks where UPPER(classroom_code) = UPPER(p_classroom_code)
             union
-            select student_token from student_review_logs where classroom_code = p_classroom_code
+            select student_token from student_review_logs where UPPER(classroom_code) = UPPER(p_classroom_code)
         ) s
     ),
     rolled_up as (

@@ -377,11 +377,12 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			FROM study_profiles
 			WHERE id = ?
 		`, s.ActiveProfileID).Scan(&profClassroom, &profUser, &profToken)
-		if err == nil {
-			s.ClassroomCode = profClassroom.String
-			s.StudentUsername = profUser.String
-			s.CloudAPIToken = profToken.String
+		if err != nil {
+			return nil, fmt.Errorf("failed to query active profile credentials: %w", err)
 		}
+		s.ClassroomCode = profClassroom.String
+		s.StudentUsername = profUser.String
+		s.CloudAPIToken = profToken.String
 	}
 
 	return &s, nil
@@ -696,9 +697,9 @@ func (r *Repository) CreateProfile(p models.StudyProfile) error {
 func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 	_, err := r.db.Exec(`
 		UPDATE study_profiles
-		SET name = ?, deadline_at = ?, classroom_code = ?, student_username = ?, cloud_api_token = ?
+		SET name = ?, deadline_at = ?
 		WHERE id = ?
-	`, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken, p.ID)
+	`, p.Name, p.DeadlineAt, p.ID)
 	return err
 }
 

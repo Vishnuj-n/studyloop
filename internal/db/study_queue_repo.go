@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -1468,7 +1469,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			NotebookID: notebookID,
 		}
 
-		startPage, endPage, ok, _ := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
+		startPage, endPage, ok, tokenMap := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
 			query := `
 				SELECT page_num, COALESCE(token_count, 0), COALESCE(chunk_text, '')
 				FROM chunks
@@ -1481,35 +1482,34 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			}
 			defer func() { _ = rows.Close() }()
 
-			tokenMap := make(map[int]int)
+			tMap := make(map[int]int)
 			for rows.Next() {
 				var pNum, tCount int
 				var cText string
 				if sErr := rows.Scan(&pNum, &tCount, &cText); sErr == nil {
 					if tCount <= 0 {
-						tCount = len(cText) / 4
+						tCount = utf8.RuneCountInString(cText) / 4
 					}
-					tokenMap[pNum] += tCount
+					tMap[pNum] += tCount
 				}
 			}
 			if rErr := rows.Err(); rErr != nil {
 				return nil, rErr
 			}
-			return tokenMap, nil
+			return tMap, nil
 		})
 
 		if !ok {
 			startPage = topicStartPage
 			endPage = topicEndPage
 		} else {
-			// Calculate current total word count for startPage..endPage
+			// Calculate current total word count for startPage..endPage using tokenMap
 			var currentWords int
 			for p := startPage; p <= endPage; p++ {
-				var pWords int
-				_ = tx.QueryRow(`
-					SELECT COALESCE(SUM(CASE WHEN token_count > 0 THEN token_count ELSE LENGTH(chunk_text)/4 END), 0)
-					FROM chunks WHERE topic_id = ? AND page_num = ?
-				`, topicID, p).Scan(&pWords)
+				pWords := tokenMap[p]
+				if pWords <= 0 {
+					pWords = FallbackWordsPerPage
+				}
 				currentWords += pWords
 			}
 
@@ -1527,12 +1527,11 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 					break
 				}
 
-				// Get word count for nextPage
-				var nextPageWords int
-				_ = tx.QueryRow(`
-					SELECT COALESCE(SUM(CASE WHEN token_count > 0 THEN token_count ELSE LENGTH(chunk_text)/4 END), 0)
-					FROM chunks WHERE topic_id = ? AND page_num = ?
-				`, topicID, nextPage).Scan(&nextPageWords)
+				// Get word count for nextPage from tokenMap
+				nextPageWords := tokenMap[nextPage]
+				if nextPageWords <= 0 {
+					nextPageWords = FallbackWordsPerPage
+				}
 
 				if currentWords+nextPageWords > maxTotalWords {
 					stopReason = "word_limit"

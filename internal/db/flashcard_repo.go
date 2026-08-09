@@ -195,21 +195,7 @@ func (r *Repository) UpdateFlashcardReviewTx(tx *sql.Tx, cardID string, dueAt in
 		return err
 	}
 	if rows != 1 {
-		result, err = tx.Exec(`
-			UPDATE fsrs_cards
-			SET state_json = ?, due_at = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?
-		`, string(stateJSON), dueAt, cardID)
-		if err != nil {
-			return err
-		}
-		rows, err = result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows != 1 {
-			return fmt.Errorf("flashcard %s was modified concurrently", cardID)
-		}
+		return fmt.Errorf("flashcard %s was modified concurrently", cardID)
 	}
 
 	var validatedTopicID string
@@ -514,8 +500,19 @@ func (r *Repository) SuspendFlashcardTx(tx *sql.Tx, cardID string) error {
 	return nil
 }
 
-func (r *Repository) MakeAllFlashcardsDueNow() (int64, error) {
-	res, err := r.db.Exec(`UPDATE fsrs_cards SET due_at = ? WHERE suspended = 0`, time.Now().Unix()-3600)
+func (r *Repository) MakeAllFlashcardsDueNow(profileID string) (int64, error) {
+	query := `UPDATE fsrs_cards SET due_at = ? WHERE suspended = 0`
+	args := []interface{}{time.Now().Unix() - 3600}
+	if profileID != "" {
+		query += ` AND topic_id IN (
+			SELECT nt.topic_id
+			FROM notebook_topics nt
+			JOIN notebooks n ON n.id = nt.notebook_id
+			WHERE n.profile_id = ?
+		)`
+		args = append(args, profileID)
+	}
+	res, err := r.db.Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}

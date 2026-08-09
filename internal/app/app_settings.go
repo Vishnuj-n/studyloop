@@ -507,6 +507,8 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 		}
 	}
 
+
+
 	// 2. Fallback: query Supabase REST user_accounts table directly if cloud server unreachable
 	if !authenticated {
 		tableURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=*", baseURL, url.QueryEscape(username))

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -358,7 +359,13 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 		utils.Warnf("[SYNC] Failed to create notebook directory: %v", err)
 		return err
 	}
-	localPath := filepath.Join(dataDir, nb.ID+".pdf")
+	validIDRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+	cleanID := strings.TrimSpace(nb.ID)
+	if !validIDRegex.MatchString(cleanID) || filepath.Base(cleanID) != cleanID {
+		return fmt.Errorf("invalid notebook assignment identifier: %q", nb.ID)
+	}
+
+	localPath := filepath.Join(dataDir, cleanID+".pdf")
 
 	// 2. Download from remote URL
 	utils.Warnf("[SYNC] Downloading PDF from URL: %s", nb.DownloadURL)

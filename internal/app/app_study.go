@@ -1252,7 +1252,8 @@ func (a *App) ForceDueFlashcardsNow() map[string]interface{} {
 	if errMap != nil {
 		return errMap
 	}
-	updated, err := repo.MakeAllFlashcardsDueNow()
+	profileID, _ := repo.GetActiveProfileID()
+	updated, err := repo.MakeAllFlashcardsDueNow(profileID)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
