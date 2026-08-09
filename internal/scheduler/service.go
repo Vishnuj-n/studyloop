@@ -245,14 +245,6 @@ func (s *service) BuildTodayPlan(now time.Time) (*models.TodayPlan, error) {
 	}, nil
 }
 
-func ResolvePageWindow(
-	topic models.ReadingTopicCursor,
-	tokenBudget int,
-	queryTokensPerPageMap queryTokensPerPageMapFn,
-) (int, int, bool, map[int]int) {
-	return db.ResolvePageWindow(topic, tokenBudget, queryTokensPerPageMap)
-}
-
 // estimateTaskMinutes calculates realistic workload using token counts.
 // Accepts optional pre-fetched tokenMap to avoid redundant DB queries.
 func (s *service) estimateTaskMinutes(

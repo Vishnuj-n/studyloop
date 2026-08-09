@@ -1485,6 +1485,9 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 					tokenMap[pNum] += tCount
 				}
 			}
+			if rErr := rows.Err(); rErr != nil {
+				return nil, rErr
+			}
 			return tokenMap, nil
 		})
 
@@ -1505,13 +1508,15 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 
 			// Semantic extension: check up to +3 additional pages
 			const maxExtensionPages = 3
-			const maxTotalWords = 6500
 			const minSimilarityThreshold = 0.85
+			maxTotalWords := targetSessionWords + int(float64(targetSessionWords)*0.3)
 
 			baseEndPage := endPage
+			stopReason := "max_pages"
 			for ext := 1; ext <= maxExtensionPages; ext++ {
 				nextPage := endPage + 1
 				if nextPage > topicEndPage {
+					stopReason = "topic_end"
 					break
 				}
 
@@ -1523,11 +1528,17 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 				`, topicID, nextPage).Scan(&nextPageWords)
 
 				if currentWords+nextPageWords > maxTotalWords {
+					stopReason = "word_limit"
 					break
 				}
 
 				sim, simErr := r.GetPageBoundaryCosineSimilarityTx(tx, topicID, endPage, nextPage)
-				if simErr != nil || sim < minSimilarityThreshold {
+				if simErr != nil {
+					stopReason = "query_err"
+					break
+				}
+				if sim < minSimilarityThreshold {
+					stopReason = fmt.Sprintf("similarity_low(%.2f)", sim)
 					break
 				}
 
@@ -1537,7 +1548,9 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			}
 
 			if endPage > baseEndPage {
-				utils.Infof("[SEMANTIC_EXTENSION] Absorbed %d extra page(s) into reading task for topicID=%q (baseEnd=%d -> extendedEnd=%d, totalWords=%d)", endPage-baseEndPage, topicID, baseEndPage, endPage, currentWords)
+				utils.Infof("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, stopReason)
+			} else {
+				utils.Infof("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d reason=%s", topicID, baseEndPage, currentWords, stopReason)
 			}
 		}
 
