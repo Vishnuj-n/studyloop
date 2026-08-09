@@ -18,6 +18,7 @@ import (
 	"ai-tutor/internal/utils"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func (a *App) GetUserSettings() map[string]interface{} {
@@ -509,7 +510,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 
 	// 2. Fallback: query Supabase REST user_accounts table directly if cloud server unreachable
 	if !authenticated {
-		tableURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=*", baseURL, url.QueryEscape(username))
+		tableURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=ilike.%s&select=*", baseURL, url.QueryEscape(username))
 		req, err := http.NewRequest("GET", tableURL, nil)
 		if err == nil {
 			if anonKey != "" {
@@ -533,7 +534,13 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 							if pwd == "" {
 								pwd, _ = user["password"].(string)
 							}
-							if pwd == password {
+							var match bool
+							if strings.HasPrefix(pwd, "$2a$") || strings.HasPrefix(pwd, "$2b$") || strings.HasPrefix(pwd, "$2y$") {
+								match = bcrypt.CompareHashAndPassword([]byte(pwd), []byte(password)) == nil
+							} else if pwd != "" {
+								match = (pwd == password)
+							}
+							if match {
 								role, _ := user["role"].(string)
 								classCode, _ := user["classroom_code"].(string)
 								uname, _ := user["username"].(string)

@@ -66,7 +66,25 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		allowed := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if allowed != "" && origin != "" {
+			origins := strings.Split(allowed, ",")
+			matched := false
+			for _, o := range origins {
+				if strings.EqualFold(strings.TrimSpace(o), strings.TrimSpace(origin)) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else {
+				w.Header().Set("Access-Control-Allow-Origin", origins[0])
+			}
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, apikey, x-session-token, X-Session-Token")
 
@@ -76,6 +94,91 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func extractSessionToken(r *http.Request) string {
+	tok := r.Header.Get("x-session-token")
+	if tok == "" {
+		tok = r.Header.Get("X-Session-Token")
+	}
+	if tok == "" {
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tok = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+	return strings.TrimSpace(tok)
+}
+
+func validateSession(r *http.Request, reqClassroomCode string, requiredRole string) bool {
+	token := extractSessionToken(r)
+	if token == "" || supabaseURL == "" || supabaseKey == "" {
+		return false
+	}
+
+	sessURL := fmt.Sprintf("%s/rest/v1/active_sessions?session_token=eq.%s&select=entity_id,role,expires_at", supabaseURL, url.QueryEscape(token))
+	sReq, err := http.NewRequest(http.MethodGet, sessURL, nil)
+	if err != nil {
+		return false
+	}
+	sReq.Header.Set("apikey", supabaseKey)
+	sReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+
+	sRes, err := httpClient.Do(sReq)
+	if err != nil || sRes.StatusCode != http.StatusOK {
+		return false
+	}
+	defer sRes.Body.Close()
+
+	sBody, _ := io.ReadAll(sRes.Body)
+	var sessions []map[string]interface{}
+	if json.Unmarshal(sBody, &sessions) != nil || len(sessions) == 0 {
+		return false
+	}
+
+	sess := sessions[0]
+	role, _ := sess["role"].(string)
+	if requiredRole != "" && !strings.EqualFold(role, requiredRole) {
+		return false
+	}
+
+	if expStr, ok := sess["expires_at"].(string); ok && expStr != "" {
+		if t, err := time.Parse(time.RFC3339, expStr); err == nil && time.Now().After(t) {
+			return false
+		}
+	}
+
+	entityID, _ := sess["entity_id"].(string)
+	if entityID == "" {
+		return false
+	}
+
+	userURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=ilike.%s&select=classroom_code", supabaseURL, url.QueryEscape(entityID))
+	uReq, err := http.NewRequest(http.MethodGet, userURL, nil)
+	if err != nil {
+		return false
+	}
+	uReq.Header.Set("apikey", supabaseKey)
+	uReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+
+	uRes, err := httpClient.Do(uReq)
+	if err != nil || uRes.StatusCode != http.StatusOK {
+		return false
+	}
+	defer uRes.Body.Close()
+
+	uBody, _ := io.ReadAll(uRes.Body)
+	var users []map[string]interface{}
+	if json.Unmarshal(uBody, &users) != nil || len(users) == 0 {
+		return false
+	}
+
+	userClassCode, _ := users[0]["classroom_code"].(string)
+	if reqClassroomCode != "" && !strings.EqualFold(strings.TrimSpace(userClassCode), strings.TrimSpace(reqClassroomCode)) {
+		return false
+	}
+
+	return true
 }
 
 func jsonResponse(w http.ResponseWriter, status int, payload interface{}) {
