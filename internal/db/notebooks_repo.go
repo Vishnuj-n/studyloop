@@ -38,6 +38,17 @@ func (r *Repository) SetNotebookFileHash(notebookID, fileHash string) error {
 	return err
 }
 
+// UpdateNotebookFilePath updates the stored file path of a notebook.
+func (r *Repository) UpdateNotebookFilePath(notebookID, filePath string) error {
+	notebookID = strings.TrimSpace(notebookID)
+	filePath = strings.TrimSpace(filePath)
+	if notebookID == "" || filePath == "" {
+		return fmt.Errorf("notebook id and file path are required")
+	}
+	_, err := r.db.Exec(`UPDATE notebooks SET file_path = ? WHERE id = ?`, filePath, notebookID)
+	return err
+}
+
 // NotebookChunkInput is a chunk row used by notebook ingestion transactions.
 type NotebookChunkInput struct {
 	ID         string
