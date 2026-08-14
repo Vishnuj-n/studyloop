@@ -162,6 +162,18 @@ def check_redundant_css(file_path):
         for suffix in ["-enter-active", "-leave-active", "-enter-from", "-leave-to", "-enter-to", "-leave-from"]:
             all_tokens.add(t_name + suffix)
 
+    # Extract dynamic class prefixes (e.g. `banner--${...}` or `'banner--' + ...`)
+    dynamic_prefixes = set()
+    # 1. Backtick template literals: `something--${...}` or `something-${...}`
+    for prefix in re.findall(r'`([a-zA-Z0-9_-]+-)\$\{', template_content + script_content):
+        dynamic_prefixes.add(prefix)
+    # 2. Single/double quoted concat: 'something--' + ... or "something-" + ...
+    for prefix in re.findall(r'["\']([a-zA-Z0-9_-]+-)["\']\s*\+', template_content + script_content):
+        dynamic_prefixes.add(prefix)
+    # 3. Dynamic classes in array syntax: e.g. `banner--${variant}` inside quotes
+    for prefix in re.findall(r'["\']([a-zA-Z0-9_-]+-)\$\{[^"\'`}]+\}["\']', template_content + script_content):
+        dynamic_prefixes.add(prefix)
+
     tag_tokens = set(re.findall(r'<([a-zA-Z0-9-]+)', template_content))
 
     redundant_selectors = []
@@ -189,7 +201,7 @@ def check_redundant_css(file_path):
                 is_used = False
                 
                 if classes:
-                    if any(cls in all_tokens for cls in classes):
+                    if any(cls in all_tokens or any(cls.startswith(p) for p in dynamic_prefixes) for cls in classes):
                         is_used = True
                 
                 if ids:

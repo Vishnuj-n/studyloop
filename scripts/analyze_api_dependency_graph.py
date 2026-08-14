@@ -83,7 +83,7 @@ def find_js_usages(frontend_dir, api_js_path, js_functions):
                     
     return usages
 
-def parse_go_definitions(go_dir):
+def parse_go_definitions(go_dir, project_root):
     """
     Scans Go codebase to collect:
     1. App methods (bound to Wails)
@@ -95,52 +95,63 @@ def parse_go_definitions(go_dir):
     app_methods = set()
     other_funcs = {}
     
+    go_files = []
+    # Walk internal/go_dir
     for root, _, files in os.walk(go_dir):
         for file in files:
             if EXCLUDE_GO_TEST.search(file) or not file.endswith(".go"):
                 continue
             filepath = os.path.join(root, file)
-            rel_path = os.path.relpath(filepath, go_dir)
+            go_files.append(filepath)
             
-            try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                    for line_num, line in enumerate(f, 1):
-                        # 1. Check App methods
-                        app_match = GO_APP_METHOD.search(line)
-                        if app_match:
-                            app_methods.add(app_match.group(1))
-                            continue
-                            
-                        # 2. Check other struct methods
-                        method_match = GO_METHOD.search(line)
-                        if method_match:
-                            recv = method_match.group(1)
-                            name = method_match.group(2)
-                            other_funcs[name] = {
-                                "type": "method",
-                                "receiver": recv,
-                                "file": f"{rel_path}:{line_num}"
-                            }
-                            continue
-                            
-                        # 3. Check plain functions
-                        func_match = GO_FUNC.search(line)
-                        if func_match:
-                            name = func_match.group(1)
-                            # Ignore main or common reserved words
-                            if name in ("main", "init"):
-                                continue
-                            other_funcs[name] = {
-                                "type": "function",
-                                "receiver": None,
-                                "file": f"{rel_path}:{line_num}"
-                            }
-            except Exception as e:
-                print(f"Error reading Go file {filepath}: {e}", file=sys.stderr)
+    # Include go files directly in project_root (such as main.go)
+    for file in os.listdir(project_root):
+        if file.endswith(".go") and not EXCLUDE_GO_TEST.search(file):
+            filepath = os.path.join(project_root, file)
+            if os.path.isfile(filepath):
+                go_files.append(filepath)
                 
+    for filepath in go_files:
+        rel_path = os.path.relpath(filepath, project_root)
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                for line_num, line in enumerate(f, 1):
+                    # 1. Check App methods
+                    app_match = GO_APP_METHOD.search(line)
+                    if app_match:
+                        app_methods.add(app_match.group(1))
+                        continue
+                        
+                    # 2. Check other struct methods
+                    method_match = GO_METHOD.search(line)
+                    if method_match:
+                        recv = method_match.group(1)
+                        name = method_match.group(2)
+                        other_funcs[name] = {
+                            "type": "method",
+                            "receiver": recv,
+                            "file": f"{rel_path}:{line_num}"
+                        }
+                        continue
+                        
+                    # 3. Check plain functions
+                    func_match = GO_FUNC.search(line)
+                    if func_match:
+                        name = func_match.group(1)
+                        # Ignore common reserved words (keep main)
+                        if name == "init":
+                            continue
+                        other_funcs[name] = {
+                            "type": "function",
+                            "receiver": None,
+                            "file": f"{rel_path}:{line_num}"
+                        }
+        except Exception as e:
+            print(f"Error reading Go file {filepath}: {e}", file=sys.stderr)
+            
     return app_methods, other_funcs
 
-def build_go_call_graph(go_dir, all_go_funcs):
+def build_go_call_graph(go_dir, all_go_funcs, project_root):
     """
     Builds an adjacency list representation of Go function calls:
     caller -> set(callees)
@@ -154,40 +165,52 @@ def build_go_call_graph(go_dir, all_go_funcs):
         filename = info["file"].split(":")[0]
         file_to_funcs.setdefault(filename, []).append(func_name)
         
+    # Gather all Go files to scan
+    go_files = []
+    # 1. Walk go_dir
     for root, _, files in os.walk(go_dir):
         for file in files:
             if EXCLUDE_GO_TEST.search(file) or not file.endswith(".go"):
                 continue
             filepath = os.path.join(root, file)
-            rel_path = os.path.relpath(filepath, go_dir)
+            rel_path = os.path.relpath(filepath, project_root)
+            go_files.append((filepath, rel_path))
             
-            try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
+    # 2. Add files directly in project_root
+    for file in os.listdir(project_root):
+        if file.endswith(".go") and not EXCLUDE_GO_TEST.search(file):
+            filepath = os.path.join(project_root, file)
+            if os.path.isfile(filepath):
+                rel_path = os.path.relpath(filepath, project_root)
+                go_files.append((filepath, rel_path))
                 
-                # Simple approximation: if a function name is referenced in the file,
-                # any caller defined in this file might call it.
-                # To make this better, we'll map references by scanning.
-                for target_func in func_names:
-                    # Don't count the definition itself as a call
-                    def_file = all_go_funcs[target_func]["file"].split(":")[0]
-                    
-                    # Look for references of target_func in content
-                    matches = list(re.finditer(r"\b" + re.escape(target_func) + r"\b", content))
-                    
-                    # We subtract 1 match if this file contains the definition
-                    expected_matches = 1 if rel_path == def_file else 0
-                    if len(matches) > expected_matches:
-                        # File references target_func. Let's find who the callers are.
-                        # For simplicity, we attribute references in this file to the Go methods/functions
-                        # defined within this file.
-                        callers = file_to_funcs.get(rel_path, [])
-                        for caller in callers:
-                            if caller != target_func:
-                                call_graph.setdefault(caller, set()).add(target_func)
-            except Exception as e:
-                pass
+    for filepath, rel_path in go_files:
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            
+            # Find all word tokens in the file to quickly filter matches
+            words = set(re.findall(r"\b[a-zA-Z0-9_]+\b", content))
+            
+            # Intersect with all defined function names
+            matching_funcs = func_names.intersection(words)
+            
+            for target_func in matching_funcs:
+                # Don't count the definition itself as a call
+                def_file = all_go_funcs[target_func]["file"].split(":")[0]
                 
+                # Check how many times target_func is referenced
+                matches_count = len(re.findall(r"\b" + re.escape(target_func) + r"\b", content))
+                expected_matches = 1 if rel_path == def_file else 0
+                
+                if matches_count > expected_matches:
+                    callers = file_to_funcs.get(rel_path, [])
+                    for caller in callers:
+                        if caller != target_func:
+                            call_graph.setdefault(caller, set()).add(target_func)
+        except Exception as e:
+            pass
+            
     return call_graph
 
 def main():
@@ -213,7 +236,7 @@ def main():
     js_usages = find_js_usages(frontend_dir, api_js_path, api_mappings.keys())
     
     print("Step 3: Parsing Go definitions...")
-    app_methods, other_go_funcs = parse_go_definitions(go_dir)
+    app_methods, other_go_funcs = parse_go_definitions(go_dir, project_root)
     
     # Classify App receiver methods:
     # - Wails Lifecycle: Startup, Shutdown, DomReady (exported, but system-called)
@@ -244,11 +267,12 @@ def main():
     all_go_funcs.update(other_go_funcs)
     
     print("Step 4: Building Go Call Graph...")
-    call_graph = build_go_call_graph(go_dir, all_go_funcs)
+    call_graph = build_go_call_graph(go_dir, all_go_funcs, project_root)
     
     # Trace reachability starting from:
     # 1. Active frontend-invoked Wails APIs
     # 2. Wails lifecycle entry points (Startup, Shutdown, DomReady)
+    # 3. Application main entry point
     active_js_funcs = [js_f for js_f, count in js_usages.items() if count > 0]
     active_app_methods = set()
     for js_f in active_js_funcs:
@@ -256,8 +280,11 @@ def main():
         if go_m and go_m in wails_api_methods:
             active_app_methods.add(go_m)
             
-    # Start tracing from active frontend APIs + lifecycle methods
+    # Start tracing from active frontend APIs + lifecycle methods + main
     entry_points = active_app_methods.union(wails_lifecycle_methods)
+    if "main" in all_go_funcs:
+        entry_points.add("main")
+        
     reachable = set(entry_points)
     queue = list(entry_points)
     
@@ -292,11 +319,11 @@ def main():
     # Section 2: Wails Go App Methods (Exported Only)
     lines.append("## 2. Go Wails `App` API Endpoints")
     lines.append("Lists exported API endpoints defined on `App` in the backend and whether they are invoked by `appApi.js` (excluding standard Wails lifecycle methods).")
-    lines.append("| Wails Method | Reachable from Frontend |")
+    lines.append("| Wails Method | Reachable from Frontend or main.go |")
     lines.append("| --- | --- |")
     
     for m in sorted(wails_api_methods):
-        status = "✅ Yes" if m in active_app_methods else "❌ No (Unused API)"
+        status = "✅ Yes" if m in reachable else "❌ No (Unused API)"
         lines.append(f"| `{m}` | {status} |")
     lines.append("")
     
@@ -308,8 +335,8 @@ def main():
     
     unreachable_count = 0
     for name, info in sorted(all_go_funcs.items()):
-        # Wails API endpoints and Wails lifecycle methods are reported in Section 2, or are top-level entry points.
-        if info["type"] in ("WailsAPI", "WailsLifecycle"):
+        # Wails API endpoints, Wails lifecycle methods, and main are entry points
+        if info["type"] in ("WailsAPI", "WailsLifecycle") or name == "main":
             continue
         if name not in reachable:
             unreachable_count += 1
