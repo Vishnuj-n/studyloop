@@ -9,8 +9,8 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-// CreateNotebook saves a notebook record to the database
-func (r *Repository) CreateNotebook(id, title, filePath, fileType, topicID, fileHash string, pageCount int) error {
+// CreateNotebook saves a notebook record to the database with optional profile association.
+func (r *Repository) CreateNotebook(id, title, filePath, fileType, topicID, fileHash string, pageCount int, profileID string) error {
 	var topicValue interface{}
 	if topicID != "" {
 		validatedTopicID, err := validateID(topicID, "topic id")
@@ -25,11 +25,18 @@ func (r *Repository) CreateNotebook(id, title, filePath, fileType, topicID, file
 		return err
 	}
 
-	_, err = r.db.Exec(`
-		INSERT INTO notebooks (id, title, file_path, file_type, topic_id, file_hash, status, indexing_status, page_count)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, validatedID, title, filePath, fileType, topicValue, fileHash, "uploaded", "PENDING", pageCount)
-	return err
+	var pID interface{} = nil
+	if profileID != "" {
+		pID = profileID
+	}
+
+	return r.withTx(func(tx *sql.Tx) error {
+		_, err := tx.Exec(`
+			INSERT INTO notebooks (id, title, file_path, file_type, topic_id, file_hash, status, indexing_status, page_count, profile_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, validatedID, title, filePath, fileType, topicValue, fileHash, "uploaded", "PENDING", pageCount, pID)
+		return err
+	})
 }
 
 // SetNotebookFileHash stores the SHA-256 hash of a notebook's file content.

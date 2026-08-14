@@ -1469,7 +1469,8 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			NotebookID: notebookID,
 		}
 
-		startPage, endPage, ok, tokenMap := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
+		var queryErr error
+		startPage, endPage, ok, wordMap := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
 			query := `
 				SELECT page_num, COALESCE(token_count, 0), COALESCE(chunk_text, '')
 				FROM chunks
@@ -1478,11 +1479,12 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			`
 			rows, qErr := tx.Query(query, tID, sp, ep)
 			if qErr != nil {
+				queryErr = qErr
 				return nil, qErr
 			}
 			defer func() { _ = rows.Close() }()
 
-			tMap := make(map[int]int)
+			wMap := make(map[int]int)
 			for rows.Next() {
 				var pNum, tCount int
 				var cText string
@@ -1490,23 +1492,27 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 					if tCount <= 0 {
 						tCount = utf8.RuneCountInString(cText) / 4
 					}
-					tMap[pNum] += tCount
+					wMap[pNum] += tCount
 				}
 			}
 			if rErr := rows.Err(); rErr != nil {
+				queryErr = rErr
 				return nil, rErr
 			}
-			return tMap, nil
+			return wMap, nil
 		})
+		if queryErr != nil {
+			return queryErr
+		}
 
 		if !ok {
 			startPage = topicStartPage
 			endPage = topicEndPage
 		} else {
-			// Calculate current total word count for startPage..endPage using tokenMap
+			// Calculate current total word count for startPage..endPage using wordMap
 			var currentWords int
 			for p := startPage; p <= endPage; p++ {
-				pWords := tokenMap[p]
+				pWords := wordMap[p]
 				if pWords <= 0 {
 					pWords = FallbackWordsPerPage
 				}
@@ -1527,8 +1533,8 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 					break
 				}
 
-				// Get word count for nextPage from tokenMap
-				nextPageWords := tokenMap[nextPage]
+				// Get word count for nextPage from wordMap
+				nextPageWords := wordMap[nextPage]
 				if nextPageWords <= 0 {
 					nextPageWords = FallbackWordsPerPage
 				}

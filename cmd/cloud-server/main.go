@@ -99,9 +99,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 func extractSessionToken(r *http.Request) string {
 	tok := r.Header.Get("x-session-token")
 	if tok == "" {
-		tok = r.Header.Get("X-Session-Token")
-	}
-	if tok == "" {
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			tok = strings.TrimPrefix(authHeader, "Bearer ")
@@ -367,7 +364,7 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if username already exists
-	checkURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=id", supabaseURL, req.Username)
+	checkURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=id", supabaseURL, url.QueryEscape(req.Username))
 	cReq, _ := http.NewRequest(http.MethodGet, checkURL, nil)
 	cReq.Header.Set("apikey", supabaseKey)
 	cReq.Header.Set("Authorization", "Bearer "+supabaseKey)
@@ -496,7 +493,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Fetching dashboard natively for classroom: %s", classroomCode)
 
 	// 1. Fetch registered student accounts for classroom
-	userURL := fmt.Sprintf("%s/rest/v1/user_accounts?classroom_code=eq.%s&role=eq.student&select=username", supabaseURL, classroomCode)
+	userURL := fmt.Sprintf("%s/rest/v1/user_accounts?classroom_code=eq.%s&role=eq.student&select=username", supabaseURL, url.QueryEscape(classroomCode))
 	uReq, uErr := http.NewRequest(http.MethodGet, userURL, nil)
 	studentMap := make(map[string][]map[string]interface{})
 	alertMap := make(map[string]int)
@@ -519,7 +516,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Fetch Notebooks for classroom
-	nbURL := fmt.Sprintf("%s/rest/v1/student_notebooks?classroom_code=eq.%s&select=*", supabaseURL, classroomCode)
+	nbURL := fmt.Sprintf("%s/rest/v1/student_notebooks?classroom_code=eq.%s&select=*", supabaseURL, url.QueryEscape(classroomCode))
 	nbReq, err := http.NewRequest(http.MethodGet, nbURL, nil)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
@@ -619,7 +616,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		targetURL := fmt.Sprintf("%s/rest/v1/teacher_assignments?classroom_code=eq.%s&order=created_at.desc", supabaseURL, classroomCode)
+		targetURL := fmt.Sprintf("%s/rest/v1/teacher_assignments?classroom_code=eq.%s&order=created_at.desc", supabaseURL, url.QueryEscape(classroomCode))
 		httpReq, err := http.NewRequest(http.MethodGet, targetURL, nil)
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())
@@ -710,7 +707,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		targetURL := fmt.Sprintf("%s/rest/v1/teacher_assignments?id=eq.%s", supabaseURL, id)
+		targetURL := fmt.Sprintf("%s/rest/v1/teacher_assignments?id=eq.%s", supabaseURL, url.QueryEscape(id))
 		httpReq, err := http.NewRequest(http.MethodDelete, targetURL, nil)
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, err.Error())

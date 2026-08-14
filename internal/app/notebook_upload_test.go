@@ -57,10 +57,10 @@ func TestGetNotebookTopicTreeReturnsNestedTopics(t *testing.T) {
 
 	notebookA := "nb-tree-a"
 	notebookB := "nb-tree-b"
-	if err := testRepo.CreateNotebook(notebookA, "Physics", "/tmp/physics.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookA, "Physics", "/tmp/physics.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook notebookA failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook(notebookB, "History", "/tmp/history.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookB, "History", "/tmp/history.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook notebookB failed: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestDraftNotebookSyllabus_FallbackCreatesEditableChapter(t *testing.T) {
 		t.Fatalf("ExtractDocument failed: %v", err)
 	}
 
-	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -228,7 +228,7 @@ func TestDraftNotebookSyllabus_CloudProfileSkipsBookmarkExtraction(t *testing.T)
 		t.Fatalf("SaveUploadedFile failed: %v", err)
 	}
 
-	if err := testRepo.CreateNotebook(uploadResult.ID, "Cloud Assignment Title", uploadResult.FilePath, uploadResult.FileType, "", "", 10); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, "Cloud Assignment Title", uploadResult.FilePath, uploadResult.FileType, "", "", 10, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -267,7 +267,7 @@ func TestConfirmNotebookSyllabus_PersistsBoundsAndPageAwareChunks(t *testing.T) 
 		t.Fatalf("ExtractDocument failed: %v", err)
 	}
 
-	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -331,7 +331,7 @@ func TestConfirmNotebookSyllabus_AutoActivatesIfLessThansFourActive(t *testing.T
 		t.Fatalf("ExtractDocument failed: %v", err)
 	}
 
-	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 	if err := testRepo.AssignNotebookToProfile(uploadResult.ID, profileID); err != nil {
@@ -374,7 +374,7 @@ func TestConfirmNotebookSyllabus_DoesNotAutoActivateIfFourOrMoreActive(t *testin
 
 	for i := 1; i <= 4; i++ {
 		id := fmt.Sprintf("nb-active-%d", i)
-		err = testRepo.CreateNotebook(id, fmt.Sprintf("Active %d", i), "dummy", "md", "", "", 1)
+		err = testRepo.CreateNotebook(id, fmt.Sprintf("Active %d", i), "dummy", "md", "", "", 1, "")
 		if err != nil {
 			t.Fatalf("CreateNotebook failed: %v", err)
 		}
@@ -398,7 +398,7 @@ func TestConfirmNotebookSyllabus_DoesNotAutoActivateIfFourOrMoreActive(t *testin
 		t.Fatalf("ExtractDocument failed: %v", err)
 	}
 
-	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 	if err := testRepo.AssignNotebookToProfile(uploadResult.ID, profileID); err != nil {
@@ -570,7 +570,7 @@ func setupConfirmedChunkedNotebook(t *testing.T, fileName string) (*App, noteboo
 	if doc.PageCount != 2 {
 		t.Fatalf("expected two-page markdown fixture, got %d", doc.PageCount)
 	}
-	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount); err != nil {
+	if err := testRepo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", "", doc.PageCount, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 

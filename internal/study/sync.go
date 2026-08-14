@@ -424,23 +424,33 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 		return fmt.Errorf("failed to compute file hash: %w", hashErr)
 	}
 
-	pageCount := 0
-	if f, r, pErr := pdfreader.Open(canonicalPath); pErr == nil {
-		pageCount = r.NumPage()
-		_ = f.Close()
+	f, r, pErr := pdfreader.Open(canonicalPath)
+	if pErr != nil {
+		_ = os.Remove(canonicalPath)
+		return fmt.Errorf("failed to open/parse downloaded PDF %s: %w", canonicalPath, pErr)
+	}
+	pageCount := r.NumPage()
+	_ = f.Close()
+	if pageCount <= 0 {
+		_ = os.Remove(canonicalPath)
+		return fmt.Errorf("invalid PDF page count %d for %s", pageCount, canonicalPath)
 	}
 
-	err = repo.CreateNotebook(nb.ID, nb.Title, canonicalPath, "pdf", "", fileHash, pageCount)
+	settings, sErr := repo.GetUserSettings()
+	if sErr != nil {
+		_ = os.Remove(canonicalPath)
+		return fmt.Errorf("failed to retrieve user settings: %w", sErr)
+	}
+
+	activeProfileID := ""
+	if settings != nil {
+		activeProfileID = settings.ActiveProfileID
+	}
+
+	err = repo.CreateNotebook(nb.ID, nb.Title, canonicalPath, "pdf", "", fileHash, pageCount, activeProfileID)
 	if err != nil {
 		_ = os.Remove(canonicalPath)
 		return fmt.Errorf("failed to insert notebook into database: %w", err)
-	}
-
-	// Assign to active profile if configured
-	if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" {
-		if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr == nil {
-			utils.Warnf("[SYNC] Assigned notebook %s to active profile %s", nb.ID, settings.ActiveProfileID)
-		}
 	}
 
 	// If assignment provides explicit page range bounds, persist initial syllabus draft

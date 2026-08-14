@@ -166,7 +166,7 @@ func mustInsertActiveQuizTask(t *testing.T, notebookID, topicID, taskID string, 
 	if err := testRepo.EnsureTopic(topicID, topicID+"-title"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook(notebookID, notebookID+"-name", "/tmp/"+notebookID+".pdf", "pdf", topicID, "", 12); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, notebookID+"-name", "/tmp/"+notebookID+".pdf", "pdf", topicID, "", 12, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -309,7 +309,7 @@ func TestActivateTask_TransitionsPendingToActive(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "activate-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Activate Test Notebook", "/tmp/activate.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Activate Test Notebook", "/tmp/activate.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -339,7 +339,7 @@ func TestActivateTask_RejectsNonPendingTask(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "activate-reject-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Activate Reject Notebook", "/tmp/activate-reject.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Activate Reject Notebook", "/tmp/activate-reject.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -364,7 +364,7 @@ func TestCompleteTask_MarksActiveAsCompleted(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "complete-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Complete Test Notebook", "/tmp/complete.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Complete Test Notebook", "/tmp/complete.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -398,7 +398,7 @@ func TestCompleteTask_InsertsFollowUpTasks(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "followup-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Followup Test Notebook", "/tmp/followup.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Followup Test Notebook", "/tmp/followup.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -444,7 +444,7 @@ func TestSkipTask_MarksTaskAsSkipped(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "skip-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Skip Test Notebook", "/tmp/skip.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Skip Test Notebook", "/tmp/skip.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -478,7 +478,7 @@ func TestOrdering_TaskTypePriority(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-type-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Ordering Type Notebook", "/tmp/ordering-type.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Ordering Type Notebook", "/tmp/ordering-type.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -528,7 +528,7 @@ func TestOrdering_TaskPriority(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-priority-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Ordering Priority Notebook", "/tmp/ordering-priority.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Ordering Priority Notebook", "/tmp/ordering-priority.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -555,7 +555,7 @@ func TestOrdering_FIFOFallback(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-fifo-nb"
-	if err := testRepo.CreateNotebook(notebookID, "FIFO Notebook", "/tmp/fifo.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "FIFO Notebook", "/tmp/fifo.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -586,7 +586,7 @@ func TestOrdering_AntiStarvation(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "anti-starvation-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Anti Starvation Notebook", "/tmp/anti-starvation.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Anti Starvation Notebook", "/tmp/anti-starvation.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -627,7 +627,7 @@ func TestOrdering_AntiStarvation(t *testing.T) {
 func TestTriggerCloudSyncRetriesAndFailSafe(t *testing.T) {
 	_ = newTestApp(t)
 
-	if err := testRepo.CreateNotebook("os-notebook-sync", "OS Notebook", "/tmp/os-notebook.pdf", "pdf", "", "", 12); err != nil {
+	if err := testRepo.CreateNotebook("os-notebook-sync", "OS Notebook", "/tmp/os-notebook.pdf", "pdf", "", "", 12, ""); err != nil {
 		t.Fatalf("failed to create notebook: %v", err)
 	}
 

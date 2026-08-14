@@ -105,24 +105,13 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 		}
 	}
 
+	profileID := a.resolveExplicitActiveProfileID()
 	// Create notebook record as unlinked; Sprint 11 uses a draft/confirm ingestion flow.
-	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount)
+	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount, profileID)
 	if err != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
 			"error": err.Error(),
-		}
-	}
-
-	// Auto-assign the notebook to the active profile, mirroring Chrome-style profile isolation:
-	// notebooks uploaded while a profile is active belong to that profile automatically.
-	// Only auto-assigns when an explicit ActiveProfileID is set (no fallback to oldest profile).
-	if profileID := a.resolveExplicitActiveProfileID(); profileID != "" {
-		if err := repo.AssignNotebookToProfile(uploadResult.ID, profileID); err != nil {
-			_ = a.notebookService.DeleteFile(uploadResult.FilePath)
-			return map[string]interface{}{
-				"error": fmt.Sprintf("failed to assign notebook to profile: %v", err),
-			}
 		}
 	}
 
