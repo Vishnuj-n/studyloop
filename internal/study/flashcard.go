@@ -102,7 +102,9 @@ func (s *StudyService) GenerateFSRSCardsForTopic(topicID, notebookID string, sta
 
 	// Start cards in Review state (bypass learning phase) with day-based offsets
 	initialState := models.FlashcardState{
-		StateCode: 2, // 2 = Review state in models.go
+		StateCode:  2,   // 2 = Review state in models.go
+		Stability:  1.0, // Default initial stability for Review state
+		Difficulty: 5.0, // Default initial difficulty for Review state
 	}
 	now := time.Now().Unix()
 	dueAt := now + 24*60*60 // Default fallback: tomorrow
@@ -164,6 +166,9 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	if err != nil {
 		return nil, "", err
 	}
+	if len(contextChunks) == 0 {
+		return nil, "", fmt.Errorf("no content found in page range %d-%d", startPage, endPage)
+	}
 	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_auto_generation_batch generation_source=%s chunk_count=%d token_estimate=%d page_range=%d-%d", generationSource, len(contextChunks), tokenCount, startPage, endPage)
 	contextText := buildContextTextFromChunks(contextChunks)
 
@@ -184,6 +189,9 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 
 	// Build prompt with token budgeting
 	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, targetCount, maxInputTokens, failedQuestions)
+	if len(includedChunkIDs) == 0 {
+		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
+	}
 
 	// Log token estimates before generation
 	utils.Warnf("[FLASHCARD_PIPELINE] token_budget_estimate prompt_tokens=%d max_input=%d budget_used_pct=%.2f", promptTokenCount, maxInputTokens, float64(promptTokenCount)/float64(maxInputTokens)*100)
@@ -222,17 +230,21 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	for _, chunkID := range includedChunkIDs {
 		allowedChunkIDs[chunkID] = struct{}{}
 	}
+	defaultChunkID := ""
+	if len(includedChunkIDs) > 0 {
+		defaultChunkID = includedChunkIDs[0]
+	}
+
 	for _, candidate := range parsed.Cards {
 		sourceChunkID := strings.TrimSpace(candidate.SourceChunkID)
 		cardPrompt := strings.TrimSpace(candidate.Prompt)
 		answer := strings.TrimSpace(candidate.Answer)
-		if cardPrompt == "" || answer == "" || sourceChunkID == "" {
-			utils.Warnf("Skipping flashcard: missing required fields")
+		if cardPrompt == "" || answer == "" {
+			utils.Warnf("Skipping flashcard: missing required prompt or answer")
 			continue
 		}
 		if _, ok := allowedChunkIDs[sourceChunkID]; !ok {
-			utils.Warnf("Skipping flashcard: source_chunk_id '%s' not found in allowed chunks (total allowed: %d)", sourceChunkID, len(allowedChunkIDs))
-			continue
+			sourceChunkID = defaultChunkID
 		}
 		id := uuid.NewString()
 		cards = append(cards, models.Flashcard{
@@ -269,7 +281,6 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 
 	var b strings.Builder
 	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
-	b.WriteString("Do not test minor details. If the text is short, generate fewer.\n")
 	b.WriteString("CRITICAL: Return ONLY valid JSON. No markdown. No code blocks. No explanations.\n")
 	b.WriteString("Output must start with { and end with }. No prefix or suffix text.\n")
 	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
@@ -283,23 +294,34 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 		b.WriteString("\n")
 	}
 
-	fmt.Fprintf(&b, "Generate exactly %d flashcards covering pages %d-%d.\n",
-		targetCount, startPage, endPage)
 	b.WriteString("\n=== JSON FORMAT (FOLLOW EXACTLY) ===\n")
-	b.WriteString(`{"cards":[{"source_chunk_id":"chunk_123","prompt":"What is X?","answer":"X is..."},{"source_chunk_id":"chunk_456","prompt":"How does Y work?","answer":"Y works by..."}]}` + "\n")
-	b.WriteString("\n=== ATOMIC KNOWLEDGE (CRITICAL) ===\n")
-	b.WriteString("Each card must test exactly ONE concept. Multi-part answers are forbidden.\n")
-	b.WriteString("\n=== PROMPT QUALITY ===\n")
-	b.WriteString("- AVOID yes/no questions.\n")
-	b.WriteString("- PREFER 'why', 'how', 'what is', 'explain' questions.\n")
-	b.WriteString("\n=== ANSWER QUALITY ===\n")
-	b.WriteString("- Answers must be short (1-2 sentences max, grounded in source).\n")
-	b.WriteString("- source_chunk_id must exactly match one chunk_id from the provided chunk list.\n")
+	b.WriteString(`{"cards":[{"prompt":"What is X?","answer":"X is..."},{"prompt":"How does Y work?","answer":"Y works by..."}]}` + "\n")
+	b.WriteString("\n=== GROUNDING & CONTENT RULES ===\n")
+	b.WriteString("- Use ONLY the information contained in the provided source material.\n")
+	b.WriteString("- Do not use outside knowledge or invent information.\n")
+	b.WriteString("- Generate cards from important, learnable concepts rather than minor details.\n")
+	b.WriteString("- Concepts may be synthesized across multiple source chunks.\n")
+	b.WriteString("- The cards belong to the requested page range; exact chunk attribution is not required.\n")
 	b.WriteString("\n=== ADAPTIVE CONTENT RULES ===\n")
-	b.WriteString("Before generating flashcards, classify the text type:\n")
-	b.WriteString("- FACTUAL/TECHNICAL (exam prep, current affairs, engineering, history): Extract specific facts, dates, definitions, formulas, and concrete data points.\n")
-	b.WriteString("- CONCEPTUAL/NARRATIVE (philosophy, self-help, psychology, business): Extract core frameworks, mindset shifts, actionable rules, and key ideas.\n")
-	b.WriteString("Use the notebook title as context for the user's study goals and the text type.\n")
+	b.WriteString("Classify the source material before generating cards:\n\n")
+	b.WriteString("- FACTUAL: Prioritize important facts, definitions, formulas, terminology, and concrete relationships.\n")
+	b.WriteString("- CONCEPTUAL: Prioritize core ideas, reasoning, principles, comparisons, and cause-effect relationships.\n")
+	b.WriteString("- TECHNICAL: Prioritize definitions, mechanisms, algorithms, workflows, constraints, trade-offs, and practical application.\n")
+	b.WriteString("\n=== FLASHCARD RULES ===\n")
+	b.WriteString("- Each card must test exactly ONE concept.\n")
+	b.WriteString("- Prefer concepts that are useful for long-term recall.\n")
+	b.WriteString("- Avoid trivial details, incidental examples, and book metadata.\n")
+	b.WriteString("- Avoid duplicate cards testing the same concept.\n")
+	b.WriteString("- Prefer \"why\", \"how\", \"what is\", and \"explain\" questions.\n")
+	b.WriteString("- Questions should require recall, not simple recognition.\n")
+	b.WriteString("\n=== ANSWER RULES ===\n")
+	b.WriteString("- Answers must be concise: 1–2 sentences.\n")
+	b.WriteString("- Answer directly and completely.\n")
+	b.WriteString("- Preserve the terminology and meaning of the source.\n")
+	b.WriteString("- Do not add information that is not supported by the source.\n")
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "Generate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 
 	// Trim chunks based on token budget

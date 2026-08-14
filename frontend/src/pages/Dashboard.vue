@@ -12,13 +12,22 @@
         >
           <option value="">-- No Profile Selected --</option>
           <option v-for="p in profiles" :key="p.id" :value="p.id">
-            {{ p.name }}
+            {{ p.classroom_code ? `☁️ ${p.name} (${p.classroom_code})` : p.name }}
           </option>
         </select>
       </div>
     </header>
 
     <!-- Status Banners -->
+    <StatusBanner
+      v-if="pendingIngestionBook"
+      variant="warning"
+      icon="⚡"
+      title="New Assignment — Ingestion Needed"
+      :subtitle="`${pendingIngestionBook.title} is ready for chapter extraction and ingestion.`"
+      action-label="✨ Ingest Book"
+      @action="goToIngestBook(pendingIngestionBook.id)"
+    />
     <StatusBanner
       v-if="userSettings.skip_to_reading_active"
       variant="info"
@@ -154,6 +163,9 @@
         <button type="button" class="dev-btn" :disabled="forcingSync" @click="forceSyncTask">
           {{ forcingSync ? 'Forcing...' : 'Force Flashcard Generate' }}
         </button>
+        <button type="button" class="dev-btn" :disabled="forcingDue" @click="forceDueFlashcards">
+          {{ forcingDue ? 'Forcing...' : 'Force Flashcards Due Now' }}
+        </button>
       </div>
       <p v-if="devMessage" class="dev-message">{{ devMessage }}</p>
     </div>
@@ -171,6 +183,7 @@ import {
   getAppEnv,
   devForceSocraticRescue,
   devForceFlashcardGenerate,
+  forceDueFlashcardsNow,
   getNotebooks,
   getFlashcardDueTimeline,
 } from '../services/appApi'
@@ -272,6 +285,13 @@ const hasSocraticRescueTask = computed(() => {
   return tasks.value.some((t) => t.action_type === 'socratic_remedial')
 })
 
+// ponytail: pending ingestion notification state
+const pendingIngestionBook = ref(null)
+
+function goToIngestBook(notebookId) {
+  router.push({ path: '/notebooks', query: { ingest: notebookId } })
+}
+
 // --- Lifecycle ---
 onMounted(async () => {
   try {
@@ -304,8 +324,7 @@ async function loadAgenda() {
       return
     }
 
-    await loadActiveProfilePace()
-    await loadFlashcardTimeline(tzOffset)
+    await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset)])
   } catch (err) {
     error.value = err.message || 'Failed to load tasks'
   } finally {
@@ -350,6 +369,11 @@ function applyDashboardOverview(overview) {
     streakState.value = overview.streak_state
     streakError.value = ''
   }
+
+  if (overview.pending_notebook_error) {
+    actionError.value = overview.pending_notebook_error
+  }
+  pendingIngestionBook.value = overview.pending_notebook || null
 
   return true
 }
@@ -538,6 +562,25 @@ async function forceSyncTask() {
     devMessage.value = 'Error: ' + err.message
   } finally {
     forcingSync.value = false
+  }
+}
+
+const forcingDue = ref(false)
+async function forceDueFlashcards() {
+  forcingDue.value = true
+  devMessage.value = ''
+  try {
+    const res = await forceDueFlashcardsNow()
+    if (res && res.error) {
+      devMessage.value = 'Error: ' + res.error
+    } else {
+      devMessage.value = `Successfully forced ${res.updated_cards ?? 0} flashcard(s) DUE NOW!`
+      await loadAgenda()
+    }
+  } catch (err) {
+    devMessage.value = 'Error: ' + err.message
+  } finally {
+    forcingDue.value = false
   }
 }
 </script>

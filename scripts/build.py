@@ -16,6 +16,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# Production Sync & Research Analytics Credentials (Injected into binary via -ldflags during build)
+# Set these environment variables before running build.py, or configure them in desktop Settings.
+PRODUCTION_SYNC_URL = os.environ.get("CLOUD_SYNC_URL", "")
+PRODUCTION_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+PRODUCTION_RESEARCH_URL = os.environ.get("RESEARCH_ANALYTICS_URL", "")
+PRODUCTION_RESEARCH_ANON_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY_LOG", os.environ.get("RESEARCH_ANALYTICS_ANON_KEY", ""))
+
+
 
 def main():
     os.chdir(PROJECT_ROOT)
@@ -24,7 +32,14 @@ def main():
         print("Error: Wails CLI not found in PATH.")
         sys.exit(1)
 
-    cmd = ["wails", "build", "-nsis", *sys.argv[1:]]
+    ldflags = (
+        f"-X ai-tutor/internal/study.DefaultProductionSyncURL={PRODUCTION_SYNC_URL} "
+        f"-X ai-tutor/internal/study.DefaultProductionAnonKey={PRODUCTION_ANON_KEY} "
+        f"-X ai-tutor/internal/study.DefaultResearchAnalyticsURL={PRODUCTION_RESEARCH_URL} "
+        f"-X ai-tutor/internal/study.DefaultResearchAnalyticsAnonKey={PRODUCTION_RESEARCH_ANON_KEY}"
+    )
+
+    cmd = ["wails", "build", "-nsis", "-ldflags", ldflags, *sys.argv[1:]]
 
     print("Executing:", " ".join(cmd))
 

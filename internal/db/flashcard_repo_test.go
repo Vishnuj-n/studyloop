@@ -222,10 +222,10 @@ func TestGetNextDueReviewNotebookUsesPriorityAndLegacyTopicLink(t *testing.T) {
 	if err := testRepo.EnsureTopic("topic-high", "High Priority Topic"); err != nil {
 		t.Fatalf("EnsureTopic high failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-low", "Low", "/tmp/low.pdf", "pdf", "topic-low", "", 10); err != nil {
+	if err := testRepo.CreateNotebook("nb-low", "Low", "/tmp/low.pdf", "pdf", "topic-low", "", 10, ""); err != nil {
 		t.Fatalf("CreateNotebook low failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-high", "High", "/tmp/high.pdf", "pdf", "", "", 10); err != nil {
+	if err := testRepo.CreateNotebook("nb-high", "High", "/tmp/high.pdf", "pdf", "", "", 10, ""); err != nil {
 		t.Fatalf("CreateNotebook high failed: %v", err)
 	}
 	if _, err := testRepo.db.Exec(`UPDATE notebooks SET priority = 9 WHERE id = 'nb-high'`); err != nil {
@@ -314,6 +314,34 @@ func TestQueryDueReviewCardsForRange(t *testing.T) {
 	}
 	if count != 3 {
 		t.Errorf("expected 3 cards due in (0, 300], got %d", count)
+	}
+}
+
+func TestSuspendFlashcardTxIdempotentAndTypeScan(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-suspend"
+	if err := testRepo.EnsureTopic(topicID, "Suspend Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+
+	err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
+		{ID: "card-suspend-1", TopicID: topicID, Prompt: "Q1", Answer: "A1", DueAt: 100, Suspended: false},
+	}, map[string]models.FlashcardState{
+		"card-suspend-1": {},
+	})
+	if err != nil {
+		t.Fatalf("CreateFlashcards failed: %v", err)
+	}
+
+	// First suspend should succeed cleanly
+	if err := testRepo.SuspendFlashcard("card-suspend-1"); err != nil {
+		t.Fatalf("First SuspendFlashcard failed: %v", err)
+	}
+
+	// Second suspend should be idempotent and not error
+	if err := testRepo.SuspendFlashcard("card-suspend-1"); err != nil {
+		t.Fatalf("Second SuspendFlashcard failed: %v", err)
 	}
 }
 

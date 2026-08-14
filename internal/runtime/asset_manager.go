@@ -48,15 +48,7 @@ type AssetManager struct {
 }
 
 // GetPlatformAssetFilename returns the zip filename for the current OS and version.
-// For v1.0.0 (first release), the archive was published as "rag-assets.zip".
-// Subsequent releases follow the naming convention "asset_<goos>.zip".
 func GetPlatformAssetFilename(version string) string {
-	// Normalize version: strip leading "v"
-	normalized := strings.TrimPrefix(version, "v")
-	if normalized == "1.0.0" || version == "v0.0.0-dev" {
-		// Legacy release name (also used for dev/local fallback)
-		return "rag-assets.zip"
-	}
 	return fmt.Sprintf("asset_%s.zip", runtime.GOOS)
 }
 

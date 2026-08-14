@@ -251,7 +251,10 @@ func NormalizeSyllabusChapters(chapters []models.SyllabusChapterDraft, pageCount
 	if len(resolved) == 0 {
 		return nil
 	}
-	resolved[len(resolved)-1].EndPage = max
+	lastOrig := normalized[len(normalized)-1]
+	if lastOrig.EndPage == lastOrig.StartPage || lastOrig.EndPage >= max {
+		resolved[len(resolved)-1].EndPage = max
+	}
 	return resolved
 }
 

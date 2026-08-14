@@ -17,6 +17,8 @@
 
     <!-- Upload Section -->
     <NotebookUpload
+      :is-cloud-profile="isCloudProfile"
+      :classroom-code="classroomCode"
       :upload-progress="uploadProgress"
       :ingestion-status-message="ingestionStatusMessage"
       :indexing-status-message="indexingStatusMessage"
@@ -37,6 +39,7 @@
           :available-topics="availableTopics"
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
+          :is-cloud-profile="isCloudProfile"
           variant="active"
           @edit-syllabus="openSyllabusDraft"
           @update-priority="updatePriority"
@@ -74,6 +77,7 @@
           :available-topics="availableTopics"
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
+          :is-cloud-profile="isCloudProfile"
           variant="dormant"
           :active-limit-reached="activeNotebooks.length >= 4"
           @edit-syllabus="openSyllabusDraft"
@@ -131,6 +135,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   getAvailableTopics,
   getNotebooks as fetchNotebooks,
@@ -158,6 +163,7 @@ import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import { useDialog } from '../composables/useDialog'
 
 const { confirm: confirmDialog } = useDialog()
+const route = useRoute()
 
 const uploadProgress = ref(0)
 const uploadError = ref('')
@@ -192,6 +198,8 @@ const isDraftingSyllabus = ref(false)
 const draftingNotebookTitle = ref('')
 const isAICleaning = ref(false)
 const activeProfileID = ref('')
+const classroomCode = ref('')
+const isCloudProfile = computed(() => !!classroomCode.value.trim())
 let loadNotebooksToken = 0
 const ragEnabled = ref(false)
 const ragNotebookChapter = ref(true)
@@ -237,6 +245,7 @@ onMounted(async () => {
     const settings = await getUserSettings()
     if (settings && !settings.error) {
       activeProfileID.value = settings.active_profile_id || ''
+      classroomCode.value = settings.classroom_code || ''
       ragEnabled.value = settings.rag_enabled || false
       if (typeof settings.rag_notebook_chapter !== 'undefined') {
         ragNotebookChapter.value = settings.rag_notebook_chapter
@@ -251,6 +260,16 @@ onMounted(async () => {
   // Load available topics and notebooks
   await loadTopics()
   await loadNotebooks()
+
+  // ponytail: auto-open syllabus draft if redirected from dashboard ingestion banner
+  if (route.query.ingest) {
+    const targetNb =
+      dormantNotebooks.value.find((n) => n.id === route.query.ingest) ||
+      activeNotebooks.value.find((n) => n.id === route.query.ingest)
+    if (targetNb) {
+      void openSyllabusDraft(targetNb.id, targetNb.title)
+    }
+  }
 })
 
 onUnmounted(() => {

@@ -31,13 +31,8 @@ type Config struct {
 	Limits    ModelLimits
 }
 
-// LoadConfigFromEnv loads the legacy single-provider config from environment variables.
-func LoadConfigFromEnv() *Config {
-	return LoadConfigFromEnvForPrefix("")
-}
-
 // LoadConfigFromEnvForPrefix loads provider config for a named tier.
-// Prefix examples: FAST_LLM
+// Prefix examples: FAST_LLM. Pass empty string for the default single-provider config.
 func LoadConfigFromEnvForPrefix(prefix string) *Config {
 	prefix = strings.TrimSpace(prefix)
 	if prefix != "" {

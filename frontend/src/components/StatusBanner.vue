@@ -1,33 +1,29 @@
 <template>
-  <article :class="['banner', `banner--${variant}`, `${legacyPrefix}-banner`, 'card']">
+  <article :class="['banner', `banner--${variant}`, 'card']">
     <div class="banner-content">
       <span class="banner-icon">{{ icon }}</span>
       <div class="banner-text">
-        <p :class="['banner-title', `${legacyPrefix}-title`]">{{ title }}</p>
+        <p class="banner-title">{{ title }}</p>
         <p v-if="subtitle" class="banner-subtitle">{{ subtitle }}</p>
       </div>
+      <button v-if="actionLabel" class="banner-action-btn" @click="$emit('action')">
+        {{ actionLabel }}
+      </button>
     </div>
   </article>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-
 const props = defineProps({
-  /** 'info' | 'rescue' | 'success' | 'error' */
+  /** 'info' | 'rescue' | 'success' | 'error' | 'warning' */
   variant: { type: String, required: true },
   icon: { type: String, required: true },
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
+  actionLabel: { type: String, default: '' },
 })
 
-const LEGACY_PREFIXES = {
-  info: 'info',
-  rescue: 'rescue',
-  success: 'flashcard-success',
-  error: 'error',
-}
-const legacyPrefix = computed(() => LEGACY_PREFIXES[props.variant] || props.variant)
+defineEmits(['action'])
 </script>
 
 <style scoped>
@@ -55,6 +51,27 @@ const legacyPrefix = computed(() => LEGACY_PREFIXES[props.variant] || props.vari
   font-size: 20px;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+.banner-text {
+  margin-right: auto;
+}
+
+.banner-action-btn {
+  background: var(--primary, #4f46e5);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+.banner-action-btn:hover {
+  opacity: 0.9;
 }
 
 .banner-title {

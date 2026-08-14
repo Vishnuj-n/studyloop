@@ -105,24 +105,13 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 		}
 	}
 
+	profileID := a.resolveExplicitActiveProfileID()
 	// Create notebook record as unlinked; Sprint 11 uses a draft/confirm ingestion flow.
-	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount)
+	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount, profileID)
 	if err != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
 			"error": err.Error(),
-		}
-	}
-
-	// Auto-assign the notebook to the active profile, mirroring Chrome-style profile isolation:
-	// notebooks uploaded while a profile is active belong to that profile automatically.
-	// Only auto-assigns when an explicit ActiveProfileID is set (no fallback to oldest profile).
-	if profileID := a.resolveExplicitActiveProfileID(); profileID != "" {
-		if err := repo.AssignNotebookToProfile(uploadResult.ID, profileID); err != nil {
-			_ = a.notebookService.DeleteFile(uploadResult.FilePath)
-			return map[string]interface{}{
-				"error": fmt.Sprintf("failed to assign notebook to profile: %v", err),
-			}
 		}
 	}
 
@@ -196,7 +185,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 					"page_count":    persistedDraft.PageCount,
 					"chapters":      persistedDraft.Chapters,
 					"status":        "draft_ready",
-					"fallback_used": false,
+					"fallback_used": persistedDraft.FallbackUsed,
 				}
 			}
 		}
@@ -216,45 +205,30 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook status: %v", err)}
 	}
 
-	// Fast path: bookmarks only, no LLM call
 	if !regenerate {
-		result, err := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, nil)
-		if err == nil && len(result.Chapters) > 0 {
-			chapters := result.Chapters
-			draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters}
-			draftJSON, err := json.Marshal(draftToPersist)
-			if err != nil {
-				return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
-			}
-			if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
-				return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
-			}
-			if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
-				return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
-			}
-			return map[string]interface{}{
-				"notebook_id":   notebookID,
-				"page_count":    doc.PageCount,
-				"chapters":      chapters,
-				"status":        "draft_ready",
-				"fallback_used": false,
-			}
+		var chapters []models.SyllabusChapterDraft
+		fallbackUsed := false
+
+		if res, err := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, nil); err == nil && len(res.Chapters) > 0 {
+			chapters = res.Chapters
+			fallbackUsed = res.FallbackUsed
 		}
-		// No bookmarks found — create a single "General" chapter covering all pages
-		// User can edit this manually or click "AI Clean Up" for smarter extraction
-		endPage := doc.PageCount
-		chapters := []models.SyllabusChapterDraft{{
-			Title:     "General",
-			StartPage: 1,
-			EndPage:   endPage,
-		}}
-		draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters}
-		draftJSON, err := json.Marshal(draftToPersist)
+
+		if len(chapters) == 0 {
+			fallbackUsed = true
+			title := strings.TrimSpace(nb.Title)
+			if title == "" {
+				title = "General"
+			}
+			chapters = []models.SyllabusChapterDraft{{Title: title, StartPage: 1, EndPage: doc.PageCount}}
+		}
+
+		draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters, FallbackUsed: fallbackUsed})
 		if err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to marshal fallback draft: %v", err)}
+			return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
 		}
 		if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to persist fallback draft: %v", err)}
+			return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
 		}
 		if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
 			return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
@@ -264,7 +238,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 			"page_count":    doc.PageCount,
 			"chapters":      chapters,
 			"status":        "draft_ready",
-			"fallback_used": true,
+			"fallback_used": fallbackUsed,
 		}
 	}
 
@@ -282,7 +256,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
-	draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: result.Chapters}
+	draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: result.Chapters, FallbackUsed: result.FallbackUsed}
 	draftJSON, err := json.Marshal(draftToPersist)
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
@@ -602,7 +576,11 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 	// Seed initial READING task into study_queue if active
 	if isActivated {
-		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID); err != nil {
+		targetWords := 5000
+		if settings, err := repo.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
 			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
 		}
 	}

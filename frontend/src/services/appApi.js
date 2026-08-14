@@ -126,6 +126,10 @@ export function suspendFlashcard(taskID, cardID) {
   return appBridge().SuspendFlashcard(taskID, cardID)
 }
 
+export function forceDueFlashcardsNow() {
+  return appBridge().ForceDueFlashcardsNow()
+}
+
 export function getNotebooks(topicID = '', profileID = '') {
   return appBridge().GetNotebooks(topicID, profileID)
 }
@@ -255,8 +259,12 @@ export function getAppEnv() {
   return appBridge().GetAppEnv()
 }
 
-export function loginStudent(username, password, classroomCode) {
-  return appBridge().LoginStudent(username, password, classroomCode)
+export function loginStudent(username, password) {
+  return appBridge().LoginStudent(username, password)
+}
+
+export function signUpStudent(username, password, classroomCode) {
+  return appBridge().SignUpStudent(username, password, classroomCode)
 }
 
 export function logoutStudent() {

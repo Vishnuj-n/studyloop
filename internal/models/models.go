@@ -63,13 +63,6 @@ type StudyQueueTask struct {
 	EndPage     int             `json:"end_page,omitempty"`
 }
 
-// QueueState provides pending counts grouped by task type for dashboard summaries.
-type QueueState struct {
-	NotebookID string         `json:"notebook_id,omitempty"`
-	Pending    map[string]int `json:"pending"`
-	Total      int            `json:"total"`
-}
-
 // CompletionResult captures explicit completion outcome and optional explicit follow-up inserts.
 type CompletionResult struct {
 	Status    StudyTaskStatus  `json:"status"`
@@ -249,9 +242,10 @@ type SyllabusChapterDraft struct {
 
 // SyllabusDraft captures the backend-generated chapter draft shown in the Notebook verification modal.
 type SyllabusDraft struct {
-	NotebookID string                 `json:"notebook_id"`
-	PageCount  int                    `json:"page_count"`
-	Chapters   []SyllabusChapterDraft `json:"chapters"`
+	NotebookID   string                 `json:"notebook_id"`
+	PageCount    int                    `json:"page_count"`
+	Chapters     []SyllabusChapterDraft `json:"chapters"`
+	FallbackUsed bool                   `json:"fallback_used"`
 }
 
 // ReaderSection is one ordered section used by the augmented reader.
@@ -510,10 +504,13 @@ type ReadingSessionResponse struct {
 
 // StudyProfile represents a user's study profile (e.g. UPSC prep).
 type StudyProfile struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	DeadlineAt int64  `json:"deadline_at"` // Unix timestamp
-	CreatedAt  string `json:"created_at,omitempty"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	DeadlineAt      int64  `json:"deadline_at"` // Unix timestamp
+	CreatedAt       string `json:"created_at,omitempty"`
+	ClassroomCode   string `json:"classroom_code,omitempty"`
+	StudentUsername string `json:"student_username,omitempty"`
+	CloudAPIToken   string `json:"cloud_api_token,omitempty"`
 }
 
 // UserSettings represents the application settings.

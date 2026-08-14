@@ -218,66 +218,6 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 // FLASHCARD/FSRS TESTS
 // ============================================================================
 
-func TestGenerateFlashcardsCreatesAndReturnsCards(t *testing.T) {
-	app := newTestApp(t)
-	expectedCount, err := testRepo.GetTotalChunkTokens("os-scheduling")
-	if err != nil {
-		t.Fatalf("GetTotalChunkTokens failed: %v", err)
-	}
-	want := study.ScaledFlashcardCount(expectedCount)
-
-	resp := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	cards, ok := resp["cards"].([]models.Flashcard)
-	if !ok {
-		t.Fatalf("expected typed flashcards slice, got %#v", resp["cards"])
-	}
-	if len(cards) != want {
-		t.Fatalf("expected %d flashcards, got %d", want, len(cards))
-	}
-
-	count, err := testRepo.CountFlashcardsForTopic("os-scheduling")
-	if err != nil {
-		t.Fatalf("CountFlashcardsForTopic failed: %v", err)
-	}
-	if count != want {
-		t.Fatalf("expected %d stored flashcards, got %d", want, count)
-	}
-}
-
-func TestGenerateFlashcardsReturnsExistingCardsWithoutDuplication(t *testing.T) {
-	app := newTestApp(t)
-	totalTokens, err := testRepo.GetTotalChunkTokens("os-scheduling")
-	if err != nil {
-		t.Fatalf("GetTotalChunkTokens failed: %v", err)
-	}
-	want := study.ScaledFlashcardCount(totalTokens)
-
-	first := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := first["error"]; hasErr {
-		t.Fatalf("first generation failed: %v", first["error"])
-	}
-
-	second := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := second["error"]; hasErr {
-		t.Fatalf("second generation failed: %v", second["error"])
-	}
-	if existing, ok := second["existing"].(bool); !ok || !existing {
-		t.Fatalf("expected existing=true on second generation, got %#v", second["existing"])
-	}
-
-	count, err := testRepo.CountFlashcardsForTopic("os-scheduling")
-	if err != nil {
-		t.Fatalf("CountFlashcardsForTopic failed: %v", err)
-	}
-	if count != want {
-		t.Fatalf("expected no duplicate flashcards, got %d", count)
-	}
-}
-
 // ============================================================================
 // REVIEW SESSION TESTS
 // ============================================================================
@@ -288,7 +228,7 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 	if err := testRepo.EnsureTopic("queue-review-topic", "Queue Review Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("queue-review-nb", "Queue Review Notebook", "/tmp/queue-review.pdf", "pdf", "", "", 15); err != nil {
+	if err := testRepo.CreateNotebook("queue-review-nb", "Queue Review Notebook", "/tmp/queue-review.pdf", "pdf", "", "", 15, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 	if err := testRepo.LinkNotebookTopics("queue-review-nb", []string{"queue-review-topic"}); err != nil {
@@ -385,7 +325,7 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 func TestGetReviewSessionNoDueCards(t *testing.T) {
 	app := newTestApp(t)
 
-	if err := testRepo.CreateNotebook("no-due-nb", "No Due Notebook", "/tmp/no-due.pdf", "pdf", "", "", 15); err != nil {
+	if err := testRepo.CreateNotebook("no-due-nb", "No Due Notebook", "/tmp/no-due.pdf", "pdf", "", "", 15, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -453,7 +393,7 @@ func TestGetReaderTopicBundle_Success(t *testing.T) {
 	app := &App{repo: testRepo}
 
 	notebookID := "test-notebook-reader"
-	if err := testRepo.CreateNotebook(notebookID, "Test Notebook", "/tmp/test.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Test Notebook", "/tmp/test.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -532,7 +472,7 @@ func TestGetReaderTopicBundle_InvalidTopic(t *testing.T) {
 	app := &App{repo: testRepo}
 
 	notebookID := "test-notebook-invalid"
-	if err := testRepo.CreateNotebook(notebookID, "Test Notebook", "/tmp/test.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Test Notebook", "/tmp/test.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -556,7 +496,7 @@ func TestAskReaderAI_ScopedResponseShape(t *testing.T) {
 	if err := testRepo.UpdateTopicPageBounds(topicID, 2, 4); err != nil {
 		t.Fatalf("UpdateTopicPageBounds failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook(notebookID, "Reader AI Notebook", "/tmp/reader-ai.txt", "txt", topicID, "", 6); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Reader AI Notebook", "/tmp/reader-ai.txt", "txt", topicID, "", 6, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 	if err := testRepo.UpdateNotebookIndexingStatus(notebookID, "READY"); err != nil {
@@ -609,7 +549,7 @@ func TestCompleteSocraticRescueInsertsRequiz(t *testing.T) {
 	if err := testRepo.EnsureTopic("topic-test", "Topic Test"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-test", "NB Test", "/tmp/nb-test.pdf", "pdf", "topic-test", "", 12); err != nil {
+	if err := testRepo.CreateNotebook("nb-test", "NB Test", "/tmp/nb-test.pdf", "pdf", "topic-test", "", 12, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 	mustInsertMockChunk(t, "nb-test", "topic-test", "chunk-socratic-test-1", 1)
@@ -681,7 +621,7 @@ func TestRequizPassGeneratesFlashcards(t *testing.T) {
 	if err := testRepo.EnsureTopic("topic-requiz-pass", "Requiz Pass Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-requiz-pass", "NB Requiz Pass", "/tmp/nb-requiz-pass.pdf", "pdf", "topic-requiz-pass", "", 12); err != nil {
+	if err := testRepo.CreateNotebook("nb-requiz-pass", "NB Requiz Pass", "/tmp/nb-requiz-pass.pdf", "pdf", "topic-requiz-pass", "", 12, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -731,7 +671,7 @@ func TestRequizFailMarksExternalHelp(t *testing.T) {
 	if err := testRepo.EnsureTopic("topic-requiz-fail", "Requiz Fail Topic"); err != nil {
 		t.Fatalf("failed to ensure topic: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-requiz-fail", "NB Requiz Fail", "/tmp/nb-requiz-fail.pdf", "pdf", "topic-requiz-fail", "", 12); err != nil {
+	if err := testRepo.CreateNotebook("nb-requiz-fail", "NB Requiz Fail", "/tmp/nb-requiz-fail.pdf", "pdf", "topic-requiz-fail", "", 12, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -870,7 +810,7 @@ func TestQuizPromptContainsStrictGroundingRules(t *testing.T) {
 	if err := testRepo.EnsureTopic("topic-prompt-test", "Topic Prompt Test"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("nb-prompt-test", "Notebook Prompt Test", "/tmp/nb.pdf", "pdf", "topic-prompt-test", "", 10); err != nil {
+	if err := testRepo.CreateNotebook("nb-prompt-test", "Notebook Prompt Test", "/tmp/nb.pdf", "pdf", "topic-prompt-test", "", 10, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 

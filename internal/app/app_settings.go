@@ -1,19 +1,24 @@
 package app
 
 import (
-	"ai-tutor/internal/llm"
-	"ai-tutor/internal/models"
-	"ai-tutor/internal/study"
-	"ai-tutor/internal/utils"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"ai-tutor/internal/llm"
+	"ai-tutor/internal/models"
+	"ai-tutor/internal/study"
+	"ai-tutor/internal/utils"
+
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func (a *App) GetUserSettings() map[string]interface{} {
@@ -417,13 +422,16 @@ func (a *App) UpdateNotebookStudyStatus(notebookID, studyStatus string) map[stri
 func (a *App) IsOnboarded() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
+		utils.QueueLogger.Warn("onboarding_check", "status", "failed", "reason", "database_not_initialized")
 		return map[string]interface{}{"error": errDatabaseNotInitialized, "onboarded": false}
 	}
 	profiles, err := repo.GetProfiles()
 	if err != nil {
+		utils.QueueLogger.Error("onboarding_check", "status", "failed", "error", err.Error())
 		return map[string]interface{}{"error": err.Error(), "onboarded": false}
 	}
 	onboarded := len(profiles) > 0
+	utils.QueueLogger.Info("onboarding_check", "status", "success", "onboarded", onboarded, "profile_count", len(profiles))
 	return map[string]interface{}{"onboarded": onboarded}
 }
 
@@ -440,8 +448,8 @@ func (a *App) TriggerCloudSync() map[string]interface{} {
 
 // app_settings.go end
 
-// LoginStudent handles student login using the Supabase login_user RPC.
-func (a *App) LoginStudent(username, password, classroomCode string) map[string]interface{} {
+// LoginStudent handles student login via Go cloud-server or direct Supabase REST user_accounts.
+func (a *App) LoginStudent(username, password string) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -453,73 +461,140 @@ func (a *App) LoginStudent(username, password, classroomCode string) map[string]
 
 	syncURL := study.ResolveCloudSyncURL(settings.CloudSyncURL)
 	if syncURL == "" {
-		syncURL = os.Getenv("CLOUD_SYNC_URL")
+		return map[string]interface{}{"error": "Cloud connection URL is not configured"}
 	}
-	if syncURL == "" {
-		return map[string]interface{}{"error": "Supabase Sync URL is not configured in the environment"}
-	}
-
-	anonKey := os.Getenv("CLOUD_API_TOKEN")
-	if anonKey == "" {
-		anonKey = os.Getenv("SUPABASE_ANON_KEY")
-	}
-	if anonKey == "" {
-		anonKey = settings.CloudAPIToken
-	}
-	if anonKey == "" {
-		return map[string]interface{}{"error": "Supabase Anon Key is not configured in the environment"}
-	}
-
-	baseURL := syncURL
-	if strings.Contains(baseURL, "/rest/v1/rpc/") {
-		idx := strings.Index(baseURL, "/rest/v1/")
-		baseURL = baseURL[:idx]
-	}
-	loginURL := fmt.Sprintf("%s/rest/v1/rpc/login_user", strings.TrimSuffix(baseURL, "/"))
-
-	type LoginPayload struct {
-		Username  string `json:"p_username"`
-		Password  string `json:"p_password"`
-		IsDesktop bool   `json:"p_is_desktop"`
-	}
-	payload := LoginPayload{
-		Username:  username,
-		Password:  password,
-		IsDesktop: true,
-	}
-	jsonBytes, err := json.Marshal(payload)
-	if err != nil {
-		return map[string]interface{}{"error": "failed to encode login payload"}
-	}
-
-	req, err := http.NewRequest("POST", loginURL, strings.NewReader(string(jsonBytes)))
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apikey", anonKey)
-	req.Header.Set("Authorization", "Bearer "+anonKey)
+	anonKey := study.ResolveAnonKey()
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return map[string]interface{}{"error": "network error: " + err.Error()}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return map[string]interface{}{"error": fmt.Sprintf("login failed: %s", string(bodyBytes))}
-	}
-
 	var loginResp struct {
 		SessionToken  string `json:"session_token"`
 		Role          string `json:"role"`
 		ClassroomCode string `json:"classroom_code"`
 		Username      string `json:"username"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
-		return map[string]interface{}{"error": "failed to parse login response: " + err.Error()}
+
+	baseURL := syncURL
+	if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
+		baseURL = baseURL[:idx]
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	// 1. Try Go cloud server endpoint /api/auth/login
+	serverURL := study.ResolveCloudServerURL()
+	if serverURL == study.DefaultProductionCloudServerURL && baseURL != "" && !strings.Contains(baseURL, "your-supabase-project") {
+		serverURL = baseURL
+	}
+
+	payload := map[string]interface{}{
+		"username":   username,
+		"password":   password,
+		"is_desktop": true,
+	}
+	jsonBytes, _ := json.Marshal(payload)
+
+	var authenticated bool
+	req, reqErr := http.NewRequest("POST", fmt.Sprintf("%s/api/auth/login", serverURL), bytes.NewBuffer(jsonBytes))
+	if reqErr == nil {
+		req.Header.Set("Content-Type", "application/json")
+		if anonKey != "" {
+			req.Header.Set("apikey", anonKey)
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
+					authenticated = true
+				}
+			}
+		}
+	}
+
+
+
+	// 2. Fallback: query Supabase REST user_accounts table directly if cloud server unreachable
+	if !authenticated {
+		tableURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=ilike.%s&select=*", baseURL, url.QueryEscape(username))
+		req, err := http.NewRequest("GET", tableURL, nil)
+		if err == nil {
+			if anonKey != "" {
+				req.Header.Set("apikey", anonKey)
+				if strings.Count(anonKey, ".") == 2 {
+					req.Header.Set("Authorization", "Bearer "+anonKey)
+				}
+			}
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				if resp.StatusCode == http.StatusOK {
+					if json.Unmarshal(bodyBytes, &loginResp) == nil && loginResp.SessionToken != "" {
+						authenticated = true
+					} else {
+						var users []map[string]interface{}
+						if json.Unmarshal(bodyBytes, &users) == nil && len(users) > 0 {
+							user := users[0]
+							pwd, _ := user["password_hash"].(string)
+							if pwd == "" {
+								pwd, _ = user["password"].(string)
+							}
+							var match bool
+							if strings.HasPrefix(pwd, "$2a$") || strings.HasPrefix(pwd, "$2b$") || strings.HasPrefix(pwd, "$2y$") {
+								match = bcrypt.CompareHashAndPassword([]byte(pwd), []byte(password)) == nil
+							} else if pwd != "" {
+								match = (pwd == password)
+							}
+							if match {
+								role, _ := user["role"].(string)
+								classCode, _ := user["classroom_code"].(string)
+								uname, _ := user["username"].(string)
+
+								sessToken := ""
+								sessReqPayload, _ := json.Marshal(map[string]interface{}{
+									"entity_id":  strings.ToLower(uname),
+									"role":       role,
+									"expires_at": time.Now().AddDate(10, 0, 0).Format(time.RFC3339),
+								})
+								sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", baseURL), bytes.NewBuffer(sessReqPayload))
+								if sErr == nil {
+									sessReq.Header.Set("Content-Type", "application/json")
+									if anonKey != "" {
+										sessReq.Header.Set("apikey", anonKey)
+										if strings.Count(anonKey, ".") == 2 {
+											sessReq.Header.Set("Authorization", "Bearer "+anonKey)
+										}
+									}
+									sessReq.Header.Set("Prefer", "return=representation")
+									if sessRes, sDoErr := client.Do(sessReq); sDoErr == nil {
+										defer sessRes.Body.Close()
+										if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
+											var createdSess []map[string]interface{}
+											if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
+												if tok, ok := createdSess[0]["session_token"].(string); ok && tok != "" {
+													sessToken = tok
+												}
+											}
+										}
+									}
+								}
+								if sessToken == "" {
+									sessToken = uname
+								}
+								loginResp.SessionToken = sessToken
+								loginResp.Role = role
+								loginResp.ClassroomCode = classCode
+								loginResp.Username = uname
+								authenticated = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !authenticated {
+		return map[string]interface{}{"error": "invalid username or password"}
 	}
 
 	settings.CloudAPIToken = loginResp.SessionToken
@@ -529,6 +604,48 @@ func (a *App) LoginStudent(username, password, classroomCode string) map[string]
 		settings.CloudSyncURL = fmt.Sprintf("%s/rest/v1/rpc/handle_cloud_sync", strings.TrimSuffix(baseURL, "/"))
 	}
 
+	// Match or create dedicated Study Profile for this classroom
+	profiles, err := repo.GetProfiles()
+	if err != nil {
+		return map[string]interface{}{"error": "failed to query study profiles: " + err.Error()}
+	}
+
+	var targetProfileID string
+	for _, p := range profiles {
+		if strings.EqualFold(p.ClassroomCode, loginResp.ClassroomCode) && loginResp.ClassroomCode != "" {
+			targetProfileID = p.ID
+			break
+		}
+	}
+
+	if targetProfileID != "" {
+		if err := repo.UpdateProfileCloudCredentials(targetProfileID, loginResp.ClassroomCode, loginResp.Username, loginResp.SessionToken); err != nil {
+			log.Printf("warning: failed to save profile cloud credentials: %v", err)
+		}
+	} else {
+		// Automatically create a new study profile for this new classroom
+		profileName := loginResp.ClassroomCode
+		if profileName == "" {
+			profileName = loginResp.Username
+		}
+		if profileName == "" {
+			profileName = "Classroom Profile"
+		}
+		newProfile := models.StudyProfile{
+			ID:              uuid.NewString(),
+			Name:            profileName,
+			DeadlineAt:      time.Now().AddDate(0, 3, 0).Unix(),
+			ClassroomCode:   loginResp.ClassroomCode,
+			StudentUsername: loginResp.Username,
+			CloudAPIToken:   loginResp.SessionToken,
+		}
+		if err := repo.CreateProfile(newProfile); err != nil {
+			return map[string]interface{}{"error": "failed to create classroom study profile: " + err.Error()}
+		}
+		targetProfileID = newProfile.ID
+	}
+
+	settings.ActiveProfileID = targetProfileID
 	if err := repo.UpdateUserSettings(*settings); err != nil {
 		return map[string]interface{}{"error": "failed to save settings: " + err.Error()}
 	}
@@ -538,7 +655,96 @@ func (a *App) LoginStudent(username, password, classroomCode string) map[string]
 		"session_token":  loginResp.SessionToken,
 		"classroom_code": loginResp.ClassroomCode,
 		"username":       loginResp.Username,
+		"profile_id":     targetProfileID,
 	}
+}
+
+// SignUpStudent handles new student account registration using Go cloud-server API or direct Supabase user_accounts REST insert.
+func (a *App) SignUpStudent(username, password, classroomCode string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	settings, err := repo.GetUserSettings()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	var signedUp bool
+
+	serverURL := study.ResolveCloudServerURL()
+	if serverURL != "" {
+		signupURL := fmt.Sprintf("%s/api/auth/signup", serverURL)
+		payload := map[string]string{
+			"username":       username,
+			"password":       password,
+			"role":           "student",
+			"classroom_code": classroomCode,
+		}
+		jsonBytes, _ := json.Marshal(payload)
+		req, reqErr := http.NewRequest("POST", signupURL, bytes.NewBuffer(jsonBytes))
+		if reqErr == nil {
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					signedUp = true
+				}
+			}
+		}
+	}
+
+	// Fallback: direct Supabase REST table insert if cloud server unreachable (WIP server / free tier)
+	if !signedUp {
+		syncURL := study.ResolveCloudSyncURL(settings.CloudSyncURL)
+		if syncURL == "" {
+			return map[string]interface{}{"error": "Cloud connection URL is not configured"}
+		}
+		anonKey := study.ResolveAnonKey()
+		if anonKey == "" {
+			return map[string]interface{}{"error": "Supabase Anon Key is not configured in environment"}
+		}
+
+		baseURL := syncURL
+		if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
+			baseURL = baseURL[:idx]
+		}
+		insertURL := fmt.Sprintf("%s/rest/v1/user_accounts", strings.TrimSuffix(baseURL, "/"))
+
+		newUser := map[string]string{
+			"username":       username,
+			"password_hash":  password,
+			"role":           "student",
+			"classroom_code": classroomCode,
+		}
+		jsonBytes, _ := json.Marshal(newUser)
+		req, err := http.NewRequest("POST", insertURL, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("apikey", anonKey)
+		if strings.Count(anonKey, ".") == 2 {
+			req.Header.Set("Authorization", "Bearer "+anonKey)
+		}
+		req.Header.Set("Prefer", "return=representation")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return map[string]interface{}{"error": "network error: " + err.Error()}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			return map[string]interface{}{"error": fmt.Sprintf("signup failed: %s", string(bodyBytes))}
+		}
+	}
+
+	// On successful signup, perform immediate login to establish active session token
+	return a.LoginStudent(username, password)
 }
 
 // LogoutStudent signs out the student by clearing saved sync credentials from the SQLite store.
@@ -556,6 +762,11 @@ func (a *App) LogoutStudent() map[string]interface{} {
 	settings.StudentUsername = ""
 	if err := repo.UpdateUserSettings(*settings); err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+	if settings.ActiveProfileID != "" {
+		if err := repo.UpdateProfileCloudCredentials(settings.ActiveProfileID, "", "", ""); err != nil {
+			log.Printf("warning: failed to clear active profile cloud credentials: %v", err)
+		}
 	}
 	return map[string]interface{}{"ok": true}
 }

@@ -316,7 +316,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	}
 	if s.TargetSessionWords <= 0 {
 		s.TargetSessionWords = 5000
-		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = 5000 WHERE id = 1`); updateErr != nil {
+		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = ? WHERE id = 1`, s.TargetSessionWords); updateErr != nil {
 			utils.Warnf("failed to persist default target_session_words: %v", updateErr)
 		}
 	}
@@ -367,6 +367,22 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 				s.ActiveProfileID = ""
 			}
 		}
+	}
+
+	// Read active profile's cloud credentials if available
+	if s.ActiveProfileID != "" {
+		var profClassroom, profUser, profToken sql.NullString
+		err := r.db.QueryRow(`
+			SELECT COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
+			FROM study_profiles
+			WHERE id = ?
+		`, s.ActiveProfileID).Scan(&profClassroom, &profUser, &profToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query active profile credentials: %w", err)
+		}
+		s.ClassroomCode = profClassroom.String
+		s.StudentUsername = profUser.String
+		s.CloudAPIToken = profToken.String
 	}
 
 	return &s, nil
@@ -624,7 +640,7 @@ func sameLLMConfig(a, b models.LLMTierSettings) bool {
 // GetProfiles retrieves all study profiles.
 func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, deadline_at, created_at
+		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
 		FROM study_profiles
 		ORDER BY created_at DESC
 	`)
@@ -640,7 +656,7 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	profiles := make([]models.StudyProfile, 0)
 	for rows.Next() {
 		var p models.StudyProfile
-		if err := rows.Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken); err != nil {
 			return nil, err
 		}
 		profiles = append(profiles, p)
@@ -655,10 +671,10 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	var p models.StudyProfile
 	err := r.db.QueryRow(`
-		SELECT id, name, deadline_at, created_at
+		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
 		FROM study_profiles
 		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt)
+	`, id).Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -671,9 +687,9 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 // CreateProfile creates a new study profile.
 func (r *Repository) CreateProfile(p models.StudyProfile) error {
 	_, err := r.db.Exec(`
-		INSERT INTO study_profiles (id, name, deadline_at)
-		VALUES (?, ?, ?)
-	`, p.ID, p.Name, p.DeadlineAt)
+		INSERT INTO study_profiles (id, name, deadline_at, classroom_code, student_username, cloud_api_token)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken)
 	return err
 }
 
@@ -684,6 +700,16 @@ func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 		SET name = ?, deadline_at = ?
 		WHERE id = ?
 	`, p.Name, p.DeadlineAt, p.ID)
+	return err
+}
+
+// UpdateProfileCloudCredentials updates the cloud credentials for a specific profile.
+func (r *Repository) UpdateProfileCloudCredentials(profileID, classroomCode, studentUsername, cloudAPIToken string) error {
+	_, err := r.db.Exec(`
+		UPDATE study_profiles
+		SET classroom_code = ?, student_username = ?, cloud_api_token = ?
+		WHERE id = ?
+	`, classroomCode, studentUsername, cloudAPIToken, profileID)
 	return err
 }
 
@@ -829,12 +855,5 @@ func (r *Repository) GetRemedialStrategy() (string, error) {
 		return "CLASSIC", nil
 	}
 	return strategy, nil
-}
-
-func (r *Repository) SetRemedialStrategy(strategy string) error {
-	_, err := r.db.Exec(
-		`UPDATE user_settings SET default_remedial_strategy = ? WHERE id = 1`, strategy,
-	)
-	return err
 }
 

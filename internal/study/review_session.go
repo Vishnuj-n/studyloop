@@ -6,6 +6,7 @@ import (
 	"ai-tutor/internal/scheduler"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -22,9 +23,6 @@ func (s *StudyService) GetReviewSession(taskID string) (*models.ReviewSession, e
 	return s.repo.GetReviewSession(taskID)
 }
 
-func (s *StudyService) ApplyFlashcardReview(cardID string, ratingCode int) (*models.Flashcard, *models.FlashcardState, string, error) {
-	return s.applyFlashcardReview(nil, cardID, ratingCode)
-}
 
 func (s *StudyService) applyFlashcardReview(tx *sql.Tx, cardID string, ratingCode int) (*models.Flashcard, *models.FlashcardState, string, error) {
 	var (
@@ -157,7 +155,7 @@ func (s *StudyService) SuspendFlashcard(taskID, cardID string) (int, error) {
 		if err := s.repo.SuspendFlashcardTx(tx, cardID); err != nil {
 			return err
 		}
-		if err := s.repo.MarkReviewTaskCardReviewedTx(tx, taskID, cardID); err != nil {
+		if err := s.repo.MarkReviewTaskCardReviewedTx(tx, taskID, cardID); err != nil && !errors.Is(err, db.ErrReviewLinkNotPending) {
 			return err
 		}
 		return nil
@@ -232,9 +230,14 @@ func FlashcardStateToCard(state models.FlashcardState, dueAt, lastReviewedAt int
 		fsrsState = fsrs.New
 	}
 
+	stability := state.Stability
+	if fsrsState != fsrs.New && stability < 0.001 {
+		stability = 0.001
+	}
+
 	return fsrs.Card{
 		Due:            dueTime,
-		Stability:      state.Stability,
+		Stability:      stability,
 		Difficulty:     state.Difficulty,
 		ScheduledDays:  uint64(state.ScheduledDays),
 		Reps:           uint64(state.Reps),

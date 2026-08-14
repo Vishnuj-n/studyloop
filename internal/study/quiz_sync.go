@@ -260,7 +260,7 @@ func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []strin
 		"correct_answer must match one option exactly.",
 		"AVOID yes/no questions. PREFER 'why', 'how', 'what is', 'explain' questions.",
 		"",
-		"JSON schema: {\"questions\":[{\"source_chunk_id\":string,\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",
+		"JSON schema: {\"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",
 		"Chunks:",
 		strings.Join(contextParts, "\n"),
 	}, "\n")
@@ -573,6 +573,9 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		if task.TopicID != "" {
 			if err := s.repo.ResetRereadAttemptCountTx(tx, task.TopicID); err != nil {
 				return models.QuizResult{}, fmt.Errorf("failed to reset reread attempts: %w", err)
+			}
+			if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
+				return models.QuizResult{}, fmt.Errorf("failed to mark topic completed: %w", err)
 			}
 		}
 	} else if task.TopicID != "" {

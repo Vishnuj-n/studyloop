@@ -1,6 +1,8 @@
 build/bin
 node_modules
 frontend/dist
+cloud-dashboard/dist
+cloud-dashboard/node_modules
 asset/model_int8.onnx
 asset/onnxruntime.dll
 asset/vec0.dll
@@ -27,3 +29,5 @@ doc/NOTES/
 .scannerwork/
 doc/ORIGINAL_NOTES/
 __pycache__/
+bin/
+cloud-dashboard/dist/

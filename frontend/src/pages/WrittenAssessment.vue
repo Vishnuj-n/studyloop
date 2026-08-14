@@ -539,28 +539,6 @@ function reset() {
   color: #dc2626;
 }
 
-/* FSRS chip */
-.fsrs-chip {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  background: var(--surface-container-low);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 12px;
-}
-
-.fsrs-rating {
-  color: var(--primary);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.fsrs-days {
-  color: var(--muted-text);
-  font-weight: 500;
-}
-
 .result-panel__feedback {
   margin: 0;
   font-size: 15px;

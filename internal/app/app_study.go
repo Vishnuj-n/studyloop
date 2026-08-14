@@ -52,14 +52,14 @@ func calculateFlashcardBudgets(dueCards, maxFlashcards int) (int, int, int) {
 	return materializedCards, deferredCards, safeReviewBudget
 }
 
-func aggregateQueueTasks(active, pending []models.StudyQueueTask) ([]models.ScheduledTask, []string, int, map[string]int) {
+func aggregateQueueTasks(repo *db.Repository, active, pending []models.StudyQueueTask) ([]models.ScheduledTask, []string, int, map[string]int) {
 	queueTasks := make([]models.ScheduledTask, 0, len(active)+len(pending))
 	actionCounts := make(map[string]int)
 	activeTopicsMap := make(map[string]bool)
 
 	processTasks := func(tasks []models.StudyQueueTask) {
 		for _, q := range tasks {
-			task := queueTaskToScheduledTask(q)
+			task := queueTaskToScheduledTask(q, repo)
 			queueTasks = append(queueTasks, task)
 			actionCounts[task.ActionType]++
 			if q.Title != "" {
@@ -238,7 +238,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 
 	dailyStudyMinutes := calculateDailyStudyMinutes(settings.StudyStartTime, settings.StudyEndTime)
 	materializedCards, deferredCards, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
-	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(activeQueueTasks, pendingQueueTasks)
+	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(repo, activeQueueTasks, pendingQueueTasks)
 
 	if reviewTask, ok := buildReviewTaskForPlan(repo, now, materializedCards, safeReviewBudget); ok {
 		queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
@@ -311,7 +311,7 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 	}, true
 }
 
-func queueTaskToScheduledTask(task models.StudyQueueTask) models.ScheduledTask {
+func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) models.ScheduledTask {
 	actionType := strings.ToLower(string(task.TaskType))
 	titleBase := strings.TrimSpace(task.Title)
 	if titleBase == "" {
@@ -343,17 +343,41 @@ func queueTaskToScheduledTask(task models.StudyQueueTask) models.ScheduledTask {
 	if task.StartPage > 0 && task.EndPage > 0 {
 		meta = fmt.Sprintf("Pages %d-%d", task.StartPage, task.EndPage)
 	}
+
 	estimateMinutes := 10
-	if task.TaskType == models.StudyTaskTypeFlashcardGenerate {
+	switch {
+	case task.TaskType == models.StudyTaskTypeFlashcardGenerate:
 		estimateMinutes = 0
-	} else if task.TaskType == models.StudyTaskTypeFlashcardReview {
-		// Use card count from payload if available
+	case task.TaskType == models.StudyTaskTypeFlashcardReview:
 		var payload models.ReviewSessionPayload
 		if err := json.Unmarshal([]byte(task.PayloadJSON), &payload); err == nil && payload.CardCount > 0 {
 			estimateMinutes = int(math.Ceil(float64(payload.CardCount) * scheduler.ReviewMinutesPerCard))
 		}
-	} else if task.StartPage > 0 && task.EndPage >= task.StartPage {
-		estimateMinutes = int(float64(task.EndPage-task.StartPage+1) * scheduler.MinutesPerPage)
+	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
+		// Word-count based estimation (words / 200 WPM).
+		// Falls back to page-count if chunks have not been ingested yet.
+		totalWords := 0
+		if tokenMap, err := repo.GetTokensPerPageMap(task.TopicID, task.StartPage, task.EndPage); err == nil {
+			for _, w := range tokenMap {
+				totalWords += w
+			}
+		}
+		pageCount := task.EndPage - task.StartPage + 1
+		estimationSource := "word_count"
+		if totalWords > 0 {
+			estimateMinutes = int(math.Ceil(float64(totalWords) / float64(scheduler.WordsPerMinute)))
+			// safety floor: at least 1 min/page
+			if pageFloor := pageCount; estimateMinutes < pageFloor {
+				estimateMinutes = pageFloor
+			}
+		} else {
+			estimationSource = "no_chunks_yet"
+			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinMinutesPerPage))
+		}
+		utils.Warnf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
+			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
+	case task.StartPage > 0 && task.EndPage >= task.StartPage:
+		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinMinutesPerPage))
 	}
 
 	return models.ScheduledTask{
@@ -378,26 +402,17 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	if taskID == models.ReviewTaskDailyID {
 		return map[string]interface{}{"ok": true}
 	}
-	if task, err := repo.GetTaskByID(taskID); err == nil {
-		utils.Warnf("[QUEUE] ActivateTask precheck taskID=%s status=%s type=%s notebookID=%s topicID=%s", taskID, task.Status, task.TaskType, task.NotebookID, task.TopicID)
-	} else {
-		utils.Warnf("[QUEUE] ActivateTask precheck taskID=%s loadError=%v", taskID, err)
-	}
-	if err := repo.ActivateTask(taskID); err != nil {
+	task, err := repo.GetTaskByID(taskID)
+	if err != nil {
 		return mapTaskError(err)
 	}
-	return map[string]interface{}{"ok": true}
-}
-
-func (a *App) CompleteTask(taskID string, result models.CompletionResult) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
+	if task.Status == models.StudyTaskStatusActive {
+		return map[string]interface{}{"ok": true}
 	}
-	if strings.TrimSpace(taskID) == "" {
-		return map[string]interface{}{"error": "task ID is required", "code": 400}
+	if task.Status == models.StudyTaskStatusCompleted {
+		return map[string]interface{}{"error": "ErrTaskCompleted", "code": 409}
 	}
-	if err := repo.CompleteTask(taskID, result); err != nil {
+	if err := repo.ActivateTask(taskID); err != nil {
 		return mapTaskError(err)
 	}
 	return map[string]interface{}{"ok": true}
@@ -430,7 +445,7 @@ func (a *App) CompleteMilestoneExam(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
+func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -461,48 +476,51 @@ func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	}
 }
 
-// GetDashboardOverview consolidates settings, profiles, today plan, and streak state into a single IPC payload.
+// GetDashboardOverview consolidates settings, profiles, today plan, streak state, and pending ingestion info into a single IPC payload.
 func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interface{} {
 	settings := a.GetUserSettings()
 	profiles := a.GetProfiles()
 	todayPlan := a.GetTodayPlan()
-	streakState := a.GetStreakState(timezoneOffsetMinutes)
+	streakState := a.getStreakState(timezoneOffsetMinutes)
+
+	var pendingNotebook map[string]interface{}
+	var pendingNotebookError string
+
+	if repo := a.getRepo(); repo != nil {
+		activeProfileID, _ := repo.GetActiveProfileID()
+		notebooks, err := repo.GetNotebooks("", activeProfileID)
+		if err != nil {
+			pendingNotebookError = err.Error()
+		} else {
+			for _, nb := range notebooks {
+				if (nb.ChunkCount == 0 || nb.Status == "uploaded" || nb.Status == "draft_ready" || nb.Status == "") && nb.Status != "indexing" && nb.Status != "indexed" && nb.Status != "failed" {
+					pendingNotebook = map[string]interface{}{
+						"id":              nb.ID,
+						"title":           nb.Title,
+						"file_type":       nb.FileType,
+						"topic_id":        nb.TopicID,
+						"status":          nb.Status,
+						"indexing_status": nb.IndexingStatus,
+						"page_count":      nb.PageCount,
+						"chunk_count":     nb.ChunkCount,
+						"priority":        nb.Priority,
+					}
+					break
+				}
+			}
+		}
+	} else {
+		pendingNotebookError = "database not initialized"
+	}
 
 	return map[string]interface{}{
-		"settings":     settings,
-		"profiles":     profiles,
-		"today_plan":   todayPlan,
-		"streak_state": streakState,
+		"settings":               settings,
+		"profiles":               profiles,
+		"today_plan":             todayPlan,
+		"streak_state":           streakState,
+		"pending_notebook":       pendingNotebook,
+		"pending_notebook_error": pendingNotebookError,
 	}
-}
-
-func (a *App) SkipTask(taskID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if strings.TrimSpace(taskID) == "" {
-		return map[string]interface{}{"error": "task ID is required", "code": 400}
-	}
-	if err := repo.SkipTask(taskID); err != nil {
-		return mapTaskError(err)
-	}
-	return map[string]interface{}{"ok": true}
-}
-
-func (a *App) GetQueueState(notebookID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if strings.TrimSpace(notebookID) == "" {
-		return map[string]interface{}{"error": "notebook ID is required", "code": 400}
-	}
-	state, err := repo.GetQueueState(notebookID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"queue_state": state}
 }
 
 // ---------- Helpers for InitializeReadingSession ----------
@@ -1044,61 +1062,6 @@ func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage in
 	return a.studyService.GenerateComprehensiveExam(notebookID, startPage, endPage)
 }
 
-func (a *App) GenerateFlashcards(topicID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if a.studyService == nil {
-		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-
-	notebooks, err := repo.GetNotebooks(topicID, "")
-	if err != nil {
-		return map[string]interface{}{"error": "failed to get notebook: " + err.Error()}
-	}
-	if len(notebooks) == 0 {
-		return map[string]interface{}{"error": "no notebook found for topic"}
-	}
-	notebookID := notebooks[0].ID
-
-	startPage, endPage, err := repo.GetTopicPageBounds(topicID)
-	if err != nil {
-		return map[string]interface{}{"error": "failed to get topic page bounds: " + err.Error()}
-	}
-
-	cards, states, existing, tier, err := a.studyService.GenerateFSRSCardsForTopic(topicID, notebookID, startPage, endPage)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	now := time.Now().Unix()
-	response := map[string]interface{}{
-		"notebook_id":       notebookID,
-		"existing":          existing,
-		"start_page":        startPage,
-		"end_page":          endPage,
-		"topic_id":          topicID,
-		"cards":             cards,
-		"states":            states,
-		"card_count":        len(cards),
-		"llm_tier":          tier,
-		"generated_at_unix": now,
-	}
-
-	var initialDueAt int64 = 0
-	for _, card := range cards {
-		if card.DueAt > 0 && (initialDueAt == 0 || card.DueAt < initialDueAt) {
-			initialDueAt = card.DueAt
-		}
-	}
-	if initialDueAt > 0 {
-		response["initial_due_at"] = initialDueAt
-	}
-
-	return response
-}
-
 func (a *App) GetReviewSession(taskID string, notebookID string) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
@@ -1154,11 +1117,19 @@ func materializeSyntheticReviewSession(repo *db.Repository, notebookID string) (
 }
 
 func (a *App) RecordCardReview(taskID, cardID string, rating int) map[string]interface{} {
-	if _, errMap := requireRepo(a); errMap != nil {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
+	}
+	if taskID == models.ReviewTaskDailyID {
+		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		taskID = resolvedTaskID
 	}
 	remaining, err := a.studyService.RecordCardReview(taskID, cardID, rating)
 	if err != nil {
@@ -1168,11 +1139,19 @@ func (a *App) RecordCardReview(taskID, cardID string, rating int) map[string]int
 }
 
 func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
-	if _, errMap := requireRepo(a); errMap != nil {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
+	}
+	if taskID == models.ReviewTaskDailyID {
+		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		taskID = resolvedTaskID
 	}
 	if err := a.studyService.CompleteReviewSession(taskID); err != nil {
 		return mapTaskError(err)
@@ -1181,17 +1160,38 @@ func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 }
 
 func (a *App) SuspendFlashcard(taskID, cardID string) map[string]interface{} {
-	if _, errMap := requireRepo(a); errMap != nil {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
+	}
+	if taskID == models.ReviewTaskDailyID {
+		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		taskID = resolvedTaskID
 	}
 	remaining, err := a.studyService.SuspendFlashcard(taskID, cardID)
 	if err != nil {
 		return mapTaskError(err)
 	}
 	return map[string]interface{}{"ok": true, "remaining": remaining}
+}
+
+func (a *App) ForceDueFlashcardsNow() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	profileID, _ := repo.GetActiveProfileID()
+	updated, err := repo.MakeAllFlashcardsDueNow(profileID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "updated_cards": updated}
 }
 
 func (a *App) ScoreShortAnswer(questionID, userAnswer string) map[string]interface{} {

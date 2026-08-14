@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"strings"
 	"sync"
 
@@ -157,10 +156,6 @@ func (a *App) GetCtx() context.Context {
 // GetNotebookUploadDir returns the uploaded notebook files directory path.
 func (a *App) GetNotebookUploadDir() string {
 	return a.notebookUploadDir
-}
-
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
 }
 
 // LogFrontendEvent accepts a structured log event from the frontend and writes it to the queue logger.
@@ -345,49 +340,6 @@ func (a *App) AskReaderAI(topicID, notebookID, question, scope string, currentPa
 	})
 }
 
-func (a *App) GetEmbeddingDiagnostics(text string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	a.aiMutex.Lock()
-	if !a.aiReady || a.embedder == nil {
-		reason := a.aiInitError
-		a.aiMutex.Unlock()
-		if reason == "" {
-			reason = errLocalAIRuntimeNotReady
-		}
-		return map[string]interface{}{"error": "Embedding diagnostics unavailable: " + reason}
-	}
-	emb := a.embedder
-	a.aiMutex.Unlock()
-	input := strings.TrimSpace(text)
-	if input == "" {
-		input = "quick embedding diagnostic sentence"
-	}
-	vector, err := emb.Embed(input)
-	if err != nil {
-		return map[string]interface{}{"error": "embedding run failed: " + err.Error()}
-	}
-	declaredDim := int(emb.GetDimension())
-	count := len(vector)
-	if count > 8 {
-		count = 8
-	}
-	sample := make([]float32, count)
-	copy(sample, vector[:count])
-	var sumSquares float64
-	for _, v := range vector {
-		sumSquares += float64(v * v)
-	}
-	return map[string]interface{}{
-		"ok": true, "input_chars": len(input),
-		"declared_dimension": declaredDim, "vector_length": len(vector),
-		"dimension_match": len(vector) == declaredDim,
-		"sample_norm_l2":  math.Sqrt(sumSquares), "sample_first_values": sample,
-	}
-}
-
 // Global state variables for RAG initialization lock
 var ragSetupMutex sync.Mutex
 var isRagSettingUp bool
@@ -439,9 +391,14 @@ func (a *App) performAsyncRAGSetup() {
 		return
 	}
 
-	newRepo, err := a.loadVectorDBWithFallback(dbPath, am.Vec0DllPath())
+	newRepo, err := db.Init(dbPath, am.Vec0DllPath())
 	if err != nil {
-		emitRagSetupFailed(a, err.Error())
+		emitRagSetupFailed(a, fmt.Sprintf("failed to initialize vector DB: %v", err))
+		return
+	}
+	if !newRepo.IsVecExtensionLoaded() {
+		_ = newRepo.Close()
+		emitRagSetupFailed(a, "sqlite-vec extension is missing or failed to load (requires CGO and vec0 binary)")
 		return
 	}
 
@@ -532,53 +489,6 @@ func (a *App) acquireAndStageAssets(am *runtime.AssetManager) error {
 	return nil
 }
 
-func (a *App) loadVectorDBWithFallback(dbPath, vecDllPath string) (*db.Repository, error) {
-	newRepo, err := db.Init(dbPath, vecDllPath)
-	if err != nil {
-		return nil, a.fallbackToNonVectorDB(dbPath, fmt.Sprintf("failed to reload DB with vector extension: %v", err))
-	}
-
-	if !newRepo.IsVecExtensionLoaded() {
-		_ = newRepo.Close()
-		return nil, a.fallbackToNonVectorDB(dbPath, "sqlite-vec extension is missing or failed to load (requires CGO and vec0 binary)")
-	}
-
-	return newRepo, nil
-}
-
-func (a *App) fallbackToNonVectorDB(dbPath string, originalErrMsg string) error {
-	repo := a.getRepo()
-	fbRepo, fbErr := db.Init(dbPath, "")
-	if fbErr != nil {
-		return fmt.Errorf("%s, and fallback non-vector initialization also failed: %v", originalErrMsg, fbErr)
-	}
-
-	a.repoMutex.Lock()
-	oldDB := repo.SwapDB(fbRepo)
-	if oldDB != nil {
-		_ = oldDB.Close()
-	}
-	a.scheduler = scheduler.New(repo, scheduler.Dependencies{})
-	a.repoMutex.Unlock()
-
-	a.aiMutex.Lock()
-	a.aiReady = false
-	if a.indexQueue != nil {
-		a.indexQueue.Stop()
-		a.indexQueue = nil
-	}
-	a.embedder = nil
-	a.retrievalEngine = nil
-	a.studyService = study.NewStudyService(study.Config{
-		Repo:             repo,
-		FastLLMProvider:  a.fastLLMProvider,
-		HeavyLLMProvider: a.heavyLLMProvider,
-		RetrievalEngine:  nil,
-	})
-	a.aiMutex.Unlock()
-
-	return fmt.Errorf("%s", originalErrMsg)
-}
 
 func (a *App) initEmbedder(am *runtime.AssetManager) (*embeddings.OnnxEmbedder, error) {
 	emb, err := embeddings.NewOnnxEmbedder(am.ModelPath(), am.TokenizerPath(), am.OnnxRuntimePath())

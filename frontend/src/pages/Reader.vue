@@ -777,12 +777,6 @@ h1 {
   letter-spacing: -0.02em;
 }
 
-h2 {
-  margin: 0;
-  font-size: 28px;
-  font-family: 'Manrope', sans-serif;
-}
-
 h3 {
   margin: 0;
   font-size: 18px;
@@ -948,38 +942,6 @@ h3 {
   gap: 8px;
 }
 
-.section-list {
-  display: grid;
-  gap: 6px;
-  max-height: 220px;
-  overflow: auto;
-}
-
-.section-item {
-  border: 1px solid var(--surface-container-low);
-  background: var(--surface-container-lowest);
-  border-radius: 10px;
-  padding: 9px;
-  text-align: left;
-  display: grid;
-  gap: 2px;
-}
-
-.section-item.active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-lowest));
-}
-
-.section-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--on-surface);
-}
-
-.section-page {
-  font-size: 12px;
-  color: var(--muted-text);
-}
 
 .field {
   display: grid;
@@ -994,8 +956,7 @@ h3 {
   color: var(--muted-text);
 }
 
-select,
-textarea {
+select {
   width: 100%;
   border: 1px solid var(--surface-container-low);
   background: var(--surface-container-lowest);
@@ -1004,11 +965,6 @@ textarea {
   font: inherit;
   padding: 10px;
   outline: 0;
-}
-
-textarea {
-  min-height: 110px;
-  resize: vertical;
 }
 
 button {
@@ -1029,8 +985,7 @@ button:disabled {
   background: linear-gradient(160deg, var(--primary), var(--primary-dim));
 }
 
-.secondary,
-.ghost {
+.secondary {
   color: var(--on-surface);
   background: var(--surface-container-low);
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -156,7 +157,9 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 3
 	`
@@ -186,6 +189,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 				sq.start_page, sq.end_page,
 				t.start_page AS topic_start_page, t.end_page AS topic_end_page,
 				t.title AS topic_title, n.title AS notebook_title, n.priority AS notebook_priority,
+				(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') AS last_completed_at,
 				ROW_NUMBER() OVER (
 					PARTITION BY sq.notebook_id
 					ORDER BY
@@ -205,7 +209,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 			  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
 		) ranked_tasks
 		WHERE rn = 1
-		ORDER BY COALESCE(notebook_priority, 5) DESC, notebook_title ASC, id ASC
+		ORDER BY COALESCE(notebook_priority, 5) DESC, last_completed_at ASC, notebook_title ASC, id ASC
 		LIMIT 1
 	`
 	rows, err := r.db.Query(query, activeProfileID, activeProfileID, activeProfileID)
@@ -327,7 +331,9 @@ func (r *Repository) getNextTaskNoProfile(notebookID string) (*models.StudyQueue
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`
@@ -369,7 +375,9 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
-			COALESCE(n.priority, 5) DESC, sq.priority ASC, n.title ASC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC, n.title ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`
@@ -544,80 +552,6 @@ func (r *Repository) CompleteTask(taskID string, result models.CompletionResult)
 	}
 	utils.Warnf("[QUEUE] CompleteTask tx commit success taskID=%s", strings.TrimSpace(taskID))
 	return nil
-}
-
-// SkipTask marks one task as SKIPPED.
-func (r *Repository) SkipTask(taskID string) error {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return fmt.Errorf("task id is required")
-	}
-	res, err := r.db.Exec(`
-		UPDATE study_queue
-		SET status = 'SKIPPED', completed_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND status IN ('PENDING', 'ACTIVE')
-	`, taskID)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 1 {
-		return nil
-	}
-	var exists int
-	if err := r.db.QueryRow(`SELECT COUNT(*) FROM study_queue WHERE id = ?`, taskID).Scan(&exists); err != nil {
-		return err
-	}
-	if exists == 0 {
-		return ErrTaskNotFound
-	}
-	return fmt.Errorf("task cannot be skipped from current status")
-}
-
-// GetQueueState returns pending counts by task type, optionally filtered by notebook.
-func (r *Repository) GetQueueState(notebookID string) (models.QueueState, error) {
-	notebookID = strings.TrimSpace(notebookID)
-	state := models.QueueState{
-		NotebookID: notebookID,
-		Pending:    map[string]int{},
-	}
-
-	query := `
-		SELECT task_type, COUNT(*)
-		FROM study_queue
-		WHERE status = 'PENDING'
-	`
-	args := make([]interface{}, 0, 1)
-	if notebookID != "" {
-		query += ` AND notebook_id = ?`
-		args = append(args, notebookID)
-	}
-	query += ` GROUP BY task_type`
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return state, err
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	for rows.Next() {
-		var taskType string
-		var count int
-		if err := rows.Scan(&taskType, &count); err != nil {
-			return state, err
-		}
-		state.Pending[taskType] = count
-		state.Total += count
-	}
-	if err := rows.Err(); err != nil {
-		return state, err
-	}
-	return state, nil
 }
 
 // GetReadingTask returns one reader-compatible task with locked bounds and persisted cursor.
@@ -1406,10 +1340,14 @@ func (r *Repository) GetQuestionsForQuizAttempts(attemptIDs []string) ([]models.
 }
 
 // EnsurePendingReadingTaskForNotebook ensures at least one PENDING/ACTIVE READING task exists in study_queue for an active notebook.
-func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) error {
+func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targetSessionWords int) error {
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
 		return fmt.Errorf("notebook id is required")
+	}
+
+	if targetSessionWords <= 0 {
+		targetSessionWords = 5000
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
@@ -1426,7 +1364,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 		}
 
 		var topicID, topicTitle, notebookTitle string
-		var startPage, endPage int
+		var topicStartPage, topicEndPage int
 		err = tx.QueryRow(`
 			SELECT
 				t.id,
@@ -1440,12 +1378,118 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 			WHERE nt.notebook_id = ? AND COALESCE(t.status, 'unseen') != 'completed'
 			ORDER BY t.start_page ASC, t.id ASC
 			LIMIT 1
-		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &startPage, &endPage)
+		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &topicStartPage, &topicEndPage)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil // No uncompleted topics found
 		}
 		if err != nil {
 			return err
+		}
+
+		// Calculate soft-capped page window based on targetSessionWords
+		topicCursor := models.ReadingTopicCursor{
+			ID:         topicID,
+			Title:      topicTitle,
+			StartPage:  topicStartPage,
+			EndPage:    topicEndPage,
+			NotebookID: notebookID,
+		}
+
+		var queryErr error
+		startPage, endPage, ok, wordMap := ResolvePageWindow(topicCursor, targetSessionWords, func(tID string, sp int, ep int) (map[int]int, error) {
+			query := `
+				SELECT page_num, COALESCE(token_count, 0), COALESCE(chunk_text, '')
+				FROM chunks
+				WHERE topic_id = ? AND page_num BETWEEN ? AND ?
+				ORDER BY page_num
+			`
+			rows, qErr := tx.Query(query, tID, sp, ep)
+			if qErr != nil {
+				queryErr = qErr
+				return nil, qErr
+			}
+			defer func() { _ = rows.Close() }()
+
+			wMap := make(map[int]int)
+			for rows.Next() {
+				var pNum, tCount int
+				var cText string
+				if sErr := rows.Scan(&pNum, &tCount, &cText); sErr == nil {
+					if tCount <= 0 {
+						tCount = utf8.RuneCountInString(cText) / 4
+					}
+					wMap[pNum] += tCount
+				}
+			}
+			if rErr := rows.Err(); rErr != nil {
+				queryErr = rErr
+				return nil, rErr
+			}
+			return wMap, nil
+		})
+		if queryErr != nil {
+			return queryErr
+		}
+
+		if !ok {
+			startPage = topicStartPage
+			endPage = topicEndPage
+		} else {
+			// Calculate current total word count for startPage..endPage using wordMap
+			var currentWords int
+			for p := startPage; p <= endPage; p++ {
+				pWords := wordMap[p]
+				if pWords <= 0 {
+					pWords = FallbackWordsPerPage
+				}
+				currentWords += pWords
+			}
+
+			// Semantic extension: check up to +3 additional pages
+			const maxExtensionPages = 3
+			const minSimilarityThreshold = 0.85
+			maxTotalWords := targetSessionWords + int(float64(targetSessionWords)*0.3)
+
+			baseEndPage := endPage
+			stopReason := "max_pages"
+			for ext := 1; ext <= maxExtensionPages; ext++ {
+				nextPage := endPage + 1
+				if nextPage > topicEndPage {
+					stopReason = "topic_end"
+					break
+				}
+
+				// Get word count for nextPage from wordMap
+				nextPageWords := wordMap[nextPage]
+				if nextPageWords <= 0 {
+					nextPageWords = FallbackWordsPerPage
+				}
+
+				if currentWords+nextPageWords > maxTotalWords {
+					stopReason = "word_limit"
+					break
+				}
+
+				sim, simErr := r.GetPageBoundaryCosineSimilarityTx(tx, topicID, endPage, nextPage)
+				if simErr != nil {
+					stopReason = "query_err"
+					break
+				}
+				if sim < minSimilarityThreshold {
+					stopReason = fmt.Sprintf("similarity_low(%.2f)", sim)
+					break
+				}
+
+				// Absorbed! Extend endPage
+				endPage = nextPage
+				currentWords += nextPageWords
+			}
+
+			if endPage > baseEndPage {
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, stopReason)
+			} else {
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d reason=%s", topicID, baseEndPage, currentWords, stopReason)
+			}
 		}
 
 		taskID := fmt.Sprintf("task-read-%s-%s", notebookID, topicID)
@@ -1470,6 +1514,11 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string) erro
 
 // EnsurePendingReadingTasksForActiveNotebooks ensures all active notebooks for a profile have at least one PENDING/ACTIVE task.
 func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID string) error {
+	targetWords := 5000
+	if settings, err := r.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
+		targetWords = settings.TargetSessionWords
+	}
+
 	rows, err := r.db.Query(`
 		SELECT id FROM notebooks
 		WHERE study_status = 'active'
@@ -1494,7 +1543,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 	}
 
 	for _, nID := range notebookIDs {
-		if err := r.EnsurePendingReadingTaskForNotebook(nID); err != nil {
+		if err := r.EnsurePendingReadingTaskForNotebook(nID, targetWords); err != nil {
 			utils.Warnf("[QUEUE] failed to ensure reading task for active notebook %s: %v", nID, err)
 		}
 	}

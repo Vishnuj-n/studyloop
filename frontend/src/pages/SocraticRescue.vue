@@ -394,7 +394,7 @@ h1 {
 
 .split-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   flex: 1;
 }
@@ -403,6 +403,7 @@ h1 {
   display: flex;
   flex-direction: column;
   min-height: 500px;
+  min-width: 0;
 }
 
 .card {
@@ -433,15 +434,6 @@ h1 {
   font-family: 'Manrope', sans-serif;
   font-weight: 700;
   color: var(--on-surface);
-}
-
-.page-range {
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--surface-container-low);
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: var(--muted-text);
 }
 
 .lane-badge {
@@ -542,7 +534,6 @@ h1 {
   transform: translateY(-1px);
 }
 
-.prompt-instruction,
 .completion-instruction {
   margin: 0;
   font-size: 13.5px;
@@ -615,6 +606,8 @@ h1 {
   align-items: center;
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .correct-opt {
@@ -643,6 +636,8 @@ h1 {
   text-transform: uppercase;
   padding: 2px 6px;
   border-radius: 4px;
+  flex-shrink: 0;
+  margin-left: 6px;
 }
 
 .correct-label {
@@ -664,6 +659,7 @@ h1 {
   padding: 16px;
   border: 1px solid var(--outline-variant);
   text-align: left;
+  min-width: 0;
 }
 
 .source-preview h3 {
@@ -682,6 +678,7 @@ h1 {
   max-height: 120px;
   overflow-y: auto;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .prompt-container {
@@ -692,10 +689,12 @@ h1 {
   border-radius: 12px;
   padding: 16px;
   border: 1px solid var(--outline-variant);
+  min-width: 0;
 }
 
 .prompt-textarea {
   width: 100%;
+  box-sizing: border-box;
   height: 140px;
   border: none;
   background: transparent;

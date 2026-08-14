@@ -55,16 +55,24 @@
           :settings="settings"
           :is-dev="isDev"
           :disabled="loading || saving"
+          :active-profile-name="activeProfileName"
+          :is-sign-up-mode="isSignUpMode"
           :login-username="loginUsername"
           :login-password="loginPassword"
-          :login-classroom-code="loginClassroomCode"
+          :signup-username="signupUsername"
+          :signup-password="signupPassword"
+          :signup-classroom-code="signupClassroomCode"
           :login-error="loginError"
           :logging-in="loggingIn"
           @login="handleLogin"
+          @signup="handleSignUp"
           @logout="handleLogout"
+          @toggle-mode="toggleAuthMode"
           @update:login-username="loginUsername = $event"
           @update:login-password="loginPassword = $event"
-          @update:login-classroom-code="loginClassroomCode = $event"
+          @update:signup-username="signupUsername = $event"
+          @update:signup-password="signupPassword = $event"
+          @update:signup-classroom-code="signupClassroomCode = $event"
         />
       </div>
 
@@ -141,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { getAppEnv, getCloudConfig, triggerCloudSync } from '../services/appApi'
 
 import { useSettings } from '../composables/useSettings'
@@ -226,14 +234,24 @@ const {
 } = useRAG(settings)
 
 const {
+  isSignUpMode,
   loginUsername,
   loginPassword,
-  loginClassroomCode,
+  signupUsername,
+  signupPassword,
+  signupClassroomCode,
   loginError,
   loggingIn,
+  toggleAuthMode,
   handleLogin,
+  handleSignUp,
   handleLogout,
 } = useAuth(loadAllData, error, success)
+
+const activeProfileName = computed(() => {
+  const p = profiles.value.find((pr) => pr.id === settings.value.active_profile_id)
+  return p ? p.name : ''
+})
 
 async function loadAllData() {
   loading.value = true
@@ -281,19 +299,13 @@ watch(
 )
 
 onMounted(async () => {
-  try {
-    const envRes = await getAppEnv()
-    isDev.value = envRes?.env === 'dev'
-  } catch (_) {
-    isDev.value = false
-  }
-  try {
-    const cfgRes = await getCloudConfig()
-    cloudConfigured.value = cfgRes?.configured === true
-  } catch (_) {
-    cloudConfigured.value = false
-  }
-  await loadAllData()
+  const [envRes, cfgRes] = await Promise.all([
+    getAppEnv().catch(() => null),
+    getCloudConfig().catch(() => null),
+    loadAllData(),
+  ])
+  isDev.value = envRes?.env === 'dev'
+  cloudConfigured.value = cfgRes?.configured === true
 })
 
 onUnmounted(() => {

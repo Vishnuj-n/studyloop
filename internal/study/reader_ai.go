@@ -1,7 +1,6 @@
 package study
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"ai-tutor/internal/retrieval"
@@ -83,41 +82,6 @@ Answer:`, scopeLabel, contextText, req.Question)
 		"cited_sections": citations,
 		"scope":          string(scope),
 	}
-}
-
-func (s *StudyService) ExplainReaderSection(sectionID string, question string) map[string]interface{} {
-	sectionID = strings.TrimSpace(sectionID)
-	question = strings.TrimSpace(question)
-	if sectionID == "" {
-		return map[string]interface{}{"error": "section ID is required"}
-	}
-
-	section, err := s.repo.GetChunkSection(sectionID)
-	if err != nil {
-		return map[string]interface{}{"error": "failed to fetch reader section: " + err.Error()}
-	}
-
-	topicID, notebookID, startPage, endPage, err := s.resolveReaderSectionScope(sectionID)
-	if err != nil {
-		return map[string]interface{}{"error": "failed to resolve reader section scope: " + err.Error()}
-	}
-	if question == "" {
-		question = "Explain this section in clear study notes."
-	}
-
-	resp := s.AnswerReaderQuestion(ReaderAIRequest{
-		TopicID:          topicID,
-		NotebookID:       notebookID,
-		Question:         question,
-		Scope:            ReaderScopeCurrentChapter,
-		ChapterStartPage: startPage,
-		ChapterEndPage:   endPage,
-	})
-	if resp["error"] != nil {
-		return resp
-	}
-	resp["section_id"] = section["id"]
-	return resp
 }
 
 func (s *StudyService) searchReaderScope(req ReaderAIRequest, scope ReaderRetrievalScope) ([]retrieval.SearchResult, error) {
@@ -208,34 +172,4 @@ func buildReaderContextBlocksWithText(results []retrieval.SearchResult) ([]strin
 	}
 
 	return blocks, citations, chunkTexts
-}
-
-func (s *StudyService) resolveReaderSectionScope(sectionID string) (string, string, int, int, error) {
-	// Use repository helpers to avoid SQL in service layer.
-	topicID, err := s.repo.GetTopicIDBySectionID(sectionID)
-	if err != nil {
-		return "", "", 0, 0, err
-	}
-
-	// Fetch the first notebook that contains this topic. It's acceptable for
-	// there to be no notebook linked (sql.ErrNoRows) — callers treat empty
-	// notebookID as a non-fatal condition.
-	notebookID, err := s.repo.GetFirstNotebookIDByTopicID(topicID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			notebookID = ""
-		} else {
-			return "", "", 0, 0, fmt.Errorf("failed to resolve notebook for topic %q: %w", topicID, err)
-		}
-	}
-
-	pageRanges, err := s.repo.GetTopicHeadingPageRanges(topicID)
-	if err != nil {
-		return topicID, notebookID, 0, 0, err
-	}
-	pageRange, ok := pageRanges[sectionID]
-	if !ok {
-		return topicID, notebookID, 0, 0, nil
-	}
-	return topicID, notebookID, pageRange[0], pageRange[1], nil
 }

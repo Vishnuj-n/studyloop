@@ -83,7 +83,11 @@ func initTestProvider(t *testing.T) *llm.Provider {
 			prompt := body.Messages[0].Content
 			switch {
 			case strings.Contains(prompt, "flashcard generator"):
-				content = flashcardJSON(extractRequestedCount(prompt, "Generate exactly "), extractFirstChunkID(prompt))
+				count := extractRequestedCount(prompt, "Generate up to ")
+				if count == 1 {
+					count = extractRequestedCount(prompt, "Generate exactly ")
+				}
+				content = flashcardJSON(count, extractFirstChunkID(prompt))
 			case strings.Contains(prompt, "quiz generator"):
 				content = questionJSON(extractRequestedCount(prompt, "Generate exactly "), extractFirstChunkID(prompt))
 			}
@@ -104,7 +108,7 @@ func initTestProvider(t *testing.T) *llm.Provider {
 	t.Setenv("LLM_API_KEY", "test-key")
 	t.Setenv("LLM_MODEL", "test-model")
 
-	return llm.NewProvider(llm.LoadConfigFromEnv())
+	return llm.NewProvider(llm.LoadConfigFromEnvForPrefix(""))
 }
 
 // newTestApp provides canonical test App initialization with all dependencies wired.
@@ -162,7 +166,7 @@ func mustInsertActiveQuizTask(t *testing.T, notebookID, topicID, taskID string, 
 	if err := testRepo.EnsureTopic(topicID, topicID+"-title"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook(notebookID, notebookID+"-name", "/tmp/"+notebookID+".pdf", "pdf", topicID, "", 12); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, notebookID+"-name", "/tmp/"+notebookID+".pdf", "pdf", topicID, "", 12, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -305,7 +309,7 @@ func TestActivateTask_TransitionsPendingToActive(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "activate-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Activate Test Notebook", "/tmp/activate.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Activate Test Notebook", "/tmp/activate.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -335,136 +339,27 @@ func TestActivateTask_RejectsNonPendingTask(t *testing.T) {
 	app := newTestApp(t)
 
 	notebookID := "activate-reject-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Activate Reject Notebook", "/tmp/activate-reject.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Activate Reject Notebook", "/tmp/activate-reject.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
 	task := models.StudyQueueTask{
-		ID:         "task-already-active",
+		ID:         "task-already-completed",
 		NotebookID: notebookID,
 		TaskType:   models.StudyTaskTypeQuiz,
-		Status:     models.StudyTaskStatusActive,
+		Status:     models.StudyTaskStatusCompleted,
 		Priority:   1,
 	}
 	if err := testRepo.InsertStudyTask(task); err != nil {
 		t.Fatalf("InsertStudyTask failed: %v", err)
 	}
 
-	resp := app.ActivateTask("task-already-active")
+	resp := app.ActivateTask("task-already-completed")
 	if code, ok := resp["code"].(int); !ok || code != 409 {
-		t.Fatalf("expected code 409 for non-pending task, got: %#v", resp)
+		t.Fatalf("expected code 409 for completed task, got: %#v", resp)
 	}
 }
 
-func TestCompleteTask_MarksActiveAsCompleted(t *testing.T) {
-	app := newTestApp(t)
-
-	notebookID := "complete-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Complete Test Notebook", "/tmp/complete.txt", "txt", "", "", 1); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-
-	task := models.StudyQueueTask{
-		ID:         "task-complete-1",
-		NotebookID: notebookID,
-		TaskType:   models.StudyTaskTypeReread,
-		Status:     models.StudyTaskStatusActive,
-		Priority:   1,
-	}
-	if err := testRepo.InsertStudyTask(task); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-
-	result := models.CompletionResult{
-		Status: models.StudyTaskStatusCompleted,
-	}
-
-	resp := app.CompleteTask("task-complete-1", result)
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	_, err := testRepo.GetNextTask(notebookID)
-	if err != db.ErrNoPendingTasks {
-		t.Fatalf("expected no pending tasks after completion, got: %v", err)
-	}
-}
-
-func TestCompleteTask_InsertsFollowUpTasks(t *testing.T) {
-	app := newTestApp(t)
-
-	notebookID := "followup-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Followup Test Notebook", "/tmp/followup.txt", "txt", "", "", 1); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-
-	task := models.StudyQueueTask{
-		ID:         "task-with-followup",
-		NotebookID: notebookID,
-		TaskType:   models.StudyTaskTypeReading,
-		Status:     models.StudyTaskStatusActive,
-		Priority:   1,
-	}
-	if err := testRepo.InsertStudyTask(task); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-
-	followUp := models.StudyQueueTask{
-		ID:         "followup-1",
-		NotebookID: notebookID,
-		TaskType:   models.StudyTaskTypeQuiz,
-		Status:     models.StudyTaskStatusPending,
-		Priority:   1,
-	}
-
-	result := models.CompletionResult{
-		Status:    models.StudyTaskStatusCompleted,
-		FollowUps: []models.StudyQueueTask{followUp},
-	}
-
-	resp := app.CompleteTask("task-with-followup", result)
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	nextTask, err := testRepo.GetNextTask(notebookID)
-	if err != nil {
-		t.Fatalf("expected follow-up task in queue, got error: %v", err)
-	}
-	if nextTask.ID != "followup-1" {
-		t.Fatalf("expected followup-1, got: %s", nextTask.ID)
-	}
-}
-
-func TestSkipTask_MarksTaskAsSkipped(t *testing.T) {
-	app := newTestApp(t)
-
-	notebookID := "skip-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Skip Test Notebook", "/tmp/skip.txt", "txt", "", "", 1); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-
-	task := models.StudyQueueTask{
-		ID:         "task-skip-1",
-		NotebookID: notebookID,
-		TaskType:   models.StudyTaskTypeExaminer,
-		Status:     models.StudyTaskStatusPending,
-		Priority:   1,
-	}
-	if err := testRepo.InsertStudyTask(task); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-
-	resp := app.SkipTask("task-skip-1")
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	_, err := testRepo.GetNextTask(notebookID)
-	if err != db.ErrNoPendingTasks {
-		t.Fatalf("expected no pending tasks after skip, got: %v", err)
-	}
-}
 
 // ============================================================================
 // DETERMINISTIC ORDERING TESTS
@@ -474,7 +369,7 @@ func TestOrdering_TaskTypePriority(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-type-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Ordering Type Notebook", "/tmp/ordering-type.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Ordering Type Notebook", "/tmp/ordering-type.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -524,7 +419,7 @@ func TestOrdering_TaskPriority(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-priority-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Ordering Priority Notebook", "/tmp/ordering-priority.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Ordering Priority Notebook", "/tmp/ordering-priority.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -551,7 +446,7 @@ func TestOrdering_FIFOFallback(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "ordering-fifo-nb"
-	if err := testRepo.CreateNotebook(notebookID, "FIFO Notebook", "/tmp/fifo.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "FIFO Notebook", "/tmp/fifo.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -582,7 +477,7 @@ func TestOrdering_AntiStarvation(t *testing.T) {
 	initTestDB(t)
 
 	notebookID := "anti-starvation-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Anti Starvation Notebook", "/tmp/anti-starvation.txt", "txt", "", "", 1); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, "Anti Starvation Notebook", "/tmp/anti-starvation.txt", "txt", "", "", 1, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
@@ -623,7 +518,7 @@ func TestOrdering_AntiStarvation(t *testing.T) {
 func TestTriggerCloudSyncRetriesAndFailSafe(t *testing.T) {
 	_ = newTestApp(t)
 
-	if err := testRepo.CreateNotebook("os-notebook-sync", "OS Notebook", "/tmp/os-notebook.pdf", "pdf", "", "", 12); err != nil {
+	if err := testRepo.CreateNotebook("os-notebook-sync", "OS Notebook", "/tmp/os-notebook.pdf", "pdf", "", "", 12, ""); err != nil {
 		t.Fatalf("failed to create notebook: %v", err)
 	}
 
@@ -785,7 +680,7 @@ func TestCalculateFlashcardBudgets(t *testing.T) {
 
 func TestAggregateQueueTasks(t *testing.T) {
 	t.Run("empty inputs", func(t *testing.T) {
-		tasks, topics, minutes, actions := aggregateQueueTasks(nil, nil)
+		tasks, topics, minutes, actions := aggregateQueueTasks(nil, nil, nil)
 		if len(tasks) != 0 {
 			t.Errorf("expected 0 tasks, got %d", len(tasks))
 		}
@@ -807,7 +702,7 @@ func TestAggregateQueueTasks(t *testing.T) {
 		pending := []models.StudyQueueTask{
 			{ID: "p1", TaskType: models.StudyTaskTypeQuiz, Status: models.StudyTaskStatusPending, Title: "Topic B", StartPage: 1, EndPage: 3},
 		}
-		tasks, topics, minutes, actions := aggregateQueueTasks(active, pending)
+		tasks, topics, minutes, actions := aggregateQueueTasks(nil, active, pending)
 
 		if len(tasks) != 2 {
 			t.Fatalf("expected 2 tasks, got %d", len(tasks))
@@ -827,9 +722,83 @@ func TestAggregateQueueTasks(t *testing.T) {
 		active := []models.StudyQueueTask{
 			{ID: "a1", TaskType: models.StudyTaskTypeReading, Status: models.StudyTaskStatusActive, Title: "", StartPage: 1, EndPage: 5},
 		}
-		tasks, _, _, _ := aggregateQueueTasks(active, nil)
+		tasks, _, _, _ := aggregateQueueTasks(nil, active, nil)
 		if tasks[0].Title != "Read: Task" {
 			t.Errorf("expected 'Read: Task', got %q", tasks[0].Title)
 		}
 	})
+}
+
+func TestLoginStudent_AutomaticProfileCreation(t *testing.T) {
+	initCleanTestDB(t)
+
+	// Mock Supabase login server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"session_token":  "mock-session-token-123",
+			"role":           "student",
+			"classroom_code": "BCD601",
+			"username":       "testing_user",
+		})
+	}))
+	defer ts.Close()
+
+	app := &App{
+		ctx:  context.Background(),
+		repo: testRepo,
+	}
+
+	// Set CloudSyncURL to point to mock server
+	settings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	settings.CloudSyncURL = ts.URL + "/rest/v1/rpc/handle_cloud_sync"
+	if err := testRepo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+
+	// 1. First login to BCD601 -> Should automatically create a new study profile named BCD601
+	res := app.LoginStudent("testing_user", "password123")
+	if res["error"] != nil {
+		t.Fatalf("LoginStudent failed: %v", res["error"])
+	}
+
+	profiles, err := testRepo.GetProfiles()
+	if err != nil {
+		t.Fatalf("GetProfiles failed: %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile automatically created, got %d", len(profiles))
+	}
+	p1 := profiles[0]
+	if p1.ClassroomCode != "BCD601" {
+		t.Errorf("expected classroom code BCD601, got %q", p1.ClassroomCode)
+	}
+	if p1.Name != "BCD601" {
+		t.Errorf("expected profile name BCD601, got %q", p1.Name)
+	}
+
+	updatedSettings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings after login failed: %v", err)
+	}
+	if updatedSettings.ActiveProfileID != p1.ID {
+		t.Errorf("expected active_profile_id %s, got %s", p1.ID, updatedSettings.ActiveProfileID)
+	}
+
+	// 2. Login again to the SAME classroom BCD601 -> Should reuse the existing BCD601 profile
+	res2 := app.LoginStudent("testing_user", "password123")
+	if res2["error"] != nil {
+		t.Fatalf("LoginStudent 2 failed: %v", res2["error"])
+	}
+
+	profilesAfter, err := testRepo.GetProfiles()
+	if err != nil {
+		t.Fatalf("GetProfiles after second login failed: %v", err)
+	}
+	if len(profilesAfter) != 1 {
+		t.Fatalf("expected still 1 profile, got %d", len(profilesAfter))
+	}
 }
