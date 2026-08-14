@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"strings"
 	"sync"
 
@@ -339,49 +338,6 @@ func (a *App) AskReaderAI(topicID, notebookID, question, scope string, currentPa
 		ChapterStartPage: chapterStartPage,
 		ChapterEndPage:   chapterEndPage,
 	})
-}
-
-func (a *App) GetEmbeddingDiagnostics(text string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	a.aiMutex.Lock()
-	if !a.aiReady || a.embedder == nil {
-		reason := a.aiInitError
-		a.aiMutex.Unlock()
-		if reason == "" {
-			reason = errLocalAIRuntimeNotReady
-		}
-		return map[string]interface{}{"error": "Embedding diagnostics unavailable: " + reason}
-	}
-	emb := a.embedder
-	a.aiMutex.Unlock()
-	input := strings.TrimSpace(text)
-	if input == "" {
-		input = "quick embedding diagnostic sentence"
-	}
-	vector, err := emb.Embed(input)
-	if err != nil {
-		return map[string]interface{}{"error": "embedding run failed: " + err.Error()}
-	}
-	declaredDim := int(emb.GetDimension())
-	count := len(vector)
-	if count > 8 {
-		count = 8
-	}
-	sample := make([]float32, count)
-	copy(sample, vector[:count])
-	var sumSquares float64
-	for _, v := range vector {
-		sumSquares += float64(v * v)
-	}
-	return map[string]interface{}{
-		"ok": true, "input_chars": len(input),
-		"declared_dimension": declaredDim, "vector_length": len(vector),
-		"dimension_match": len(vector) == declaredDim,
-		"sample_norm_l2":  math.Sqrt(sumSquares), "sample_first_values": sample,
-	}
 }
 
 // Global state variables for RAG initialization lock

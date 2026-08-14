@@ -23,9 +23,6 @@ func (s *StudyService) GetReviewSession(taskID string) (*models.ReviewSession, e
 	return s.repo.GetReviewSession(taskID)
 }
 
-func (s *StudyService) ApplyFlashcardReview(cardID string, ratingCode int) (*models.Flashcard, *models.FlashcardState, string, error) {
-	return s.applyFlashcardReview(nil, cardID, ratingCode)
-}
 
 func (s *StudyService) applyFlashcardReview(tx *sql.Tx, cardID string, ratingCode int) (*models.Flashcard, *models.FlashcardState, string, error) {
 	var (

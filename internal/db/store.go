@@ -857,10 +857,3 @@ func (r *Repository) GetRemedialStrategy() (string, error) {
 	return strategy, nil
 }
 
-func (r *Repository) SetRemedialStrategy(strategy string) error {
-	_, err := r.db.Exec(
-		`UPDATE user_settings SET default_remedial_strategy = ? WHERE id = 1`, strategy,
-	)
-	return err
-}
-

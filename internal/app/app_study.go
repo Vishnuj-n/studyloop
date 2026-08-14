@@ -418,20 +418,6 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) CompleteTask(taskID string, result models.CompletionResult) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if strings.TrimSpace(taskID) == "" {
-		return map[string]interface{}{"error": "task ID is required", "code": 400}
-	}
-	if err := repo.CompleteTask(taskID, result); err != nil {
-		return mapTaskError(err)
-	}
-	return map[string]interface{}{"ok": true}
-}
-
 // CompleteMilestoneExam completes an active MILESTONE_EXAM task.
 // ponytail: simplest way to complete milestone task with no flashcard generation.
 func (a *App) CompleteMilestoneExam(taskID string) map[string]interface{} {
@@ -1074,61 +1060,6 @@ func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage in
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
 	return a.studyService.GenerateComprehensiveExam(notebookID, startPage, endPage)
-}
-
-func (a *App) GenerateFlashcards(topicID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if a.studyService == nil {
-		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-
-	notebooks, err := repo.GetNotebooks(topicID, "")
-	if err != nil {
-		return map[string]interface{}{"error": "failed to get notebook: " + err.Error()}
-	}
-	if len(notebooks) == 0 {
-		return map[string]interface{}{"error": "no notebook found for topic"}
-	}
-	notebookID := notebooks[0].ID
-
-	startPage, endPage, err := repo.GetTopicPageBounds(topicID)
-	if err != nil {
-		return map[string]interface{}{"error": "failed to get topic page bounds: " + err.Error()}
-	}
-
-	cards, states, existing, tier, err := a.studyService.GenerateFSRSCardsForTopic(topicID, notebookID, startPage, endPage)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	now := time.Now().Unix()
-	response := map[string]interface{}{
-		"notebook_id":       notebookID,
-		"existing":          existing,
-		"start_page":        startPage,
-		"end_page":          endPage,
-		"topic_id":          topicID,
-		"cards":             cards,
-		"states":            states,
-		"card_count":        len(cards),
-		"llm_tier":          tier,
-		"generated_at_unix": now,
-	}
-
-	var initialDueAt int64 = 0
-	for _, card := range cards {
-		if card.DueAt > 0 && (initialDueAt == 0 || card.DueAt < initialDueAt) {
-			initialDueAt = card.DueAt
-		}
-	}
-	if initialDueAt > 0 {
-		response["initial_due_at"] = initialDueAt
-	}
-
-	return response
 }
 
 func (a *App) GetReviewSession(taskID string, notebookID string) map[string]interface{} {

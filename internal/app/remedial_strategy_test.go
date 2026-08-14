@@ -9,7 +9,7 @@ func TestFastTrackSkipsReread(t *testing.T) {
 	app := newTestApp(t)
 	
 	// Set strategy to FAST
-	if err := testRepo.SetRemedialStrategy("FAST"); err != nil {
+	if _, err := testRepo.ExecForTest("UPDATE user_settings SET default_remedial_strategy = ? WHERE id = 1", "FAST"); err != nil {
 		t.Fatalf("failed to set strategy to FAST: %v", err)
 	}
 
@@ -59,7 +59,7 @@ func TestClassicTrackInsertsReread(t *testing.T) {
 	app := newTestApp(t)
 	
 	// Set strategy to CLASSIC
-	if err := testRepo.SetRemedialStrategy("CLASSIC"); err != nil {
+	if _, err := testRepo.ExecForTest("UPDATE user_settings SET default_remedial_strategy = ? WHERE id = 1", "CLASSIC"); err != nil {
 		t.Fatalf("failed to set strategy to CLASSIC: %v", err)
 	}
 

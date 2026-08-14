@@ -154,67 +154,6 @@ func (r *Repository) GetChunksForTopics(topicIDs []string) (map[string][]models.
 	return chunksByTopic, nil
 }
 
-// GetChunkSection returns notebook metadata plus ordered sections with resolved page numbers.
-func (r *Repository) GetChunkSection(chunkID string) (map[string]string, error) {
-	var notebookID sql.NullString
-	var pageNum sql.NullInt64
-
-	err := r.db.QueryRow(`
-		SELECT nc.notebook_id, nc.page_num
-		FROM notebook_chunks nc
-		WHERE nc.chunk_id = ?
-		LIMIT 1
-	`, chunkID).Scan(&notebookID, &pageNum)
-	if err != nil {
-		return nil, err
-	}
-
-	res := map[string]string{}
-	res["id"] = chunkID
-	if notebookID.Valid {
-		res["notebook_id"] = notebookID.String
-	}
-	if pageNum.Valid {
-		res["page_num"] = fmt.Sprintf("%d", pageNum.Int64)
-	}
-	return res, nil
-}
-
-// GetTopicIDBySectionID returns the topic ID associated with a chunk ID.
-func (r *Repository) GetTopicIDBySectionID(chunkID string) (string, error) {
-	var topicID string
-	err := r.db.QueryRow(`
-		SELECT topic_id
-		FROM chunks
-		WHERE id = ?
-	`, chunkID).Scan(&topicID)
-	if err != nil {
-		return "", err
-	}
-	return topicID, nil
-}
-
-// GetFirstNotebookIDByTopicID returns the earliest notebook_id linked to a topic.
-// If no notebook is linked, returns sql.ErrNoRows.
-func (r *Repository) GetFirstNotebookIDByTopicID(topicID string) (string, error) {
-	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
-		return "", fmt.Errorf("invalid empty topicID")
-	}
-	var notebookID string
-	err := r.db.QueryRow(`
-		SELECT notebook_id
-		FROM notebook_topics
-		WHERE topic_id = ?
-		ORDER BY created_at ASC, notebook_id ASC
-		LIMIT 1
-	`, topicID).Scan(&notebookID)
-	if err != nil {
-		return "", err
-	}
-	return notebookID, nil
-}
-
 // GetTotalChunkTokens returns estimated total tokens for one topic.
 // It prefers stored token_count values and falls back to len(chunk_text)/4 when token_count is zero or missing.
 func (r *Repository) GetTotalChunkTokens(topicID string) (int, error) {
