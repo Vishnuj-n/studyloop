@@ -316,7 +316,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	}
 	if s.TargetSessionWords <= 0 {
 		s.TargetSessionWords = 5000
-		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = 5000 WHERE id = 1`); updateErr != nil {
+		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = ? WHERE id = 1`, s.TargetSessionWords); updateErr != nil {
 			utils.Warnf("failed to persist default target_session_words: %v", updateErr)
 		}
 	}

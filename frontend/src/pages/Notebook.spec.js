@@ -41,6 +41,7 @@ vi.mock('vue-router', () => ({
 describe('Notebook.vue - AI Cleanup then Confirm regression test', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    appApi.getAvailableTopics.mockResolvedValue([])
     appApi.getNotebooks.mockResolvedValue([
       {
         id: 'nb-1',

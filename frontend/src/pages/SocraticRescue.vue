@@ -617,7 +617,6 @@ h1 {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   min-width: 0;
-  word-break: break-word;
   overflow-wrap: break-word;
 }
 
@@ -689,7 +688,6 @@ h1 {
   max-height: 120px;
   overflow-y: auto;
   white-space: pre-wrap;
-  word-break: break-word;
   overflow-wrap: break-word;
 }
 

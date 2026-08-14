@@ -517,13 +517,28 @@ async function handleFileUpload(event) {
       body: file
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(errText || `Upload returned status ${res.status}`);
+    const signRes = await fetch(`${supabaseUrl.value}/storage/v1/object/sign/assignments/${storagePath}`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey.value,
+        'Authorization': `Bearer ${supabaseKey.value}`,
+        'x-session-token': sessionToken.value,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ expiresIn: 315360000 })
+    });
+
+    if (!signRes.ok) {
+      const signErrText = await signRes.text();
+      throw new Error(signErrText || `Failed to sign URL (status ${signRes.status})`);
     }
 
-    newUrl.value = `${supabaseUrl.value}/storage/v1/object/public/assignments/${storagePath}`;
-    showToast('PDF uploaded to Supabase Storage!');
+    const signData = await signRes.json();
+    const signedPath = signData.signedURL || signData.signedUrl || '';
+    newUrl.value = signedPath.startsWith('http')
+      ? signedPath
+      : `${supabaseUrl.value}${signedPath.startsWith('/') ? '' : '/'}${signedPath}`;
+    showToast('PDF uploaded and signed URL created!');
   } catch (err) {
     console.error('PDF upload error:', err);
     error.value = `Failed to upload PDF: ${err.message}`;

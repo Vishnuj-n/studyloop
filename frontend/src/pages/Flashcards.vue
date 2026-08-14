@@ -402,16 +402,7 @@ async function rate(ratingKey) {
         return
       }
 
-      flipped.value = false
-      cards.value = cards.value.filter((c) => (c.card_id || c.id) !== targetCardID)
-      sessionRemaining.value = Number(res.remaining ?? cards.value.length)
-      if (sessionRemaining.value <= 0 || cards.value.length === 0) {
-        await handleQueueCompletion()
-        return
-      }
-      if (reviewIndex.value >= cards.value.length) {
-        reviewIndex.value = 0
-      }
+      await loadQueueSession(reviewTaskID.value)
       return
     }
     flipped.value = false
@@ -459,17 +450,7 @@ async function suspendCard() {
       return
     }
     showToast('Card Suspended', 'success')
-    flipped.value = false
-    cards.value = cards.value.filter((c) => (c.card_id || c.id) !== targetCardID)
-    sessionRemaining.value = Number(res.remaining ?? cards.value.length)
-
-    if (sessionRemaining.value <= 0 || cards.value.length === 0) {
-      await handleQueueCompletion()
-      return
-    }
-    if (reviewIndex.value >= cards.value.length) {
-      reviewIndex.value = 0
-    }
+    await loadQueueSession(reviewTaskID.value)
   } catch (e) {
     error.value = `Failed to suspend card: ${e?.message ?? 'Unknown error'}`
   } finally {
@@ -565,8 +546,12 @@ async function loadQueueSession(taskID, notebookID = '') {
       reviewing: reviewing.value,
     })
     flipped.value = false
-    if (reviewIndex.value < 0) {
-      reviewIndex.value = cards.value.length
+    if (sessionRemaining.value <= 0 || cards.value.length === 0) {
+      await handleQueueCompletion()
+      return
+    }
+    if (reviewIndex.value < 0 || reviewIndex.value >= cards.value.length) {
+      reviewIndex.value = 0
     }
   } catch (e) {
     error.value = e?.message ?? 'Failed to load queue session'

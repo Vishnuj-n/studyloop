@@ -61,8 +61,8 @@ DROP POLICY IF EXISTS "No direct client access to teacher_signup_invites" ON pub
 CREATE POLICY "No direct client access to teacher_signup_invites" ON public.teacher_signup_invites FOR ALL USING (false);
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('assignments', 'assignments', true, 52428800, ARRAY['application/pdf'])
-ON CONFLICT (id) DO UPDATE SET file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
+VALUES ('assignments', 'assignments', false, 52428800, ARRAY['application/pdf'])
+ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 DROP POLICY IF EXISTS "Teacher PDF Upload Policy" ON storage.objects;
 DROP POLICY IF EXISTS "Allow Public Upload to Assignments Bucket" ON storage.objects;
@@ -76,4 +76,4 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "Public Read Assignments Policy" ON storage.objects;
-CREATE POLICY "Public Read Assignments Policy" ON storage.objects FOR SELECT TO public USING (bucket_id = 'assignments');
+

@@ -288,30 +288,12 @@ const hasSocraticRescueTask = computed(() => {
 // ponytail: pending ingestion notification state
 const pendingIngestionBook = ref(null)
 
-async function checkPendingIngestion() {
-  try {
-    const res = await getNotebooks()
-    if (Array.isArray(res)) {
-      const draft = res.find(
-        (n) =>
-          !n.error &&
-          (n.chunk_count === 0 || !n.chunk_count) &&
-          (n.status === 'uploaded' || n.status === 'draft_ready' || !n.status)
-      )
-      pendingIngestionBook.value = draft || null
-    }
-  } catch (err) {
-    console.error('Failed to check pending ingestion books:', err)
-  }
-}
-
 function goToIngestBook(notebookId) {
   router.push({ path: '/notebooks', query: { ingest: notebookId } })
 }
 
 // --- Lifecycle ---
 onMounted(async () => {
-  void checkPendingIngestion()
   try {
     const envRes = await getAppEnv()
     if (envRes && envRes.env) {
@@ -387,6 +369,11 @@ function applyDashboardOverview(overview) {
     streakState.value = overview.streak_state
     streakError.value = ''
   }
+
+  if (overview.pending_notebook_error) {
+    actionError.value = overview.pending_notebook_error
+  }
+  pendingIngestionBook.value = overview.pending_notebook || null
 
   return true
 }

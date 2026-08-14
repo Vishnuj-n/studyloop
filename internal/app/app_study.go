@@ -490,18 +490,50 @@ func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	}
 }
 
-// GetDashboardOverview consolidates settings, profiles, today plan, and streak state into a single IPC payload.
+// GetDashboardOverview consolidates settings, profiles, today plan, streak state, and pending ingestion info into a single IPC payload.
 func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interface{} {
 	settings := a.GetUserSettings()
 	profiles := a.GetProfiles()
 	todayPlan := a.GetTodayPlan()
 	streakState := a.GetStreakState(timezoneOffsetMinutes)
 
+	var pendingNotebook map[string]interface{}
+	var pendingNotebookError string
+
+	if repo := a.getRepo(); repo != nil {
+		activeProfileID, _ := repo.GetActiveProfileID()
+		notebooks, err := repo.GetNotebooks("", activeProfileID)
+		if err != nil {
+			pendingNotebookError = err.Error()
+		} else {
+			for _, nb := range notebooks {
+				if (nb.ChunkCount == 0 || nb.Status == "uploaded" || nb.Status == "draft_ready" || nb.Status == "") && nb.Status != "indexing" && nb.Status != "indexed" && nb.Status != "failed" {
+					pendingNotebook = map[string]interface{}{
+						"id":              nb.ID,
+						"title":           nb.Title,
+						"file_type":       nb.FileType,
+						"topic_id":        nb.TopicID,
+						"status":          nb.Status,
+						"indexing_status": nb.IndexingStatus,
+						"page_count":      nb.PageCount,
+						"chunk_count":     nb.ChunkCount,
+						"priority":        nb.Priority,
+					}
+					break
+				}
+			}
+		}
+	} else {
+		pendingNotebookError = "database not initialized"
+	}
+
 	return map[string]interface{}{
-		"settings":     settings,
-		"profiles":     profiles,
-		"today_plan":   todayPlan,
-		"streak_state": streakState,
+		"settings":               settings,
+		"profiles":               profiles,
+		"today_plan":             todayPlan,
+		"streak_state":           streakState,
+		"pending_notebook":       pendingNotebook,
+		"pending_notebook_error": pendingNotebookError,
 	}
 }
 
