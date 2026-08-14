@@ -70,7 +70,7 @@
       <!-- Stat 4: Red Alerts -->
       <div class="stat-card animate-fade-in" style="animation-delay: 180ms" :style="{ borderColor: stats.alertsCount > 0 ? 'var(--ds-danger-ring)' : 'var(--ds-border)' }">
         <div class="stat-header">
-          <span class="stat-title">Socratic Alerts</span>
+          <span class="stat-title">Teacher Intervention Alerts</span>
           <span v-if="stats.alertsCount > 0" class="pulse-dot" style="background-color: var(--ds-danger);"></span>
           <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ds-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>

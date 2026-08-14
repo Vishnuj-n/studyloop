@@ -91,10 +91,6 @@ func chapterIndexForPage(page int, chapters []models.SyllabusChapterDraft) int {
 			return i
 		}
 	}
-	last := chapters[len(chapters)-1]
-	if page > last.EndPage {
-		return len(chapters) - 1
-	}
 	return -1
 }
 

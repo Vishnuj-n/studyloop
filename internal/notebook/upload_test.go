@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ai-tutor/internal/models"
 )
 
 func TestSplitPageIntoChunks(t *testing.T) {
@@ -296,4 +298,33 @@ func buildSentenceBlob(sentences, wordsPerSentence int) string {
 		parts = append(parts, strings.Join(line, " ")+".")
 	}
 	return strings.Join(parts, " ")
+}
+
+func TestNormalizeSyllabusChaptersCustomPageRange(t *testing.T) {
+	chapters := []models.SyllabusChapterDraft{
+		{Title: "Predictably irrational", StartPage: 25, EndPage: 100},
+	}
+	res := NormalizeSyllabusChapters(chapters, 352)
+	if len(res) != 1 {
+		t.Fatalf("expected 1 chapter, got %d", len(res))
+	}
+	if res[0].StartPage != 25 || res[0].EndPage != 100 {
+		t.Fatalf("expected StartPage 25, EndPage 100; got StartPage %d, EndPage %d", res[0].StartPage, res[0].EndPage)
+	}
+}
+
+func TestChapterIndexForPageBounds(t *testing.T) {
+	chapters := []models.SyllabusChapterDraft{
+		{Title: "Predictably irrational", StartPage: 25, EndPage: 100},
+	}
+
+	if idx := chapterIndexForPage(15, chapters); idx != -1 {
+		t.Fatalf("expected page 15 to return -1 (out of bounds), got %d", idx)
+	}
+	if idx := chapterIndexForPage(50, chapters); idx != 0 {
+		t.Fatalf("expected page 50 to return 0, got %d", idx)
+	}
+	if idx := chapterIndexForPage(150, chapters); idx != -1 {
+		t.Fatalf("expected page 150 to return -1 (out of bounds), got %d", idx)
+	}
 }

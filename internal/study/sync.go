@@ -438,10 +438,33 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 
 	// Assign to active profile if configured
 	if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" {
-		if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr != nil {
-			utils.Warnf("[SYNC] Warning: failed to assign downloaded notebook to profile %s: %v", settings.ActiveProfileID, assignErr)
-		} else {
+		if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr == nil {
 			utils.Warnf("[SYNC] Assigned notebook %s to active profile %s", nb.ID, settings.ActiveProfileID)
+		}
+	}
+
+	// If assignment provides explicit page range bounds, persist initial syllabus draft
+	if nb.StartPage != nil && *nb.StartPage > 0 {
+		startP := *nb.StartPage
+		endP := pageCount
+		if nb.EndPage != nil && *nb.EndPage > 0 {
+			endP = *nb.EndPage
+		}
+		if pageCount > 0 && endP > pageCount {
+			endP = pageCount
+		}
+		draft := models.SyllabusDraft{
+			PageCount: pageCount,
+			Chapters: []models.SyllabusChapterDraft{
+				{
+					Title:     nb.Title,
+					StartPage: startP,
+					EndPage:   endP,
+				},
+			},
+		}
+		if draftBytes, dErr := json.Marshal(draft); dErr == nil {
+			_ = repo.UpdateNotebookSyllabusDraft(nb.ID, string(draftBytes))
 		}
 	}
 

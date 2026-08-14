@@ -60,7 +60,16 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 			LIMIT 1
 		`, selectedNotebookID, topicID, topicID).Scan(&notebookIDRow, &notebookTitle, &filePath, &fileType, &pageCount, &fileHashRow)
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("selected notebook does not contain this topic")
+			// Fallback: If notebookID is explicitly provided (e.g. from task mode), look up notebook directly by ID.
+			err = r.db.QueryRow(`
+				SELECT id, title, file_path, file_type, COALESCE(page_count, 0), COALESCE(file_hash, '')
+				FROM notebooks n
+				WHERE n.id = ?
+				LIMIT 1
+			`, selectedNotebookID).Scan(&notebookIDRow, &notebookTitle, &filePath, &fileType, &pageCount, &fileHashRow)
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("selected notebook does not exist")
+			}
 		}
 	} else {
 		err = r.db.QueryRow(`
@@ -124,9 +133,32 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		bundle.PageCount = int(pageCount.Int64)
 	}
 
-	var rows *sql.Rows
+	fetchSections := func(query string, args ...interface{}) ([]models.ReaderSection, error) {
+		rows, err := r.db.Query(query, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = rows.Close() }()
+
+		var result []models.ReaderSection
+		for rows.Next() {
+			var section models.ReaderSection
+			if err := rows.Scan(
+				&section.ID,
+				&section.Heading,
+				&section.Content,
+				&section.Order,
+				&section.PageNum,
+			); err != nil {
+				return nil, err
+			}
+			result = append(result, section)
+		}
+		return result, rows.Err()
+	}
+
 	if bundle.NotebookID != "" {
-		rows, err = r.db.Query(`
+		sec, err := fetchSections(`
 			SELECT
 				c.id,
 				'Page ' || CAST(COALESCE(nc.page_num, 0) AS TEXT),
@@ -138,8 +170,46 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 			WHERE c.topic_id = ?
 			ORDER BY nc.page_num ASC, c.id ASC
 		`, bundle.NotebookID, topicID)
+		if err == nil {
+			bundle.Sections = sec
+		}
+		// Fallback 1: Page range match if no sections match topic_id exactly
+		if len(bundle.Sections) == 0 && bundle.TopicStartPage > 0 && bundle.TopicEndPage >= bundle.TopicStartPage {
+			sec, err = fetchSections(`
+				SELECT
+					c.id,
+					'Page ' || CAST(COALESCE(nc.page_num, 0) AS TEXT),
+					c.chunk_text,
+					COALESCE(nc.page_num, 0),
+					COALESCE(nc.page_num, 0) AS page_num
+				FROM chunks c
+				JOIN notebook_chunks nc ON nc.chunk_id = c.id AND nc.notebook_id = ?
+				WHERE nc.page_num >= ? AND nc.page_num <= ?
+				ORDER BY nc.page_num ASC, c.id ASC
+			`, bundle.NotebookID, bundle.TopicStartPage, bundle.TopicEndPage)
+			if err == nil {
+				bundle.Sections = sec
+			}
+		}
+		// Fallback 2: All chunks in notebook if still 0 sections
+		if len(bundle.Sections) == 0 {
+			sec, err = fetchSections(`
+				SELECT
+					c.id,
+					'Page ' || CAST(COALESCE(nc.page_num, 0) AS TEXT),
+					c.chunk_text,
+					COALESCE(nc.page_num, 0),
+					COALESCE(nc.page_num, 0) AS page_num
+				FROM chunks c
+				JOIN notebook_chunks nc ON nc.chunk_id = c.id AND nc.notebook_id = ?
+				ORDER BY nc.page_num ASC, c.id ASC
+			`, bundle.NotebookID)
+			if err == nil {
+				bundle.Sections = sec
+			}
+		}
 	} else {
-		rows, err = r.db.Query(`
+		sec, err := fetchSections(`
 			SELECT
 				c.id,
 				'Page ' || CAST(COALESCE(c.page_num, 0) AS TEXT),
@@ -150,30 +220,9 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 			WHERE c.topic_id = ?
 			ORDER BY c.page_num ASC, c.id ASC
 		`, topicID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	for rows.Next() {
-		var section models.ReaderSection
-		if err := rows.Scan(
-			&section.ID,
-			&section.Heading,
-			&section.Content,
-			&section.Order,
-			&section.PageNum,
-		); err != nil {
-			return nil, err
+		if err == nil {
+			bundle.Sections = sec
 		}
-		bundle.Sections = append(bundle.Sections, section)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	return bundle, nil
