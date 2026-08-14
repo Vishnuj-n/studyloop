@@ -556,6 +556,10 @@ async function publishAssignment() {
     error.value = 'Failed to publish assignment: URL must use secure https scheme.';
     return;
   }
+  if (!trimmedUrl.startsWith(supabaseUrl.value)) {
+    error.value = 'Failed to publish assignment: Only approved server-issued HTTPS storage URLs are allowed.';
+    return;
+  }
 
   publishing.value = true;
 

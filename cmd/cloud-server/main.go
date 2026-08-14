@@ -657,6 +657,10 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 			return
 		}
+		if !strings.HasPrefix(req.DownloadURL, supabaseURL) {
+			jsonError(w, http.StatusBadRequest, "Invalid download URL: only approved server-issued HTTPS storage URLs are allowed")
+			return
+		}
 
 		payloadMap := map[string]interface{}{
 			"id":             req.ID,
