@@ -37,7 +37,7 @@ func TestResolveCloudSyncURL(t *testing.T) {
 
 func TestResolveAnonKeyAndToken(t *testing.T) {
 	os.Unsetenv("CLOUD_API_TOKEN")
-	os.Unsetenv("SUPABASE_PUBLISHABLE_KEY")
+	os.Unsetenv("SUPABASE_ANON_KEY")
 	os.Unsetenv("VITE_SUPABASE_ANON_KEY")
 
 	// 1. Stored user token
@@ -45,17 +45,17 @@ func TestResolveAnonKeyAndToken(t *testing.T) {
 		t.Errorf("expected stored token, got %q", got)
 	}
 
-	// 2. SUPABASE_PUBLISHABLE_KEY for ResolveAnonKey
-	os.Setenv("SUPABASE_PUBLISHABLE_KEY", "sb_pub_456")
+	// 2. SUPABASE_ANON_KEY for ResolveAnonKey
+	os.Setenv("SUPABASE_ANON_KEY", "sb_pub_456")
 	if got := ResolveAnonKey(); got != "sb_pub_456" {
-		t.Errorf("expected SUPABASE_PUBLISHABLE_KEY, got %q", got)
+		t.Errorf("expected SUPABASE_ANON_KEY, got %q", got)
 	}
 
 	// 3. Fallback when storedToken is empty uses ResolveAnonKey
 	if got := ResolveCloudAPIToken(""); got != "sb_pub_456" {
 		t.Errorf("expected anon key as fallback for empty stored token, got %q", got)
 	}
-	os.Unsetenv("SUPABASE_PUBLISHABLE_KEY")
+	os.Unsetenv("SUPABASE_ANON_KEY")
 
 	// 4. Default fallback
 	if got := ResolveAnonKey(); got != DefaultProductionAnonKey {

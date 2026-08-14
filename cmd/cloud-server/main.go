@@ -33,7 +33,7 @@ func main() {
 	supabaseURL = os.Getenv("SUPABASE_URL")
 	supabaseKey = os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
 	if supabaseKey == "" {
-		supabaseKey = os.Getenv("SUPABASE_PUBLISHABLE_KEY")
+		supabaseKey = os.Getenv("SUPABASE_ANON_KEY")
 	}
 
 	port := os.Getenv("PORT")

@@ -61,7 +61,7 @@ func ResolveCloudSyncURL(storedURL string) string {
 
 // ResolveAnonKey returns the project Supabase anon/publishable API key from environment variables.
 func ResolveAnonKey() string {
-	for _, envKey := range []string{"CLOUD_API_TOKEN", "SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_ANON_KEY"} {
+	for _, envKey := range []string{"CLOUD_API_TOKEN", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"} {
 		if env := os.Getenv(envKey); env != "" {
 			return env
 		}
@@ -254,7 +254,10 @@ func syncAnalyticsFallback(repo *db.Repository) error {
 	if researchURL == "" {
 		researchURL = DefaultResearchAnalyticsURL
 	}
-	researchToken := os.Getenv("RESEARCH_ANALYTICS_ANON_KEY")
+	researchToken := os.Getenv("SUPABASE_PUBLISHABLE_KEY_LOG")
+	if researchToken == "" {
+		researchToken = os.Getenv("RESEARCH_ANALYTICS_ANON_KEY")
+	}
 	if researchToken == "" {
 		researchToken = DefaultResearchAnalyticsAnonKey
 	}

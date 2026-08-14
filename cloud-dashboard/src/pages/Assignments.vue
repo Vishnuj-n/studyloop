@@ -142,13 +142,17 @@
 
     <!-- Centered PDF Preview Modal -->
     <Teleport to="body">
-      <div v-if="previewUrl" class="modal-backdrop" @click.self="previewUrl = null">
+      <div v-if="previewUrl || loadingPreview" class="modal-backdrop" @click.self="closePreview">
         <div class="modal-card">
           <div class="modal-head">
             <span>📄 {{ previewTitle }}</span>
-            <button class="btn-ghost" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;" @click="previewUrl = null">✕ Close</button>
+            <button class="btn-ghost" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;" @click="closePreview">✕ Close</button>
           </div>
-          <iframe :src="previewUrl" class="modal-pdf" title="PDF Preview" sandbox="allow-scripts allow-same-origin"></iframe>
+          <div v-if="loadingPreview" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--ds-fg); gap: 1rem;">
+            <div class="loading-spinner"></div>
+            <span style="font-size: 0.85rem; color: var(--ds-muted);">Downloading PDF for preview...</span>
+          </div>
+          <iframe v-else-if="previewUrl" :src="previewUrl" class="modal-pdf" title="PDF Preview" sandbox="allow-scripts allow-same-origin"></iframe>
         </div>
       </div>
     </Teleport>
@@ -161,10 +165,43 @@ import { useDashboard } from '../composables/useDashboard';
 
 const previewUrl = ref(null);
 const previewTitle = ref('');
+const loadingPreview = ref(false);
+let activeObjectUrl = null;
 
-function openPreview(url, page = 1, title = 'PDF Preview') {
+async function openPreview(url, page = 1, title = 'PDF Preview') {
   previewTitle.value = title;
-  previewUrl.value = `${url}#page=${page}`;
+  loadingPreview.value = true;
+  
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+  previewUrl.value = null;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch file (HTTP ${res.status})`);
+    }
+    const blob = await res.blob();
+    const blobPdf = new Blob([blob], { type: 'application/pdf' });
+    activeObjectUrl = URL.createObjectURL(blobPdf);
+    previewUrl.value = `${activeObjectUrl}#page=${page}`;
+  } catch (err) {
+    console.error('Error fetching PDF for preview:', err);
+    alert(`Could not load PDF preview: ${err.message}. You can try downloading it directly by clicking its link.`);
+  } finally {
+    loadingPreview.value = false;
+  }
+}
+
+function closePreview() {
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+  previewUrl.value = null;
+  loadingPreview.value = false;
 }
 
 const {
@@ -201,5 +238,17 @@ const {
   font-weight: 600; color: var(--ds-fg); font-size: 0.9rem;
 }
 .modal-pdf { width: 100%; height: 100%; border: none; background: #fff; flex: 1; }
+.loading-spinner {
+  border: 3px solid var(--ds-border-hi);
+  border-top: 3px solid var(--ds-primary);
+  border-radius: 50%;
+  width: 2.25rem;
+  height: 2.25rem;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 
