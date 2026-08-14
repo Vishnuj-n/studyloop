@@ -103,13 +103,18 @@ As a developer inheriting the cloud infrastructure, you will manage both the **S
 To hand over or provision a new backend:
 1. Create a new project in the [Supabase Console](https://supabase.com).
 2. Go to the **SQL Editor** in your Supabase project dashboard.
-3. Open and copy the entire contents of [supabase_schema.sql](./supabase_schema.sql) in this repository.
+3. Open and copy the entire contents of [`cloud-dashboard/supabase/setup_all.sql`](../cloud-dashboard/supabase/setup_all.sql) in this repository.
 4. Paste and execute it. This script does the following:
-   * Enables the UUID extension.
-   * Creates the core tables: `student_notebooks`, `student_review_logs`, `teacher_assignments`, `user_accounts`, and `active_sessions`.
-   * Sets up the custom `login_user` and `signup_user` RPC functions.
+   * Enables the UUID and pgcrypto extensions.
+   * Creates the core tables: `student_notebooks`, `student_review_logs`, `teacher_assignments`, `user_accounts`, `active_sessions`, `teacher_signup_invites`, and `anonymous_analytics_events`.
+   * Sets up authentication & dashboard RPC functions (`login_user`, `signup_user`, `get_classroom_dashboard`, `toggle_classroom_lock`, `remove_student_from_classroom`).
    * Sets up the `handle_cloud_sync` RPC function (which handles transactional delta upserts).
    * Enforces Row Level Security (RLS) policies requiring validation of the custom `x-session-token` header.
+   * Configures the `assignments` PDF storage bucket.
+
+> [!TIP]
+> For full takeover details, environment variable templates, and the issue roadmap, see the [Cloud Dashboard Handover Guide](./CLOUD_DASHBOARD_HANDOVER.md).
+
 
 #### Creating Initial User Accounts
 Since the system is secure, you can register new accounts using the `signup_user` RPC function via the SQL editor:

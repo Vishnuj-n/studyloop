@@ -37,7 +37,6 @@ func TestResolveCloudSyncURL(t *testing.T) {
 
 func TestResolveAnonKeyAndToken(t *testing.T) {
 	os.Unsetenv("CLOUD_API_TOKEN")
-	os.Unsetenv("SUPABASE_ANON_KEY")
 	os.Unsetenv("SUPABASE_PUBLISHABLE_KEY")
 	os.Unsetenv("VITE_SUPABASE_ANON_KEY")
 
