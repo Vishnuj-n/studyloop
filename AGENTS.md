@@ -193,8 +193,9 @@ These must NEVER be violated:
 ## Development Stage Rules
 
 - **No Backward Compatibility Required:** The application is in active development. Do not implement backward-compatible wrapper functions, legacy database table adapters, column fallback checks, or automated database migration schema repair loops. Keep schemas clean and lean.
+- **Development SQLite Database & Storage Location:** When running in development mode (`APP_ENV=dev` / `wails dev`), the application uses `dev_data/Studyloop.db` as the SQLite database source of truth, and stores uploaded textbooks in `dev_data/uploads/`. Always inspect `dev_data/Studyloop.db` using `sqlite3` when investigating or debugging development data/schema issues.
 
 ---
 
-*Last updated: 2026-06-09*
+*Last updated: 2026-08-10*
 

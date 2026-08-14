@@ -501,6 +501,7 @@ func (r *Repository) SuspendFlashcardTx(tx *sql.Tx, cardID string) error {
 }
 
 func (r *Repository) MakeAllFlashcardsDueNow(profileID string) (int64, error) {
+	profileID = strings.TrimSpace(profileID)
 	query := `UPDATE fsrs_cards SET due_at = ? WHERE suspended = 0`
 	args := []interface{}{time.Now().Unix() - 3600}
 	if profileID != "" {

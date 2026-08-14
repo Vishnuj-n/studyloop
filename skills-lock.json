@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "add-to-portfolio": {
+      "source": "Vishnuj-n/LAZY-PORTFOLIO",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/add-to-portfolio/SKILL.md",
+      "computedHash": "696a112d0678ef3e626f767e48cc307b3234b0289ffcff16f3e2d4657111077b"
+    },
     "caveman": {
       "source": "JuliusBrussee/caveman",
       "sourceType": "github",

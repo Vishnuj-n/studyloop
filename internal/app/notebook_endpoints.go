@@ -220,10 +220,8 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		var chapters []models.SyllabusChapterDraft
 		fallbackUsed := false
 
-		if s, err := repo.GetUserSettings(); err == nil && s != nil && strings.TrimSpace(s.ClassroomCode) == "" {
-			if res, err := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, nil); err == nil && len(res.Chapters) > 0 {
-				chapters = res.Chapters
-			}
+		if res, err := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, nil); err == nil && len(res.Chapters) > 0 {
+			chapters = res.Chapters
 		}
 
 		if len(chapters) == 0 {

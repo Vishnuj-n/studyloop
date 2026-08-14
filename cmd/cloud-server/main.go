@@ -65,16 +65,25 @@ func main() {
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
-	allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" && allowedOrigins != "" {
-			for _, allowed := range strings.Split(allowedOrigins, ",") {
-				if strings.TrimSpace(allowed) == origin {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
+		allowed := os.Getenv("CORS_ALLOWED_ORIGINS")
+		if allowed != "" && origin != "" {
+			origins := strings.Split(allowed, ",")
+			matched := false
+			for _, o := range origins {
+				if strings.EqualFold(strings.TrimSpace(o), strings.TrimSpace(origin)) {
+					matched = true
 					break
 				}
 			}
+			if matched {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else {
+				w.Header().Set("Access-Control-Allow-Origin", strings.TrimSpace(origins[0]))
+			}
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, apikey, x-session-token, X-Session-Token")
@@ -85,33 +94,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func jsonResponse(w http.ResponseWriter, status int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func jsonError(w http.ResponseWriter, status int, message string) {
-	jsonResponse(w, status, map[string]interface{}{
-		"error":   message,
-		"success": false,
-	})
-}
-
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	jsonResponse(w, http.StatusOK, map[string]string{"status": "ok", "service": "ai-tutor-cloud-server", "mode": "supabase-rest"})
-}
-
-type LoginRequest struct {
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	IsDesktop bool   `json:"is_desktop"`
-}
-
-func checkPassword(storedPassword, providedPassword string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(providedPassword)) == nil
 }
 
 func extractSessionToken(r *http.Request) string {
@@ -171,7 +153,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 		return false
 	}
 
-	userURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=classroom_code", supabaseURL, url.QueryEscape(entityID))
+	userURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=ilike.%s&select=classroom_code", supabaseURL, url.QueryEscape(entityID))
 	uReq, err := http.NewRequest(http.MethodGet, userURL, nil)
 	if err != nil {
 		return false
@@ -197,6 +179,33 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 	}
 
 	return true
+}
+
+func jsonResponse(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func jsonError(w http.ResponseWriter, status int, message string) {
+	jsonResponse(w, status, map[string]interface{}{
+		"error":   message,
+		"success": false,
+	})
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "ok", "service": "ai-tutor-cloud-server", "mode": "supabase-rest"})
+}
+
+type LoginRequest struct {
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	IsDesktop bool   `json:"is_desktop"`
+}
+
+func checkPassword(storedPassword, providedPassword string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(providedPassword)) == nil
 }
 
 func migratePlaintextPassword(username, plaintext string) string {

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -330,47 +329,152 @@ func postJSONWithRetry(url string, jsonBytes []byte, headers map[string]string, 
 	return lastErr
 }
 
+func resolveNotebookUploadDir() (string, error) {
+	if os.Getenv("APP_ENV") == "dev" {
+		projectRoot, err := os.Getwd()
+		if err == nil {
+			dir := filepath.Join(projectRoot, "dev_data", "uploads")
+			if mkErr := os.MkdirAll(dir, 0o755); mkErr == nil {
+				return dir, nil
+			}
+		}
+	}
+
+	var dir string
+	if cfgDir, err := os.UserConfigDir(); err == nil && cfgDir != "" {
+		dir = filepath.Join(cfgDir, "Studyloop", "uploads")
+	} else if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		dir = filepath.Join(cacheDir, "Studyloop", "uploads")
+	} else if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+		dir = filepath.Join(homeDir, ".Studyloop", "uploads")
+	} else {
+		return "", fmt.Errorf("failed to resolve application upload directory")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create app upload directory %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
 func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error {
 	utils.Warnf("[SYNC] Processing assigned notebook: title=%q, id=%q, url=%q", nb.Title, nb.ID, nb.DownloadURL)
 
-	// Check if already registered
+	uploadDir, err := resolveNotebookUploadDir()
+	if err != nil {
+		utils.Warnf("[SYNC] Failed to resolve notebook upload directory: %v", err)
+		return err
+	}
+	canonicalPath := filepath.Join(uploadDir, nb.ID+".pdf")
+
+	// 1. Check if already registered by ID
 	if existing, _ := repo.GetNotebookByID(nb.ID); existing != nil {
-		utils.Warnf("[SYNC] Assignment %q (%s) already exists in database, skipping download", nb.Title, nb.ID)
+		utils.Warnf("[SYNC] Assignment %q (%s) already exists in database", nb.Title, nb.ID)
 		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" && existing.ProfileID != settings.ActiveProfileID {
 			if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr == nil {
 				utils.Warnf("[SYNC] Associated existing notebook %s with active profile %s", nb.ID, settings.ActiveProfileID)
 			}
 		}
+
+		// Verify file exists on disk at stored path; if missing or in wrong path, repair it
+		if _, statErr := os.Stat(existing.FilePath); statErr == nil {
+			return nil
+		}
+
+		// If file exists at canonical path, update DB file_path
+		if _, statErr := os.Stat(canonicalPath); statErr == nil {
+			utils.Warnf("[SYNC] Updating notebook %s file path to canonical upload dir: %s", nb.ID, canonicalPath)
+			_ = repo.UpdateNotebookFilePath(nb.ID, canonicalPath)
+			return nil
+		}
+
+		// If file is missing altogether, fall through to download to canonical path and update DB file_path
+		utils.Warnf("[SYNC] File missing at %s, re-downloading to %s", existing.FilePath, canonicalPath)
+		if downloadErr := downloadPDFToFile(nb.DownloadURL, canonicalPath); downloadErr != nil {
+			return downloadErr
+		}
+		_ = repo.UpdateNotebookFilePath(nb.ID, canonicalPath)
 		return nil
 	}
 
-	// 1. Create a local path for the downloaded PDF
-	baseDir := os.Getenv("APPDATA")
-	if baseDir == "" {
-		if dir, err := os.UserConfigDir(); err == nil {
-			baseDir = dir
+	// 2. Check if notebook with matching title already exists locally (e.g. uploaded manually by user)
+	if allNotebooks, fetchErr := repo.GetNotebooks("", ""); fetchErr == nil {
+		for _, existing := range allNotebooks {
+			if strings.EqualFold(strings.TrimSpace(existing.Title), strings.TrimSpace(nb.Title)) {
+				utils.Warnf("[SYNC] Assignment %q matches existing local notebook %q (%s), linking to active profile", nb.Title, existing.Title, existing.ID)
+				if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" {
+					if assignErr := repo.AssignNotebookToProfile(existing.ID, settings.ActiveProfileID); assignErr == nil {
+						utils.Warnf("[SYNC] Linked local notebook %s to active profile %s", existing.ID, settings.ActiveProfileID)
+					}
+				}
+				return nil
+			}
 		}
 	}
-	if baseDir == "" {
-		baseDir = os.TempDir()
-	}
-	dataDir := filepath.Join(baseDir, "ai-tutor", "notebooks")
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		utils.Warnf("[SYNC] Failed to create notebook directory: %v", err)
-		return err
-	}
-	validIDRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
-	cleanID := strings.TrimSpace(nb.ID)
-	if !validIDRegex.MatchString(cleanID) || filepath.Base(cleanID) != cleanID {
-		return fmt.Errorf("invalid notebook assignment identifier: %q", nb.ID)
+
+	// 3. Download from remote URL to canonical upload directory
+	utils.Warnf("[SYNC] Downloading PDF from URL to canonical path %s: %s", canonicalPath, nb.DownloadURL)
+	if downloadErr := downloadPDFToFile(nb.DownloadURL, canonicalPath); downloadErr != nil {
+		return downloadErr
 	}
 
-	localPath := filepath.Join(dataDir, cleanID+".pdf")
+	// 4. Register in SQLite
+	fileHash, hashErr := utils.FileSHA256(canonicalPath)
+	if hashErr != nil {
+		_ = os.Remove(canonicalPath)
+		return fmt.Errorf("failed to compute file hash: %w", hashErr)
+	}
 
-	// 2. Download from remote URL
-	utils.Warnf("[SYNC] Downloading PDF from URL: %s", nb.DownloadURL)
+	pageCount := 0
+	if f, r, pErr := pdfreader.Open(canonicalPath); pErr == nil {
+		pageCount = r.NumPage()
+		_ = f.Close()
+	}
+
+	err = repo.CreateNotebook(nb.ID, nb.Title, canonicalPath, "pdf", "", fileHash, pageCount)
+	if err != nil {
+		_ = os.Remove(canonicalPath)
+		return fmt.Errorf("failed to insert notebook into database: %w", err)
+	}
+
+	// Assign to active profile if configured
+	if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" {
+		if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr == nil {
+			utils.Warnf("[SYNC] Assigned notebook %s to active profile %s", nb.ID, settings.ActiveProfileID)
+		}
+	}
+
+	// If assignment provides explicit page range bounds, persist initial syllabus draft
+	if nb.StartPage != nil && *nb.StartPage > 0 {
+		startP := *nb.StartPage
+		endP := pageCount
+		if nb.EndPage != nil && *nb.EndPage > 0 {
+			endP = *nb.EndPage
+		}
+		if pageCount > 0 && endP > pageCount {
+			endP = pageCount
+		}
+		draft := models.SyllabusDraft{
+			PageCount: pageCount,
+			Chapters: []models.SyllabusChapterDraft{
+				{
+					Title:     nb.Title,
+					StartPage: startP,
+					EndPage:   endP,
+				},
+			},
+		}
+		if draftBytes, dErr := json.Marshal(draft); dErr == nil {
+			_ = repo.UpdateNotebookSyllabusDraft(nb.ID, string(draftBytes))
+		}
+	}
+
+	utils.Warnf("[SYNC] Successfully registered newly assigned notebook: %s (ID: %s, Hash: %s)", nb.Title, nb.ID, fileHash)
+	return nil
+}
+
+func downloadPDFToFile(downloadURL string, localPath string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", nb.DownloadURL, nil)
+	req, err := http.NewRequest("GET", downloadURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create GET request: %w", err)
 	}
@@ -410,35 +514,6 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 	}
 
 	utils.Warnf("[SYNC] Downloaded %d bytes to %s", written, localPath)
-
-	// 3. Register in SQLite
-	fileHash, hashErr := utils.FileSHA256(localPath)
-	if hashErr != nil {
-		_ = os.Remove(localPath)
-		return fmt.Errorf("failed to compute file hash: %w", hashErr)
-	}
-
-	pageCount := 0
-	if f, r, pErr := pdfreader.Open(localPath); pErr == nil {
-		pageCount = r.NumPage()
-		_ = f.Close()
-	}
-
-	err = repo.CreateNotebook(nb.ID, nb.Title, localPath, "pdf", "", fileHash, pageCount)
-	if err != nil {
-		_ = os.Remove(localPath)
-		return fmt.Errorf("failed to insert notebook into database: %w", err)
-	}
-
-	// Assign to active profile if configured
-	if settings, sErr := repo.GetUserSettings(); sErr == nil && settings.ActiveProfileID != "" {
-		if assignErr := repo.AssignNotebookToProfile(nb.ID, settings.ActiveProfileID); assignErr != nil {
-			utils.Warnf("[SYNC] Warning: failed to assign downloaded notebook to profile %s: %v", settings.ActiveProfileID, assignErr)
-		} else {
-			utils.Warnf("[SYNC] Assigned notebook %s to active profile %s", nb.ID, settings.ActiveProfileID)
-		}
-	}
-
-	utils.Warnf("[SYNC] Successfully registered newly assigned notebook: %s (ID: %s, Hash: %s)", nb.Title, nb.ID, fileHash)
 	return nil
 }
+
