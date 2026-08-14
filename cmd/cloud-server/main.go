@@ -441,8 +441,31 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	if role == "" { role = req.Role }
 	if classCode == "" { classCode = req.ClassroomCode }
 	if uname == "" { uname = req.Username }
-	sessionToken := fmt.Sprintf("%v", user["id"])
-	if sessionToken == "" || sessionToken == "<nil>" {
+	sessionToken := ""
+	sessReqPayload, _ := json.Marshal(map[string]interface{}{
+		"entity_id":  strings.ToLower(uname),
+		"role":       role,
+		"expires_at": time.Now().AddDate(10, 0, 0).Format(time.RFC3339),
+	})
+	sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", supabaseURL), bytes.NewBuffer(sessReqPayload))
+	if sErr == nil {
+		sessReq.Header.Set("Content-Type", "application/json")
+		sessReq.Header.Set("apikey", supabaseKey)
+		sessReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		sessReq.Header.Set("Prefer", "return=representation")
+		if sessRes, sDoErr := httpClient.Do(sessReq); sDoErr == nil {
+			defer sessRes.Body.Close()
+			if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
+				var createdSess []map[string]interface{}
+				if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
+					if tok, ok := createdSess[0]["session_token"].(string); ok && tok != "" {
+						sessionToken = tok
+					}
+				}
+			}
+		}
+	}
+	if sessionToken == "" {
 		sessionToken = uname
 	}
 
