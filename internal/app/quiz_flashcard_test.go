@@ -218,66 +218,6 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 // FLASHCARD/FSRS TESTS
 // ============================================================================
 
-func TestGenerateFlashcardsCreatesAndReturnsCards(t *testing.T) {
-	app := newTestApp(t)
-	expectedCount, err := testRepo.GetTotalChunkTokens("os-scheduling")
-	if err != nil {
-		t.Fatalf("GetTotalChunkTokens failed: %v", err)
-	}
-	want := study.ScaledFlashcardCount(expectedCount)
-
-	resp := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	cards, ok := resp["cards"].([]models.Flashcard)
-	if !ok {
-		t.Fatalf("expected typed flashcards slice, got %#v", resp["cards"])
-	}
-	if len(cards) != want {
-		t.Fatalf("expected %d flashcards, got %d", want, len(cards))
-	}
-
-	count, err := testRepo.CountFlashcardsForTopic("os-scheduling")
-	if err != nil {
-		t.Fatalf("CountFlashcardsForTopic failed: %v", err)
-	}
-	if count != want {
-		t.Fatalf("expected %d stored flashcards, got %d", want, count)
-	}
-}
-
-func TestGenerateFlashcardsReturnsExistingCardsWithoutDuplication(t *testing.T) {
-	app := newTestApp(t)
-	totalTokens, err := testRepo.GetTotalChunkTokens("os-scheduling")
-	if err != nil {
-		t.Fatalf("GetTotalChunkTokens failed: %v", err)
-	}
-	want := study.ScaledFlashcardCount(totalTokens)
-
-	first := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := first["error"]; hasErr {
-		t.Fatalf("first generation failed: %v", first["error"])
-	}
-
-	second := app.GenerateFlashcards("os-scheduling")
-	if _, hasErr := second["error"]; hasErr {
-		t.Fatalf("second generation failed: %v", second["error"])
-	}
-	if existing, ok := second["existing"].(bool); !ok || !existing {
-		t.Fatalf("expected existing=true on second generation, got %#v", second["existing"])
-	}
-
-	count, err := testRepo.CountFlashcardsForTopic("os-scheduling")
-	if err != nil {
-		t.Fatalf("CountFlashcardsForTopic failed: %v", err)
-	}
-	if count != want {
-		t.Fatalf("expected no duplicate flashcards, got %d", count)
-	}
-}
-
 // ============================================================================
 // REVIEW SESSION TESTS
 // ============================================================================

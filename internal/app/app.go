@@ -159,10 +159,6 @@ func (a *App) GetNotebookUploadDir() string {
 	return a.notebookUploadDir
 }
 
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
-}
-
 // LogFrontendEvent accepts a structured log event from the frontend and writes it to the queue logger.
 func (a *App) LogFrontendEvent(level string, component string, event string, details string) {
 	switch strings.ToLower(level) {

@@ -440,35 +440,6 @@ func TestCompleteTask_InsertsFollowUpTasks(t *testing.T) {
 	}
 }
 
-func TestSkipTask_MarksTaskAsSkipped(t *testing.T) {
-	app := newTestApp(t)
-
-	notebookID := "skip-test-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Skip Test Notebook", "/tmp/skip.txt", "txt", "", "", 1, ""); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-
-	task := models.StudyQueueTask{
-		ID:         "task-skip-1",
-		NotebookID: notebookID,
-		TaskType:   models.StudyTaskTypeExaminer,
-		Status:     models.StudyTaskStatusPending,
-		Priority:   1,
-	}
-	if err := testRepo.InsertStudyTask(task); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-
-	resp := app.SkipTask("task-skip-1")
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected success, got error: %v", resp["error"])
-	}
-
-	_, err := testRepo.GetNextTask(notebookID)
-	if err != db.ErrNoPendingTasks {
-		t.Fatalf("expected no pending tasks after skip, got: %v", err)
-	}
-}
 
 // ============================================================================
 // DETERMINISTIC ORDERING TESTS

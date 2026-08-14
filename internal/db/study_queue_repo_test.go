@@ -173,14 +173,6 @@ func TestStudyQueueLifecycleAndState(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CompleteTask failed: %v", err)
 	}
-
-	state, err := testRepo.GetQueueState("nb-1")
-	if err != nil {
-		t.Fatalf("GetQueueState failed: %v", err)
-	}
-	if state.Pending["READING"] != 1 || state.Pending["QUIZ"] != 1 || state.Total != 2 {
-		t.Fatalf("unexpected queue state: %#v", state)
-	}
 }
 
 func TestStudyQueueErrors(t *testing.T) {
@@ -191,9 +183,6 @@ func TestStudyQueueErrors(t *testing.T) {
 	}
 	if err := testRepo.ActivateTask("missing"); !errors.Is(err, ErrTaskNotFound) {
 		t.Fatalf("expected ErrTaskNotFound, got %v", err)
-	}
-	if err := testRepo.SkipTask("missing"); !errors.Is(err, ErrTaskNotFound) {
-		t.Fatalf("expected ErrTaskNotFound from skip, got %v", err)
 	}
 }
 

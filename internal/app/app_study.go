@@ -459,7 +459,7 @@ func (a *App) CompleteMilestoneExam(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
+func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -495,7 +495,7 @@ func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interfa
 	settings := a.GetUserSettings()
 	profiles := a.GetProfiles()
 	todayPlan := a.GetTodayPlan()
-	streakState := a.GetStreakState(timezoneOffsetMinutes)
+	streakState := a.getStreakState(timezoneOffsetMinutes)
 
 	var pendingNotebook map[string]interface{}
 	var pendingNotebookError string
@@ -535,35 +535,6 @@ func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interfa
 		"pending_notebook":       pendingNotebook,
 		"pending_notebook_error": pendingNotebookError,
 	}
-}
-
-func (a *App) SkipTask(taskID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if strings.TrimSpace(taskID) == "" {
-		return map[string]interface{}{"error": "task ID is required", "code": 400}
-	}
-	if err := repo.SkipTask(taskID); err != nil {
-		return mapTaskError(err)
-	}
-	return map[string]interface{}{"ok": true}
-}
-
-func (a *App) GetQueueState(notebookID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	if strings.TrimSpace(notebookID) == "" {
-		return map[string]interface{}{"error": "notebook ID is required", "code": 400}
-	}
-	state, err := repo.GetQueueState(notebookID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"queue_state": state}
 }
 
 // ---------- Helpers for InitializeReadingSession ----------

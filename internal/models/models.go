@@ -63,13 +63,6 @@ type StudyQueueTask struct {
 	EndPage     int             `json:"end_page,omitempty"`
 }
 
-// QueueState provides pending counts grouped by task type for dashboard summaries.
-type QueueState struct {
-	NotebookID string         `json:"notebook_id,omitempty"`
-	Pending    map[string]int `json:"pending"`
-	Total      int            `json:"total"`
-}
-
 // CompletionResult captures explicit completion outcome and optional explicit follow-up inserts.
 type CompletionResult struct {
 	Status    StudyTaskStatus  `json:"status"`
