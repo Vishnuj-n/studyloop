@@ -436,15 +436,6 @@ h1 {
   color: var(--on-surface);
 }
 
-.page-range {
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--surface-container-low);
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: var(--muted-text);
-}
-
 .lane-badge {
   font-size: 11px;
   font-weight: 700;
@@ -543,7 +534,6 @@ h1 {
   transform: translateY(-1px);
 }
 
-.prompt-instruction,
 .completion-instruction {
   margin: 0;
   font-size: 13.5px;

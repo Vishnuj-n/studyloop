@@ -414,7 +414,6 @@ button:disabled {
   background: linear-gradient(160deg, var(--primary), var(--primary-dim));
 }
 
-.secondary,
 .ghost {
   color: var(--on-surface);
   background: var(--surface-container-low);

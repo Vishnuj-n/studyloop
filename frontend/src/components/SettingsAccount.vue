@@ -239,13 +239,6 @@ input:focus {
   outline: none;
 }
 
-.hint {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--muted-text);
-  line-height: 1.4;
-}
-
 .form-grid {
   display: flex;
   flex-direction: column;

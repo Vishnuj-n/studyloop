@@ -154,14 +154,6 @@ const topItems = [
   color: var(--on-surface);
 }
 
-.brand-subtitle {
-  margin: 2px 0 0;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--muted-text);
-}
-
 .menu {
   margin-top: 28px;
   display: grid;
@@ -213,16 +205,6 @@ const topItems = [
   gap: 10px;
 }
 
-.focus-chip {
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px);
-  color: var(--on-surface);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 10px 14px;
-}
 
 .sync-link {
   display: flex;
