@@ -249,9 +249,10 @@ type SyllabusChapterDraft struct {
 
 // SyllabusDraft captures the backend-generated chapter draft shown in the Notebook verification modal.
 type SyllabusDraft struct {
-	NotebookID string                 `json:"notebook_id"`
-	PageCount  int                    `json:"page_count"`
-	Chapters   []SyllabusChapterDraft `json:"chapters"`
+	NotebookID   string                 `json:"notebook_id"`
+	PageCount    int                    `json:"page_count"`
+	Chapters     []SyllabusChapterDraft `json:"chapters"`
+	FallbackUsed bool                   `json:"fallback_used"`
 }
 
 // ReaderSection is one ordered section used by the augmented reader.

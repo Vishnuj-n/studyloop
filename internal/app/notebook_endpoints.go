@@ -196,7 +196,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 					"page_count":    persistedDraft.PageCount,
 					"chapters":      persistedDraft.Chapters,
 					"status":        "draft_ready",
-					"fallback_used": false,
+					"fallback_used": persistedDraft.FallbackUsed,
 				}
 			}
 		}
@@ -222,6 +222,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 
 		if res, err := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, nil); err == nil && len(res.Chapters) > 0 {
 			chapters = res.Chapters
+			fallbackUsed = res.FallbackUsed
 		}
 
 		if len(chapters) == 0 {
@@ -233,7 +234,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 			chapters = []models.SyllabusChapterDraft{{Title: title, StartPage: 1, EndPage: doc.PageCount}}
 		}
 
-		draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters})
+		draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters, FallbackUsed: fallbackUsed})
 		if err != nil {
 			return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
 		}
@@ -266,7 +267,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
-	draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: result.Chapters}
+	draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: result.Chapters, FallbackUsed: result.FallbackUsed}
 	draftJSON, err := json.Marshal(draftToPersist)
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}

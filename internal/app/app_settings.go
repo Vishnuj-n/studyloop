@@ -500,10 +500,12 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 			req.Header.Set("apikey", anonKey)
 		}
 		resp, err := client.Do(req)
-		if err == nil && resp.StatusCode == http.StatusOK {
+		if err == nil {
 			defer resp.Body.Close()
-			if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
-				authenticated = true
+			if resp.StatusCode == http.StatusOK {
+				if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
+					authenticated = true
+				}
 			}
 		}
 	}
