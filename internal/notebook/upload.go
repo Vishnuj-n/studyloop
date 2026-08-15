@@ -106,7 +106,7 @@ func (s *Service) SaveUploadedFile(fileData []byte, fileName string) (*UploadRes
 		return nil, fmt.Errorf("file too large: %d bytes (max %d)", len(fileData), s.config.MaxFileSize)
 	}
 
-	id, filePath := s.buildUploadPath(fileName, ext)
+	id, filePath := s.buildUploadPath(ext)
 
 	// Write file to disk
 	if err := os.WriteFile(filePath, fileData, 0o644); err != nil {
@@ -146,7 +146,7 @@ func (s *Service) SaveUploadedFileFromPath(sourcePath string) (*UploadResult, er
 		return nil, err
 	}
 
-	id, destinationPath := s.buildUploadPath(fileName, ext)
+	id, destinationPath := s.buildUploadPath(ext)
 
 	source, err := os.Open(sourcePath)
 	if err != nil {
@@ -191,7 +191,7 @@ func (s *Service) SaveUploadedFileFromPath(sourcePath string) (*UploadResult, er
 	}, nil
 }
 
-func (s *Service) buildUploadPath(fileName, ext string) (string, string) {
+func (s *Service) buildUploadPath(ext string) (string, string) {
 	id := uuid.New().String()
 	// Use pure UUID for compact, collision-free file naming on disk while preserving extension
 	uniqueFileName := fmt.Sprintf("%s%s", id, ext)
