@@ -38,22 +38,27 @@ defineEmits(['start'])
 
 <style scoped>
 .card {
-  background: var(--surface-container-lowest);
-  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest, #ffffff);
+  border: none;
   border-radius: 16px;
 }
 
 .review-hero-card {
-  background: var(--surface-container-low);
-  border: 1px solid var(--primary);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  padding: 24px;
+  background: var(--surface-container-lowest, #ffffff);
+  box-shadow: 0 4px 20px rgba(45, 51, 56, 0.04);
+  padding: 28px 32px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 20px;
   position: relative;
   overflow: hidden;
   border-radius: 16px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+}
+
+.review-hero-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(45, 51, 56, 0.08);
 }
 
 @media (min-width: 768px) {
@@ -73,19 +78,19 @@ defineEmits(['start'])
 
 .review-hero-tag {
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  color: var(--primary);
-  background: rgba(108, 92, 231, 0.1);
-  padding: 4px 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--primary, #005bc1);
+  background: var(--surface-container, #ebeef2);
+  padding: 4px 10px;
   border-radius: 6px;
   text-transform: uppercase;
 }
 
 .review-hero-estimate {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--muted-text);
+  font-weight: 500;
+  color: var(--muted-text, #64707d);
 }
 
 .review-hero-body {
@@ -97,9 +102,9 @@ defineEmits(['start'])
 .review-hero-body h2 {
   margin: 0;
   font-family: 'Manrope', sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--on-surface);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--on-surface, #2d3338);
 }
 
 .review-hero-stats {
@@ -116,15 +121,15 @@ defineEmits(['start'])
 .stat-num {
   font-family: 'Manrope', sans-serif;
   font-size: 32px;
-  font-weight: 800;
-  color: var(--on-surface);
+  font-weight: 700;
+  color: var(--on-surface, #2d3338);
   line-height: 1;
 }
 
 .stat-lbl {
   font-size: 11px;
   font-weight: 600;
-  color: var(--muted-text);
+  color: var(--muted-text, #64707d);
   text-transform: uppercase;
   margin-top: 4px;
 }
@@ -132,28 +137,33 @@ defineEmits(['start'])
 .review-hero-meta {
   margin: 0;
   font-size: 14px;
-  color: var(--muted-text);
+  color: var(--muted-text, #64707d);
 }
 
 .primary-btn {
-  background: var(--primary);
-  color: var(--on-primary);
+  background: linear-gradient(15deg, var(--primary, #005bc1) 0%, var(--primary-dim, #004faa) 100%);
+  color: var(--on-primary, #ffffff);
   border: none;
-  border-radius: 10px;
-  padding: 10px;
-  font-weight: 700;
+  border-radius: 0.75rem;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  box-shadow: 0 2px 8px rgba(45, 51, 56, 0.08);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s;
 }
 
 .primary-btn:hover {
-  opacity: 0.9;
+  opacity: 0.94;
+  transform: translateY(-1px);
+}
+
+.primary-btn:active {
+  transform: scale(0.98);
 }
 
 .review-hero-btn {
   justify-self: stretch;
-  padding: 14px 28px;
-  font-size: 16px;
   height: auto;
 }
 

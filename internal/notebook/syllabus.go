@@ -149,7 +149,7 @@ Rules:
 		return &SyllabusDraftResult{
 			Chapters:     NormalizeSyllabusChapters(bookmarkLikeDraft, doc.PageCount),
 			PageCount:    doc.PageCount,
-			FallbackUsed: true, // Bookmark-based chapters are a fallback
+			FallbackUsed: false,
 		}, nil
 	}
 

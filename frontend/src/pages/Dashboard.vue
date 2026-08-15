@@ -57,13 +57,21 @@
       :subtitle="actionError"
     />
 
+    <!-- Top Context Bar (Study Queue + Pacing Telemetry + Actions) -->
     <article class="status-strip">
-      <div>
+      <div class="status-title-group">
         <p class="eyebrow">Study Queue</p>
         <h1>Today's Tasks</h1>
       </div>
 
       <div class="header-actions">
+        <!-- Horizontal Pacing Telemetry with 0/2 Reading Session Counter -->
+        <TelemetryWidget
+          :pace="activeProfilePace"
+          :profile-name="activeProfileName"
+          :completed-sessions="completedSessionsToday"
+        />
+
         <!-- Escape Hatch Quick Toggle Button -->
         <button
           class="escape-hatch-toggle"
@@ -97,33 +105,40 @@
     <template v-else>
       <!-- Dashboard Layout Grid -->
       <div class="dashboard-grid">
-        <!-- Main Panel (Tasks / States) -->
+        <!-- Main Panel (Focus Hero Task & Vertical Queue) -->
         <div class="dashboard-main">
-          <!-- Task List & Custom Hero Review Card -->
-          <div
-            v-if="tasks.length > 0"
-            class="tasks-container"
-            style="display: flex; flex-direction: column; gap: 16px"
-          >
-            <!-- High-Priority Today's Reviews Card -->
-            <ReviewHeroCard
-              v-if="reviewTask"
-              :task="reviewTask"
-              :due-review-cards="dueReviewCards"
-              :total-due-review-cards="totalDueReviewCards"
-              @start="startTask"
-            />
-
-            <!-- Task List (Other Interleaved Tasks) -->
-            <div v-if="nonReviewTasks.length > 0" class="task-list">
-              <TaskCard
-                v-for="task in nonReviewTasks"
-                :key="task.id"
-                :task="task"
+          <div v-if="tasks.length > 0" class="tasks-container">
+            <!-- TIER 1: FOCUS HERO CARD (Action) -->
+            <section class="focus-hero-section">
+              <ReviewHeroCard
+                v-if="isReviewHero"
+                :task="reviewTask"
+                :due-review-cards="dueReviewCards"
+                :total-due-review-cards="totalDueReviewCards"
+                @start="startTask"
+              />
+              <FocusHeroCard
+                v-else-if="focusHeroTask"
+                :task="focusHeroTask"
                 :is-syncing="isSyncing"
                 @start="startTask"
               />
-            </div>
+            </section>
+
+            <!-- TIER 2: UP NEXT IN QUEUE (Visibility & Pipeline) -->
+            <section v-if="queueTasks.length > 0" class="up-next-section">
+              <h2 class="queue-section-title">Up Next in Queue</h2>
+              <div class="vertical-queue-stack">
+                <TaskCard
+                  v-for="(task, idx) in queueTasks"
+                  :key="task.id"
+                  :task="task"
+                  :queue-index="idx + 2"
+                  :is-syncing="isSyncing"
+                  @start="startTask"
+                />
+              </div>
+            </section>
           </div>
 
           <div v-else-if="hasActiveStudyContent" class="card state-card victory-card">
@@ -132,9 +147,6 @@
           </div>
 
           <OnboardingCard v-else @go-to-notebooks="goToNotebooks" />
-
-          <!-- Secondary Telemetry Widget -->
-          <TelemetryWidget :pace="activeProfilePace" :profile-name="activeProfileName" />
         </div>
 
         <!-- Sidebar Panel (Streak Calendar & Forecast Chart) -->
@@ -191,6 +203,7 @@ import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
 
 import StatusBanner from '../components/StatusBanner.vue'
 import ReviewHeroCard from '../components/ReviewHeroCard.vue'
+import FocusHeroCard from '../components/FocusHeroCard.vue'
 import TaskCard from '../components/TaskCard.vue'
 import OnboardingCard from '../components/OnboardingCard.vue'
 import TelemetryWidget from '../components/TelemetryWidget.vue'
@@ -271,6 +284,26 @@ const nonReviewTasks = computed(() => {
   return tasks.value.filter((t) => t.id !== 'task-review-daily')
 })
 
+const isReviewHero = computed(() => {
+  return (
+    !!reviewTask.value &&
+    !userSettings.value.skip_to_reading_active &&
+    dueReviewCards.value > 0
+  )
+})
+
+const focusHeroTask = computed(() => {
+  if (isReviewHero.value) return null
+  return nonReviewTasks.value.length > 0 ? nonReviewTasks.value[0] : null
+})
+
+const queueTasks = computed(() => {
+  if (isReviewHero.value) {
+    return nonReviewTasks.value
+  }
+  return nonReviewTasks.value.slice(1)
+})
+
 const flashcardsJustCreated = computed(() => {
   const created = Number.parseInt(route.query.flashcardsCreated, 10)
   return isNaN(created) || created <= 0 ? 0 : created
@@ -291,6 +324,11 @@ const pendingIngestionBook = ref(null)
 function goToIngestBook(notebookId) {
   router.push({ path: '/notebooks', query: { ingest: notebookId } })
 }
+
+const completedSessionsToday = computed(() => {
+  const todayKey = `study_completed_${new Date().toISOString().slice(0, 10)}`
+  return Number(localStorage.getItem(todayKey)) || 0
+})
 
 // --- Lifecycle ---
 onMounted(async () => {
@@ -588,7 +626,7 @@ async function forceDueFlashcards() {
 <style scoped>
 .page {
   display: grid;
-  gap: 16px;
+  gap: 20px;
   font-family: 'Inter', sans-serif;
 }
 
@@ -597,29 +635,33 @@ async function forceDueFlashcards() {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--outline-variant, #e0e0e0);
 }
 
 .profile-selector-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .profile-selector-container label {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--muted-text);
+  font-weight: 700;
+  color: var(--muted-text, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .topbar-select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  border: 1px solid var(--outline-variant);
+  border: 1px solid var(--outline-variant, #e0e0e0);
   border-radius: 12px;
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  padding: 10px 36px 10px 14px;
+  background: var(--surface-container-low, #f8f9fa);
+  color: var(--on-surface, #1e1e1e);
+  padding: 8px 36px 8px 14px;
   font-size: 14px;
   font-family: inherit;
   font-weight: 600;
@@ -651,35 +693,51 @@ async function forceDueFlashcards() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 8px 2px 2px;
+  gap: 16px;
+  padding: 4px 0 8px;
+  flex-wrap: wrap;
+}
+
+.status-title-group .eyebrow {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
 }
 
 .status-strip h1 {
   margin: 0;
   font-family: 'Manrope', sans-serif;
-  font-size: 44px;
+  font-size: 38px;
   letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--on-surface);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .escape-hatch-toggle {
   background: var(--surface-container-low);
   color: var(--on-surface);
   border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  padding: 10px 18px;
+  border-radius: 9999px;
+  padding: 7px 16px;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.escape-hatch-toggle:hover {
+  border-color: var(--primary);
 }
 
 .escape-hatch-toggle.active {
@@ -695,21 +753,21 @@ async function forceDueFlashcards() {
 
 .review-count {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--primary);
   font-family: 'Manrope', sans-serif;
 }
 
 .review-hint {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--muted-text);
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted-text, #777);
 }
 
 .card {
-  background: var(--surface-container-lowest);
-  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e0e0e0);
   border-radius: 16px;
 }
 
@@ -724,17 +782,43 @@ async function forceDueFlashcards() {
 }
 
 .muted {
-  color: var(--muted-text);
+  color: var(--muted-text, #666);
 }
 
 .error-card h2 {
   color: #eb5e55;
 }
 
-.task-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+.tasks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.focus-hero-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.up-next-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.queue-section-title {
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--on-surface, #1e1e1e);
+}
+
+.vertical-queue-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* Dashboard Two-Column Layout Grid */
@@ -754,7 +838,7 @@ async function forceDueFlashcards() {
 .dashboard-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .dashboard-sidebar {
