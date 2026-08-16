@@ -237,14 +237,14 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 			NotebookID:  notebookID,
 			TopicID:     sessionTopicID,
 			TaskType:    models.StudyTaskTypeFlashcardReview,
-			Status:      models.StudyTaskStatusPending,
+			Status:      models.StudyTaskStatusActive, // ponytail: on-demand review sessions start active immediately
 			Priority:    0,
 			PayloadJSON: string(payloadBytes),
 		}
 		if _, err := tx.Exec(`
 			INSERT INTO study_queue (
-				id, notebook_id, topic_id, task_type, status, priority, payload_json
-			) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?)
+				id, notebook_id, topic_id, task_type, status, priority, payload_json, activated_at
+			) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		`, task.ID, task.NotebookID, task.TopicID, string(task.TaskType), string(task.Status), task.Priority, task.PayloadJSON); err != nil {
 			return err
 		}

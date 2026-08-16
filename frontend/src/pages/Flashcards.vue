@@ -406,11 +406,6 @@ async function rate(ratingKey) {
     if (queueMode.value) {
       const res = await recordCardReview(reviewTaskID.value, targetCardID, validRating.value)
       if (res?.error) {
-        if (res.error === 'ErrTaskNotActive') {
-          showToast('This review session has already been completed.', 'info')
-          router.push('/dashboard')
-          return
-        }
         error.value = `Failed to save review: ${res.error}`
         showToast(res.error, 'error')
         return

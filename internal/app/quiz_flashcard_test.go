@@ -340,6 +340,66 @@ func TestGetReviewSessionNoDueCards(t *testing.T) {
 	}
 }
 
+func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivation(t *testing.T) {
+	app := newTestApp(t)
+
+	if err := testRepo.EnsureTopic("auto-act-topic", "Auto Act Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook("auto-act-nb", "Auto Act Notebook", "/tmp/auto-act.pdf", "pdf", "", "", 15, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if err := testRepo.LinkNotebookTopics("auto-act-nb", []string{"auto-act-topic"}); err != nil {
+		t.Fatalf("link notebook_topics failed: %v", err)
+	}
+	if err := testRepo.CreateFlashcards("auto-act-topic", []models.Flashcard{
+		{ID: "auto-card-1", TopicID: "auto-act-topic", Prompt: "Q1", Answer: "A1", DueAt: 1},
+		{ID: "auto-card-2", TopicID: "auto-act-topic", Prompt: "Q2", Answer: "A2", DueAt: 2},
+	}, map[string]models.FlashcardState{
+		"auto-card-1": {},
+		"auto-card-2": {},
+	}); err != nil {
+		t.Fatalf("CreateFlashcards failed: %v", err)
+	}
+
+	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "auto-act-nb")
+	if _, hasErr := sessionResp["error"]; hasErr {
+		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
+	}
+	session, ok := sessionResp["session"].(*models.ReviewSession)
+	if !ok {
+		t.Fatalf("expected ReviewSession pointer, got %#v", sessionResp["session"])
+	}
+	taskID := session.Task.ID
+
+	// Note: We deliberately do NOT call app.ActivateTask(taskID) here to test auto-activation!
+	reviewResp := app.RecordCardReview(taskID, "auto-card-1", 4)
+	if _, hasErr := reviewResp["error"]; hasErr {
+		t.Fatalf("RecordCardReview failed without manual ActivateTask: %v", reviewResp["error"])
+	}
+	if remaining, ok := reviewResp["remaining"].(int); !ok || remaining != 1 {
+		t.Fatalf("expected remaining=1, got %#v", reviewResp["remaining"])
+	}
+
+	reviewResp2 := app.RecordCardReview(taskID, "auto-card-2", 4)
+	if _, hasErr := reviewResp2["error"]; hasErr {
+		t.Fatalf("second RecordCardReview failed: %v", reviewResp2["error"])
+	}
+
+	completeResp := app.CompleteReviewSession(taskID)
+	if _, hasErr := completeResp["error"]; hasErr {
+		t.Fatalf("CompleteReviewSession failed: %v", completeResp["error"])
+	}
+
+	task, err := testRepo.GetTaskByID(taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID failed: %v", err)
+	}
+	if task.Status != models.StudyTaskStatusCompleted {
+		t.Fatalf("expected review task completed, got %s", task.Status)
+	}
+}
+
 // ============================================================================
 // WRITTEN ANSWER TESTS
 // ============================================================================

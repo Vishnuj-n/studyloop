@@ -181,7 +181,12 @@ func (s *StudyService) withFlashcardTaskTx(taskID string, fn func(tx *sql.Tx) er
 	if task.TaskType != models.StudyTaskTypeFlashcardReview {
 		return 0, fmt.Errorf("task %s is not a flashcard review task", taskID)
 	}
-	if task.Status != models.StudyTaskStatusActive {
+	// ponytail: self-healing activation if task is PENDING
+	if task.Status == models.StudyTaskStatusPending {
+		if err := s.repo.ActivateTaskTx(tx, taskID); err != nil {
+			return 0, err
+		}
+	} else if task.Status != models.StudyTaskStatusActive {
 		return 0, db.ErrTaskNotActive
 	}
 
