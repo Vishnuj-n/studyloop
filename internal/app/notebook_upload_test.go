@@ -558,7 +558,7 @@ func setupConfirmedChunkedNotebook(t *testing.T, fileName string) (*App, noteboo
 	service := notebook.NewService(uploadDir)
 	app := &App{repo: testRepo, notebookService: service}
 
-	content := []byte("# Intro\n\nAlpha beta gamma\n\n## Details\n\nDelta epsilon zeta")
+	content := []byte("# Intro\n\nAlpha beta gamma\n\n# Details\n\nDelta epsilon zeta")
 	uploadResult, err := service.SaveUploadedFile(content, fileName)
 	if err != nil {
 		t.Fatalf("SaveUploadedFile failed: %v", err)

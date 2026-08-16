@@ -109,7 +109,7 @@ func TestExtractDocumentTXTNormalization(t *testing.T) {
 
 func TestExtractDocumentMarkdownNormalization(t *testing.T) {
 	service := NewService(t.TempDir())
-	mdContent := "# Intro\n\n Alpha   beta \n\n## Deep Dive\n gamma\t delta \n"
+	mdContent := "# Intro\n\n Alpha   beta \n\n# Deep Dive\n gamma\t delta \n"
 	mdPath := writeTempFile(t, t.TempDir(), "notes.md", []byte(mdContent))
 
 	doc, err := service.ExtractDocument(mdPath, "md")

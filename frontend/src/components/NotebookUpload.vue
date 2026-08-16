@@ -72,6 +72,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useDialog } from '../composables/useDialog'
 
 defineProps({
   isCloudProfile: { type: Boolean, default: false },
@@ -84,6 +85,7 @@ defineProps({
 })
 
 const emit = defineEmits(['upload-file'])
+const { confirm } = useDialog()
 
 const fileInput = ref(null)
 const folderInput = ref(null)
@@ -133,8 +135,18 @@ async function processFiles(fileList) {
   // Sort files deterministically (natural order)
   files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
 
-  // Concatenate files into 1 markdown notebook
   const folderName = files[0].webkitRelativePath?.split('/')[0] || 'Course Notes'
+
+  // ponytail: reuse global useDialog() confirm modal instead of custom modal component
+  const ok = await confirm({
+    title: `Upload ${files.length} files to this site?`,
+    message: `This will upload all files from "${folderName}". Do this only if you trust the site.`,
+    confirmText: 'Upload',
+    cancelText: 'Cancel',
+    type: 'info',
+  })
+  if (!ok) return
+
   const sections = []
   for (const f of files) {
     const text = await f.text()
@@ -230,6 +242,11 @@ function handleFileDrop(e) {
   color: var(--on-primary);
   background: linear-gradient(15deg, var(--primary), var(--primary-dim));
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upload-cta:active {
+  transform: scale(0.97);
 }
 
 .folder-cta {
@@ -300,3 +317,4 @@ function handleFileDrop(e) {
   font-size: 14px;
 }
 </style>
+
