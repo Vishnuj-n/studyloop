@@ -286,9 +286,7 @@ const nonReviewTasks = computed(() => {
 
 const isReviewHero = computed(() => {
   return (
-    !!reviewTask.value &&
-    !userSettings.value.skip_to_reading_active &&
-    dueReviewCards.value > 0
+    !!reviewTask.value && !userSettings.value.skip_to_reading_active && dueReviewCards.value > 0
   )
 })
 
@@ -436,7 +434,7 @@ async function loadActiveProfilePace() {
 async function loadFlashcardTimeline(tzOffset) {
   try {
     const timelineRes = await getFlashcardDueTimeline(tzOffset)
-    timelineData.value = timelineRes && !timelineRes.error ? (timelineRes.timeline || []) : []
+    timelineData.value = timelineRes && !timelineRes.error ? timelineRes.timeline || [] : []
   } catch (err) {
     console.error('Failed to get flashcard due timeline', err)
     timelineData.value = []

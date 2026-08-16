@@ -269,6 +269,7 @@ type ReaderTopicBundle struct {
 	PageCount        int             `json:"page_count"`
 	TopicStartPage   int             `json:"topic_start_page"`
 	TopicEndPage     int             `json:"topic_end_page"`
+	RawContent       string          `json:"raw_content,omitempty"`
 	Sections         []ReaderSection `json:"sections"`
 	Subtopics        []Subtopic      `json:"subtopics,omitempty"`
 }

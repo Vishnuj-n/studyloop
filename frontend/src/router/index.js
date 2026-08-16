@@ -43,13 +43,23 @@ router.beforeEach(async (to, from, next) => {
   try {
     const res = await isOnboarded()
     if (res && res.onboarded === false) {
-      logFrontendEvent('info', 'Router', 'onboarding_redirect', JSON.stringify({ target: to.path, res }))
+      logFrontendEvent(
+        'info',
+        'Router',
+        'onboarding_redirect',
+        JSON.stringify({ target: to.path, res })
+      )
       next('/onboarding')
     } else {
       next()
     }
   } catch (err) {
-    logFrontendEvent('error', 'Router', 'onboarding_check_error', JSON.stringify({ target: to.path, error: String(err) }))
+    logFrontendEvent(
+      'error',
+      'Router',
+      'onboarding_check_error',
+      JSON.stringify({ target: to.path, error: String(err) })
+    )
     next()
   }
 })

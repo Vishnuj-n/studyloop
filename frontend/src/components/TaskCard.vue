@@ -23,9 +23,7 @@
           </h3>
           <h3 v-else>{{ cleanTitle }}</h3>
 
-          <span v-if="taskMetaText" class="task-meta-inline">
-            ({{ taskMetaText }})
-          </span>
+          <span v-if="taskMetaText" class="task-meta-inline"> ({{ taskMetaText }}) </span>
         </div>
       </div>
     </div>
@@ -203,7 +201,9 @@ const taskMetaText = computed(() => {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(45, 51, 56, 0.06);
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
   white-space: nowrap;
 }
 

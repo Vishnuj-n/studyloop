@@ -22,9 +22,9 @@
         class="sync-link"
         :class="{ 'sync-success': syncState === 'success', 'sync-error': syncState === 'error' }"
         type="button"
-        @click="handleSync"
         :disabled="syncing"
         title="Sync with Cloud"
+        @click="handleSync"
       >
         <span class="menu-icon">{{ syncIcon }}</span>
         <span>{{ syncLabel }}</span>
@@ -204,7 +204,6 @@ const topItems = [
   display: grid;
   gap: 10px;
 }
-
 
 .sync-link {
   display: flex;

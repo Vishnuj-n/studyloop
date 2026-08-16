@@ -40,7 +40,11 @@
       </div>
 
       <p class="field-hint" style="margin-bottom: 0.75rem">
-        {{ isSignUpMode ? 'Register a student account using your classroom code to enable cloud sync.' : 'Sign in with your student credentials to enable cloud sync for this profile.' }}
+        {{
+          isSignUpMode
+            ? 'Register a student account using your classroom code to enable cloud sync.'
+            : 'Sign in with your student credentials to enable cloud sync for this profile.'
+        }}
       </p>
 
       <div v-if="loginError" class="login-error-message">

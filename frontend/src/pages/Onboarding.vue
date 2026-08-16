@@ -117,9 +117,7 @@
             />
             <div class="check-label">
               <strong>Enable Study Reminders</strong>
-              <p class="hint">
-                Notify when daily study time starts and ends.
-              </p>
+              <p class="hint">Notify when daily study time starts and ends.</p>
             </div>
           </label>
         </div>
@@ -197,11 +195,7 @@
         </div>
 
         <label class="checkbox-container inline-check">
-          <input
-            v-model="useSameLLMForHeavy"
-            type="checkbox"
-            class="checkbox-input"
-          />
+          <input v-model="useSameLLMForHeavy" type="checkbox" class="checkbox-input" />
           <div class="check-label">
             <strong>Use same provider and model for heavy AI tasks</strong>
           </div>
@@ -921,7 +915,6 @@ select {
   box-sizing: border-box;
   width: 100%;
 }
-
 
 .quick-durations {
   margin-top: 8px !important;

@@ -29,10 +29,14 @@
         :disabled="task.action_type === 'flashcard_generate' && isSyncing"
         @click="$emit('start', task)"
       >
-        <span v-if="task.action_type === 'flashcard_generate' && isSyncing">Generating Flashcards...</span>
+        <span v-if="task.action_type === 'flashcard_generate' && isSyncing"
+          >Generating Flashcards...</span
+        >
         <span v-else-if="task.action_type === 'flashcard_generate'">⚡ Generate Flashcards</span>
         <span v-else-if="isReadingTask">▶ Start Reading</span>
-        <span v-else-if="task.action_type === 'quiz' || task.action_type === 'milestone_exam'">▶ Start Quiz</span>
+        <span v-else-if="task.action_type === 'quiz' || task.action_type === 'milestone_exam'"
+          >▶ Start Quiz</span
+        >
         <span v-else-if="task.action_type === 'socratic_remedial'">🛡️ Start Rescue Session</span>
         <span v-else>▶ Start Task</span>
       </button>
@@ -111,7 +115,9 @@ const formattedMeta = computed(() => {
   box-shadow: 0 4px 20px rgba(45, 51, 56, 0.04);
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s;
 }
 
 .focus-hero-card:hover {
@@ -203,7 +209,9 @@ const formattedMeta = computed(() => {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(45, 51, 56, 0.08);
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s;
+  transition:
+    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.15s;
   display: inline-flex;
   align-items: center;
   gap: 8px;

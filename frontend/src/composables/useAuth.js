@@ -27,10 +27,7 @@ export function useAuth(reloadFn, errorRef, successRef) {
     loginError.value = ''
     loggingIn.value = true
     try {
-      const res = await loginStudent(
-        loginUsername.value.trim(),
-        loginPassword.value.trim()
-      )
+      const res = await loginStudent(loginUsername.value.trim(), loginPassword.value.trim())
       if (res.error) {
         loginError.value = res.error
       } else {
@@ -48,7 +45,11 @@ export function useAuth(reloadFn, errorRef, successRef) {
   }
 
   async function handleSignUp() {
-    if (!signupUsername.value.trim() || !signupPassword.value.trim() || !signupClassroomCode.value.trim()) {
+    if (
+      !signupUsername.value.trim() ||
+      !signupPassword.value.trim() ||
+      !signupClassroomCode.value.trim()
+    ) {
       loginError.value = 'Username, password, and classroom code are all required.'
       return
     }
@@ -85,7 +86,8 @@ export function useAuth(reloadFn, errorRef, successRef) {
   async function handleLogout() {
     const ok = await confirm({
       title: 'Sign Out Profile',
-      message: 'Are you sure you want to sign out? This will disable cloud sync for this study profile.',
+      message:
+        'Are you sure you want to sign out? This will disable cloud sync for this study profile.',
       confirmText: 'Sign Out',
       cancelText: 'Cancel',
       type: 'warning',

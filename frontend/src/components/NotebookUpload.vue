@@ -1,25 +1,33 @@
 <template>
   <div class="upload-section">
     <div class="upload-card">
-      <div v-if="isCloudProfile" class="cloud-locked-container" style="text-align: center; padding: 1.5rem 1rem;">
-        <div class="upload-icon" style="font-size: 3rem;">☁️</div>
-        <h3 style="margin-top: 0.5rem;">Cloud Classroom Active</h3>
-        <p style="max-width: 480px; margin: 0.5rem auto 0; color: var(--muted-text); font-size: 0.9rem;">
-          Direct PDF uploads are disabled for Cloud Profiles. Study materials published by your teacher in classroom
-          <strong v-if="classroomCode" style="color: var(--accent);">{{ classroomCode }}</strong>
+      <div v-if="isCloudProfile" class="cloud-locked-container">
+        <div class="upload-icon">☁️</div>
+        <h3>Cloud Classroom Active</h3>
+        <p>
+          Direct PDF uploads are disabled for Cloud Profiles. Study materials published by your
+          teacher in classroom
+          <strong v-if="classroomCode">{{ classroomCode }}</strong>
           will download automatically.
         </p>
       </div>
 
       <template v-else>
         <div class="upload-icon">📄</div>
-        <h3>Upload Document</h3>
-        <p>Drag and drop or click to select PDF, TXT, or MD files</p>
+        <h3>Upload Your Study Material</h3>
+        <p class="upload-desc">
+          Upload a PDF, Markdown (.md), or Text (.txt) file to create a notebook.
+          <span class="upload-note"
+            >You can also upload multiple files of the same type — they’ll be combined into one
+            notebook.</span
+          >
+        </p>
 
         <input
           ref="fileInput"
           type="file"
-          accept=".pdf,.txt,.md"
+          multiple
+          accept=".pdf,.md,.txt"
           style="display: none"
           @change="handleFileSelect"
         />
@@ -32,9 +40,11 @@
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleFileDrop"
         >
-          <p class="drop-title">Drop files here</p>
-          <button type="button" class="upload-cta">Choose File</button>
-          <p class="drop-hint">or drag and drop PDF, TXT, MD up to 50 MB</p>
+          <p class="drop-title">Drop files or a folder here</p>
+          <button type="button" class="upload-cta">Choose Files</button>
+          <p class="drop-hint">
+            PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multiple files must be the same type
+          </p>
         </div>
 
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">
@@ -47,8 +57,8 @@
           <p class="progress-label">{{ indexingStatusMessage }}</p>
         </div>
 
-        <div v-if="uploadError" class="error-message">
-          {{ uploadError }}
+        <div v-if="uploadError || localError" class="error-message">
+          {{ uploadError || localError }}
         </div>
 
         <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
@@ -59,6 +69,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useDialog } from '../composables/useDialog'
 
 defineProps({
   isCloudProfile: { type: Boolean, default: false },
@@ -71,31 +82,89 @@ defineProps({
 })
 
 const emit = defineEmits(['upload-file'])
+const { confirm } = useDialog()
 
 const fileInput = ref(null)
 const isDragging = ref(false)
+const localError = ref('')
 
 function triggerFilePicker() {
+  localError.value = ''
   fileInput.value?.click()
 }
 
-function handleFileSelect(event) {
-  const files = event.target.files
-  if (files.length > 0) {
+async function processFiles(fileList) {
+  localError.value = ''
+  const files = Array.from(fileList || []).filter(
+    (f) => !f.name.startsWith('.') && f.name !== 'Thumbs.db' && !f.name.includes('__MACOSX')
+  )
+
+  if (!files.length) return
+
+  if (files.length === 1) {
     emit('upload-file', files[0])
+    return
   }
-  // Reset input so the same file can be re-selected
-  if (fileInput.value) {
-    fileInput.value.value = ''
+
+  // Same-type check for folder/multi-file drops
+  const exts = new Set(files.map((f) => f.name.split('.').pop().toLowerCase()))
+  if (exts.has('pdf')) {
+    localError.value =
+      exts.size > 1
+        ? 'Mixed file types detected. Please ensure all files in the folder are notes (.md or .txt).'
+        : 'Folders of PDF files are not supported as a single book. Please upload PDFs individually.'
+    return
   }
+
+  const unsupported = Array.from(exts).filter(
+    (e) => e !== 'md' && e !== 'markdown' && e !== 'txt' && e !== 'text'
+  )
+  if (unsupported.length > 0) {
+    localError.value = 'Folders must contain only text/markdown (.md or .txt) chapter files.'
+    return
+  }
+
+  // Sort files deterministically (natural order)
+  files.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  )
+
+  const folderName = files[0].webkitRelativePath?.split('/')[0] || 'Course Notes'
+
+  // ponytail: reuse global useDialog() confirm modal instead of custom modal component
+  const ok = await confirm({
+    title: `Upload ${files.length} files to this site?`,
+    message: `This will upload all files from "${folderName}". Do this only if you trust the site.`,
+    confirmText: 'Upload',
+    cancelText: 'Cancel',
+    type: 'info',
+  })
+  if (!ok) return
+
+  const sections = []
+  for (const f of files) {
+    const text = await f.text()
+    const title = f.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+    sections.push(`# ${title}\n\n${text.trim()}`)
+  }
+
+  emit(
+    'upload-file',
+    new File([sections.join('\n\n')], `${folderName}.md`, { type: 'text/markdown' })
+  )
 }
 
-function handleFileDrop(event) {
+function handleFileSelect(e) {
+  if (e.target.files?.length) void processFiles(e.target.files)
+  e.target.value = ''
+}
+
+function handleFileDrop(e) {
   isDragging.value = false
-  const files = event.dataTransfer.files
-  if (files.length > 0) {
-    emit('upload-file', files[0])
-  }
+  if (e.dataTransfer?.files?.length) void processFiles(e.dataTransfer.files)
 }
 </script>
 
@@ -129,13 +198,30 @@ function handleFileDrop(event) {
   color: var(--muted-text);
 }
 
+.upload-desc {
+  margin: 0 0 18px !important;
+  line-height: 1.5;
+}
+
+.upload-desc strong {
+  color: var(--on-surface);
+  font-weight: 600;
+}
+
+.upload-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted-text);
+  opacity: 0.9;
+}
+
 .drop-zone {
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
   padding: 28px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
   background: var(--surface-container-lowest);
   min-height: 170px;
   display: flex;
@@ -166,10 +252,14 @@ function handleFileDrop(event) {
   font-size: 14px;
   font-family: 'Manrope', sans-serif;
   font-weight: 700;
-  letter-spacing: 0.01em;
   color: var(--on-primary);
   background: linear-gradient(15deg, var(--primary), var(--primary-dim));
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upload-cta:active {
+  transform: scale(0.97);
 }
 
 .drop-hint {
@@ -180,7 +270,6 @@ function handleFileDrop(event) {
 
 .progress {
   margin-top: 16px;
-  position: relative;
 }
 
 .progress-bar {

@@ -19,7 +19,11 @@
         <div class="profile-info">
           <div class="profile-title-row">
             <h3>{{ profile.name }}</h3>
-            <span v-if="profile.classroom_code" class="cloud-badge" :title="`Synced to classroom ${profile.classroom_code}`">
+            <span
+              v-if="profile.classroom_code"
+              class="cloud-badge"
+              :title="`Synced to classroom ${profile.classroom_code}`"
+            >
               ☁️ {{ profile.classroom_code }}
             </span>
           </div>

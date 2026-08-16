@@ -695,7 +695,8 @@ type markdownSection struct {
 	Text    string
 }
 
-// splitMarkdownByHeadings splits markdown content by headings (#, ##, ###, etc.)
+// splitMarkdownByHeadings splits markdown content by top-level H1 headings (# Heading).
+// Subheadings (##, ###, etc.) remain as content within their parent chapter.
 func splitMarkdownByHeadings(content string) []markdownSection {
 	lines := strings.Split(content, "\n")
 	sections := make([]markdownSection, 0)
@@ -704,8 +705,8 @@ func splitMarkdownByHeadings(content string) []markdownSection {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		// Check if line is a heading (starts with #)
-		if strings.HasPrefix(trimmed, "#") {
+		// Only split on top-level H1 headings (# Heading), not subheadings (##, ###)
+		if strings.HasPrefix(trimmed, "# ") && !strings.HasPrefix(trimmed, "##") {
 			// Save previous section if it has content
 			if currentHeading != "" || currentText.Len() > 0 {
 				sections = append(sections, markdownSection{
@@ -714,8 +715,7 @@ func splitMarkdownByHeadings(content string) []markdownSection {
 				})
 			}
 			// Start new section
-			currentHeading = strings.TrimLeft(trimmed, "# ")
-			currentHeading = strings.TrimSpace(currentHeading)
+			currentHeading = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
 			currentText.Reset()
 		} else {
 			currentText.WriteString(line)

@@ -71,7 +71,8 @@ export function useProfiles(errorRef) {
   async function handleDeleteProfile(id) {
     const ok = await confirm({
       title: 'Delete Profile',
-      message: 'Are you sure you want to delete this profile? Associated books will become unassigned.',
+      message:
+        'Are you sure you want to delete this profile? Associated books will become unassigned.',
       confirmText: 'Delete Profile',
       cancelText: 'Cancel',
       type: 'danger',

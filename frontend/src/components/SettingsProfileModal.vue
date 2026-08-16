@@ -90,7 +90,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 20px;
-  box-shadow: 
+  box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 20px 40px -4px rgba(0, 0, 0, 0.12);
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -231,8 +231,12 @@ input::placeholder {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {

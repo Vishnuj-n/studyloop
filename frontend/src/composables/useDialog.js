@@ -45,7 +45,13 @@ export function useDialog() {
    * @param {'danger'|'warning'|'info'} [options.type='danger'] - Type visual style
    * @returns {Promise<boolean>}
    */
-  function confirm({ title = 'Are you sure?', message = '', confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger' }) {
+  function confirm({
+    title = 'Are you sure?',
+    message = '',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    type = 'danger',
+  }) {
     return new Promise((resolve) => {
       dialogQueue.push({ title, message, confirmText, cancelText, type, resolve })
       processQueue()
@@ -58,10 +64,15 @@ export function useDialog() {
    * @param {string} [message]
    */
   function alert(titleOrOptions, message = '') {
-    const title = typeof titleOrOptions === 'string' ? titleOrOptions : (titleOrOptions.title || 'Notice')
-    const msg = typeof titleOrOptions === 'string' ? message : (titleOrOptions.message || '')
-    const confirmText = typeof titleOrOptions === 'object' && titleOrOptions.confirmText ? titleOrOptions.confirmText : 'OK'
-    const type = typeof titleOrOptions === 'object' && titleOrOptions.type ? titleOrOptions.type : 'info'
+    const title =
+      typeof titleOrOptions === 'string' ? titleOrOptions : titleOrOptions.title || 'Notice'
+    const msg = typeof titleOrOptions === 'string' ? message : titleOrOptions.message || ''
+    const confirmText =
+      typeof titleOrOptions === 'object' && titleOrOptions.confirmText
+        ? titleOrOptions.confirmText
+        : 'OK'
+    const type =
+      typeof titleOrOptions === 'object' && titleOrOptions.type ? titleOrOptions.type : 'info'
 
     return new Promise((resolve) => {
       dialogQueue.push({
