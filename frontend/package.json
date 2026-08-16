@@ -13,8 +13,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@iktakahiro/markdown-it-katex": "^4.0.1",
     "dompurify": "^3.4.0",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.18.4",
     "markdown-it": "^14.1.1",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-github-alerts": "^1.0.1",
+    "markdown-it-task-lists": "^2.1.1",
     "vue": "^3.2.37",
     "vue-pdf-embed": "^2.1.4",
     "vue-router": "^4.5.1"

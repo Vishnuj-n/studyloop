@@ -1264,4 +1264,112 @@ button:disabled {
   font-family: monospace;
   font-size: 13.5px;
 }
+
+.markdown-viewport :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+/* Syntax Highlighting */
+.markdown-viewport :deep(.hljs-keyword),
+.markdown-viewport :deep(.hljs-selector-tag) {
+  color: #ff7b72;
+  font-weight: 600;
+}
+.markdown-viewport :deep(.hljs-string),
+.markdown-viewport :deep(.hljs-attribute) {
+  color: #a5d6ff;
+}
+.markdown-viewport :deep(.hljs-number),
+.markdown-viewport :deep(.hljs-literal) {
+  color: #79c0ff;
+}
+.markdown-viewport :deep(.hljs-title),
+.markdown-viewport :deep(.hljs-section) {
+  color: #d2a8ff;
+  font-weight: 600;
+}
+.markdown-viewport :deep(.hljs-comment) {
+  color: #8b949e;
+  font-style: italic;
+}
+
+/* Task lists */
+.markdown-viewport :deep(.task-list-item) {
+  list-style-type: none;
+  margin-left: -20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.markdown-viewport :deep(.task-list-item input[type='checkbox']) {
+  margin: 0;
+  cursor: default;
+}
+
+/* GitHub Alerts */
+.markdown-viewport :deep(.markdown-alert) {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--primary);
+  background: var(--surface-container-low);
+  border-radius: 0 8px 8px 0;
+}
+
+.markdown-viewport :deep(.markdown-alert-title) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.markdown-viewport :deep(.markdown-alert-note) {
+  border-left-color: #58a6ff;
+}
+.markdown-viewport :deep(.markdown-alert-note .markdown-alert-title) {
+  color: #58a6ff;
+}
+
+.markdown-viewport :deep(.markdown-alert-tip) {
+  border-left-color: #3fb950;
+}
+.markdown-viewport :deep(.markdown-alert-tip .markdown-alert-title) {
+  color: #3fb950;
+}
+
+.markdown-viewport :deep(.markdown-alert-important) {
+  border-left-color: #a371f7;
+}
+.markdown-viewport :deep(.markdown-alert-important .markdown-alert-title) {
+  color: #a371f7;
+}
+
+.markdown-viewport :deep(.markdown-alert-warning) {
+  border-left-color: #d29922;
+}
+.markdown-viewport :deep(.markdown-alert-warning .markdown-alert-title) {
+  color: #d29922;
+}
+
+.markdown-viewport :deep(.markdown-alert-caution) {
+  border-left-color: #f85149;
+}
+.markdown-viewport :deep(.markdown-alert-caution .markdown-alert-title) {
+  color: #f85149;
+}
+
+/* Footnotes */
+.markdown-viewport :deep(.footnotes) {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--outline-variant);
+  font-size: 13px;
+  color: var(--muted-text);
+}
 </style>
