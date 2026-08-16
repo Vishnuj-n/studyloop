@@ -91,6 +91,14 @@
             >
               {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
             </button>
+            <button
+              class="secondary copy-session-btn"
+              :disabled="reader.loadingBundle.value || reader.loadingText.value"
+              title="Copy reading session text as Markdown"
+              @click="copySessionContent"
+            >
+              {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
+            </button>
           </div>
           <div v-if="isTaskFlow && reader.hasNavigationBounds.value" class="stage-head-right">
             <span class="reading-window-info">
@@ -758,6 +766,53 @@ async function completeSession() {
     completionError.value = err?.message || 'Failed to complete session'
   } finally {
     completingSession.value = false
+  }
+}
+
+// ponytail: clean structured markdown clipboard export
+const copiedSession = ref(false)
+
+async function copySessionContent() {
+  const startPage =
+    reader.navigationMinPage.value ||
+    reader.topicStartPage.value ||
+    reader.currentPage.value ||
+    1
+  const endPage =
+    reader.navigationMaxPage.value ||
+    reader.topicEndPage.value ||
+    reader.pageCount.value ||
+    startPage
+  const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
+  const topicTitle = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+
+  let sessionText = ''
+  if (Array.isArray(reader.sections.value) && reader.sections.value.length > 0) {
+    const rangeSections = reader.sections.value.filter(
+      (s) => !s.page_num || (s.page_num >= startPage && s.page_num <= endPage)
+    )
+    sessionText = (rangeSections.length > 0 ? rangeSections : reader.sections.value)
+      .map((s) => s.content || s.text || '')
+      .filter(Boolean)
+      .join('\n\n')
+  }
+  if (!sessionText) {
+    sessionText = reader.textContent.value || ''
+  }
+
+  const markdown = `# ${bookTitle}
+## ${topicTitle} (Pages ${startPage}–${endPage})
+
+${sessionText.trim()}`
+
+  try {
+    await navigator.clipboard.writeText(markdown)
+    copiedSession.value = true
+    setTimeout(() => {
+      copiedSession.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy session content:', err)
   }
 }
 </script>

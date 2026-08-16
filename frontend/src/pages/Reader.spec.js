@@ -135,4 +135,28 @@ describe('Reader.vue Integration', () => {
 
     expect(appApi.completeReading).toHaveBeenCalledWith('task-read-456')
   })
+
+  it('copies session content as formatted markdown when Copy Session is clicked', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue()
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    })
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const copyBtn = wrapper.find('.copy-session-btn')
+    expect(copyBtn.exists()).toBe(true)
+    expect(copyBtn.text()).toContain('Copy Session')
+
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(writeTextMock).toHaveBeenCalledTimes(1)
+    const copiedText = writeTextMock.mock.calls[0][0]
+    expect(copiedText).toContain('# Notebook')
+    expect(copiedText).toContain('## Intro to AI (Pages 1–5)')
+  })
 })
