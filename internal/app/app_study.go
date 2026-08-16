@@ -1112,6 +1112,11 @@ func materializeSyntheticReviewSession(repo *db.Repository, notebookID string) (
 	if task == nil {
 		return "", fmt.Errorf("No due cards found for review materialization")
 	}
+	if task.Status == models.StudyTaskStatusPending {
+		if activateErr := repo.ActivateTask(task.ID); activateErr != nil {
+			utils.Warnf("[FLASHCARD_PIPELINE] failed to auto-activate materialized review task taskID=%s: %v", task.ID, activateErr)
+		}
+	}
 	utils.Warnf("[FLASHCARD_PIPELINE] GetReviewSession materialized notebookID=%s taskID=%s reused=%t", notebookID, task.ID, reused)
 	return task.ID, nil
 }
