@@ -29,6 +29,8 @@ export function useReaderBase(taskID) {
   const topicEndPage = ref(0)
   const sections = ref([])
   const activeSection = ref(null)
+  const textContent = ref('')
+  const loadingText = ref(false)
 
   // Normalized context handed to the reader after either init path settles.
   // Shape: { pdfUrl, startPage, endPage, mode: 'task' | 'browse' }
@@ -45,6 +47,12 @@ export function useReaderBase(taskID) {
   )
 
   const selectedNotebookTitle = computed(() => selectedNotebook.value?.title || '')
+
+  const isMarkdown = computed(
+    () => fileType.value === 'md' || fileType.value === 'markdown' || fileType.value === 'txt' || fileType.value === 'text'
+  )
+
+  const isPdf = computed(() => fileType.value === 'pdf')
 
   const availableTopics = computed(() => {
     const topics = selectedNotebook.value?.topics || []
@@ -66,20 +74,26 @@ export function useReaderBase(taskID) {
     return match?.title || ''
   })
 
-  const pdfVisible = computed(() => fileType.value === 'pdf' && notebookUrl.value !== '')
+  const pdfVisible = computed(() => isPdf.value && notebookUrl.value !== '')
 
   const hasNavigationBounds = computed(
     () => navigationMinPage.value > 0 && navigationMaxPage.value >= navigationMinPage.value
   )
 
   const canGoPrev = computed(() => {
-    if (!pdfVisible.value) return false
-    return currentPage.value > 1
+    if (pdfVisible.value || isMarkdown.value) {
+      const min = navigationMinPage.value > 0 ? navigationMinPage.value : 1
+      return currentPage.value > min
+    }
+    return false
   })
 
   const canGoNext = computed(() => {
-    if (!pdfVisible.value) return false
-    return currentPage.value < pageCount.value
+    if (pdfVisible.value || isMarkdown.value) {
+      const max = navigationMaxPage.value > 0 ? navigationMaxPage.value : pageCount.value
+      return currentPage.value < max
+    }
+    return false
   })
 
   const pdfSource = computed(() => {
@@ -88,6 +102,36 @@ export function useReaderBase(taskID) {
   })
 
   // Methods
+  async function fetchDocumentText(url, fallbackSections = []) {
+    if (!url) {
+      if (fallbackSections && fallbackSections.length > 0) {
+        return fallbackSections
+          .map((s) => s.content || s.text || '')
+          .filter(Boolean)
+          .join('\n\n')
+      }
+      return ''
+    }
+    try {
+      loadingText.value = true
+      const res = await fetch(url)
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`)
+      }
+      return await res.text()
+    } catch (err) {
+      console.warn('[useReaderBase] Failed to fetch raw text from url, falling back to sections:', err)
+      if (fallbackSections && fallbackSections.length > 0) {
+        return fallbackSections
+          .map((s) => s.content || s.text || '')
+          .filter(Boolean)
+          .join('\n\n')
+      }
+      return ''
+    } finally {
+      loadingText.value = false
+    }
+  }
   function extractChapterNumber(title) {
     const matches = /^chapter\s*(\d+)\b/i.exec(String(title).trim())
     if (!matches) return null
@@ -223,6 +267,12 @@ export function useReaderBase(taskID) {
       sections.value = bundle?.sections || []
       activeSection.value = sections.value[0] || null
 
+      if (!isPdf.value) {
+        textContent.value = await fetchDocumentText(notebookUrl.value, sections.value)
+      } else {
+        textContent.value = ''
+      }
+
       readerContext.value = {
         pdfUrl: notebookUrl.value,
         startPage: currentPage.value,
@@ -276,6 +326,12 @@ export function useReaderBase(taskID) {
       topicEndPage.value = Number(result?.topic_end_page) || 0
       sections.value = Array.isArray(result?.sections) ? result.sections : []
       activeSection.value = sections.value[0] || null
+
+      if (!isPdf.value) {
+        textContent.value = await fetchDocumentText(notebookUrl.value, sections.value)
+      } else {
+        textContent.value = ''
+      }
 
       // Set page to topic start page (browse mode - no task navigation bounds)
       const topicStart = Number(result?.topic_start_page) || 1
@@ -341,6 +397,8 @@ export function useReaderBase(taskID) {
     selectedTopicID,
     loadingTree,
     loadingBundle,
+    loadingText,
+    textContent,
     globalError,
     readerContext,
     topicTitle,
@@ -361,6 +419,8 @@ export function useReaderBase(taskID) {
     selectedNotebookTitle,
     availableTopics,
     selectedTopicTitle,
+    isMarkdown,
+    isPdf,
     pdfVisible,
     hasNavigationBounds,
     canGoPrev,

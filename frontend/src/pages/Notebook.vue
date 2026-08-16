@@ -380,8 +380,8 @@ async function uploadFile(file) {
 
   // Validate file type
   const validTypes = ['application/pdf', 'text/plain', 'text/markdown']
-  if (!validTypes.includes(file.type) && !file.name.endsWith('.md')) {
-    uploadError.value = 'Invalid file type. Please upload PDF, TXT, or MD files.'
+  if (!validTypes.includes(file.type) && !file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+    uploadError.value = 'Invalid file type. Please upload PDF, MD, or TXT files.'
     return
   }
 

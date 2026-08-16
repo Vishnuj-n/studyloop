@@ -101,9 +101,10 @@
           </div>
         </div>
 
-        <div v-if="reader.loadingBundle.value" class="empty">Loading document...</div>
+        <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">Loading document...</div>
+        <div v-else-if="reader.isMarkdown.value" class="markdown-viewport" v-html="renderedMarkdown"></div>
         <div v-else-if="!reader.pdfVisible.value" class="empty">
-          PDF not available for selected notebook/topic.
+          Document not available for selected notebook/topic.
         </div>
         <div
           v-else
@@ -218,6 +219,7 @@ import {
 import { useReaderBase } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import ReaderChat from '../components/ReaderChat.vue'
+import { renderMarkdown } from '../services/markdown'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
@@ -235,6 +237,10 @@ const routeTaskID = computed(() => {
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
 provide('chat', chat)
+
+const renderedMarkdown = computed(() => {
+  return renderMarkdown(reader.textContent.value || '')
+})
 
 // Local state for completion
 const completingSession = ref(false)
@@ -1164,5 +1170,48 @@ button:disabled {
   height: 100%;
   background: linear-gradient(90deg, var(--primary-dim), var(--primary));
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.markdown-viewport,
+.plaintext-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px;
+  background: var(--surface-container-lowest);
+  border-radius: 12px;
+  border: 1px solid var(--outline-variant);
+  line-height: 1.7;
+  color: var(--on-surface);
+  font-size: 15px;
+}
+
+.markdown-viewport :deep(h1),
+.markdown-viewport :deep(h2),
+.markdown-viewport :deep(h3) {
+  font-family: 'Manrope', sans-serif;
+  color: var(--on-surface);
+}
+
+.markdown-viewport :deep(pre) {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+.markdown-viewport :deep(code) {
+  background: var(--surface-container-low);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.plaintext-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
 }
 </style>

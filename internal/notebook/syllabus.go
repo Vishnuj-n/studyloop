@@ -42,6 +42,19 @@ func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *Extracte
 		if raw, err := runPDFCPUBookmarksExport(filePath, s.config.UploadDir); err == nil {
 			rawBookmarkJSON = raw
 		}
+	} else if strings.EqualFold(strings.TrimSpace(fileType), "md") || strings.EqualFold(strings.TrimSpace(fileType), "markdown") {
+		// For markdown files, headings extracted in doc.Sections serve as deterministic chapter drafts
+		for _, sec := range doc.Sections {
+			heading := strings.TrimSpace(sec.Heading)
+			if heading == "" {
+				heading = fmt.Sprintf("Chapter %d", sec.PageNum)
+			}
+			bookmarkLikeDraft = append(bookmarkLikeDraft, models.SyllabusChapterDraft{
+				Title:     heading,
+				StartPage: sec.PageNum,
+				EndPage:   sec.PageNum,
+			})
+		}
 	}
 	sample := buildPageSample(doc, 30)
 
