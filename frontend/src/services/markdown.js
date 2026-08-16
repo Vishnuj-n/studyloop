@@ -15,7 +15,10 @@ const md = new MarkdownIt({
     if (lang && hljs.getLanguage(lang)) {
       try {
         return hljs.highlight(str, { language: lang, ignoreIllegals: true }).value
-      } catch {}
+      } catch (e) {
+        // Fall back to unhighlighted escaping on parse error
+        return ''
+      }
     }
     return ''
   },
