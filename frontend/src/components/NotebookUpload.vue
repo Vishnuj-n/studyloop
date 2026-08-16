@@ -13,10 +13,10 @@
 
       <template v-else>
         <div class="upload-icon">📄</div>
-        <h3>Upload Document</h3>
+        <h3>Upload Your Study Material</h3>
         <p class="upload-desc">
-          Drag and drop or select <strong>PDF</strong>, <strong>Markdown (.md)</strong>, or <strong>Text (.txt)</strong> files.
-          <span class="upload-note">Multiple chapter files will be combined into a single unified notebook (same file type required).</span>
+          Upload a PDF, Markdown (.md), or Text (.txt) file to create a notebook.
+          <span class="upload-note">You can also upload multiple files of the same type — they’ll be combined into one notebook.</span>
         </p>
 
         <input
@@ -36,9 +36,9 @@
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleFileDrop"
         >
-          <p class="drop-title">Drop files or folders here</p>
+          <p class="drop-title">Drop files or a folder here</p>
           <button type="button" class="upload-cta">Choose Files</button>
-          <p class="drop-hint">PDF, MD, or TXT up to 50 MB &bull; Multi-chapter notes merged automatically</p>
+          <p class="drop-hint">PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multiple files must be the same type</p>
         </div>
 
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">

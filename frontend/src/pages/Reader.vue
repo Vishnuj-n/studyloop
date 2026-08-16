@@ -1172,8 +1172,7 @@ button:disabled {
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.markdown-viewport,
-.plaintext-viewport {
+.markdown-viewport {
   flex: 1;
   overflow-y: auto;
   padding: 32px 40px;
@@ -1187,9 +1186,66 @@ button:disabled {
 
 .markdown-viewport :deep(h1),
 .markdown-viewport :deep(h2),
-.markdown-viewport :deep(h3) {
+.markdown-viewport :deep(h3),
+.markdown-viewport :deep(h4) {
   font-family: 'Manrope', sans-serif;
   color: var(--on-surface);
+  margin: 24px 0 12px;
+  line-height: 1.3;
+}
+
+.markdown-viewport :deep(h1) {
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 8px;
+}
+
+.markdown-viewport :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 14px;
+}
+
+.markdown-viewport :deep(th),
+.markdown-viewport :deep(td) {
+  border: 1px solid var(--outline-variant);
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.markdown-viewport :deep(th) {
+  background: var(--surface-container-low);
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.markdown-viewport :deep(tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, var(--surface-container-low) 50%, transparent);
+}
+
+.markdown-viewport :deep(blockquote) {
+  margin: 16px 0;
+  padding: 10px 16px;
+  border-left: 4px solid var(--primary);
+  background: var(--surface-container-low);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted-text);
+}
+
+.markdown-viewport :deep(ul),
+.markdown-viewport :deep(ol) {
+  padding-left: 24px;
+  margin: 12px 0;
+}
+
+.markdown-viewport :deep(li) {
+  margin-bottom: 6px;
+}
+
+.markdown-viewport :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--outline-variant);
+  margin: 24px 0;
 }
 
 .markdown-viewport :deep(pre) {
@@ -1206,12 +1262,6 @@ button:disabled {
   padding: 2px 6px;
   border-radius: 4px;
   font-family: monospace;
-}
-
-.plaintext-content {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
+  font-size: 13.5px;
 }
 </style>

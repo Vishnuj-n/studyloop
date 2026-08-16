@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -125,6 +126,13 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		// The notebookHandler in main.go serves files at /notebooks/<filename>
 		filename := filepath.Base(filePath.String)
 		bundle.NotebookURL = "/notebooks/" + url.PathEscape(filename)
+
+		// For text and markdown files, load raw content directly from disk for instant, 100% fidelity rendering
+		if !strings.EqualFold(bundle.FileType, "pdf") && filePath.String != "" {
+			if contentBytes, err := os.ReadFile(filePath.String); err == nil {
+				bundle.RawContent = string(contentBytes)
+			}
+		}
 	}
 	if fileType.Valid {
 		bundle.FileType = fileType.String

@@ -268,7 +268,7 @@ export function useReaderBase(taskID) {
       activeSection.value = sections.value[0] || null
 
       if (!isPdf.value) {
-        textContent.value = await fetchDocumentText(notebookUrl.value, sections.value)
+        textContent.value = bundle?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
       } else {
         textContent.value = ''
       }
@@ -328,7 +328,7 @@ export function useReaderBase(taskID) {
       activeSection.value = sections.value[0] || null
 
       if (!isPdf.value) {
-        textContent.value = await fetchDocumentText(notebookUrl.value, sections.value)
+        textContent.value = result?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
       } else {
         textContent.value = ''
       }
