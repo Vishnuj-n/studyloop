@@ -14,22 +14,16 @@
       <template v-else>
         <div class="upload-icon">📄</div>
         <h3>Upload Document</h3>
-        <p>Drag and drop or click to select PDF, MD, or TXT files/folders</p>
+        <p class="upload-desc">
+          Drag and drop or select <strong>PDF</strong>, <strong>Markdown (.md)</strong>, or <strong>Text (.txt)</strong> files.
+          <span class="upload-note">Multiple chapter files will be combined into a single unified notebook (same file type required).</span>
+        </p>
 
         <input
           ref="fileInput"
           type="file"
-          accept=".pdf,.md,.txt"
-          style="display: none"
-          @change="handleFileSelect"
-        />
-
-        <input
-          ref="folderInput"
-          type="file"
-          webkitdirectory
-          directory
           multiple
+          accept=".pdf,.md,.txt"
           style="display: none"
           @change="handleFileSelect"
         />
@@ -43,11 +37,8 @@
           @drop.prevent="handleFileDrop"
         >
           <p class="drop-title">Drop files or folders here</p>
-          <div class="drop-actions" @click.stop>
-            <button type="button" class="upload-cta" @click="triggerFilePicker">Choose File</button>
-            <button type="button" class="upload-cta folder-cta" @click="triggerFolderPicker">Choose Folder</button>
-          </div>
-          <p class="drop-hint">or drag and drop PDF, MD, TXT up to 50 MB</p>
+          <button type="button" class="upload-cta">Choose Files</button>
+          <p class="drop-hint">PDF, MD, or TXT up to 50 MB &bull; Multi-chapter notes merged automatically</p>
         </div>
 
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">
@@ -88,18 +79,12 @@ const emit = defineEmits(['upload-file'])
 const { confirm } = useDialog()
 
 const fileInput = ref(null)
-const folderInput = ref(null)
 const isDragging = ref(false)
 const localError = ref('')
 
 function triggerFilePicker() {
   localError.value = ''
   fileInput.value?.click()
-}
-
-function triggerFolderPicker() {
-  localError.value = ''
-  folderInput.value?.click()
 }
 
 async function processFiles(fileList) {
@@ -198,6 +183,24 @@ function handleFileDrop(e) {
   color: var(--muted-text);
 }
 
+.upload-desc {
+  margin: 0 0 18px !important;
+  line-height: 1.5;
+}
+
+.upload-desc strong {
+  color: var(--on-surface);
+  font-weight: 600;
+}
+
+.upload-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted-text);
+  opacity: 0.9;
+}
+
 .drop-zone {
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
@@ -227,11 +230,6 @@ function handleFileDrop(e) {
   color: var(--on-surface);
 }
 
-.drop-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .upload-cta {
   border: none;
   border-radius: 12px;
@@ -247,12 +245,6 @@ function handleFileDrop(e) {
 
 .upload-cta:active {
   transform: scale(0.97);
-}
-
-.folder-cta {
-  background: var(--surface-container-highest);
-  color: var(--on-surface);
-  border: 1px solid var(--outline-variant);
 }
 
 .drop-hint {
