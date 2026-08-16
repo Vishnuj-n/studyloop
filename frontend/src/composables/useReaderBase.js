@@ -49,7 +49,11 @@ export function useReaderBase(taskID) {
   const selectedNotebookTitle = computed(() => selectedNotebook.value?.title || '')
 
   const isMarkdown = computed(
-    () => fileType.value === 'md' || fileType.value === 'markdown' || fileType.value === 'txt' || fileType.value === 'text'
+    () =>
+      fileType.value === 'md' ||
+      fileType.value === 'markdown' ||
+      fileType.value === 'txt' ||
+      fileType.value === 'text'
   )
 
   const isPdf = computed(() => fileType.value === 'pdf')
@@ -120,7 +124,10 @@ export function useReaderBase(taskID) {
       }
       return await res.text()
     } catch (err) {
-      console.warn('[useReaderBase] Failed to fetch raw text from url, falling back to sections:', err)
+      console.warn(
+        '[useReaderBase] Failed to fetch raw text from url, falling back to sections:',
+        err
+      )
       if (fallbackSections && fallbackSections.length > 0) {
         return fallbackSections
           .map((s) => s.content || s.text || '')
@@ -268,7 +275,8 @@ export function useReaderBase(taskID) {
       activeSection.value = sections.value[0] || null
 
       if (!isPdf.value) {
-        textContent.value = bundle?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
+        textContent.value =
+          bundle?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
       } else {
         textContent.value = ''
       }
@@ -328,7 +336,8 @@ export function useReaderBase(taskID) {
       activeSection.value = sections.value[0] || null
 
       if (!isPdf.value) {
-        textContent.value = result?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
+        textContent.value =
+          result?.raw_content || (await fetchDocumentText(notebookUrl.value, sections.value))
       } else {
         textContent.value = ''
       }

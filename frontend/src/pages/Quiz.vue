@@ -172,7 +172,8 @@
           :key="q.id"
           class="breakdown-card"
           :class="
-            (answers[q.id] || '').trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase()
+            (answers[q.id] || '').trim().toLowerCase() ===
+            (q.correct_answer || '').trim().toLowerCase()
               ? 'breakdown-card--correct'
               : 'breakdown-card--incorrect'
           "
@@ -181,7 +182,8 @@
             <span class="question-num">{{ index + 1 }}</span>
             <span class="breakdown-status">
               {{
-                (answers[q.id] || '').trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase()
+                (answers[q.id] || '').trim().toLowerCase() ===
+                (q.correct_answer || '').trim().toLowerCase()
                   ? '✓ Correct'
                   : '✗ Incorrect'
               }}
@@ -194,7 +196,8 @@
               <span
                 class="answer-val"
                 :class="
-                  (answers[q.id] || '').trim().toLowerCase() === (q.correct_answer || '').trim().toLowerCase()
+                  (answers[q.id] || '').trim().toLowerCase() ===
+                  (q.correct_answer || '').trim().toLowerCase()
                     ? 'val--correct'
                     : 'val--incorrect'
                 "
@@ -203,7 +206,10 @@
               </span>
             </p>
             <p
-              v-if="(answers[q.id] || '').trim().toLowerCase() !== (q.correct_answer || '').trim().toLowerCase()"
+              v-if="
+                (answers[q.id] || '').trim().toLowerCase() !==
+                (q.correct_answer || '').trim().toLowerCase()
+              "
               class="answer-item"
             >
               <span class="answer-label">Correct Answer:</span>

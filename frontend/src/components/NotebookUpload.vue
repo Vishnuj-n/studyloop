@@ -5,7 +5,8 @@
         <div class="upload-icon">☁️</div>
         <h3>Cloud Classroom Active</h3>
         <p>
-          Direct PDF uploads are disabled for Cloud Profiles. Study materials published by your teacher in classroom
+          Direct PDF uploads are disabled for Cloud Profiles. Study materials published by your
+          teacher in classroom
           <strong v-if="classroomCode">{{ classroomCode }}</strong>
           will download automatically.
         </p>
@@ -16,7 +17,10 @@
         <h3>Upload Your Study Material</h3>
         <p class="upload-desc">
           Upload a PDF, Markdown (.md), or Text (.txt) file to create a notebook.
-          <span class="upload-note">You can also upload multiple files of the same type — they’ll be combined into one notebook.</span>
+          <span class="upload-note"
+            >You can also upload multiple files of the same type — they’ll be combined into one
+            notebook.</span
+          >
         </p>
 
         <input
@@ -38,7 +42,9 @@
         >
           <p class="drop-title">Drop files or a folder here</p>
           <button type="button" class="upload-cta">Choose Files</button>
-          <p class="drop-hint">PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multiple files must be the same type</p>
+          <p class="drop-hint">
+            PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multiple files must be the same type
+          </p>
         </div>
 
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">
@@ -103,9 +109,10 @@ async function processFiles(fileList) {
   // Same-type check for folder/multi-file drops
   const exts = new Set(files.map((f) => f.name.split('.').pop().toLowerCase()))
   if (exts.has('pdf')) {
-    localError.value = exts.size > 1
-      ? 'Mixed file types detected. Please ensure all files in the folder are notes (.md or .txt).'
-      : 'Folders of PDF files are not supported as a single book. Please upload PDFs individually.'
+    localError.value =
+      exts.size > 1
+        ? 'Mixed file types detected. Please ensure all files in the folder are notes (.md or .txt).'
+        : 'Folders of PDF files are not supported as a single book. Please upload PDFs individually.'
     return
   }
 
@@ -118,7 +125,9 @@ async function processFiles(fileList) {
   }
 
   // Sort files deterministically (natural order)
-  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+  files.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  )
 
   const folderName = files[0].webkitRelativePath?.split('/')[0] || 'Course Notes'
 
@@ -135,11 +144,17 @@ async function processFiles(fileList) {
   const sections = []
   for (const f of files) {
     const text = await f.text()
-    const title = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ').trim()
+    const title = f.name
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
     sections.push(`# ${title}\n\n${text.trim()}`)
   }
 
-  emit('upload-file', new File([sections.join('\n\n')], `${folderName}.md`, { type: 'text/markdown' }))
+  emit(
+    'upload-file',
+    new File([sections.join('\n\n')], `${folderName}.md`, { type: 'text/markdown' })
+  )
 }
 
 function handleFileSelect(e) {
@@ -309,4 +324,3 @@ function handleFileDrop(e) {
   font-size: 14px;
 }
 </style>
-

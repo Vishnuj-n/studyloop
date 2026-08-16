@@ -85,7 +85,11 @@
       <button
         class="btn-delete"
         :disabled="isCloudProfile"
-        :title="isCloudProfile ? 'Classroom assignments cannot be deleted locally while linked to a cloud profile' : 'Delete notebook'"
+        :title="
+          isCloudProfile
+            ? 'Classroom assignments cannot be deleted locally while linked to a cloud profile'
+            : 'Delete notebook'
+        "
         @click="!isCloudProfile && $emit('delete', notebook.id)"
       >
         Delete
@@ -133,8 +137,12 @@ const formattedDate = computed(() => {
 })
 
 const needsIngestion = computed(() => {
-  return (props.notebook.chunk_count === 0 || !props.notebook.chunk_count) &&
-         (props.notebook.status === 'uploaded' || props.notebook.status === 'draft_ready' || !props.notebook.status)
+  return (
+    (props.notebook.chunk_count === 0 || !props.notebook.chunk_count) &&
+    (props.notebook.status === 'uploaded' ||
+      props.notebook.status === 'draft_ready' ||
+      !props.notebook.status)
+  )
 })
 
 const variantClass = computed(() =>

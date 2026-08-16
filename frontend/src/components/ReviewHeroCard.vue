@@ -53,7 +53,9 @@ defineEmits(['start'])
   position: relative;
   overflow: hidden;
   border-radius: 16px;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s;
 }
 
 .review-hero-card:hover {
@@ -150,7 +152,9 @@ defineEmits(['start'])
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(45, 51, 56, 0.08);
-  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s;
+  transition:
+    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.15s;
 }
 
 .primary-btn:hover {

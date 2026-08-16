@@ -111,12 +111,9 @@ describe('Notebook.vue - AI Cleanup then Confirm regression test', () => {
     await flushPromises()
 
     // Assert confirmNotebookSyllabus receives the cleaned chapters
-    expect(appApi.confirmNotebookSyllabus).toHaveBeenCalledWith(
-      'nb-1',
-      [
-        { title: 'Cleaned Chapter 1', start_page: 1, end_page: 5 },
-        { title: 'Cleaned Chapter 2', start_page: 6, end_page: 10 },
-      ]
-    )
+    expect(appApi.confirmNotebookSyllabus).toHaveBeenCalledWith('nb-1', [
+      { title: 'Cleaned Chapter 1', start_page: 1, end_page: 5 },
+      { title: 'Cleaned Chapter 2', start_page: 6, end_page: 10 },
+    ])
   })
 })

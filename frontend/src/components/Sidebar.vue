@@ -205,7 +205,6 @@ const topItems = [
   gap: 10px;
 }
 
-
 .sync-link {
   display: flex;
   align-items: center;

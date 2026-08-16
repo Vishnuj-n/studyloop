@@ -85,8 +85,13 @@ export function useSettings(errorRef, successRef) {
           return
         }
         const words = s.target_session_words
-        if (typeof words === 'number' && words > 0 && (words < 1000 || words > 20000 || words % 500 !== 0)) {
-          errorRef.value = 'Target session words must be between 1000 and 20000 and a multiple of 500.'
+        if (
+          typeof words === 'number' &&
+          words > 0 &&
+          (words < 1000 || words > 20000 || words % 500 !== 0)
+        ) {
+          errorRef.value =
+            'Target session words must be between 1000 and 20000 and a multiple of 500.'
           return
         }
         const start = s.study_start_time

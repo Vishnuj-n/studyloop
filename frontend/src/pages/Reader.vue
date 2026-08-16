@@ -101,8 +101,14 @@
           </div>
         </div>
 
-        <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">Loading document...</div>
-        <div v-else-if="reader.isMarkdown.value" class="markdown-viewport" v-html="renderedMarkdown"></div>
+        <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">
+          Loading document...
+        </div>
+        <div
+          v-else-if="reader.isMarkdown.value"
+          class="markdown-viewport"
+          v-html="renderedMarkdown"
+        ></div>
         <div v-else-if="!reader.pdfVisible.value" class="empty">
           Document not available for selected notebook/topic.
         </div>
@@ -947,7 +953,6 @@ h3 {
   display: grid;
   gap: 8px;
 }
-
 
 .field {
   display: grid;
