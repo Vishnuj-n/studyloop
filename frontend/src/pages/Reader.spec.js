@@ -159,4 +159,26 @@ describe('Reader.vue Integration', () => {
     expect(copiedText).toContain('# Notebook')
     expect(copiedText).toContain('## Intro to AI (Pages 1–5)')
   })
+
+  it('formats raw topic IDs into human readable titles in the header', async () => {
+    routeQuery.value = { taskId: 'task-raw-slug', notebookId: 'nb-1', topicId: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh' }
+    appApi.initializeReadingSession.mockResolvedValueOnce({
+      ok: true,
+      task: { id: 'task-raw-slug', notebook_id: 'nb-1', topic_id: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh', topic_title: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh' },
+      page_bounds: { start_page: 1, end_page: 1, current_page: 1 },
+      navigation_bounds: { start_page: 1, end_page: 1, current_page: 1 },
+      navigation: { mode: 'task', current_page: 1, min_page: 1, max_page: 1 },
+      bundle: {
+        topic_id: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh',
+        topic_title: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh',
+        file_type: 'md',
+        sections: [{ id: 's1', heading: 'Section 1', content: 'Sample markdown', page_num: 1 }],
+      },
+    })
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toBe('Chapter 1: Cn Final Revision Sh')
+  })
 })

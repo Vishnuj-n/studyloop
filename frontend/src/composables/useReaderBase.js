@@ -5,6 +5,32 @@ import {
   initializeReadingSession,
 } from '../services/appApi'
 
+// ponytail: convert raw topic IDs (nb-*-ch-01-slug) to clean human titles
+export function cleanTopicTitle(raw) {
+  if (!raw || typeof raw !== 'string') return ''
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith('nb-') || !trimmed.includes('-ch-')) {
+    return trimmed
+  }
+  const parts = trimmed.split('-ch-')
+  if (parts.length < 2) return trimmed
+  const subParts = parts[1].split('-')
+  let chNum = (subParts[0] || '').replace(/^0+/, '') || '0'
+  if (subParts.length < 2) return `Chapter ${chNum}`
+  const suffixWords = subParts
+    .slice(1)
+    .join(' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+  const suffix = suffixWords.join(' ')
+  if (suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() || suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase()) {
+    return `Chapter ${chNum}`
+  }
+  return `Chapter ${chNum}: ${suffix}`
+}
+
 /**
  * useReaderBase - Extracted base reader logic for task-flow-only reading sessions.
  * Handles: notebook/topic loading, page navigation, session initialization.
@@ -265,7 +291,7 @@ export function useReaderBase(taskID) {
       navigationState.value = nav
 
       // Apply bundle data safely (bundle might be null/empty)
-      topicTitle.value = bundle?.topic_title || task.topic_title || 'Reader'
+      topicTitle.value = cleanTopicTitle(bundle?.topic_title || task.topic_title) || 'Reader'
       notebookUrl.value = bundle?.notebook_url || ''
       fileType.value = (bundle?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(bundle?.page_count) || 1)
@@ -326,7 +352,7 @@ export function useReaderBase(taskID) {
         return true
       }
 
-      topicTitle.value = result?.topic_title || selectedTopicTitle.value || 'Reader'
+      topicTitle.value = cleanTopicTitle(result?.topic_title || selectedTopicTitle.value) || 'Reader'
       notebookUrl.value = result?.notebook_url || ''
       fileType.value = (result?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(result?.page_count) || 1)

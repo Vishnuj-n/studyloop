@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 // GetReaderTopicBundle returns notebook metadata plus ordered sections with resolved page numbers.
@@ -33,6 +34,8 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 	`, topicID).Scan(&bundle.TopicTitle, &startPage, &endPage); err != nil {
 		return nil, err
 	}
+	// ponytail: ensure human-readable title for reader UI and session exports
+	bundle.TopicTitle = utils.CleanTopicTitle(bundle.TopicTitle)
 	bundle.TopicStartPage = startPage
 	bundle.TopicEndPage = endPage
 

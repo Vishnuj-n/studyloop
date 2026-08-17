@@ -230,7 +230,7 @@ import {
   logFrontendEvent,
   trackAnalyticsEvent,
 } from '../services/appApi'
-import { useReaderBase } from '../composables/useReaderBase'
+import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import ReaderChat from '../components/ReaderChat.vue'
 import { renderMarkdown } from '../services/markdown'
@@ -784,7 +784,8 @@ async function copySessionContent() {
     reader.pageCount.value ||
     startPage
   const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
-  const topicTitle = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+  const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+  const topicTitle = cleanTopicTitle(rawTopic)
 
   let sessionText = ''
   if (Array.isArray(reader.sections.value) && reader.sections.value.length > 0) {
