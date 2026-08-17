@@ -52,7 +52,7 @@ const baseSettings = {
   rag_notebook_chapter: true,
   rag_entire_notebook: true,
   rag_queue_study: true,
-  default_remedial_strategy: 'CLASSIC',
+  default_remedial_strategy: 'FAST',
   classroom_code: '',
   analytics_enabled: false,
   anonymous_user_id: '',

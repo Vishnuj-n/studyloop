@@ -87,15 +87,24 @@ func TestClassicTrackInsertsReread(t *testing.T) {
 	}
 }
 
-func TestDefaultIsClassic(t *testing.T) {
+func TestDefaultIsFast(t *testing.T) {
 	app := newTestApp(t)
 
-	// Do not set strategy explicitly; it should default to CLASSIC
+	// Do not set strategy explicitly; it should default to FAST
 	mustInsertActiveQuizTask(t, "nb-default-track", "topic-default-track", "task-default-track", 100)
 	result := submitFailedQuiz(t, app, "task-default-track")
 
-	// Verify REREAD task was created (default behavior)
-	if result.RereadTaskID == "" {
-		t.Fatalf("expected reread task to be created by default")
+	// Verify no REREAD task was created
+	if result.RereadTaskID != "" {
+		t.Fatalf("expected no reread task, but got ID: %s", result.RereadTaskID)
+	}
+
+	// Verify SOCRATIC_REMEDIAL task was created
+	pendingSocratic, err := testRepo.CountTasksByTopicTypeAndStatus("topic-default-track", "SOCRATIC_REMEDIAL", "PENDING")
+	if err != nil {
+		t.Fatalf("query pending socratic failed: %v", err)
+	}
+	if pendingSocratic != 1 {
+		t.Fatalf("expected 1 pending SOCRATIC_REMEDIAL task, got %d", pendingSocratic)
 	}
 }

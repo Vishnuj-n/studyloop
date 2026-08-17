@@ -15,8 +15,17 @@ import (
 // QUIZ TESTS
 // ============================================================================
 
-func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *testing.T) {
+func newClassicTestApp(t *testing.T) *App {
+	t.Helper()
 	app := newTestApp(t)
+	if _, err := testRepo.ExecForTest("UPDATE user_settings SET default_remedial_strategy = ? WHERE id = 1", "CLASSIC"); err != nil {
+		t.Fatalf("failed to set strategy to CLASSIC: %v", err)
+	}
+	return app
+}
+
+func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *testing.T) {
+	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-fail", "topic-quiz-fail", "task-quiz-fail", 100)
 
 	resp := app.SubmitQuizAttempt("task-quiz-fail", []models.QuizAnswer{
@@ -54,7 +63,7 @@ func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *test
 }
 
 func TestSubmitQuizAttemptAfterMaxReturnsManualReviewWithoutReread(t *testing.T) {
-	app := newTestApp(t)
+	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-max", "topic-quiz-max", "task-quiz-max", 100)
 
 	if _, err := testRepo.ExecForTest(`
@@ -131,7 +140,7 @@ func TestSubmitQuizAttemptAfterMaxReturnsManualReviewWithoutReread(t *testing.T)
 }
 
 func TestSubmitQuizAttemptRepeatedSubmissionReturnsErrTaskNotActiveAndNoDuplicateReread(t *testing.T) {
-	app := newTestApp(t)
+	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-repeat", "topic-quiz-repeat", "task-quiz-repeat", 100)
 
 	first := app.SubmitQuizAttempt("task-quiz-repeat", []models.QuizAnswer{
@@ -160,7 +169,7 @@ func TestSubmitQuizAttemptRepeatedSubmissionReturnsErrTaskNotActiveAndNoDuplicat
 }
 
 func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testing.T) {
-	app := newTestApp(t)
+	app := newClassicTestApp(t)
 
 	mustInsertActiveQuizTask(t, "nb-quiz-pass-reset", "topic-quiz-pass-reset", "task-quiz-pass", 100)
 	tx, err := testRepo.Begin()

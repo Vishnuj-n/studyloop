@@ -107,6 +107,30 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Quiz Failure Rescue</label>
+          <p class="hint" style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2; margin-bottom: 8px">
+            Choose what happens when you fail a quiz. Customize the remediation track to match your study style.
+          </p>
+          <div class="strategy-options">
+            <label class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
+              <input v-model="defaultRemedialStrategy" type="radio" value="FAST" style="cursor: pointer" />
+              <div class="option-content">
+                <span class="option-title">Fast Track</span>
+                <span class="option-desc">Go directly to Socratic AI tutor (deeper encoding, conceptual topics)</span>
+              </div>
+            </label>
+
+            <label class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
+              <input v-model="defaultRemedialStrategy" type="radio" value="CLASSIC" style="cursor: pointer" />
+              <div class="option-content">
+                <span class="option-title">Classic Track</span>
+                <span class="option-desc">Reread first, then Socratic tutor if you fail again (dense text, sequential learning)</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <div class="form-group check-group">
           <label class="checkbox-container" for="reminders-enabled">
             <input
@@ -493,6 +517,7 @@ const profileDeadline = ref('')
 const maxFlashcards = ref(30)
 const studyStartTime = ref('17:00')
 const studyEndTime = ref('18:00')
+const defaultRemedialStrategy = ref('FAST')
 
 const durationPresets = [
   { label: '30 min', minutes: 30 },
@@ -746,7 +771,7 @@ async function completeOnboarding() {
       rag_notebook_chapter: true,
       rag_entire_notebook: true,
       rag_queue_study: true,
-      default_remedial_strategy: 'CLASSIC',
+      default_remedial_strategy: defaultRemedialStrategy.value,
       classroom_code: '',
       analytics_enabled: analyticsEnabled.value,
       target_session_words: 5000,
@@ -1269,5 +1294,56 @@ select:focus {
 /* Onboarding-specific override */
 .time-range-section {
   margin-bottom: 8px;
+}
+
+.strategy-options {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.strategy-option {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--surface-container-low);
+  border: none;
+  color: var(--on-surface);
+}
+
+.strategy-option:hover {
+  background: var(--surface-container-lowest);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--on-surface) 6%, transparent);
+}
+
+.strategy-option.active {
+  background: var(--surface-container-lowest);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.strategy-option input[type='radio'] {
+  margin-top: 4px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.option-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.option-desc {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
