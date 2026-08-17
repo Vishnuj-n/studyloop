@@ -595,7 +595,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 	}
 
 	if targetSessionWords <= 0 {
-		targetSessionWords = 5000
+		targetSessionWords = 3000
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
@@ -762,7 +762,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 
 // EnsurePendingReadingTasksForActiveNotebooks ensures all active notebooks for a profile have at least one PENDING/ACTIVE task.
 func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID string) error {
-	targetWords := 5000
+	targetWords := 3000
 	if settings, err := r.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
 		targetWords = settings.TargetSessionWords
 	}

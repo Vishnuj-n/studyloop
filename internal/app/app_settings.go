@@ -66,7 +66,7 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 			return map[string]interface{}{"error": "target session words must be between 1000 and 20000 and a multiple of 500"}
 		}
 	} else {
-		s.TargetSessionWords = 5000
+		s.TargetSessionWords = 3000
 	}
 	if s.StudyStartTime != "" {
 		if _, err := time.Parse("15:04", s.StudyStartTime); err != nil {

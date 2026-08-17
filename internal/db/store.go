@@ -287,7 +287,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 5000)
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000)
 		FROM user_settings
 		WHERE id = 1
 	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.RemindersEnabled, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords)
@@ -305,7 +305,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			DefaultRemedialStrategy: "FAST",
 			AnalyticsEnabled:        false,
 			AnonymousUserID:         "",
-			TargetSessionWords:      5000,
+			TargetSessionWords:      3000,
 		}
 	} else if err != nil {
 		return nil, err
@@ -315,7 +315,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		}
 	}
 	if s.TargetSessionWords <= 0 {
-		s.TargetSessionWords = 5000
+		s.TargetSessionWords = 3000
 		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = ? WHERE id = 1`, s.TargetSessionWords); updateErr != nil {
 			utils.Warnf("failed to persist default target_session_words: %v", updateErr)
 		}
@@ -404,7 +404,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	}
 	targetWords := s.TargetSessionWords
 	if targetWords <= 0 {
-		targetWords = 5000
+		targetWords = 3000
 	}
 	_, err := r.db.Exec(`
 		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words)

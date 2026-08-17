@@ -788,7 +788,7 @@ async function completeOnboarding() {
       default_remedial_strategy: defaultRemedialStrategy.value,
       classroom_code: '',
       analytics_enabled: analyticsEnabled.value,
-      target_session_words: 5000,
+      target_session_words: 3000,
     })
 
     if (settingsRes.error) {

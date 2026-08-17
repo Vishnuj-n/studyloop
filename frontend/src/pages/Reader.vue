@@ -241,6 +241,7 @@ import {
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
+import { useToast } from '../composables/useToast'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
@@ -259,6 +260,7 @@ const routeTaskID = computed(() => {
 // Initialize composables
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
+const { showError } = useToast()
 provide('chat', chat)
 
 // Local state for completion
@@ -747,6 +749,7 @@ async function completeSession() {
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
     if (done?.error) {
       completionError.value = done.error
+      showError(done.error, 'Session Completion Failed')
       return
     }
     if (analyticsEnabled.value) {
@@ -768,7 +771,9 @@ async function completeSession() {
     console.warn('[COMPLETE_SESSION] completeSession() router.push resolved', { nextRoute })
   } catch (err) {
     console.error('[COMPLETE_SESSION] completeSession() catch', err)
-    completionError.value = err?.message || 'Failed to complete session'
+    const errMsg = err?.message || 'Failed to complete session'
+    completionError.value = errMsg
+    showError(errMsg, 'Session Completion Failed')
   } finally {
     completingSession.value = false
   }

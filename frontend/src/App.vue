@@ -10,6 +10,9 @@ import {
   checkForUpdates,
   openRepoURL,
 } from './services/appApi'
+import { useToast } from './composables/useToast'
+
+const { toast, hideToast } = useToast()
 
 const route = useRoute()
 
@@ -283,6 +286,23 @@ onUnmounted(() => {
 
       <RouterView />
       <ConfirmModal />
+
+      <!-- Global Toaster -->
+      <div class="toast-stack">
+        <transition name="toast-fade">
+          <div
+            v-if="toast.show"
+            class="fallback-toast"
+            :class="toast.type === 'notice' ? 'notice-toast' : ''"
+            @click="hideToast"
+          >
+            <div class="fallback-toast-inner">
+              <span class="fallback-toast-title">{{ toast.title || 'Error' }}</span>
+              <p>{{ toast.message }}</p>
+            </div>
+          </div>
+        </transition>
+      </div>
     </main>
   </div>
 </template>
@@ -587,5 +607,72 @@ onUnmounted(() => {
 .modal-btn.secondary:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--on-surface, #ffffff);
+}
+
+/* ponytail: unified global toast notification */
+.toast-stack {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-stack > * {
+  pointer-events: auto;
+}
+
+.fallback-toast {
+  position: relative;
+  cursor: pointer;
+}
+
+.fallback-toast-inner {
+  max-width: 360px;
+  padding: 14px 16px;
+  background: #b33939;
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.fallback-toast:hover .fallback-toast-inner {
+  transform: translateY(-2px);
+}
+
+.fallback-toast.notice-toast .fallback-toast-inner {
+  background: #1f8b4c;
+}
+
+.fallback-toast-title {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fallback-toast-inner p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.25s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

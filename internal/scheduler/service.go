@@ -18,7 +18,7 @@ const (
 
 	// Reading assumptions
 	WordsPerMinute            = 200
-	DefaultTargetSessionWords = 5000
+	DefaultTargetSessionWords = 3000
 
 	// Fallback assumptions
 	FallbackWordsPerPage = 500

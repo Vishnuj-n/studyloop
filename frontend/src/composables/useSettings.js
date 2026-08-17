@@ -22,7 +22,7 @@ export function useSettings(errorRef, successRef) {
     default_remedial_strategy: 'FAST',
     classroom_code: '',
     analytics_enabled: false,
-    target_session_words: 5000,
+    target_session_words: 3000,
   })
 
   const studyDuration = ref('')

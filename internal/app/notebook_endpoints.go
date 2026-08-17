@@ -559,7 +559,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 	// Seed initial READING task into study_queue if active
 	if isActivated {
-		targetWords := 5000
+		targetWords := 3000
 		if settings, err := repo.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
 			targetWords = settings.TargetSessionWords
 		}
@@ -769,7 +769,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		dailyPace = remainingWords
 	}
 
-	targetWords := 5000
+	targetWords := 3000
 	settings, err := repo.GetUserSettings()
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}

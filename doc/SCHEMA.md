@@ -375,6 +375,7 @@ Singleton table for global preferences.
 | `default_remedial_strategy` | TEXT DEFAULT 'CLASSIC' | User preference for quiz failure handling (`CLASSIC` or `FAST`) |
 | `classroom_code` | TEXT DEFAULT '' | Classroom code for teacher-student association in cloud sync |
 | `last_synced_at` | INTEGER DEFAULT 0 | Timestamp of last successful cloud sync |
+| `target_session_words` | INTEGER NOT NULL DEFAULT 3000 | Target word count per reading session |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 
 **Foreign keys:** `active_profile_id` → `study_profiles(id)` ON DELETE SET NULL.

@@ -30,7 +30,7 @@
         required
       />
       <p class="hint">
-        Target word count per reading session (5,000 words ≈ 25 minutes of standard reading).
+        Target word count per reading session (3,000 words ≈ 15 minutes of standard reading).
       </p>
     </div>
 
