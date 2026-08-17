@@ -9,7 +9,7 @@ import (
 
 func mustNextState(t *testing.T, state models.FlashcardState, rating int, now time.Time, dueAt, lastReviewedAt int64) models.FlashcardState {
 	t.Helper()
-	fsrsCard := models.FlashcardStateToCard(state, dueAt, lastReviewedAt)
+	fsrsCard := FlashcardStateToCard(state, dueAt, lastReviewedAt)
 	resCard, err := NextFSRSState(fsrsCard, rating, now)
 	if err != nil {
 		t.Fatalf("NextFSRSState failed: %v", err)

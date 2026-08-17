@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import argparse
+from path_utils import validate_path
 
 # Path definitions
 DEFAULT_API_JS = "frontend/src/services/appApi.js"
@@ -22,13 +23,7 @@ GO_APP_METHOD = re.compile(r"func\s*\(\s*\w+\s+\*?App\s*\)\s*([a-zA-Z0-9_]+)\s*\
 # Go general method: func (r *Repository) Name(...)
 GO_METHOD = re.compile(r"func\s*\(\s*\w+\s+\*?([a-zA-Z0-9_]+)\s*\)\s*([a-zA-Z0-9_]+)\s*\(")
 GO_FUNC = re.compile(r"func\s+([a-zA-Z0-9_]+)\s*\(")
-# ponytail: path validation to prevent path traversal (pythonsecurity:S8707)
-def validate_path(path, root):
-    abs_path = os.path.abspath(path)
-    abs_root = os.path.abspath(root)
-    if os.path.commonpath([abs_path, abs_root]) != abs_root:
-        raise ValueError(f"Access denied: {path} escapes project root {root}")
-    return abs_path
+
 
 def parse_app_api(filepath):
     """

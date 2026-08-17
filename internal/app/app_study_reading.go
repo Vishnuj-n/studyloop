@@ -24,7 +24,7 @@ func (a *App) resolveReadingTaskIdentity(taskID, notebookID, topicID string, sta
 		return "", map[string]interface{}{"error": existingErr.Error()}
 	}
 
-	if existingTask != nil && existingTask.Status != models.StudyTaskStatusPending && existingTask.Status != models.StudyTaskStatusActive {
+	if existingTask.Status != models.StudyTaskStatusPending && existingTask.Status != models.StudyTaskStatusActive {
 		if notebookID == "" {
 			notebookID = existingTask.NotebookID
 		}
@@ -46,6 +46,13 @@ func (a *App) createPendingReadingTask(taskID, notebookID, topicID string, start
 	utils.Warnf("[READER_INIT] %s taskID=%s notebookID=%s topicID=%s", logMsg, taskID, notebookID, topicID)
 	if notebookID == "" || topicID == "" {
 		return "", map[string]interface{}{"error": "task not found and notebookID/topicID required to create it", "code": 400}
+	}
+	if startPage == 0 || endPage == 0 {
+		var err error
+		startPage, endPage, err = repo.ResolveAndValidateTopicBounds(topicID, startPage, endPage)
+		if err != nil {
+			return "", map[string]interface{}{"error": "failed to resolve bounds: " + err.Error()}
+		}
 	}
 	insertErr := repo.InsertStudyTask(models.StudyQueueTask{
 		ID:         taskID,
@@ -73,10 +80,8 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": "failed to load task: " + qErr.Error()}
 	}
 
-	if qTask == nil {
-		utils.Errorf("InitializeReadingSession loading anomaly: taskID=%s err=%v", taskID, fmt.Errorf("nil task loaded from database"))
-		utils.QueueLogger.Info("queue task pre-activate loading anomaly", "taskID", taskID)
-
+	switch qTask.Status {
+	case models.StudyTaskStatusPending:
 		if err := repo.ActivateTask(taskID); err != nil {
 			utils.Errorf("InitializeReadingSession activation failed: taskID=%s err=%v", taskID, err)
 			utils.QueueLogger.Info("queue task activation failed", "taskID", taskID)
@@ -84,22 +89,11 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 		} else {
 			utils.QueueLogger.Info("queue task activated", "taskID", taskID)
 		}
-	} else {
-		switch qTask.Status {
-		case models.StudyTaskStatusPending:
-			if err := repo.ActivateTask(taskID); err != nil {
-				utils.Errorf("InitializeReadingSession activation failed: taskID=%s err=%v", taskID, err)
-				utils.QueueLogger.Info("queue task activation failed", "taskID", taskID)
-				return map[string]interface{}{"error": "failed to activate task: " + err.Error()}
-			} else {
-				utils.QueueLogger.Info("queue task activated", "taskID", taskID)
-			}
-		case models.StudyTaskStatusActive:
-			utils.QueueLogger.Info("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)
-		default:
-			utils.QueueLogger.Info("task terminal", "status", qTask.Status, "taskID", taskID)
-			return map[string]interface{}{"error": "task is in terminal status: " + string(qTask.Status), "code": 409}
-		}
+	case models.StudyTaskStatusActive:
+		utils.QueueLogger.Info("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)
+	default:
+		utils.QueueLogger.Info("task terminal", "status", qTask.Status, "taskID", taskID)
+		return map[string]interface{}{"error": "task is in terminal status: " + string(qTask.Status), "code": 409}
 	}
 	return nil
 }
@@ -261,9 +255,16 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	}
 
 	utils.Warnf("[QUIZ] CompleteReading before GenerateQuizSync taskID=%s topicID=%q chunkCount=%d chunkIDs=%v", taskID, task.TopicID, len(chunkIDs), chunkIDs)
+	if reserveErr := repo.ReserveTask(taskID); reserveErr != nil {
+		return map[string]interface{}{"error": "failed to reserve task: " + reserveErr.Error()}
+	}
+
 	quizPayload, err := a.studyService.GenerateQuizSync(task.TopicID, chunkIDs, chunkTextByID)
 	if err != nil {
 		utils.Warnf("[QUIZ] CompleteReading GenerateQuizSync error taskID=%s err=%v", taskID, err)
+		if revertErr := repo.RevertTaskReservation(taskID); revertErr != nil {
+			utils.Warnf("[QUIZ] failed to revert task reservation for task %s: %v", taskID, revertErr)
+		}
 		return map[string]interface{}{"error": err.Error()}
 	}
 	utils.Warnf("[QUIZ] CompleteReading after GenerateQuizSync taskID=%s questionCount=%d", taskID, len(quizPayload.Questions))
@@ -273,6 +274,9 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	utils.Warnf("[COMPLETE_SESSION] CompleteReading before CompleteReadingWithGeneratedQuiz taskID=%s", taskID)
 	quizTaskID, err := repo.CompleteReadingWithGeneratedQuiz(taskID, quizPayload)
 	if err != nil {
+		if revertErr := repo.RevertTaskReservation(taskID); revertErr != nil {
+			utils.Warnf("[QUIZ] failed to revert task reservation on finalization failure for task %s: %v", taskID, revertErr)
+		}
 		switch err {
 		case db.ErrTaskNotFound:
 			utils.Warnf("[COMPLETE_SESSION] CompleteReading CompleteReadingWithGeneratedQuiz error: task not found taskID=%s", taskID)

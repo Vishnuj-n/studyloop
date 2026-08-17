@@ -509,9 +509,6 @@ func TestRereadTaskCanBeLoadedAndCompletedThroughReaderHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to fetch task by ID: %v", err)
 	}
-	if fetchedTask == nil {
-		t.Fatalf("expected task to be found, got nil")
-	}
 	if fetchedTask.TaskType != models.StudyTaskTypeQuiz {
 		t.Fatalf("expected task type %s, got %s", models.StudyTaskTypeQuiz, fetchedTask.TaskType)
 	}

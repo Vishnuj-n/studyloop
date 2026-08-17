@@ -12,12 +12,12 @@ import (
 )
 
 // GetTaskByID returns one queue task by id.
-func (r *Repository) GetTaskByID(taskID string) (*models.StudyQueueTask, error) {
+func (r *Repository) GetTaskByID(taskID string) (models.StudyQueueTask, error) {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
-		return nil, fmt.Errorf("task id is required")
+		return models.StudyQueueTask{}, fmt.Errorf("task id is required")
 	}
-	task := &models.StudyQueueTask{}
+	task := models.StudyQueueTask{}
 	err := r.db.QueryRow(`
 		SELECT
 			id, notebook_id, COALESCE(topic_id, ''), task_type, status, priority,
@@ -30,10 +30,10 @@ func (r *Repository) GetTaskByID(taskID string) (*models.StudyQueueTask, error) 
 		&task.CreatedAt, &task.ActivatedAt, &task.CompletedAt, &task.PayloadJSON, &task.StartPage, &task.EndPage,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrTaskNotFound
+		return models.StudyQueueTask{}, ErrTaskNotFound
 	}
 	if err != nil {
-		return nil, err
+		return models.StudyQueueTask{}, err
 	}
 	return task, nil
 }
@@ -190,13 +190,13 @@ func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 }
 
 // GetNextTask returns the next pending task ordered by deterministic queue rules.
-func (r *Repository) GetNextTask(notebookID string) (*models.StudyQueueTask, error) {
+func (r *Repository) GetNextTask(notebookID string) (models.StudyQueueTask, error) {
 	notebookID = strings.TrimSpace(notebookID)
 	utils.Debugf("[QUEUE] GetNextTask filter status=PENDING notebookID=%q", notebookID)
 
 	activeProfileID, err := r.readActiveProfileID()
 	if err != nil {
-		return nil, fmt.Errorf("GetNextTask: %w", err)
+		return models.StudyQueueTask{}, fmt.Errorf("GetNextTask: %w", err)
 	}
 
 	if activeProfileID == "" {
@@ -206,7 +206,7 @@ func (r *Repository) GetNextTask(notebookID string) (*models.StudyQueueTask, err
 }
 
 // getNextTaskNoProfile returns the next pending task without profile filtering.
-func (r *Repository) getNextTaskNoProfile(notebookID string) (*models.StudyQueueTask, error) {
+func (r *Repository) getNextTaskNoProfile(notebookID string) (models.StudyQueueTask, error) {
 	query := `
 		SELECT
 			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
@@ -243,7 +243,7 @@ func (r *Repository) getNextTaskNoProfile(notebookID string) (*models.StudyQueue
 }
 
 // getNextTaskWithProfile returns the next pending task filtered by active profile.
-func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) (*models.StudyQueueTask, error) {
+func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) (models.StudyQueueTask, error) {
 	query := `
 		SELECT
 			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
@@ -287,8 +287,8 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 }
 
 // scanNextPendingTask executes a query expecting one row and returns a title-assigned task.
-func (r *Repository) scanNextPendingTask(query string, args ...interface{}) (*models.StudyQueueTask, error) {
-	task := &models.StudyQueueTask{}
+func (r *Repository) scanNextPendingTask(query string, args ...interface{}) (models.StudyQueueTask, error) {
+	task := models.StudyQueueTask{}
 	var topicTitle, notebookTitle string
 	var notebookPriority int
 	err := r.db.QueryRow(query, args...).Scan(
@@ -297,23 +297,23 @@ func (r *Repository) scanNextPendingTask(query string, args ...interface{}) (*mo
 		&task.StartPage, &task.EndPage, &topicTitle, &notebookTitle, &notebookPriority,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNoPendingTasks
+		return models.StudyQueueTask{}, ErrNoPendingTasks
 	}
 	if err != nil {
-		return nil, err
+		return models.StudyQueueTask{}, err
 	}
-	assignTaskTitle(task, topicTitle, notebookTitle)
+	assignTaskTitle(&task, topicTitle, notebookTitle)
 	return task, nil
 }
 
 // GetReadingTask returns one reader-compatible task with locked bounds and persisted cursor.
-func (r *Repository) GetReadingTask(taskID string) (*models.ReadingTask, error) {
+func (r *Repository) GetReadingTask(taskID string) (models.ReadingTask, error) {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
-		return nil, fmt.Errorf("task id is required")
+		return models.ReadingTask{}, fmt.Errorf("task id is required")
 	}
 
-	task := &models.ReadingTask{}
+	task := models.ReadingTask{}
 	err := r.db.QueryRow(`
 		SELECT
 			sq.id,
@@ -337,34 +337,36 @@ func (r *Repository) GetReadingTask(taskID string) (*models.ReadingTask, error) 
 		&task.FileHash,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrTaskNotFound
+		return models.ReadingTask{}, ErrTaskNotFound
 	}
 	if err != nil {
-		return nil, err
+		return models.ReadingTask{}, err
 	}
-	// If task was inserted without explicit page bounds, fall back to topic page bounds.
-	// This allows READING tasks created without bounds to still be initialized and completed.
-	if (task.StartPage <= 0 || task.EndPage <= 0) && task.TopicID != "" {
-		var topicStart, topicEnd int
-		boundsErr := r.db.QueryRow(`
-			SELECT COALESCE(start_page, 1), COALESCE(end_page, start_page)
-			FROM topics WHERE id = ?
-		`, task.TopicID).Scan(&topicStart, &topicEnd)
-		if boundsErr == nil && topicStart > 0 && topicEnd >= topicStart {
-			if task.StartPage <= 0 {
-				task.StartPage = topicStart
-			}
-			if task.EndPage <= 0 {
-				task.EndPage = topicEnd
-			}
+
+	// Resolve and validate bounds using helper functions
+	originalStart := task.StartPage
+	originalEnd := task.EndPage
+	resolvedStart, resolvedEnd, err := r.resolveReadingBounds(task.TopicID, task.StartPage, task.EndPage)
+	if err != nil {
+		return models.ReadingTask{}, err
+	}
+	if err := validateReadingBounds(resolvedStart, resolvedEnd); err != nil {
+		return models.ReadingTask{}, err
+	}
+
+	task.StartPage = resolvedStart
+	task.EndPage = resolvedEnd
+
+	// Persist resolved bounds with explicit repository update if they were modified
+	if originalStart != resolvedStart || originalEnd != resolvedEnd {
+		_, updateErr := r.db.Exec(`
+			UPDATE study_queue
+			SET start_page = ?, end_page = ?
+			WHERE id = ?
+		`, resolvedStart, resolvedEnd, task.TaskID)
+		if updateErr != nil {
+			return models.ReadingTask{}, fmt.Errorf("failed to persist resolved task bounds: %w", updateErr)
 		}
-	}
-	// After fallback: if bounds are still missing or invalid, return an explicit error.
-	if task.StartPage <= 0 || task.EndPage <= 0 {
-		return nil, fmt.Errorf("reading task has no valid page bounds: startPage=%d, endPage=%d — set start_page/end_page on the task or ensure topic has page bounds", task.StartPage, task.EndPage)
-	}
-	if task.EndPage < task.StartPage {
-		return nil, fmt.Errorf("reading task has invalid page bounds: endPage=%d must be >= startPage=%d", task.EndPage, task.StartPage)
 	}
 
 	// Clamp current page to bounds
@@ -375,6 +377,56 @@ func (r *Repository) GetReadingTask(taskID string) (*models.ReadingTask, error) 
 		task.CurrentPage = task.EndPage
 	}
 	return task, nil
+}
+
+func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int) (int, int, error) {
+	if startPage > 0 && endPage > 0 {
+		return startPage, endPage, nil
+	}
+	if topicID == "" {
+		return startPage, endPage, nil
+	}
+	var topicStart, topicEnd int
+	err := r.db.QueryRow(`
+		SELECT COALESCE(start_page, 1), COALESCE(end_page, start_page)
+		FROM topics WHERE id = ?
+	`, topicID).Scan(&topicStart, &topicEnd)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return startPage, endPage, nil
+		}
+		return 0, 0, err
+	}
+	resolvedStart := startPage
+	resolvedEnd := endPage
+	if resolvedStart <= 0 {
+		resolvedStart = topicStart
+	}
+	if resolvedEnd <= 0 {
+		resolvedEnd = topicEnd
+	}
+	return resolvedStart, resolvedEnd, nil
+}
+
+func validateReadingBounds(startPage, endPage int) error {
+	if startPage <= 0 || endPage <= 0 {
+		return fmt.Errorf("reading task has no valid page bounds: startPage=%d, endPage=%d — set start_page/end_page on the task or ensure topic has page bounds", startPage, endPage)
+	}
+	if endPage < startPage {
+		return fmt.Errorf("reading task has invalid page bounds: endPage=%d must be >= startPage=%d", endPage, startPage)
+	}
+	return nil
+}
+
+func (r *Repository) ResolveAndValidateTopicBounds(topicID string, startPage, endPage int) (int, int, error) {
+	resolvedStart, resolvedEnd, err := r.resolveReadingBounds(topicID, startPage, endPage)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := validateReadingBounds(resolvedStart, resolvedEnd); err != nil {
+		return 0, 0, err
+	}
+	return resolvedStart, resolvedEnd, nil
 }
 
 // GetReadingProgressPage retrieves the current page progress for a task.

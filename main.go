@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"net/http"
+	"os"
 	"strings"
 
 	"ai-tutor/internal/app"
@@ -80,7 +81,29 @@ func notebookHandler(a *app.App) http.Handler {
 			return
 		}
 
-		http.StripPrefix("/notebooks/", http.FileServer(http.Dir(uploadDir))).ServeHTTP(rw, req)
+		fs := noDirListingFS{fs: http.Dir(uploadDir)}
+		http.StripPrefix("/notebooks/", http.FileServer(fs)).ServeHTTP(rw, req)
 	})
+}
+
+type noDirListingFS struct {
+	fs http.FileSystem
+}
+
+func (nfs noDirListingFS) Open(name string) (http.File, error) {
+	file, err := nfs.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if stat.IsDir() {
+		file.Close()
+		return nil, os.ErrPermission
+	}
+	return file, nil
 }
 

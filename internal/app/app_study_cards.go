@@ -58,7 +58,7 @@ func (a *App) GetTask(taskID string) map[string]interface{} {
 
 	// Dynamic compile for MILESTONE_EXAM questions
 	if task.TaskType == models.StudyTaskTypeMilestoneExam {
-		if quizPayload, err := studypkg.CompileMilestonePayload(repo, task); err == nil && len(quizPayload.Questions) > 0 {
+		if quizPayload, err := studypkg.CompileMilestonePayload(repo, &task); err == nil && len(quizPayload.Questions) > 0 {
 			if quizPayloadJSON, mErr := json.Marshal(quizPayload); mErr == nil {
 				task.PayloadJSON = string(quizPayloadJSON)
 			}
@@ -83,7 +83,11 @@ func (a *App) GetTaskContext(taskID string) map[string]interface{} {
 	}
 	externalPrompt := ""
 	if task.TaskType == models.StudyTaskTypeSocraticRemedial {
-		externalPrompt = buildSocraticRemedialPrompt(repo, *task)
+		var promptErr error
+		externalPrompt, promptErr = buildSocraticRemedialPrompt(repo, task)
+		if promptErr != nil {
+			return map[string]interface{}{"error": promptErr.Error()}
+		}
 	}
 
 	return map[string]interface{}{
@@ -98,11 +102,10 @@ func (a *App) GetTaskContext(taskID string) map[string]interface{} {
 	}
 }
 
-func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask) string {
+func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask) (string, error) {
 	bundle, err := repo.GetReaderTopicBundle(task.TopicID, task.NotebookID)
 	if err != nil {
-		utils.Warnf("failed to get reader topic bundle for task %s: %v", task.ID, err)
-		return ""
+		return "", fmt.Errorf("failed to get reader topic bundle for task %s: %w", task.ID, err)
 	}
 
 	var sectionsContent []string
@@ -128,7 +131,7 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 
 	promptText = appendFailedQuestionsSection(promptText, task)
 
-	return promptText + bookContext + "---\n" + sourceText + "\n---"
+	return promptText + bookContext + "---\n" + sourceText + "\n---", nil
 }
 
 func appendFailedQuestionsSection(promptText string, task models.StudyQueueTask) string {
@@ -210,12 +213,14 @@ func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{
 		utils.Warnf("[FLASHCARD_PIPELINE] flashcard_generation_failed taskID=%s reason=%v", taskID, err)
 		if ensureErr := repo.EnsurePendingFlashcardGenerateTask(task.NotebookID, task.TopicID, task.StartPage, task.EndPage, task.Title); ensureErr != nil {
 			utils.Warnf("[FLASHCARD_PIPELINE] failed to insert FLASHCARD_GENERATE retry task: %v", ensureErr)
+			return map[string]interface{}{"error": fmt.Sprintf("failed to generate flashcards: %v; failed to insert retry task: %v", err, ensureErr)}
 		}
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
 
 	if resolveErr := repo.ResolveFlashcardGenerateTasksForTopic(task.TopicID); resolveErr != nil {
 		utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE tasks: %v", resolveErr)
+		return map[string]interface{}{"error": "failed to resolve FLASHCARD_GENERATE tasks: " + resolveErr.Error()}
 	}
 
 	checkAndInsertMilestoneExam(repo, task.NotebookID)
@@ -355,6 +360,7 @@ func materializeSyntheticReviewSession(repo *db.Repository, notebookID string) (
 	if task.Status == models.StudyTaskStatusPending {
 		if activateErr := repo.ActivateTask(task.ID); activateErr != nil {
 			utils.Warnf("[FLASHCARD_PIPELINE] failed to auto-activate materialized review task taskID=%s: %v", task.ID, activateErr)
+			return "", fmt.Errorf("failed to auto-activate materialized review task taskID=%s: %w", task.ID, activateErr)
 		}
 	}
 	utils.Warnf("[FLASHCARD_PIPELINE] GetReviewSession materialized notebookID=%s taskID=%s reused=%t", notebookID, task.ID, reused)
@@ -565,7 +571,7 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": "task is not a flashcard generation retry task"}
 	}
 
-	topicID, startPage, endPage, resolveErr := resolveRetryTopicAndBounds(repo, *task)
+	topicID, startPage, endPage, resolveErr := resolveRetryTopicAndBounds(repo, task)
 	if resolveErr != nil {
 		utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_generation_failed taskID=%s reason=no_topics_for_notebook notebookID=%s", taskID, task.NotebookID)
 		return map[string]interface{}{"error": resolveErr.Error()}
@@ -573,18 +579,35 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 
 	utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_generation_started taskID=%s topicID=%s notebookID=%s", taskID, topicID, task.NotebookID)
 
-	cardCount, err := a.studyService.GenerateFlashcardsAfterQuiz(task.NotebookID, topicID, startPage, endPage)
+	var cardCount int
+	var existingCardsExist bool
+
+	if topicID != "" {
+		count, countErr := repo.CountFlashcardsForTopic(topicID)
+		if countErr == nil && count > 0 {
+			utils.Infof("[FLASHCARD_PIPELINE] retry_flashcard_generation_skipped reason=cards_already_exist taskID=%s topicID=%s cardCount=%d", taskID, topicID, count)
+			cardCount = count
+			existingCardsExist = true
+		}
+	}
+
+	if !existingCardsExist {
+		cardCount, err = a.studyService.GenerateFlashcardsAfterQuiz(task.NotebookID, topicID, startPage, endPage)
+	}
+
 	if err != nil {
 		utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_generation_failed taskID=%s reason=%v", taskID, err)
 		if task.Status == models.StudyTaskStatusPending {
 			if activateErr := repo.ActivateTask(taskID); activateErr != nil {
 				utils.Warnf("[FLASHCARD_PIPELINE] failed to activate taskID=%s on retry failure: %v", taskID, activateErr)
+				return map[string]interface{}{"error": fmt.Sprintf("failed to generate flashcards: %v; failed to activate task: %v", err, activateErr)}
 			}
 		}
 		if completeErr := repo.CompleteTask(taskID, models.CompletionResult{
 			Status: models.StudyTaskStatusFailed,
 		}); completeErr != nil {
 			utils.Warnf("[FLASHCARD_PIPELINE] failed to mark taskID=%s as FAILED: %v", taskID, completeErr)
+			return map[string]interface{}{"error": fmt.Sprintf("failed to generate flashcards: %v; failed to mark task as FAILED: %v", err, completeErr)}
 		}
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
@@ -593,23 +616,27 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 	if task.Status == models.StudyTaskStatusPending {
 		if activateErr := repo.ActivateTask(taskID); activateErr != nil {
 			utils.Debugf("[FLASHCARD_PIPELINE] activate taskID=%s note=%v", taskID, activateErr)
+			return map[string]interface{}{"error": "failed to activate task: " + activateErr.Error()}
 		}
 	}
 	if completeErr := repo.CompleteTask(taskID, models.CompletionResult{
 		Status: models.StudyTaskStatusCompleted,
 	}); completeErr != nil {
 		utils.Warnf("[FLASHCARD_PIPELINE] failed to mark taskID=%s as COMPLETED: %v", taskID, completeErr)
+		return map[string]interface{}{"error": "failed to mark task as COMPLETED: " + completeErr.Error()}
 	}
 
 	// Also resolve any other pending FLASHCARD_GENERATE tasks for the topic
 	if topicID != "" {
 		if err := repo.ResolveFlashcardGenerateTasksForTopic(topicID); err != nil {
 			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE tasks for topic %s: %v", topicID, err)
+			return map[string]interface{}{"error": "failed to resolve pending flashcard tasks: " + err.Error()}
 		}
 	}
 	if task.TopicID == "" {
 		if err := repo.ResolveFlashcardGenerateTasksForTopic(""); err != nil {
 			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve empty topic FLASHCARD_GENERATE tasks: %v", err)
+			return map[string]interface{}{"error": "failed to resolve empty topic pending tasks: " + err.Error()}
 		}
 	}
 
@@ -637,14 +664,16 @@ func resolveRetryTopicAndBounds(repo *db.Repository, task models.StudyQueueTask)
 	if topicID == "" {
 		topicID = firstTopic.TopicID
 	}
-	if startPage <= 0 || endPage <= 0 || endPage < startPage {
+	if startPage <= 0 {
 		startPage = firstTopic.StartPage
 		if startPage <= 0 {
 			startPage = 1
 		}
+	}
+	if endPage <= 0 || endPage < startPage {
 		endPage = firstTopic.EndPage
-		if endPage <= startPage {
-			endPage = startPage + 10
+		if endPage <= 0 || endPage < startPage {
+			endPage = startPage
 		}
 	}
 	return topicID, startPage, endPage, nil

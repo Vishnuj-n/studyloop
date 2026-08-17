@@ -691,6 +691,7 @@ func (a *App) UpdateNotebookPriority(notebookID string, priority int) map[string
 
 // DeleteNotebook removes a notebook and its associated file
 func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
+	notebookID = strings.TrimSpace(notebookID)
 	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
 	if errResp != nil {
 		return errResp

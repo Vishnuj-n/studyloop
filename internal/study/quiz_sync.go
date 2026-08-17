@@ -363,7 +363,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 func (s *StudyService) triggerSocraticRescueHandoffTx(
 	tx *sql.Tx,
-	task *models.StudyQueueTask,
+	task models.StudyQueueTask,
 	attempt *models.QuizAttemptRecord,
 	failedQuestions []models.FailedQuestionDetail,
 ) (string, string, models.StudyTaskStatus, bool, models.StudyQueueTask, error) {
@@ -492,7 +492,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		return models.QuizResult{}, fmt.Errorf("task is not a QUIZ or MILESTONE_EXAM task")
 	}
 	if task.TaskType == models.StudyTaskTypeMilestoneExam {
-		quizPayload, err := CompileMilestonePayload(s.repo, task)
+		quizPayload, err := CompileMilestonePayload(s.repo, &task)
 		if err != nil {
 			return models.QuizResult{}, err
 		}

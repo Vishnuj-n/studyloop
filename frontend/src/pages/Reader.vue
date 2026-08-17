@@ -117,9 +117,33 @@
         </div>
         <div
           v-else-if="reader.isMarkdown.value"
-          class="markdown-viewport"
-          v-html="renderedMarkdown"
-        ></div>
+          class="markdown-container"
+        >
+          <div class="markdown-boundary-tag top-boundary">
+            <span class="boundary-badge">📖 Document Start</span>
+            <span class="boundary-sub">Continuous reading format</span>
+          </div>
+
+          <div
+            class="markdown-viewport"
+            v-html="renderedMarkdown"
+          ></div>
+
+          <div class="markdown-boundary-tag bottom-boundary">
+            <div class="boundary-info">
+              <span class="boundary-badge success">✓ End of Assigned Reading</span>
+              <span class="boundary-sub">You have reached the end of this study section.</span>
+            </div>
+            <button
+              v-if="isTaskFlow"
+              class="primary proceed-button"
+              :disabled="completingReading"
+              @click="handleCompleteReading"
+            >
+              {{ completingReading ? 'Generating Quiz...' : 'Complete & Proceed to Quiz →' }}
+            </button>
+          </div>
+        </div>
         <div v-else-if="!reader.pdfVisible.value" class="empty">
           Document not available for selected notebook/topic.
         </div>
@@ -1238,6 +1262,77 @@ button:disabled {
   height: 100%;
   background: linear-gradient(90deg, var(--primary-dim), var(--primary));
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.markdown-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.markdown-boundary-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface-container);
+  border: 1px dashed var(--outline-variant);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted-text);
+  gap: 12px;
+}
+
+.markdown-boundary-tag.top-boundary {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: var(--primary);
+}
+
+.markdown-boundary-tag.bottom-boundary {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #10b981;
+  background: color-mix(in srgb, var(--surface-container) 92%, #10b981 8%);
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+.boundary-badge {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--on-surface);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.boundary-badge.success {
+  color: #10b981;
+  font-size: 14px;
+}
+
+.boundary-sub {
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.boundary-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proceed-button {
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-left: auto;
 }
 
 .markdown-viewport {

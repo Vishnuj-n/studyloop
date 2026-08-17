@@ -79,7 +79,7 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 		}
 	}
 	if s.DefaultRemedialStrategy == "" {
-		s.DefaultRemedialStrategy = "CLASSIC"
+		s.DefaultRemedialStrategy = "FAST"
 	}
 	if s.DefaultRemedialStrategy != "FAST" && s.DefaultRemedialStrategy != "CLASSIC" {
 		return map[string]interface{}{"error": "default remedial strategy must be CLASSIC or FAST"}

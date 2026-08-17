@@ -312,7 +312,7 @@ func (r *Repository) CompleteReadingWithGeneratedQuiz(taskID string, quizPayload
 	if err != nil {
 		return "", err
 	}
-	if status != string(models.StudyTaskStatusActive) {
+	if status != string(models.StudyTaskStatusActive) && status != string(models.StudyTaskStatusReserved) {
 		return "", ErrTaskNotActive
 	}
 
@@ -796,4 +796,60 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 		}
 	}
 	return nil
+}
+
+// ReserveTask updates a task status from ACTIVE to RESERVED.
+func (r *Repository) ReserveTask(taskID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var status string
+	err = tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if status != string(models.StudyTaskStatusActive) {
+		return fmt.Errorf("task %s cannot be reserved because it is in status %s (expected ACTIVE)", taskID, status)
+	}
+
+	_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, models.StudyTaskStatusReserved, taskID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// RevertTaskReservation reverts a task status from RESERVED to ACTIVE.
+func (r *Repository) RevertTaskReservation(taskID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var status string
+	err = tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if status != string(models.StudyTaskStatusReserved) {
+		return fmt.Errorf("task %s is not reserved (status: %s)", taskID, status)
+	}
+
+	_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, models.StudyTaskStatusActive, taskID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

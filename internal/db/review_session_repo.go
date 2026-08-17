@@ -271,7 +271,7 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 	utils.LogReviewSession(task.ID, notebookID, strconv.Itoa(len(cards)), "session_created")
 	utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation committed taskID=%s notebookID=%s linkedCards=%d", task.ID, notebookID, len(cards))
 	createdTask, err := r.GetTaskByID(task.ID)
-	return createdTask, false, err
+	return &createdTask, false, err
 }
 
 func (r *Repository) getExistingReviewTaskForNotebookTxRepo(tx *sql.Tx, notebookID string) (*models.StudyQueueTask, error) {
@@ -288,7 +288,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 	}
 
 	session := &models.ReviewSession{
-		Task:           task,
+		Task:           &task,
 		Cards:          make([]models.ReviewSessionCard, 0),
 		NextPendingIdx: -1,
 	}

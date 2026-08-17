@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import argparse
+from path_utils import validate_path
 
 # Default directories to scan (relative to project root)
 DEFAULT_DIRS = ["internal", "cmd", "frontend/src"]
@@ -77,13 +78,7 @@ def should_exclude_file(filename):
             return True
     return False
 
-# ponytail: path validation to prevent path traversal (pythonsecurity:S8707)
-def validate_path(path, root):
-    abs_path = os.path.abspath(path)
-    abs_root = os.path.abspath(root)
-    if os.path.commonpath([abs_path, abs_root]) != abs_root:
-        raise ValueError(f"Access denied: {path} escapes project root {root}")
-    return abs_path
+
 
 def scan_file(filepath):
     results = []
