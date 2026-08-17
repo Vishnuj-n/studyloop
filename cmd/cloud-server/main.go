@@ -308,33 +308,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	classCode, _ := user["classroom_code"].(string)
 	uname, _ := user["username"].(string)
 
-	sessionToken := ""
-	sessReqPayload, _ := json.Marshal(map[string]interface{}{
-		"entity_id":  strings.ToLower(uname),
-		"role":       role,
-		"expires_at": time.Now().AddDate(10, 0, 0).Format(time.RFC3339),
-	})
-	sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", supabaseURL), bytes.NewBuffer(sessReqPayload))
-	if sErr == nil {
-		sessReq.Header.Set(headerContentType, contentTypeJSON)
-		sessReq.Header.Set("apikey", supabaseKey)
-		sessReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
-		sessReq.Header.Set("Prefer", preferRepresentation)
-		if sessRes, sDoErr := httpClient.Do(sessReq); sDoErr == nil {
-			defer sessRes.Body.Close()
-			if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
-				var createdSess []map[string]interface{}
-				if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
-					if tok, ok := createdSess[0]["session_token"].(string); ok && tok != "" {
-						sessionToken = tok
-					}
-				}
-			}
-		}
-	}
-	if sessionToken == "" {
-		sessionToken = uname
-	}
+	sessionToken := createActiveSession(uname, role)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"success":        true,
@@ -449,6 +423,20 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	if role == "" { role = req.Role }
 	if classCode == "" { classCode = req.ClassroomCode }
 	if uname == "" { uname = req.Username }
+	sessionToken := createActiveSession(uname, role)
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"user":           user,
+		"token":          sessionToken,
+		"session_token":  sessionToken,
+		"role":           role,
+		"classroom_code": classCode,
+		"username":       uname,
+	})
+}
+
+func createActiveSession(uname, role string) string {
 	sessionToken := ""
 	sessReqPayload, _ := json.Marshal(map[string]interface{}{
 		"entity_id":  strings.ToLower(uname),
@@ -476,16 +464,7 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	if sessionToken == "" {
 		sessionToken = uname
 	}
-
-	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"success":        true,
-		"user":           user,
-		"token":          sessionToken,
-		"session_token":  sessionToken,
-		"role":           role,
-		"classroom_code": classCode,
-		"username":       uname,
-	})
+	return sessionToken
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {

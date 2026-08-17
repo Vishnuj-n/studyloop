@@ -231,29 +231,36 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 // REVIEW SESSION TESTS
 // ============================================================================
 
-func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing.T) {
-	app := newTestApp(t)
-
-	if err := testRepo.EnsureTopic("queue-review-topic", "Queue Review Topic"); err != nil {
+func setupReviewTestNotebook(t *testing.T, prefix string) (string, string) {
+	t.Helper()
+	topicID := prefix + "-topic"
+	notebookID := prefix + "-nb"
+	if err := testRepo.EnsureTopic(topicID, prefix+" Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
-	if err := testRepo.CreateNotebook("queue-review-nb", "Queue Review Notebook", "/tmp/queue-review.pdf", "pdf", "", "", 15, ""); err != nil {
+	if err := testRepo.CreateNotebook(notebookID, prefix+" Notebook", "/tmp/"+prefix+".pdf", "pdf", "", "", 15, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
-	if err := testRepo.LinkNotebookTopics("queue-review-nb", []string{"queue-review-topic"}); err != nil {
+	if err := testRepo.LinkNotebookTopics(notebookID, []string{topicID}); err != nil {
 		t.Fatalf("link notebook_topics failed: %v", err)
 	}
-	if err := testRepo.CreateFlashcards("queue-review-topic", []models.Flashcard{
-		{ID: "queue-card-1", TopicID: "queue-review-topic", Prompt: "Q1", Answer: "A1", DueAt: 1},
-		{ID: "queue-card-2", TopicID: "queue-review-topic", Prompt: "Q2", Answer: "A2", DueAt: 2},
+	if err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
+		{ID: prefix + "-card-1", TopicID: topicID, Prompt: "Q1", Answer: "A1", DueAt: 1},
+		{ID: prefix + "-card-2", TopicID: topicID, Prompt: "Q2", Answer: "A2", DueAt: 2},
 	}, map[string]models.FlashcardState{
-		"queue-card-1": {},
-		"queue-card-2": {},
+		prefix + "-card-1": {},
+		prefix + "-card-2": {},
 	}); err != nil {
 		t.Fatalf("CreateFlashcards failed: %v", err)
 	}
+	return topicID, notebookID
+}
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "queue-review-nb")
+func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing.T) {
+	app := newTestApp(t)
+	_, notebookID := setupReviewTestNotebook(t, "queue-review")
+
+	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession materialization failed: %v", sessionResp["error"])
 	}
@@ -263,7 +270,7 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 	}
 	taskID := session.Task.ID
 
-	secondSessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "queue-review-nb")
+	secondSessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
 	if _, hasErr := secondSessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession materialization failed: %v", secondSessionResp["error"])
 	}
@@ -276,7 +283,7 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 		t.Fatalf("ActivateTask failed: %#v", resp)
 	}
 
-	sessionResp = app.GetReviewSession(taskID, "queue-review-nb")
+	sessionResp = app.GetReviewSession(taskID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}
@@ -284,11 +291,11 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 	if !ok {
 		t.Fatalf("expected review session pointer, got %#v", sessionResp["session"])
 	}
-	if session.CurrentCard == nil || session.CurrentCard.CardID != "queue-card-1" {
-		t.Fatalf("expected first pending card queue-card-1, got %#v", session.CurrentCard)
+	if session.CurrentCard == nil || session.CurrentCard.CardID != "queue-review-card-1" {
+		t.Fatalf("expected first pending card queue-review-card-1, got %#v", session.CurrentCard)
 	}
 
-	reviewResp := app.RecordCardReview(taskID, "queue-card-1", 3)
+	reviewResp := app.RecordCardReview(taskID, "queue-review-card-1", 3)
 	if _, hasErr := reviewResp["error"]; hasErr {
 		t.Fatalf("RecordCardReview failed: %v", reviewResp["error"])
 	}
@@ -296,13 +303,13 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 		t.Fatalf("expected remaining=1, got %#v", reviewResp["remaining"])
 	}
 
-	reloadResp := app.GetReviewSession(taskID, "queue-review-nb")
+	reloadResp := app.GetReviewSession(taskID, notebookID)
 	reloaded := reloadResp["session"].(*models.ReviewSession)
-	if reloaded.CurrentCard == nil || reloaded.CurrentCard.CardID != "queue-card-2" {
-		t.Fatalf("expected resumed next pending card queue-card-2, got %#v", reloaded.CurrentCard)
+	if reloaded.CurrentCard == nil || reloaded.CurrentCard.CardID != "queue-review-card-2" {
+		t.Fatalf("expected resumed next pending card queue-review-card-2, got %#v", reloaded.CurrentCard)
 	}
 
-	duplicateReviewResp := app.RecordCardReview(taskID, "queue-card-1", 3)
+	duplicateReviewResp := app.RecordCardReview(taskID, "queue-review-card-1", 3)
 	if code, ok := duplicateReviewResp["code"].(int); !ok || code != 409 {
 		t.Fatalf("expected duplicate review to return 409, got %#v", duplicateReviewResp)
 	}
@@ -312,7 +319,7 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 		t.Fatalf("expected incomplete completion to return 409, got %#v", incompleteCompleteResp)
 	}
 
-	reviewResp2 := app.RecordCardReview(taskID, "queue-card-2", 4)
+	reviewResp2 := app.RecordCardReview(taskID, "queue-review-card-2", 4)
 	if _, hasErr := reviewResp2["error"]; hasErr {
 		t.Fatalf("second RecordCardReview failed: %v", reviewResp2["error"])
 	}
@@ -351,27 +358,9 @@ func TestGetReviewSessionNoDueCards(t *testing.T) {
 
 func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivation(t *testing.T) {
 	app := newTestApp(t)
+	_, notebookID := setupReviewTestNotebook(t, "auto-act")
 
-	if err := testRepo.EnsureTopic("auto-act-topic", "Auto Act Topic"); err != nil {
-		t.Fatalf("EnsureTopic failed: %v", err)
-	}
-	if err := testRepo.CreateNotebook("auto-act-nb", "Auto Act Notebook", "/tmp/auto-act.pdf", "pdf", "", "", 15, ""); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-	if err := testRepo.LinkNotebookTopics("auto-act-nb", []string{"auto-act-topic"}); err != nil {
-		t.Fatalf("link notebook_topics failed: %v", err)
-	}
-	if err := testRepo.CreateFlashcards("auto-act-topic", []models.Flashcard{
-		{ID: "auto-card-1", TopicID: "auto-act-topic", Prompt: "Q1", Answer: "A1", DueAt: 1},
-		{ID: "auto-card-2", TopicID: "auto-act-topic", Prompt: "Q2", Answer: "A2", DueAt: 2},
-	}, map[string]models.FlashcardState{
-		"auto-card-1": {},
-		"auto-card-2": {},
-	}); err != nil {
-		t.Fatalf("CreateFlashcards failed: %v", err)
-	}
-
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "auto-act-nb")
+	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}
@@ -382,7 +371,7 @@ func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivati
 	taskID := session.Task.ID
 
 	// Note: We deliberately do NOT call app.ActivateTask(taskID) here to test auto-activation!
-	reviewResp := app.RecordCardReview(taskID, "auto-card-1", 4)
+	reviewResp := app.RecordCardReview(taskID, "auto-act-card-1", 4)
 	if _, hasErr := reviewResp["error"]; hasErr {
 		t.Fatalf("RecordCardReview failed without manual ActivateTask: %v", reviewResp["error"])
 	}
@@ -390,14 +379,12 @@ func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivati
 		t.Fatalf("expected remaining=1, got %#v", reviewResp["remaining"])
 	}
 
-	reviewResp2 := app.RecordCardReview(taskID, "auto-card-2", 4)
-	if _, hasErr := reviewResp2["error"]; hasErr {
-		t.Fatalf("second RecordCardReview failed: %v", reviewResp2["error"])
+	if rev2 := app.RecordCardReview(taskID, "auto-act-card-2", 4); rev2["error"] != nil {
+		t.Fatalf("second RecordCardReview failed: %v", rev2["error"])
 	}
 
-	completeResp := app.CompleteReviewSession(taskID)
-	if _, hasErr := completeResp["error"]; hasErr {
-		t.Fatalf("CompleteReviewSession failed: %v", completeResp["error"])
+	if complete := app.CompleteReviewSession(taskID); complete["error"] != nil {
+		t.Fatalf("CompleteReviewSession failed: %v", complete["error"])
 	}
 
 	task, err := testRepo.GetTaskByID(taskID)
