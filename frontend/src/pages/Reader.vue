@@ -99,6 +99,9 @@
             >
               {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
             </button>
+            <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
+              {{ copyError }}
+            </span>
           </div>
           <div v-if="isTaskFlow && reader.hasNavigationBounds.value" class="stage-head-right">
             <span class="reading-window-info">
@@ -771,6 +774,7 @@ async function completeSession() {
 
 // ponytail: clean structured markdown clipboard export
 const copiedSession = ref(false)
+const copyError = ref('')
 
 async function copySessionContent() {
   const startPage =
@@ -809,11 +813,14 @@ ${sessionText.trim()}`
   try {
     await navigator.clipboard.writeText(markdown)
     copiedSession.value = true
+    copyError.value = ''
     setTimeout(() => {
       copiedSession.value = false
     }, 2000)
   } catch (err) {
     console.error('Failed to copy session content:', err)
+    copiedSession.value = false
+    copyError.value = 'Failed to copy session content'
   }
 }
 </script>

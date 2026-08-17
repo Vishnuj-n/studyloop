@@ -9,12 +9,12 @@ import {
 export function cleanTopicTitle(raw) {
   if (!raw || typeof raw !== 'string') return ''
   const trimmed = raw.trim()
-  if (!trimmed.startsWith('nb-') || !trimmed.includes('-ch-')) {
+  const chIndex = trimmed.indexOf('-ch-')
+  if (chIndex === -1 || !trimmed.startsWith('nb-')) {
     return trimmed
   }
-  const parts = trimmed.split('-ch-')
-  if (parts.length < 2) return trimmed
-  const subParts = parts[1].split('-')
+  const part1 = trimmed.substring(chIndex + 4)
+  const subParts = part1.split('-')
   let chNum = (subParts[0] || '').replace(/^0+/, '') || '0'
   if (subParts.length < 2) return `Chapter ${chNum}`
   const suffixWords = subParts

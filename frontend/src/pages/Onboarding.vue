@@ -107,29 +107,43 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Quiz Failure Rescue</label>
+        <fieldset class="form-group" style="border: none; padding: 0; margin: 0 0 16px 0;">
+          <legend style="border: 0; padding: 0; margin: 0 0 4px; display: block;">Quiz Failure Rescue</legend>
           <p class="hint" style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2; margin-bottom: 8px">
             Choose what happens when you fail a quiz. Customize the remediation track to match your study style.
           </p>
           <div class="strategy-options">
-            <label class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
-              <input v-model="defaultRemedialStrategy" type="radio" value="FAST" style="cursor: pointer" />
-              <div class="option-content">
+            <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
+              <input
+                id="strategy-fast"
+                name="defaultRemedialStrategy"
+                v-model="defaultRemedialStrategy"
+                type="radio"
+                value="FAST"
+                style="cursor: pointer"
+              />
+              <label for="strategy-fast" class="option-content">
                 <span class="option-title">Fast Track</span>
                 <span class="option-desc">Go directly to Socratic AI tutor (deeper encoding, conceptual topics)</span>
-              </div>
-            </label>
+              </label>
+            </div>
 
-            <label class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
-              <input v-model="defaultRemedialStrategy" type="radio" value="CLASSIC" style="cursor: pointer" />
-              <div class="option-content">
+            <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
+              <input
+                id="strategy-classic"
+                name="defaultRemedialStrategy"
+                v-model="defaultRemedialStrategy"
+                type="radio"
+                value="CLASSIC"
+                style="cursor: pointer"
+              />
+              <label for="strategy-classic" class="option-content">
                 <span class="option-title">Classic Track</span>
                 <span class="option-desc">Reread first, then Socratic tutor if you fail again (dense text, sequential learning)</span>
-              </div>
-            </label>
+              </label>
+            </div>
           </div>
-        </div>
+        </fieldset>
 
         <div class="form-group check-group">
           <label class="checkbox-container" for="reminders-enabled">
@@ -910,19 +924,30 @@ h2 {
   margin: -6px 0 4px; /* 8px grid */
 }
 
-.form-group:focus-within label {
+.form-group:focus-within label,
+.form-group:focus-within legend {
   color: var(--primary); /* Spec focus shift */
 }
 
 /* Password wrapper styles removed in favor of native browser toggles */
 
-label {
+label, legend {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-text);
   transition: color 0.2s ease;
+}
+
+.strategy-option label {
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  display: block;
+  cursor: pointer;
 }
 
 input:not([type='checkbox']):not([type='radio']),
