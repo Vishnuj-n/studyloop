@@ -39,18 +39,7 @@ func (r *Repository) GetChunksForTopicPageRange(topicID string, startPage, endPa
 		_ = rows.Close()
 	}()
 
-	var chunks []models.Chunk
-	for rows.Next() {
-		var chunk models.Chunk
-		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
-			return nil, err
-		}
-		chunks = append(chunks, chunk)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return chunks, nil
+	return scanChunks(rows)
 }
 
 // GetChunksForTopic retrieves all chunks associated with a topic.
@@ -68,18 +57,7 @@ func (r *Repository) GetChunksForTopic(topicID string) ([]models.Chunk, error) {
 		_ = rows.Close()
 	}()
 
-	var chunks []models.Chunk
-	for rows.Next() {
-		var chunk models.Chunk
-		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
-			return nil, err
-		}
-		chunks = append(chunks, chunk)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return chunks, nil
+	return scanChunks(rows)
 }
 
 // GetChunksForNotebook retrieves all chunks associated with a notebook.
@@ -98,18 +76,7 @@ func (r *Repository) GetChunksForNotebook(notebookID string) ([]models.Chunk, er
 		_ = rows.Close()
 	}()
 
-	var chunks []models.Chunk
-	for rows.Next() {
-		var chunk models.Chunk
-		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
-			return nil, err
-		}
-		chunks = append(chunks, chunk)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return chunks, nil
+	return scanChunks(rows)
 }
 
 // GetChunksForTopics batches chunk loading for multiple topics.
@@ -405,6 +372,10 @@ func (r *Repository) GetAllChunks() ([]models.Chunk, error) {
 		_ = rows.Close()
 	}()
 
+	return scanChunks(rows)
+}
+
+func scanChunks(rows *sql.Rows) ([]models.Chunk, error) {
 	var chunks []models.Chunk
 	for rows.Next() {
 		var chunk models.Chunk
