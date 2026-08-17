@@ -3,6 +3,7 @@ package db
 import (
 	"ai-tutor/internal/models"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,6 +18,36 @@ type QuizAttemptWithPayload struct {
 	CompletedAt  int64
 	QuizPayload  string
 	PassingScore int
+}
+
+func scanQuizAttemptsWithPayload(rows *sql.Rows) ([]QuizAttemptWithPayload, error) {
+	var attempts []QuizAttemptWithPayload
+	for rows.Next() {
+		var attempt QuizAttemptWithPayload
+		if err := rows.Scan(
+			&attempt.ID,
+			&attempt.Score,
+			&attempt.Passed,
+			&attempt.AnswersJSON,
+			&attempt.CompletedAt,
+			&attempt.QuizPayload,
+		); err != nil {
+			return nil, err
+		}
+
+		var payload models.QuizTaskPayload
+		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
+			attempt.PassingScore = payload.PassingScore
+		} else {
+			attempt.PassingScore = 70
+		}
+
+		attempts = append(attempts, attempt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attempts, nil
 }
 
 // readActiveProfileID fetches only the active_profile_id from user_settings.

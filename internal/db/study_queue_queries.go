@@ -478,33 +478,7 @@ func (r *Repository) GetLastNQuizAttemptsWithCorrectness(notebookID string, n in
 	}
 	defer func() { _ = rows.Close() }()
 
-	attempts := make([]QuizAttemptWithPayload, 0, n)
-	for rows.Next() {
-		var attempt QuizAttemptWithPayload
-		if err := rows.Scan(
-			&attempt.ID,
-			&attempt.Score,
-			&attempt.Passed,
-			&attempt.AnswersJSON,
-			&attempt.CompletedAt,
-			&attempt.QuizPayload,
-		); err != nil {
-			return nil, err
-		}
-
-		var payload models.QuizTaskPayload
-		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
-			attempt.PassingScore = payload.PassingScore
-		} else {
-			attempt.PassingScore = 70
-		}
-
-		attempts = append(attempts, attempt)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return attempts, nil
+	return scanQuizAttemptsWithPayload(rows)
 }
 
 // HasMilestoneExamForAttemptID reports whether a milestone exam already includes the given quiz attempt.
@@ -578,33 +552,7 @@ func (r *Repository) GetPassedQuizAttempts(notebookID string) ([]QuizAttemptWith
 	}
 	defer func() { _ = rows.Close() }()
 
-	var attempts []QuizAttemptWithPayload
-	for rows.Next() {
-		var attempt QuizAttemptWithPayload
-		if err := rows.Scan(
-			&attempt.ID,
-			&attempt.Score,
-			&attempt.Passed,
-			&attempt.AnswersJSON,
-			&attempt.CompletedAt,
-			&attempt.QuizPayload,
-		); err != nil {
-			return nil, err
-		}
-
-		var payload models.QuizTaskPayload
-		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
-			attempt.PassingScore = payload.PassingScore
-		} else {
-			attempt.PassingScore = 70
-		}
-
-		attempts = append(attempts, attempt)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return attempts, nil
+	return scanQuizAttemptsWithPayload(rows)
 }
 
 // GetCompletedTaskTimes returns a list of completion times in UTC.
