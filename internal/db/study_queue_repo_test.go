@@ -1358,6 +1358,76 @@ func TestCompleteTaskTx_PayloadPreservation(t *testing.T) {
 	}
 }
 
+func TestCompleteReadingWithGeneratedQuizReservedStatusFlow(t *testing.T) {
+	initDBForTest(t, false, 0)
 
+	nbID := "nb-flow-test"
+	topID := "top-flow-test"
+	_ = testRepo.EnsureTopic(topID, "Flow Topic")
+	_ = testRepo.CreateNotebook(nbID, "Flow Notebook", "/tmp/flow.md", "md", topID, "", 5, "")
 
+	taskID := "task-flow-read-1"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         taskID,
+		NotebookID: nbID,
+		TopicID:    topID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		StartPage:  1,
+		EndPage:    3,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
 
+	// 1. Activate task
+	if err := testRepo.ActivateTask(taskID); err != nil {
+		t.Fatalf("ActivateTask failed: %v", err)
+	}
+
+	// 2. Reserve task (as done during synchronous LLM quiz generation in CompleteReading)
+	if err := testRepo.ReserveTask(taskID); err != nil {
+		t.Fatalf("ReserveTask failed: %v", err)
+	}
+
+	// 3. CompleteReadingWithGeneratedQuiz while task is in RESERVED state
+	quizPayload := models.QuizTaskPayload{
+		Questions: []models.QuizTaskQuestion{
+			{
+				ID:            "q1",
+				Prompt:        "What is database normalization?",
+				Options:       []string{"A", "B", "C", "D"},
+				CorrectAnswer: "A",
+			},
+		},
+		PassingScore: 70,
+	}
+
+	quizTaskID, err := testRepo.CompleteReadingWithGeneratedQuiz(taskID, quizPayload)
+	if err != nil {
+		t.Fatalf("CompleteReadingWithGeneratedQuiz failed for RESERVED task: %v", err)
+	}
+	if quizTaskID == "" {
+		t.Fatalf("expected valid quizTaskID, got empty")
+	}
+
+	// 4. Verify reading task is now COMPLETED
+	readingTask, err := testRepo.GetTaskByID(taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID for completed reading task failed: %v", err)
+	}
+	if readingTask.Status != models.StudyTaskStatusCompleted {
+		t.Fatalf("expected reading task status COMPLETED, got %s", readingTask.Status)
+	}
+
+	// 5. Verify follow-up QUIZ task was created and is PENDING
+	quizTask, err := testRepo.GetTaskByID(quizTaskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID for generated quiz task failed: %v", err)
+	}
+	if quizTask.TaskType != models.StudyTaskTypeQuiz {
+		t.Fatalf("expected quiz task type QUIZ, got %s", quizTask.TaskType)
+	}
+	if quizTask.Status != models.StudyTaskStatusPending {
+		t.Fatalf("expected quiz task status PENDING, got %s", quizTask.Status)
+	}
+}

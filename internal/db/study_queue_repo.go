@@ -128,7 +128,7 @@ func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.Com
 		UPDATE study_queue
 		SET status = ?, completed_at = CURRENT_TIMESTAMP,
 		    payload_json = CASE WHEN ? = '' THEN payload_json ELSE ? END
-		WHERE id = ? AND status = 'ACTIVE'
+		WHERE id = ? AND status IN ('ACTIVE', 'RESERVED')
 	`, status, payloadVal, payloadVal, taskID)
 	if err != nil {
 		utils.Warnf("[QUEUE] CompleteTaskTx reading task completion update error taskID=%s err=%v", taskID, err)

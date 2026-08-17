@@ -43,6 +43,13 @@
       subtitle="Your study queue is locked because you failed the quiz twice on this topic. You must complete the Socratic tutor rescue session to unblock your timeline."
     />
     <StatusBanner
+      v-if="flashcardNotice"
+      variant="success"
+      icon="🎉"
+      title="Flashcards Ready"
+      :subtitle="flashcardNotice"
+    />
+    <StatusBanner
       v-if="flashcardsJustCreated"
       variant="success"
       icon="✓"
@@ -217,6 +224,7 @@ const route = useRoute()
 const loading = ref(true)
 const error = ref('')
 const actionError = ref('')
+const flashcardNotice = ref('')
 const tasks = ref([])
 const hasActiveStudyContent = ref(false)
 const dueReviewCards = ref(0)
@@ -492,10 +500,15 @@ async function runFlashcardSyncInline(task) {
   try {
     isSyncing.value = true
     actionError.value = ''
+    flashcardNotice.value = ''
     const res = await retryFlashcardGeneration(task.id)
     if (res && res.error) {
       actionError.value = `Flashcard Generation Failed: ${res.error}. Please check your connection.`
     } else {
+      const count = res && typeof res.cards_scheduled === 'number' ? res.cards_scheduled : 0
+      flashcardNotice.value = count > 0
+        ? `🎉 Successfully generated ${count} flashcards for spaced repetition!`
+        : '✨ Flashcards are ready and up to date!'
       await loadAgenda()
     }
   } catch (err) {

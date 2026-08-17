@@ -133,13 +133,13 @@ export function useReaderBase(taskID) {
 
   // Methods
   async function fetchDocumentText(url, fallbackSections = []) {
+    if (fallbackSections && fallbackSections.length > 0) {
+      return fallbackSections
+        .map((s) => s.content || s.text || '')
+        .filter(Boolean)
+        .join('\n\n')
+    }
     if (!url) {
-      if (fallbackSections && fallbackSections.length > 0) {
-        return fallbackSections
-          .map((s) => s.content || s.text || '')
-          .filter(Boolean)
-          .join('\n\n')
-      }
       return ''
     }
     try {
@@ -151,15 +151,9 @@ export function useReaderBase(taskID) {
       return await res.text()
     } catch (err) {
       console.warn(
-        '[useReaderBase] Failed to fetch raw text from url, falling back to sections:',
+        '[useReaderBase] Failed to fetch raw text from url:',
         err
       )
-      if (fallbackSections && fallbackSections.length > 0) {
-        return fallbackSections
-          .map((s) => s.content || s.text || '')
-          .filter(Boolean)
-          .join('\n\n')
-      }
       return ''
     } finally {
       loadingText.value = false

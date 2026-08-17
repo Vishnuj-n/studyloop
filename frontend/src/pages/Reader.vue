@@ -115,35 +115,17 @@
         <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">
           Loading document...
         </div>
-        <div
+        <MarkdownReader
           v-else-if="reader.isMarkdown.value"
-          class="markdown-container"
-        >
-          <div class="markdown-boundary-tag top-boundary">
-            <span class="boundary-badge">📖 Document Start</span>
-            <span class="boundary-sub">Continuous reading format</span>
-          </div>
-
-          <div
-            class="markdown-viewport"
-            v-html="renderedMarkdown"
-          ></div>
-
-          <div class="markdown-boundary-tag bottom-boundary">
-            <div class="boundary-info">
-              <span class="boundary-badge success">✓ End of Assigned Reading</span>
-              <span class="boundary-sub">You have reached the end of this study section.</span>
-            </div>
-            <button
-              v-if="isTaskFlow"
-              class="primary proceed-button"
-              :disabled="completingReading"
-              @click="handleCompleteReading"
-            >
-              {{ completingReading ? 'Generating Quiz...' : 'Complete & Proceed to Quiz →' }}
-            </button>
-          </div>
-        </div>
+          :content="reader.textContent.value"
+          :topic-title="reader.topicTitle.value"
+          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
+          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :is-task-flow="isTaskFlow"
+          :completing="completingSession"
+          :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+          @complete="completeSession"
+        />
         <div v-else-if="!reader.pdfVisible.value" class="empty">
           Document not available for selected notebook/topic.
         </div>
@@ -260,7 +242,7 @@ import {
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import ReaderChat from '../components/ReaderChat.vue'
-import { renderMarkdown } from '../services/markdown'
+import MarkdownReader from '../components/MarkdownReader.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
@@ -278,10 +260,6 @@ const routeTaskID = computed(() => {
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
 provide('chat', chat)
-
-const renderedMarkdown = computed(() => {
-  return renderMarkdown(reader.textContent.value || '')
-})
 
 // Local state for completion
 const completingSession = ref(false)
@@ -1264,275 +1242,4 @@ button:disabled {
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.markdown-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.markdown-boundary-tag {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background: var(--surface-container);
-  border: 1px dashed var(--outline-variant);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--muted-text);
-  gap: 12px;
-}
-
-.markdown-boundary-tag.top-boundary {
-  border-top-style: solid;
-  border-top-width: 2px;
-  border-top-color: var(--primary);
-}
-
-.markdown-boundary-tag.bottom-boundary {
-  border-bottom-style: solid;
-  border-bottom-width: 2px;
-  border-bottom-color: #10b981;
-  background: color-mix(in srgb, var(--surface-container) 92%, #10b981 8%);
-  padding: 16px 20px;
-  flex-wrap: wrap;
-}
-
-.boundary-badge {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--on-surface);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.boundary-badge.success {
-  color: #10b981;
-  font-size: 14px;
-}
-
-.boundary-sub {
-  font-size: 12px;
-  color: var(--muted-text);
-}
-
-.boundary-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.proceed-button {
-  padding: 8px 18px;
-  font-weight: 600;
-  font-size: 13px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-left: auto;
-}
-
-.markdown-viewport {
-  flex: 1;
-  overflow-y: auto;
-  padding: 32px 40px;
-  background: var(--surface-container-lowest);
-  border-radius: 12px;
-  border: 1px solid var(--outline-variant);
-  line-height: 1.7;
-  color: var(--on-surface);
-  font-size: 15px;
-}
-
-.markdown-viewport :deep(h1),
-.markdown-viewport :deep(h2),
-.markdown-viewport :deep(h3),
-.markdown-viewport :deep(h4) {
-  font-family: 'Manrope', sans-serif;
-  color: var(--on-surface);
-  margin: 24px 0 12px;
-  line-height: 1.3;
-}
-
-.markdown-viewport :deep(h1) {
-  border-bottom: 1px solid var(--outline-variant);
-  padding-bottom: 8px;
-}
-
-.markdown-viewport :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20px 0;
-  font-size: 14px;
-}
-
-.markdown-viewport :deep(th),
-.markdown-viewport :deep(td) {
-  border: 1px solid var(--outline-variant);
-  padding: 10px 14px;
-  text-align: left;
-}
-
-.markdown-viewport :deep(th) {
-  background: var(--surface-container-low);
-  font-weight: 700;
-  color: var(--on-surface);
-}
-
-.markdown-viewport :deep(tbody tr:nth-child(even)) {
-  background: color-mix(in srgb, var(--surface-container-low) 50%, transparent);
-}
-
-.markdown-viewport :deep(blockquote) {
-  margin: 16px 0;
-  padding: 10px 16px;
-  border-left: 4px solid var(--primary);
-  background: var(--surface-container-low);
-  border-radius: 0 8px 8px 0;
-  color: var(--muted-text);
-}
-
-.markdown-viewport :deep(ul),
-.markdown-viewport :deep(ol) {
-  padding-left: 24px;
-  margin: 12px 0;
-}
-
-.markdown-viewport :deep(li) {
-  margin-bottom: 6px;
-}
-
-.markdown-viewport :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--outline-variant);
-  margin: 24px 0;
-}
-
-.markdown-viewport :deep(pre) {
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  padding: 16px;
-  overflow-x: auto;
-  font-family: monospace;
-}
-
-.markdown-viewport :deep(code) {
-  background: var(--surface-container-low);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 13.5px;
-}
-
-.markdown-viewport :deep(pre code) {
-  padding: 0;
-  background: transparent;
-  font-size: 13px;
-}
-
-/* Syntax Highlighting */
-.markdown-viewport :deep(.hljs-keyword),
-.markdown-viewport :deep(.hljs-selector-tag) {
-  color: #ff7b72;
-  font-weight: 600;
-}
-.markdown-viewport :deep(.hljs-string),
-.markdown-viewport :deep(.hljs-attribute) {
-  color: #a5d6ff;
-}
-.markdown-viewport :deep(.hljs-number),
-.markdown-viewport :deep(.hljs-literal) {
-  color: #79c0ff;
-}
-.markdown-viewport :deep(.hljs-title),
-.markdown-viewport :deep(.hljs-section) {
-  color: #d2a8ff;
-  font-weight: 600;
-}
-.markdown-viewport :deep(.hljs-comment) {
-  color: #8b949e;
-  font-style: italic;
-}
-
-/* Task lists */
-.markdown-viewport :deep(.task-list-item) {
-  list-style-type: none;
-  margin-left: -20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.markdown-viewport :deep(.task-list-item input[type='checkbox']) {
-  margin: 0;
-  cursor: default;
-}
-
-/* GitHub Alerts */
-.markdown-viewport :deep(.markdown-alert) {
-  margin: 16px 0;
-  padding: 12px 16px;
-  border-left: 4px solid var(--primary);
-  background: var(--surface-container-low);
-  border-radius: 0 8px 8px 0;
-}
-
-.markdown-viewport :deep(.markdown-alert-title) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-
-.markdown-viewport :deep(.markdown-alert-note) {
-  border-left-color: #58a6ff;
-}
-.markdown-viewport :deep(.markdown-alert-note .markdown-alert-title) {
-  color: #58a6ff;
-}
-
-.markdown-viewport :deep(.markdown-alert-tip) {
-  border-left-color: #3fb950;
-}
-.markdown-viewport :deep(.markdown-alert-tip .markdown-alert-title) {
-  color: #3fb950;
-}
-
-.markdown-viewport :deep(.markdown-alert-important) {
-  border-left-color: #a371f7;
-}
-.markdown-viewport :deep(.markdown-alert-important .markdown-alert-title) {
-  color: #a371f7;
-}
-
-.markdown-viewport :deep(.markdown-alert-warning) {
-  border-left-color: #d29922;
-}
-.markdown-viewport :deep(.markdown-alert-warning .markdown-alert-title) {
-  color: #d29922;
-}
-
-.markdown-viewport :deep(.markdown-alert-caution) {
-  border-left-color: #f85149;
-}
-.markdown-viewport :deep(.markdown-alert-caution .markdown-alert-title) {
-  color: #f85149;
-}
-
-/* Footnotes */
-.markdown-viewport :deep(.footnotes) {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--outline-variant);
-  font-size: 13px;
-  color: var(--muted-text);
-}
 </style>

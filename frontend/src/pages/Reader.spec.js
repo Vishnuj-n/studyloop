@@ -181,4 +181,76 @@ describe('Reader.vue Integration', () => {
 
     expect(wrapper.find('h1').text()).toBe('Chapter 1: Cn Final Revision Sh')
   })
+
+  it('renders continuous markdown document with boundary banners and completes session when clicking proceed button', async () => {
+    const pushMock = vi.fn()
+    vi.mocked(appApi.completeReading).mockResolvedValue({
+      error: null,
+      quiz_task_id: 'quiz-flow-test-123',
+    })
+
+    routeQuery.value = {
+      taskId: 'task-md-flow-1',
+      notebookId: 'nb-notes',
+      topicId: 'nb-notes-ch-01-cn',
+    }
+
+    appApi.initializeReadingSession.mockResolvedValueOnce({
+      ok: true,
+      task: {
+        id: 'task-md-flow-1',
+        task_type: 'READING',
+        notebook_id: 'nb-notes',
+        topic_id: 'nb-notes-ch-01-cn',
+        start_page: 1,
+        end_page: 1,
+      },
+      page_bounds: { start_page: 1, end_page: 1, current_page: 1 },
+      navigation: { mode: 'task', current_page: 1, min_page: 1, max_page: 1 },
+      bundle: {
+        topic_id: 'nb-notes-ch-01-cn',
+        topic_title: 'Chapter 1: Computer Networks',
+        file_type: 'md',
+        page_count: 1,
+        topic_start_page: 1,
+        topic_end_page: 1,
+        raw_content: '# Course Notes\n\n## 1. OSI Model\n\nApplication layer text\n\n| Layer | Job |\n|---|---|\n| App | Web |',
+        sections: [
+          {
+            id: 'c1',
+            heading: 'OSI Model',
+            content: '## 1. OSI Model\n\nApplication layer text',
+            page_num: 1,
+          },
+        ],
+      },
+    })
+
+    const wrapper = mount(Reader, {
+      global: {
+        mocks: {
+          $router: { push: pushMock },
+        },
+      },
+    })
+    await flushPromises()
+
+    // 1. Verify markdown viewport is rendered with full continuous content & tables
+    const viewport = wrapper.find('.markdown-viewport')
+    expect(viewport.exists()).toBe(true)
+    expect(viewport.text()).toContain('OSI Model')
+    expect(wrapper.find('.top-boundary').exists()).toBe(true)
+    expect(wrapper.find('.bottom-boundary').exists()).toBe(true)
+
+    // 2. Find and click the prominent bottom boundary Proceed to Quiz button
+    const proceedBtn = wrapper.find('.proceed-button')
+    expect(proceedBtn.exists()).toBe(true)
+    expect(proceedBtn.text()).toContain('Complete & Proceed to Quiz')
+
+    await proceedBtn.trigger('click')
+    await flushPromises()
+
+    // 3. Verify completion call was dispatched with the correct task ID
+    expect(appApi.completeReading).toHaveBeenCalledWith('task-md-flow-1')
+  })
 })
