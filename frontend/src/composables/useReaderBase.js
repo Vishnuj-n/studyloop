@@ -5,6 +5,32 @@ import {
   initializeReadingSession,
 } from '../services/appApi'
 
+// ponytail: convert raw topic IDs (nb-*-ch-01-slug) to clean human titles
+export function cleanTopicTitle(raw) {
+  if (!raw || typeof raw !== 'string') return ''
+  const trimmed = raw.trim()
+  const chIndex = trimmed.indexOf('-ch-')
+  if (chIndex === -1 || !trimmed.startsWith('nb-')) {
+    return trimmed
+  }
+  const part1 = trimmed.substring(chIndex + 4)
+  const subParts = part1.split('-')
+  let chNum = (subParts[0] || '').replace(/^0+/, '') || '0'
+  if (subParts.length < 2) return `Chapter ${chNum}`
+  const suffixWords = subParts
+    .slice(1)
+    .join(' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+  const suffix = suffixWords.join(' ')
+  if (suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() || suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase()) {
+    return `Chapter ${chNum}`
+  }
+  return `Chapter ${chNum}: ${suffix}`
+}
+
 /**
  * useReaderBase - Extracted base reader logic for task-flow-only reading sessions.
  * Handles: notebook/topic loading, page navigation, session initialization.
@@ -107,13 +133,13 @@ export function useReaderBase(taskID) {
 
   // Methods
   async function fetchDocumentText(url, fallbackSections = []) {
+    if (fallbackSections && fallbackSections.length > 0) {
+      return fallbackSections
+        .map((s) => s.content || s.text || '')
+        .filter(Boolean)
+        .join('\n\n')
+    }
     if (!url) {
-      if (fallbackSections && fallbackSections.length > 0) {
-        return fallbackSections
-          .map((s) => s.content || s.text || '')
-          .filter(Boolean)
-          .join('\n\n')
-      }
       return ''
     }
     try {
@@ -125,15 +151,9 @@ export function useReaderBase(taskID) {
       return await res.text()
     } catch (err) {
       console.warn(
-        '[useReaderBase] Failed to fetch raw text from url, falling back to sections:',
+        '[useReaderBase] Failed to fetch raw text from url:',
         err
       )
-      if (fallbackSections && fallbackSections.length > 0) {
-        return fallbackSections
-          .map((s) => s.content || s.text || '')
-          .filter(Boolean)
-          .join('\n\n')
-      }
       return ''
     } finally {
       loadingText.value = false
@@ -265,7 +285,7 @@ export function useReaderBase(taskID) {
       navigationState.value = nav
 
       // Apply bundle data safely (bundle might be null/empty)
-      topicTitle.value = bundle?.topic_title || task.topic_title || 'Reader'
+      topicTitle.value = cleanTopicTitle(bundle?.topic_title || task.topic_title) || 'Reader'
       notebookUrl.value = bundle?.notebook_url || ''
       fileType.value = (bundle?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(bundle?.page_count) || 1)
@@ -326,7 +346,7 @@ export function useReaderBase(taskID) {
         return true
       }
 
-      topicTitle.value = result?.topic_title || selectedTopicTitle.value || 'Reader'
+      topicTitle.value = cleanTopicTitle(result?.topic_title || selectedTopicTitle.value) || 'Reader'
       notebookUrl.value = result?.notebook_url || ''
       fileType.value = (result?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(result?.page_count) || 1)

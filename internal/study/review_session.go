@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	fsrs "github.com/open-spaced-repetition/go-fsrs/v4"
 )
 
 func (s *StudyService) GetReviewSession(taskID string) (*models.ReviewSession, error) {
@@ -63,7 +62,7 @@ func (s *StudyService) applyFlashcardReview(tx *sql.Tx, cardID string, ratingCod
 		return nil, nil, "", fmt.Errorf("failed to retrieve last reviewed time: %w", err)
 	}
 
-	fsrsCard := FlashcardStateToCard(*state, card.DueAt, lastReviewedAt)
+	fsrsCard := scheduler.FlashcardStateToCard(*state, card.DueAt, lastReviewedAt)
 	originalLastReview := fsrsCard.LastReview
 	tNow := time.Now()
 
@@ -181,7 +180,12 @@ func (s *StudyService) withFlashcardTaskTx(taskID string, fn func(tx *sql.Tx) er
 	if task.TaskType != models.StudyTaskTypeFlashcardReview {
 		return 0, fmt.Errorf("task %s is not a flashcard review task", taskID)
 	}
-	if task.Status != models.StudyTaskStatusActive {
+	// ponytail: self-healing activation if task is PENDING
+	if task.Status == models.StudyTaskStatusPending {
+		if err := s.repo.ActivateTaskTx(tx, taskID); err != nil {
+			return 0, err
+		}
+	} else if task.Status != models.StudyTaskStatusActive {
 		return 0, db.ErrTaskNotActive
 	}
 
@@ -201,49 +205,4 @@ func (s *StudyService) withFlashcardTaskTx(taskID string, fn func(tx *sql.Tx) er
 	return remaining, nil
 }
 
-const UnixMillisecondThreshold = 1e12
 
-func FlashcardStateToCard(state models.FlashcardState, dueAt, lastReviewedAt int64) fsrs.Card {
-	var dueTime, lastReviewTime time.Time
-	if dueAt > 0 {
-		dueTime = time.Unix(dueAt, 0)
-	}
-	if lastReviewedAt > 0 {
-		if lastReviewedAt > UnixMillisecondThreshold {
-			lastReviewTime = time.UnixMilli(lastReviewedAt)
-		} else {
-			lastReviewTime = time.Unix(lastReviewedAt, 0)
-		}
-	}
-
-	var fsrsState fsrs.State
-	switch state.StateCode {
-	case 0:
-		fsrsState = fsrs.New
-	case 1:
-		fsrsState = fsrs.Learning
-	case 2:
-		fsrsState = fsrs.Review
-	case 3:
-		fsrsState = fsrs.Relearning
-	default:
-		fsrsState = fsrs.New
-	}
-
-	stability := state.Stability
-	if fsrsState != fsrs.New && stability < 0.001 {
-		stability = 0.001
-	}
-
-	return fsrs.Card{
-		Due:            dueTime,
-		Stability:      stability,
-		Difficulty:     state.Difficulty,
-		ScheduledDays:  uint64(state.ScheduledDays),
-		Reps:           uint64(state.Reps),
-		Lapses:         uint64(state.Lapses),
-		State:          fsrsState,
-		LastReview:     lastReviewTime,
-		RemainingSteps: 0,
-	}
-}

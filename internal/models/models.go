@@ -41,6 +41,7 @@ const (
 	StudyTaskStatusCompleted StudyTaskStatus = "COMPLETED"
 	StudyTaskStatusSkipped   StudyTaskStatus = "SKIPPED"
 	StudyTaskStatusFailed    StudyTaskStatus = "FAILED"
+	StudyTaskStatusReserved  StudyTaskStatus = "RESERVED"
 )
 
 // ReviewTaskDailyID is the synthetic task ID for daily flashcard review materialization.
@@ -435,6 +436,9 @@ func CardToFlashcardState(card fsrs.Card) FlashcardState {
 		StateCode:     stateCode,
 	}
 }
+
+// FlashcardStateToCard converts FlashcardState and timestamps to a go-fsrs Card.
+
 
 // Subtopic represents a logical section within a parent topic for study task organization.
 type Subtopic struct {

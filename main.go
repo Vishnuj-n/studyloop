@@ -3,9 +3,7 @@ package main
 import (
 	"embed"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"ai-tutor/internal/app"
@@ -76,8 +74,6 @@ func notebookHandler(a *app.App) http.Handler {
 			return
 		}
 
-		utils.Debugf("[notebookHandler] Top of handler: path=%s, dir=%s", req.URL.Path, uploadDir)
-
 		// Serve only GET requests.
 		if req.Method != http.MethodGet {
 			utils.Warnf("[notebookHandler] Rejected method: %s", req.Method)
@@ -85,39 +81,29 @@ func notebookHandler(a *app.App) http.Handler {
 			return
 		}
 
-		// Unescape the URL path to handle URL-encoded characters (like spaces %20)
-		unescapedPath, err := url.PathUnescape(req.URL.Path)
-		if err != nil {
-			utils.Warnf("[notebookHandler] Error unescaping path: %s", err.Error())
-			http.Error(rw, "invalid URL path encoding", http.StatusBadRequest)
-			return
-		}
-		utils.Debugf("[notebookHandler] Unescaped path: %s", unescapedPath)
-
-		// Clean the path and prevent directory traversal
-		relPath := strings.TrimPrefix(unescapedPath, "/notebooks/")
-		relPath = filepath.Clean("/" + relPath)
-		
-		uploadDirClean := filepath.Clean(uploadDir)
-		fullPath := filepath.Clean(filepath.Join(uploadDirClean, relPath))
-		utils.Debugf("[notebookHandler] uploadDirClean: %s, fullPath: %s", uploadDirClean, fullPath)
-
-		if !strings.HasPrefix(fullPath, uploadDirClean) {
-			utils.Warnf("[notebookHandler] Access denied. Prefix check failed.")
-			http.Error(rw, "access denied", http.StatusForbidden)
-			return
-		}
-
-		// Verify the file actually exists on disk to prevent Wails SPA html fallback
-		info, err := os.Stat(fullPath)
-		if err != nil || info.IsDir() {
-			utils.Warnf("[notebookHandler] File not found or is dir. Stat err: %v", err)
-			http.Error(rw, "file not found", http.StatusNotFound)
-			return
-		}
-
-		utils.Debugf("[notebookHandler] Serving file: %s", fullPath)
-		// Serve the file directly using http.ServeFile which handles HTTP Range headers correctly
-		http.ServeFile(rw, req, fullPath)
+		fs := noDirListingFS{fs: http.Dir(uploadDir)}
+		http.StripPrefix("/notebooks/", http.FileServer(fs)).ServeHTTP(rw, req)
 	})
 }
+
+type noDirListingFS struct {
+	fs http.FileSystem
+}
+
+func (nfs noDirListingFS) Open(name string) (http.File, error) {
+	file, err := nfs.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if stat.IsDir() {
+		file.Close()
+		return nil, os.ErrPermission
+	}
+	return file, nil
+}
+

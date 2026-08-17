@@ -582,8 +582,9 @@ func TestTriggerCloudSyncRetriesAndFailSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to query sync task: %v", err)
 	}
-	if syncCount != 1 {
-		t.Fatalf("expected 1 PENDING FLASHCARD_GENERATE task, got %d", syncCount)
+	// ponytail: cloud sync does not inject flashcard generate tasks into study queue
+	if syncCount != 0 {
+		t.Fatalf("expected 0 PENDING FLASHCARD_GENERATE task, got %d", syncCount)
 	}
 
 	serverSuccess := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -606,14 +607,63 @@ func TestTriggerCloudSyncRetriesAndFailSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected sync to succeed, got %v", err)
 	}
+}
 
-	var status string
-	err = testRepo.QueryRowForTest("SELECT status FROM study_queue WHERE task_type = 'FLASHCARD_GENERATE' AND (topic_id IS NULL OR topic_id = '')").Scan(&status)
-	if err != nil {
-		t.Fatalf("failed to query sync task status: %v", err)
+// TestSyncDoesNotMutateStudyQueue enforces that cloud sync failures or successes
+// never inject or manipulate tasks in the study_queue table.
+func TestSyncDoesNotMutateStudyQueue(t *testing.T) {
+	initTestDB(t)
+
+	// Count initial tasks in study_queue
+	var initialCount int
+	if err := testRepo.QueryRowForTest("SELECT COUNT(*) FROM study_queue").Scan(&initialCount); err != nil {
+		t.Fatalf("failed to count study queue tasks: %v", err)
 	}
-	if status != "COMPLETED" {
-		t.Fatalf("expected sync task status to be COMPLETED, got %q", status)
+
+	// 1. Trigger sync failure with broken server
+	serverFail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer serverFail.Close()
+
+	if _, err := testRepo.ExecForTest(`UPDATE user_settings SET cloud_sync_url = ? WHERE id = 1`, serverFail.URL); err != nil {
+		t.Fatalf("failed to update user settings: %v", err)
+	}
+
+	// Sync fails after retries
+	_ = study.TriggerCloudSync(testRepo)
+
+	// Verify study_queue was NOT mutated
+	var afterFailCount int
+	if err := testRepo.QueryRowForTest("SELECT COUNT(*) FROM study_queue").Scan(&afterFailCount); err != nil {
+		t.Fatalf("failed to count study queue tasks after failure: %v", err)
+	}
+	if afterFailCount != initialCount {
+		t.Fatalf("architectural invariant violated: sync failure mutated study_queue (expected %d, got %d)", initialCount, afterFailCount)
+	}
+
+	// 2. Trigger sync success
+	serverSuccess := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"new_notebooks": []interface{}{}})
+	}))
+	defer serverSuccess.Close()
+
+	if _, err := testRepo.ExecForTest(`UPDATE user_settings SET cloud_sync_url = ? WHERE id = 1`, serverSuccess.URL); err != nil {
+		t.Fatalf("failed to update user settings: %v", err)
+	}
+
+	if err := study.TriggerCloudSync(testRepo); err != nil {
+		t.Fatalf("sync success expected, got: %v", err)
+	}
+
+	// Verify study_queue count remains untouched
+	var afterSuccessCount int
+	if err := testRepo.QueryRowForTest("SELECT COUNT(*) FROM study_queue").Scan(&afterSuccessCount); err != nil {
+		t.Fatalf("failed to count study queue tasks after success: %v", err)
+	}
+	if afterSuccessCount != initialCount {
+		t.Fatalf("architectural invariant violated: sync success mutated study_queue (expected %d, got %d)", initialCount, afterSuccessCount)
 	}
 }
 

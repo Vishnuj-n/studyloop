@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"encoding/json"
@@ -6,70 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/scheduler"
 
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v4"
 )
 
-func toFsrsCard(state models.FlashcardState, dueAt, lastReviewedAt int64) fsrs.Card {
-	var dueTime, lastReviewTime time.Time
-	if dueAt > 0 {
-		dueTime = time.Unix(dueAt, 0)
-	}
-	if lastReviewedAt > 0 {
-		if lastReviewedAt > 1e12 {
-			lastReviewTime = time.UnixMilli(lastReviewedAt)
-		} else {
-			lastReviewTime = time.Unix(lastReviewedAt, 0)
-		}
-	}
-
-	var fsrsState fsrs.State
-	switch state.StateCode {
-	case 0:
-		fsrsState = fsrs.New
-	case 1:
-		fsrsState = fsrs.Learning
-	case 2:
-		fsrsState = fsrs.Review
-	case 3:
-		fsrsState = fsrs.Relearning
-	default:
-		fsrsState = fsrs.New
-	}
-
-	return fsrs.Card{
-		Due:            dueTime,
-		Stability:      state.Stability,
-		Difficulty:     state.Difficulty,
-		ScheduledDays:  uint64(state.ScheduledDays),
-		Reps:           uint64(state.Reps),
-		Lapses:         uint64(state.Lapses),
-		State:          fsrsState,
-		LastReview:     lastReviewTime,
-		RemainingSteps: 0,
-	}
-}
-
-// computeNextState is the test-local equivalent of scheduler.NextFSRSState,
-// avoiding the import cycle db → scheduler → db.
 func computeNextState(state models.FlashcardState, rating int, now time.Time, dueAt, lastReviewedAt int64) (models.FlashcardState, error) {
-	p := fsrs.DefaultParam()
-	p.RequestRetention = 0.9
-	engine := fsrs.NewFSRS(p)
-
-	fsrsCard := toFsrsCard(state, dueAt, lastReviewedAt)
-	if state.Reps == 0 || fsrsCard.Due.IsZero() {
-		fsrsCard.Due = now
-	}
-
-	schedulingCards, err := engine.Repeat(fsrsCard, now)
+	fsrsCard := scheduler.FlashcardStateToCard(state, dueAt, lastReviewedAt)
+	nextFsrsCard, err := scheduler.NextFSRSState(fsrsCard, rating, now)
 	if err != nil {
 		return state, err
 	}
-
-	chosenRecord := schedulingCards[fsrs.Rating(rating)]
-	updatedState := models.CardToFlashcardState(chosenRecord.Card)
+	updatedState := models.CardToFlashcardState(nextFsrsCard)
 
 	if !fsrsCard.LastReview.IsZero() {
 		elapsedDays := int(now.Sub(fsrsCard.LastReview).Hours() / 24)
@@ -88,7 +38,7 @@ func computeNextState(state models.FlashcardState, rating int, now time.Time, du
 }
 
 // reviewCard performs one FSRS review with the given rating, persists it, and returns the new due_at.
-func reviewCard(t *testing.T, repo *Repository, cardID, topicID string, rating fsrs.Rating, simNow time.Time, currentDueAt int64) int64 {
+func reviewCard(t *testing.T, repo *db.Repository, cardID, topicID string, rating fsrs.Rating, simNow time.Time, currentDueAt int64) int64 {
 	t.Helper()
 
 	card, state, err := repo.GetFlashcardByID(cardID)
@@ -138,7 +88,7 @@ func reviewCard(t *testing.T, repo *Repository, cardID, topicID string, rating f
 // Good if due. Intervals must grow monotonically, and no edge cases
 // (explosion, permanent short-loops, integer overflows) should occur.
 func TestFSRS365DaySimulation(t *testing.T) {
-	repo, err := Init(":memory:", "")
+	repo, err := db.Init(":memory:", "")
 	if err != nil {
 		t.Fatalf("Init(:memory:) failed: %v", err)
 	}
@@ -289,7 +239,7 @@ func TestFSRS365DaySimulation(t *testing.T) {
 // TestFSRS365DayMixedRatings runs the same 365-day simulation with a mix of
 // ratings (Good, Hard, Again) to test realistic usage patterns.
 func TestFSRS365DayMixedRatings(t *testing.T) {
-	repo, err := Init(":memory:", "")
+	repo, err := db.Init(":memory:", "")
 	if err != nil {
 		t.Fatalf("Init(:memory:) failed: %v", err)
 	}
@@ -380,7 +330,7 @@ func TestFSRS365DayMixedRatings(t *testing.T) {
 // TestFSRS365DayAllEasy tests the upper-bound scenario where the user
 // always answers Easy, ensuring no runaway interval growth.
 func TestFSRS365DayAllEasy(t *testing.T) {
-	repo, err := Init(":memory:", "")
+	repo, err := db.Init(":memory:", "")
 	if err != nil {
 		t.Fatalf("Init(:memory:) failed: %v", err)
 	}

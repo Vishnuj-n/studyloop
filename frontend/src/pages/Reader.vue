@@ -91,6 +91,17 @@
             >
               {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
             </button>
+            <button
+              class="secondary copy-session-btn"
+              :disabled="reader.loadingBundle.value || reader.loadingText.value"
+              title="Copy reading session text as Markdown"
+              @click="copySessionContent"
+            >
+              {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
+            </button>
+            <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
+              {{ copyError }}
+            </span>
           </div>
           <div v-if="isTaskFlow && reader.hasNavigationBounds.value" class="stage-head-right">
             <span class="reading-window-info">
@@ -104,11 +115,17 @@
         <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">
           Loading document...
         </div>
-        <div
+        <MarkdownReader
           v-else-if="reader.isMarkdown.value"
-          class="markdown-viewport"
-          v-html="renderedMarkdown"
-        ></div>
+          :content="reader.textContent.value"
+          :topic-title="reader.topicTitle.value"
+          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
+          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :is-task-flow="isTaskFlow"
+          :completing="completingSession"
+          :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+          @complete="completeSession"
+        />
         <div v-else-if="!reader.pdfVisible.value" class="empty">
           Document not available for selected notebook/topic.
         </div>
@@ -222,10 +239,10 @@ import {
   logFrontendEvent,
   trackAnalyticsEvent,
 } from '../services/appApi'
-import { useReaderBase } from '../composables/useReaderBase'
+import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import ReaderChat from '../components/ReaderChat.vue'
-import { renderMarkdown } from '../services/markdown'
+import MarkdownReader from '../components/MarkdownReader.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
@@ -243,10 +260,6 @@ const routeTaskID = computed(() => {
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
 provide('chat', chat)
-
-const renderedMarkdown = computed(() => {
-  return renderMarkdown(reader.textContent.value || '')
-})
 
 // Local state for completion
 const completingSession = ref(false)
@@ -760,6 +773,58 @@ async function completeSession() {
     completingSession.value = false
   }
 }
+
+// ponytail: clean structured markdown clipboard export
+const copiedSession = ref(false)
+const copyError = ref('')
+
+async function copySessionContent() {
+  const startPage =
+    reader.navigationMinPage.value ||
+    reader.topicStartPage.value ||
+    reader.currentPage.value ||
+    1
+  const endPage =
+    reader.navigationMaxPage.value ||
+    reader.topicEndPage.value ||
+    reader.pageCount.value ||
+    startPage
+  const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
+  const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+  const topicTitle = cleanTopicTitle(rawTopic)
+
+  let sessionText = ''
+  if (Array.isArray(reader.sections.value) && reader.sections.value.length > 0) {
+    const rangeSections = reader.sections.value.filter(
+      (s) => !s.page_num || (s.page_num >= startPage && s.page_num <= endPage)
+    )
+    sessionText = (rangeSections.length > 0 ? rangeSections : reader.sections.value)
+      .map((s) => s.content || s.text || '')
+      .filter(Boolean)
+      .join('\n\n')
+  }
+  if (!sessionText) {
+    sessionText = reader.textContent.value || ''
+  }
+
+  const markdown = `# ${bookTitle}
+## ${topicTitle} (Pages ${startPage}–${endPage})
+
+${sessionText.trim()}`
+
+  try {
+    await navigator.clipboard.writeText(markdown)
+    copiedSession.value = true
+    copyError.value = ''
+    setTimeout(() => {
+      copiedSession.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy session content:', err)
+    copiedSession.value = false
+    copyError.value = 'Failed to copy session content'
+  }
+}
 </script>
 
 <style scoped>
@@ -1177,204 +1242,4 @@ button:disabled {
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.markdown-viewport {
-  flex: 1;
-  overflow-y: auto;
-  padding: 32px 40px;
-  background: var(--surface-container-lowest);
-  border-radius: 12px;
-  border: 1px solid var(--outline-variant);
-  line-height: 1.7;
-  color: var(--on-surface);
-  font-size: 15px;
-}
-
-.markdown-viewport :deep(h1),
-.markdown-viewport :deep(h2),
-.markdown-viewport :deep(h3),
-.markdown-viewport :deep(h4) {
-  font-family: 'Manrope', sans-serif;
-  color: var(--on-surface);
-  margin: 24px 0 12px;
-  line-height: 1.3;
-}
-
-.markdown-viewport :deep(h1) {
-  border-bottom: 1px solid var(--outline-variant);
-  padding-bottom: 8px;
-}
-
-.markdown-viewport :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20px 0;
-  font-size: 14px;
-}
-
-.markdown-viewport :deep(th),
-.markdown-viewport :deep(td) {
-  border: 1px solid var(--outline-variant);
-  padding: 10px 14px;
-  text-align: left;
-}
-
-.markdown-viewport :deep(th) {
-  background: var(--surface-container-low);
-  font-weight: 700;
-  color: var(--on-surface);
-}
-
-.markdown-viewport :deep(tbody tr:nth-child(even)) {
-  background: color-mix(in srgb, var(--surface-container-low) 50%, transparent);
-}
-
-.markdown-viewport :deep(blockquote) {
-  margin: 16px 0;
-  padding: 10px 16px;
-  border-left: 4px solid var(--primary);
-  background: var(--surface-container-low);
-  border-radius: 0 8px 8px 0;
-  color: var(--muted-text);
-}
-
-.markdown-viewport :deep(ul),
-.markdown-viewport :deep(ol) {
-  padding-left: 24px;
-  margin: 12px 0;
-}
-
-.markdown-viewport :deep(li) {
-  margin-bottom: 6px;
-}
-
-.markdown-viewport :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--outline-variant);
-  margin: 24px 0;
-}
-
-.markdown-viewport :deep(pre) {
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  padding: 16px;
-  overflow-x: auto;
-  font-family: monospace;
-}
-
-.markdown-viewport :deep(code) {
-  background: var(--surface-container-low);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 13.5px;
-}
-
-.markdown-viewport :deep(pre code) {
-  padding: 0;
-  background: transparent;
-  font-size: 13px;
-}
-
-/* Syntax Highlighting */
-.markdown-viewport :deep(.hljs-keyword),
-.markdown-viewport :deep(.hljs-selector-tag) {
-  color: #ff7b72;
-  font-weight: 600;
-}
-.markdown-viewport :deep(.hljs-string),
-.markdown-viewport :deep(.hljs-attribute) {
-  color: #a5d6ff;
-}
-.markdown-viewport :deep(.hljs-number),
-.markdown-viewport :deep(.hljs-literal) {
-  color: #79c0ff;
-}
-.markdown-viewport :deep(.hljs-title),
-.markdown-viewport :deep(.hljs-section) {
-  color: #d2a8ff;
-  font-weight: 600;
-}
-.markdown-viewport :deep(.hljs-comment) {
-  color: #8b949e;
-  font-style: italic;
-}
-
-/* Task lists */
-.markdown-viewport :deep(.task-list-item) {
-  list-style-type: none;
-  margin-left: -20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.markdown-viewport :deep(.task-list-item input[type='checkbox']) {
-  margin: 0;
-  cursor: default;
-}
-
-/* GitHub Alerts */
-.markdown-viewport :deep(.markdown-alert) {
-  margin: 16px 0;
-  padding: 12px 16px;
-  border-left: 4px solid var(--primary);
-  background: var(--surface-container-low);
-  border-radius: 0 8px 8px 0;
-}
-
-.markdown-viewport :deep(.markdown-alert-title) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-
-.markdown-viewport :deep(.markdown-alert-note) {
-  border-left-color: #58a6ff;
-}
-.markdown-viewport :deep(.markdown-alert-note .markdown-alert-title) {
-  color: #58a6ff;
-}
-
-.markdown-viewport :deep(.markdown-alert-tip) {
-  border-left-color: #3fb950;
-}
-.markdown-viewport :deep(.markdown-alert-tip .markdown-alert-title) {
-  color: #3fb950;
-}
-
-.markdown-viewport :deep(.markdown-alert-important) {
-  border-left-color: #a371f7;
-}
-.markdown-viewport :deep(.markdown-alert-important .markdown-alert-title) {
-  color: #a371f7;
-}
-
-.markdown-viewport :deep(.markdown-alert-warning) {
-  border-left-color: #d29922;
-}
-.markdown-viewport :deep(.markdown-alert-warning .markdown-alert-title) {
-  color: #d29922;
-}
-
-.markdown-viewport :deep(.markdown-alert-caution) {
-  border-left-color: #f85149;
-}
-.markdown-viewport :deep(.markdown-alert-caution .markdown-alert-title) {
-  color: #f85149;
-}
-
-/* Footnotes */
-.markdown-viewport :deep(.footnotes) {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--outline-variant);
-  font-size: 13px;
-  color: var(--muted-text);
-}
 </style>

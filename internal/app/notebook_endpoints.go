@@ -147,29 +147,60 @@ func (a *App) resolveExplicitActiveProfileID() string {
 }
 
 // DraftNotebookSyllabus creates editable chapter ranges for HITL verification.
-// Uses bookmark extraction only (no LLM) for fast default response.
-// If regenerate=true, runs full extraction+LLM (same as AICleanupNotebookSyllabus).
-// If regenerate=false and a draft exists in DB, returns the persisted draft.
-func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[string]interface{} {
+func (a *App) getNotebookAndRepo(notebookID string) (*db.Repository, *models.Notebook, map[string]interface{}) {
 	repo := a.getRepo()
 	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
+		return nil, nil, map[string]interface{}{"error": errDatabaseNotInitialized}
 	}
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
-		return map[string]interface{}{"error": "notebook id is required"}
+		return nil, nil, map[string]interface{}{"error": "notebook id is required"}
 	}
 	if a.notebookService == nil {
-		return map[string]interface{}{"error": "notebook service not initialized"}
+		return nil, nil, map[string]interface{}{"error": "notebook service not initialized"}
 	}
 
 	nb, err := repo.GetNotebookByID(notebookID)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return nil, nil, map[string]interface{}{"error": err.Error()}
 	}
 	if nb == nil {
-		return map[string]interface{}{"error": "notebook not found"}
+		return nil, nil, map[string]interface{}{"error": "notebook not found"}
 	}
+	return repo, nb, nil
+}
+
+func persistSyllabusDraft(repo *db.Repository, notebookID string, pageCount int, chapters []models.SyllabusChapterDraft, fallbackUsed bool) map[string]interface{} {
+	draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: pageCount, Chapters: chapters, FallbackUsed: fallbackUsed})
+	if err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
+	}
+	if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
+	}
+	if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
+	}
+	return map[string]interface{}{
+		"notebook_id":   notebookID,
+		"page_count":    pageCount,
+		"chapters":      chapters,
+		"status":        "draft_ready",
+		"fallback_used": fallbackUsed,
+	}
+}
+
+// DraftNotebookSyllabus creates editable chapter ranges for HITL verification.
+// Uses bookmark extraction only (no LLM) for fast default response.
+// If regenerate=true, runs full extraction+LLM (same as AICleanupNotebookSyllabus).
+// If regenerate=false and a draft exists in DB, returns the persisted draft.
+func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[string]interface{} {
+	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
+	if errResp != nil {
+		return errResp
+	}
+
+	notebookID = strings.TrimSpace(notebookID)
 
 	// Try to load persisted draft if not regenerating
 	if !regenerate {
@@ -223,23 +254,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 			chapters = []models.SyllabusChapterDraft{{Title: title, StartPage: 1, EndPage: doc.PageCount}}
 		}
 
-		draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: doc.PageCount, Chapters: chapters, FallbackUsed: fallbackUsed})
-		if err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
-		}
-		if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
-		}
-		if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
-		}
-		return map[string]interface{}{
-			"notebook_id":   notebookID,
-			"page_count":    doc.PageCount,
-			"chapters":      chapters,
-			"status":        "draft_ready",
-			"fallback_used": fallbackUsed,
-		}
+		return persistSyllabusDraft(repo, notebookID, doc.PageCount, chapters, fallbackUsed)
 	}
 
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
@@ -256,26 +271,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
-	draftToPersist := models.SyllabusDraft{PageCount: doc.PageCount, Chapters: result.Chapters, FallbackUsed: result.FallbackUsed}
-	draftJSON, err := json.Marshal(draftToPersist)
-	if err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
-	}
-	if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
-	}
-
-	if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
-	}
-
-	return map[string]interface{}{
-		"notebook_id":   notebookID,
-		"page_count":    doc.PageCount,
-		"chapters":      result.Chapters,
-		"status":        "draft_ready",
-		"fallback_used": result.FallbackUsed,
-	}
+	return persistSyllabusDraft(repo, notebookID, doc.PageCount, result.Chapters, result.FallbackUsed)
 }
 
 // AICleanupNotebookSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.
@@ -286,25 +282,12 @@ func (a *App) AICleanupNotebookSyllabus(notebookID string) map[string]interface{
 
 // ConfirmNotebookSyllabus commits notebook ingestion from user-confirmed chapter bounds.
 func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.SyllabusChapterDraft) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	notebookID = strings.TrimSpace(notebookID)
-	if notebookID == "" {
-		return map[string]interface{}{"error": "notebook id is required"}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{"error": "notebook service not initialized"}
+	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
+	if errResp != nil {
+		return errResp
 	}
 
-	nb, err := repo.GetNotebookByID(notebookID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	if nb == nil {
-		return map[string]interface{}{"error": "notebook not found"}
-	}
+	notebookID = strings.TrimSpace(notebookID)
 
 	// Extract document only when a full re-ingest is necessary. We'll try to detect
 	// whether a metadata-only or topic-metadata-only update is sufficient.
@@ -708,28 +691,10 @@ func (a *App) UpdateNotebookPriority(notebookID string, priority int) map[string
 
 // DeleteNotebook removes a notebook and its associated file
 func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{
-			"error": "notebook service not initialized",
-		}
-	}
-
-	// Get notebook to retrieve file path
-	nb, err := repo.GetNotebookByID(notebookID)
-	if err != nil {
-		return map[string]interface{}{
-			"error": err.Error(),
-		}
-	}
-
-	if nb == nil {
-		return map[string]interface{}{
-			"error": "notebook not found",
-		}
+	notebookID = strings.TrimSpace(notebookID)
+	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
+	if errResp != nil {
+		return errResp
 	}
 
 	// 1. Delete associated physical file from disk first

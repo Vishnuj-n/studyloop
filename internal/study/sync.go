@@ -130,9 +130,7 @@ func TriggerCloudSync(repo *db.Repository) error {
 	anonKey := ResolveAnonKey()
 
 	if syncURL == "" {
-		if syncErr := repo.ResolveFlashcardGenerateTasksForTopic(""); syncErr != nil {
-			utils.Warnf("[SYNC] failed to resolve FLASHCARD_GENERATE tasks: %v", syncErr)
-		}
+		// ponytail: cloud sync is independent of study queue tasks
 		if settings.AnalyticsEnabled {
 			if fbErr := syncAnalyticsFallback(repo); fbErr != nil {
 				utils.Warnf("[SYNC] fallback analytics upload failed: %v", fbErr)
@@ -219,21 +217,10 @@ func TriggerCloudSync(repo *db.Repository) error {
 
 
 
-		// Sync completed successfully. Clear any pending FLASHCARD_GENERATE tasks.
-		if syncErr := repo.ResolveFlashcardGenerateTasksForTopic(""); syncErr != nil {
-			utils.Warnf("[SYNC] failed to resolve FLASHCARD_GENERATE tasks: %v", syncErr)
-		}
 	}
 
 	if lastErr != nil {
 		utils.Warnf("[SYNC] Cloud sync failed after %d attempts: %v", 3, lastErr)
-		// Insert FLASHCARD_GENERATE task if not already pending/active and a valid notebook exists
-		if len(notebooks) > 0 {
-			notebookID := notebooks[0].ID
-			if syncErr := repo.EnsurePendingFlashcardGenerateTask(notebookID, "", 0, 0, "Cloud Sync Recovery"); syncErr != nil {
-				utils.Warnf("[SYNC] failed to insert FLASHCARD_GENERATE task: %v", syncErr)
-			}
-		}
 		return lastErr
 	}
 

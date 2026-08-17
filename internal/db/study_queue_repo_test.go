@@ -509,9 +509,6 @@ func TestRereadTaskCanBeLoadedAndCompletedThroughReaderHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to fetch task by ID: %v", err)
 	}
-	if fetchedTask == nil {
-		t.Fatalf("expected task to be found, got nil")
-	}
 	if fetchedTask.TaskType != models.StudyTaskTypeQuiz {
 		t.Fatalf("expected task type %s, got %s", models.StudyTaskTypeQuiz, fetchedTask.TaskType)
 	}
@@ -1250,4 +1247,187 @@ func TestStudyQueueRoundRobinInterleaving(t *testing.T) {
 	}
 }
 
+func TestGetAllPendingTasks_MultipleTasksWithProfile(t *testing.T) {
+	initDBForTest(t, false, 0)
+	profileID := "prof-all-pending"
+	_ = testRepo.CreateProfile(models.StudyProfile{ID: profileID, Name: "All Pending Profile"})
+	_ = testRepo.UpdateUserSettings(models.UserSettings{ActiveProfileID: profileID})
 
+	// Create 3 active notebooks under this profile
+	for i := 1; i <= 3; i++ {
+		nbID := fmt.Sprintf("nb-multi-%d", i)
+		topID := fmt.Sprintf("top-multi-%d", i)
+		_ = testRepo.EnsureTopic(topID, fmt.Sprintf("Topic %d", i))
+		_ = testRepo.CreateNotebook(nbID, fmt.Sprintf("Book %d", i), "/tmp/b.pdf", "pdf", topID, "", 5, profileID)
+		_ = testRepo.LinkNotebookTopics(nbID, []string{topID})
+		_ = testRepo.UpdateNotebookStatus(nbID, "chunked")
+		_ = testRepo.UpdateNotebookStudyStatus(nbID, "active")
+
+		_ = testRepo.InsertStudyTask(models.StudyQueueTask{
+			ID:         fmt.Sprintf("task-multi-%d", i),
+			NotebookID: nbID,
+			TopicID:    topID,
+			TaskType:   models.StudyTaskTypeReading,
+			Status:     models.StudyTaskStatusPending,
+			Priority:   0,
+		})
+	}
+
+	tasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 pending tasks returned for profile with 3 active notebooks, got %d", len(tasks))
+	}
+}
+
+func TestGetNextTaskWithProfile_ProfileIsolationOnExplicitNotebook(t *testing.T) {
+	initDBForTest(t, false, 0)
+	profileA := "prof-a"
+	profileB := "prof-b"
+	_ = testRepo.CreateProfile(models.StudyProfile{ID: profileA, Name: "Profile A"})
+	_ = testRepo.CreateProfile(models.StudyProfile{ID: profileB, Name: "Profile B"})
+
+	// Notebook belongs to Profile B
+	nbB := "nb-profile-b"
+	topB := "top-profile-b"
+	_ = testRepo.EnsureTopic(topB, "Topic B")
+	_ = testRepo.CreateNotebook(nbB, "Book B", "/tmp/b.pdf", "pdf", topB, "", 5, profileB)
+	_ = testRepo.LinkNotebookTopics(nbB, []string{topB})
+	_ = testRepo.UpdateNotebookStatus(nbB, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbB, "active")
+	_ = testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         "task-b",
+		NotebookID: nbB,
+		TopicID:    topB,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+	})
+
+	// User active profile is Profile A
+	_ = testRepo.UpdateUserSettings(models.UserSettings{ActiveProfileID: profileA})
+
+	// Requesting task for nbB while active profile is profileA must return ErrNoPendingTasks
+	_, err := testRepo.GetNextTask(nbB)
+	if !errors.Is(err, ErrNoPendingTasks) {
+		t.Fatalf("expected ErrNoPendingTasks when requesting notebook from another profile, got %v", err)
+	}
+}
+
+func TestCompleteTaskTx_PayloadPreservation(t *testing.T) {
+	initDBForTest(t, false, 0)
+	nbID := "nb-preserve"
+	topID := "top-preserve"
+	_ = testRepo.EnsureTopic(topID, "Topic Preserve")
+	_ = testRepo.CreateNotebook(nbID, "Book Preserve", "/tmp/s.pdf", "pdf", topID, "", 5, "")
+
+	taskID := "task-preserve-test"
+	initialPayload := `{"initial":"payload"}`
+	_ = testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:          taskID,
+		NotebookID:  nbID,
+		TopicID:     topID,
+		TaskType:    models.StudyTaskTypeReading,
+		Status:      models.StudyTaskStatusPending,
+		PayloadJSON: initialPayload,
+	})
+	_ = testRepo.ActivateTask(taskID)
+
+	// Complete with empty payload preserves existing payload
+	tx, err := testRepo.Begin()
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	err = testRepo.CompleteTaskTx(tx, taskID, models.CompletionResult{
+		Status:  models.StudyTaskStatusCompleted,
+		Payload: "",
+	})
+	if err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("CompleteTaskTx failed: %v", err)
+	}
+	_ = tx.Commit()
+
+	task, err := testRepo.GetTaskByID(taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID failed: %v", err)
+	}
+	if task.PayloadJSON != initialPayload {
+		t.Fatalf("expected payload_json to be preserved as %q, got %q", initialPayload, task.PayloadJSON)
+	}
+}
+
+func TestCompleteReadingWithGeneratedQuizReservedStatusFlow(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	nbID := "nb-flow-test"
+	topID := "top-flow-test"
+	_ = testRepo.EnsureTopic(topID, "Flow Topic")
+	_ = testRepo.CreateNotebook(nbID, "Flow Notebook", "/tmp/flow.md", "md", topID, "", 5, "")
+
+	taskID := "task-flow-read-1"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         taskID,
+		NotebookID: nbID,
+		TopicID:    topID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		StartPage:  1,
+		EndPage:    3,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
+
+	// 1. Activate task
+	if err := testRepo.ActivateTask(taskID); err != nil {
+		t.Fatalf("ActivateTask failed: %v", err)
+	}
+
+	// 2. Reserve task (as done during synchronous LLM quiz generation in CompleteReading)
+	if err := testRepo.ReserveTask(taskID); err != nil {
+		t.Fatalf("ReserveTask failed: %v", err)
+	}
+
+	// 3. CompleteReadingWithGeneratedQuiz while task is in RESERVED state
+	quizPayload := models.QuizTaskPayload{
+		Questions: []models.QuizTaskQuestion{
+			{
+				ID:            "q1",
+				Prompt:        "What is database normalization?",
+				Options:       []string{"A", "B", "C", "D"},
+				CorrectAnswer: "A",
+			},
+		},
+		PassingScore: 70,
+	}
+
+	quizTaskID, err := testRepo.CompleteReadingWithGeneratedQuiz(taskID, quizPayload)
+	if err != nil {
+		t.Fatalf("CompleteReadingWithGeneratedQuiz failed for RESERVED task: %v", err)
+	}
+	if quizTaskID == "" {
+		t.Fatalf("expected valid quizTaskID, got empty")
+	}
+
+	// 4. Verify reading task is now COMPLETED
+	readingTask, err := testRepo.GetTaskByID(taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID for completed reading task failed: %v", err)
+	}
+	if readingTask.Status != models.StudyTaskStatusCompleted {
+		t.Fatalf("expected reading task status COMPLETED, got %s", readingTask.Status)
+	}
+
+	// 5. Verify follow-up QUIZ task was created and is PENDING
+	quizTask, err := testRepo.GetTaskByID(quizTaskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID for generated quiz task failed: %v", err)
+	}
+	if quizTask.TaskType != models.StudyTaskTypeQuiz {
+		t.Fatalf("expected quiz task type QUIZ, got %s", quizTask.TaskType)
+	}
+	if quizTask.Status != models.StudyTaskStatusPending {
+		t.Fatalf("expected quiz task status PENDING, got %s", quizTask.Status)
+	}
+}

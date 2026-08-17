@@ -92,7 +92,7 @@
         <!-- Progress row -->
         <div class="progress-row">
           <p class="progress-label">
-            Card {{ reviewIndex + 1 }} of {{ cards.length }}
+            Card {{ currentCardNumber }} of {{ cards.length }}
             <span
               v-if="!queueMode"
               class="manual-badge"
@@ -104,7 +104,7 @@
           <div class="progress-track">
             <div
               class="progress-fill"
-              :style="{ width: `${((reviewIndex + 1) / cards.length) * 100}%` }"
+              :style="{ width: `${progressPercent}%` }"
             />
           </div>
         </div>
@@ -251,11 +251,10 @@ import {
   activateTask,
   completeReviewSession,
   getNotebooks,
-  generateManualFlashcards as generateManualFlashcards,
+  generateManualFlashcards,
   getReviewSession,
   recordCardReview,
   suspendFlashcard,
-  forceDueFlashcardsNow,
   getUserSettings,
 } from '../services/appApi.js'
 import BaseButton from '../components/BaseButton.vue'
@@ -298,6 +297,17 @@ const canGenerate = computed(
     !loading.value
 )
 const currentCard = computed(() => cards.value[reviewIndex.value] ?? null)
+const currentCardNumber = computed(() => {
+  if (queueMode.value) {
+    if (cards.value.length === 0) return 0
+    return Math.min(cards.value.length, Math.max(1, cards.value.length - sessionRemaining.value + 1))
+  }
+  return reviewIndex.value + 1
+})
+const progressPercent = computed(() => {
+  if (cards.value.length === 0) return 0
+  return (currentCardNumber.value / cards.value.length) * 100
+})
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
@@ -349,31 +359,12 @@ async function generate() {
   }
 }
 
-async function makeCardsDueNow() {
-  error.value = ''
-  loading.value = true
-  try {
-    const res = await forceDueFlashcardsNow()
-    if (res?.error) {
-      error.value = res.error
-      return
-    }
-    showToast(`Success! ${res.updated_cards ?? 0} flashcards set to DUE NOW.`, 'success')
-    await loadQueueSession('task-review-daily', selectedNotebookID.value)
-  } catch (e) {
-    error.value = e?.message ?? 'Failed to set cards due now'
-  } finally {
-    loading.value = false
-  }
-}
-
 async function handleQueueCompletion() {
   const completeRes = await completeReviewSession(reviewTaskID.value)
   if (completeRes?.error) {
     error.value = `Failed to complete session: ${completeRes.error}`
     return false
   }
-  console.warn('[FLASHCARDS] flashcard_review_completed_dashboard_redirect')
   router.push('/dashboard')
   return true
 }
@@ -396,21 +387,10 @@ async function rate(ratingKey) {
   }
 
   isSubmittingReview.value = true
-  console.warn('[FLASHCARD_PIPELINE] frontend_review_rating_submit', {
-    queueMode: queueMode.value,
-    reviewTaskID: reviewTaskID.value,
-    cardID: targetCardID,
-    rating: ratingKey,
-  })
   try {
     if (queueMode.value) {
       const res = await recordCardReview(reviewTaskID.value, targetCardID, validRating.value)
       if (res?.error) {
-        if (res.error === 'ErrTaskNotActive') {
-          showToast('This review session has already been completed.', 'info')
-          router.push('/dashboard')
-          return
-        }
         error.value = `Failed to save review: ${res.error}`
         showToast(res.error, 'error')
         return
@@ -519,7 +499,6 @@ async function loadQueueSession(taskID, notebookID = '') {
   loading.value = true
   reviewTaskID.value = taskID
   if (notebookID) selectedNotebookID.value = notebookID
-  console.warn('[FLASHCARD_PIPELINE] frontend_review_task_rendering start', { taskID, notebookID })
   try {
     const activateRes = await activateTask(taskID)
     if (activateRes?.error) {
@@ -552,13 +531,6 @@ async function loadQueueSession(taskID, notebookID = '') {
     reviewIndex.value = Number(session?.next_pending_idx ?? -1)
     sessionRemaining.value = Number(session?.remaining ?? 0)
     reviewing.value = cards.value.length > 0
-    console.warn('[FLASHCARD_PIPELINE] frontend_review_task_rendering result', {
-      taskID,
-      cards: cards.value.length,
-      nextPendingIdx: reviewIndex.value,
-      remaining: sessionRemaining.value,
-      reviewing: reviewing.value,
-    })
     flipped.value = false
     if (sessionRemaining.value <= 0 || cards.value.length === 0) {
       await handleQueueCompletion()

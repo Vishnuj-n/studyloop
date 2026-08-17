@@ -19,7 +19,7 @@ export function useSettings(errorRef, successRef) {
     rag_notebook_chapter: true,
     rag_entire_notebook: true,
     rag_queue_study: true,
-    default_remedial_strategy: 'CLASSIC',
+    default_remedial_strategy: 'FAST',
     classroom_code: '',
     analytics_enabled: false,
     target_session_words: 5000,
@@ -122,7 +122,7 @@ export function useSettings(errorRef, successRef) {
       errorRef.value = res.error
       return false
     }
-    if (!res.default_remedial_strategy) res.default_remedial_strategy = 'CLASSIC'
+    if (!res.default_remedial_strategy) res.default_remedial_strategy = 'FAST'
     settings.value = res
     computeDuration()
     return true

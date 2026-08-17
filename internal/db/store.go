@@ -287,7 +287,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'CLASSIC'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 5000)
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 5000)
 		FROM user_settings
 		WHERE id = 1
 	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.RemindersEnabled, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords)
@@ -302,7 +302,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			RAGNotebookChapter:     true,
 			RAGEntireNotebook:      true,
 			RAGQueueStudy:          true,
-			DefaultRemedialStrategy: "CLASSIC",
+			DefaultRemedialStrategy: "FAST",
 			AnalyticsEnabled:        false,
 			AnonymousUserID:         "",
 			TargetSessionWords:      5000,
@@ -843,16 +843,16 @@ func (r *Repository) GetChunkEmbeddingRefsForTopic(topicID string) (map[string]s
 func (r *Repository) GetRemedialStrategy() (string, error) {
 	var strategy string
 	err := r.db.QueryRow(
-		`SELECT COALESCE(default_remedial_strategy, 'CLASSIC') FROM user_settings WHERE id = 1`,
+		`SELECT COALESCE(default_remedial_strategy, 'FAST') FROM user_settings WHERE id = 1`,
 	).Scan(&strategy)
 	if err == sql.ErrNoRows {
-		return "CLASSIC", nil
+		return "FAST", nil
 	}
 	if err != nil {
 		return "", err
 	}
 	if strategy == "" {
-		return "CLASSIC", nil
+		return "FAST", nil
 	}
 	return strategy, nil
 }

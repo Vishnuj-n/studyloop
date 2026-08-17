@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 // GetReaderTopicBundle returns notebook metadata plus ordered sections with resolved page numbers.
@@ -33,6 +34,8 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 	`, topicID).Scan(&bundle.TopicTitle, &startPage, &endPage); err != nil {
 		return nil, err
 	}
+	// ponytail: ensure human-readable title for reader UI and session exports
+	bundle.TopicTitle = utils.CleanTopicTitle(bundle.TopicTitle)
 	bundle.TopicStartPage = startPage
 	bundle.TopicEndPage = endPage
 
@@ -126,13 +129,6 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		// The notebookHandler in main.go serves files at /notebooks/<filename>
 		filename := filepath.Base(filePath.String)
 		bundle.NotebookURL = "/notebooks/" + url.PathEscape(filename)
-
-		// For text and markdown files, load raw content directly from disk for instant, 100% fidelity rendering
-		if !strings.EqualFold(bundle.FileType, "pdf") && filePath.String != "" {
-			if contentBytes, err := os.ReadFile(filePath.String); err == nil {
-				bundle.RawContent = string(contentBytes)
-			}
-		}
 	}
 	if fileType.Valid {
 		bundle.FileType = fileType.String
@@ -230,6 +226,13 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		`, topicID)
 		if err == nil {
 			bundle.Sections = sec
+		}
+	}
+
+	// For text and markdown files, load raw content directly from disk for instant, 100% fidelity rendering
+	if !strings.EqualFold(bundle.FileType, "pdf") && filePath.Valid && filePath.String != "" {
+		if contentBytes, err := os.ReadFile(filePath.String); err == nil {
+			bundle.RawContent = string(contentBytes)
 		}
 	}
 
