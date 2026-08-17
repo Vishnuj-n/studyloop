@@ -374,7 +374,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 			estimationSource = "no_chunks_yet"
 			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinMinutesPerPage))
 		}
-		utils.Warnf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
+		utils.Debugf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
 			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
 	case task.StartPage > 0 && task.EndPage >= task.StartPage:
 		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinMinutesPerPage))
@@ -1356,12 +1356,31 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
 
-	// On success, resolve the FLASHCARD_GENERATE task
-	if err := repo.ResolveFlashcardGenerateTasksForTopic(topicID); err != nil {
-		utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE task: %v", err)
+	// On success, activate and complete this specific task
+	if task.Status == models.StudyTaskStatusPending {
+		if activateErr := repo.ActivateTask(taskID); activateErr != nil {
+			utils.Debugf("[FLASHCARD_PIPELINE] activate taskID=%s note=%v", taskID, activateErr)
+		}
+	}
+	if completeErr := repo.CompleteTask(taskID, models.CompletionResult{
+		Status: models.StudyTaskStatusCompleted,
+	}); completeErr != nil {
+		utils.Warnf("[FLASHCARD_PIPELINE] failed to mark taskID=%s as COMPLETED: %v", taskID, completeErr)
 	}
 
-	utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_generation_completed taskID=%s topicID=%s cardsScheduled=%d", taskID, topicID, cardCount)
+	// Also resolve any other pending FLASHCARD_GENERATE tasks for the topic
+	if topicID != "" {
+		if err := repo.ResolveFlashcardGenerateTasksForTopic(topicID); err != nil {
+			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE tasks for topic %s: %v", topicID, err)
+		}
+	}
+	if task.TopicID == "" {
+		if err := repo.ResolveFlashcardGenerateTasksForTopic(""); err != nil {
+			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve empty topic FLASHCARD_GENERATE tasks: %v", err)
+		}
+	}
+
+	utils.Infof("[FLASHCARD_PIPELINE] retry_flashcard_generation_completed taskID=%s topicID=%s cardsScheduled=%d", taskID, topicID, cardCount)
 
 	return map[string]interface{}{
 		"ok":              true,

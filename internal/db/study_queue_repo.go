@@ -161,7 +161,6 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
 			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
-		LIMIT 3
 	`
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -176,41 +175,29 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]models.StudyQueueTask, error) {
 	query := `
 		SELECT
-			id, notebook_id, COALESCE(topic_id, ''), task_type, status, priority,
-			COALESCE(created_at, ''), COALESCE(activated_at, ''), COALESCE(completed_at, ''),
-			COALESCE(payload_json, ''),
-			COALESCE(NULLIF(start_page, 0), COALESCE(topic_start_page, 0)),
-			COALESCE(NULLIF(end_page, 0), COALESCE(topic_end_page, 0)),
-			COALESCE(topic_title, ''), COALESCE(notebook_title, ''), COALESCE(notebook_priority, 5)
-		FROM (
-			SELECT
-				sq.id, sq.notebook_id, sq.topic_id, sq.task_type, sq.status, sq.priority,
-				sq.created_at, sq.activated_at, sq.completed_at, sq.payload_json,
-				sq.start_page, sq.end_page,
-				t.start_page AS topic_start_page, t.end_page AS topic_end_page,
-				t.title AS topic_title, n.title AS notebook_title, n.priority AS notebook_priority,
-				(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') AS last_completed_at,
-				ROW_NUMBER() OVER (
-					PARTITION BY sq.notebook_id
-					ORDER BY
-						CASE sq.task_type
-							WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
-							WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
-							WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
-							WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
-						END DESC,
-						sq.priority ASC, sq.created_at ASC
-				) as rn
-			FROM study_queue sq
-			JOIN notebooks n ON sq.notebook_id = n.id
-			LEFT JOIN topics t ON sq.topic_id = t.id
-			WHERE sq.status = 'PENDING'
-			  AND ( ? = '' OR n.profile_id = ? )
-			  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
-		) ranked_tasks
-		WHERE rn = 1
-		ORDER BY COALESCE(notebook_priority, 5) DESC, last_completed_at ASC, notebook_title ASC, id ASC
-		LIMIT 1
+			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
+			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
+			COALESCE(sq.payload_json, ''),
+			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
+			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
+			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		LEFT JOIN topics t ON sq.topic_id = t.id
+		WHERE sq.status = 'PENDING'
+		  AND ( ? = '' OR n.profile_id = ? )
+		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
+		ORDER BY
+			CASE sq.task_type
+				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
+				WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
+				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
+				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
+			END DESC,
+			COALESCE(n.priority, 5) DESC,
+			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+			sq.priority ASC,
+			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
 	rows, err := r.db.Query(query, activeProfileID, activeProfileID, activeProfileID)
 	if err != nil {
@@ -257,7 +244,7 @@ func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
 			COALESCE(t.title, ''), COALESCE(n.title, '')
 		FROM study_queue sq
-		LEFT JOIN notebooks n ON sq.notebook_id = n.id
+		JOIN notebooks n ON sq.notebook_id = n.id
 		LEFT JOIN topics t ON sq.topic_id = t.id
 		WHERE sq.status = 'ACTIVE'
 		  AND ( ? = '' OR n.profile_id = ? )
@@ -290,7 +277,7 @@ func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 // GetNextTask returns the next pending task ordered by deterministic queue rules.
 func (r *Repository) GetNextTask(notebookID string) (*models.StudyQueueTask, error) {
 	notebookID = strings.TrimSpace(notebookID)
-	utils.Warnf("[QUEUE] GetNextTask filter status=PENDING notebookID=%q", notebookID)
+	utils.Debugf("[QUEUE] GetNextTask filter status=PENDING notebookID=%q", notebookID)
 
 	activeProfileID, err := r.readActiveProfileID()
 	if err != nil {
@@ -356,14 +343,14 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 		WHERE sq.status = 'PENDING'
 	`
 	args := make([]interface{}, 0, 5)
+	if activeProfileID != "" {
+		query += ` AND n.profile_id = ?`
+		args = append(args, activeProfileID)
+	}
 	if notebookID != "" {
 		query += ` AND sq.notebook_id = ?`
 		args = append(args, notebookID)
 	} else {
-		if activeProfileID != "" {
-			query += ` AND n.profile_id = ?`
-			args = append(args, activeProfileID)
-		}
 		query += ` AND (sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active')`
 	}
 
@@ -413,7 +400,7 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 	var beforeStatus string
 	var taskType string
 	if err := tx.QueryRow(`SELECT COALESCE(status, ''), COALESCE(task_type, '') FROM study_queue WHERE id = ?`, taskID).Scan(&beforeStatus, &taskType); err == nil {
-		utils.Warnf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s", taskID, beforeStatus, taskType)
+		utils.Debugf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s", taskID, beforeStatus, taskType)
 	} else {
 		utils.Warnf("[QUEUE] ActivateTaskTx before update taskID=%s statusLoadErr=%v", taskID, err)
 	}
@@ -459,7 +446,7 @@ func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.Com
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	utils.Warnf("[QUEUE] CompleteTaskTx reading task completion update start taskID=%s", taskID)
+	utils.Debugf("[QUEUE] CompleteTaskTx reading task completion update start taskID=%s", taskID)
 	status := strings.TrimSpace(string(result.Status))
 	if status == "" {
 		status = string(models.StudyTaskStatusCompleted)
@@ -468,13 +455,14 @@ func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.Com
 		return fmt.Errorf("completion status must be COMPLETED or FAILED")
 	}
 
-	// Note: Empty string payload preserves existing payload (sentinel value)
-	// To clear payload, use a non-empty sentinel value in application logic
+	// Empty string preserves existing payload; non-empty string overwrites it.
+	payloadVal := strings.TrimSpace(result.Payload)
 	res, err := tx.Exec(`
 		UPDATE study_queue
-		SET status = ?, completed_at = CURRENT_TIMESTAMP, payload_json = CASE WHEN ? = '' THEN payload_json ELSE ? END
+		SET status = ?, completed_at = CURRENT_TIMESTAMP,
+		    payload_json = CASE WHEN ? = '' THEN payload_json ELSE ? END
 		WHERE id = ? AND status = 'ACTIVE'
-	`, status, strings.TrimSpace(result.Payload), strings.TrimSpace(result.Payload), taskID)
+	`, status, payloadVal, payloadVal, taskID)
 	if err != nil {
 		utils.Warnf("[QUEUE] CompleteTaskTx reading task completion update error taskID=%s err=%v", taskID, err)
 		return err
