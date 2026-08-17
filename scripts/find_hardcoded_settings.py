@@ -77,6 +77,14 @@ def should_exclude_file(filename):
             return True
     return False
 
+# ponytail: path validation to prevent path traversal (pythonsecurity:S8707)
+def validate_path(path, root):
+    abs_path = os.path.abspath(path)
+    abs_root = os.path.abspath(root)
+    if os.path.commonpath([abs_path, abs_root]) != abs_root:
+        raise ValueError(f"Access denied: {path} escapes project root {root}")
+    return abs_path
+
 def scan_file(filepath):
     results = []
     ext = os.path.splitext(filepath)[1]
@@ -136,7 +144,7 @@ def main():
     
     # Scan individual files
     for f in scan_files:
-        full_path = os.path.join(project_root, f)
+        full_path = validate_path(os.path.join(project_root, f), project_root)
         if os.path.isfile(full_path) and not should_exclude_file(f):
             results = scan_file(full_path)
             if results:
@@ -144,7 +152,7 @@ def main():
                 
     # Scan directories
     for d in scan_dirs:
-        dir_path = os.path.join(project_root, d)
+        dir_path = validate_path(os.path.join(project_root, d), project_root)
         if not os.path.isdir(dir_path):
             continue
             
@@ -182,7 +190,7 @@ def main():
     report = "\n".join(output_lines)
     
     if args.output:
-        out_path = os.path.abspath(args.output)
+        out_path = validate_path(os.path.join(project_root, args.output), project_root)
         with open(out_path, "w", encoding="utf-8") as out_f:
             out_f.write(report)
         print(f"Report written to {out_path}")

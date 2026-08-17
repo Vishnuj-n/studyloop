@@ -22,6 +22,14 @@ var (
 	httpClient  = &http.Client{Timeout: 10 * time.Second}
 )
 
+// ponytail: duplicate string literals consolidated into constants to satisfy SonarQube
+const (
+	bearerPrefix         = "Bearer "
+	contentTypeJSON      = "application/json"
+	headerContentType    = "Content-Type"
+	preferRepresentation = "return=representation"
+)
+
 type Response struct {
 	Error string      `json:"error,omitempty"`
 	Data  interface{} `json:"data,omitempty"`
@@ -100,8 +108,8 @@ func extractSessionToken(r *http.Request) string {
 	tok := r.Header.Get("x-session-token")
 	if tok == "" {
 		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tok = strings.TrimPrefix(authHeader, "Bearer ")
+		if strings.HasPrefix(authHeader, bearerPrefix) {
+			tok = strings.TrimPrefix(authHeader, bearerPrefix)
 		}
 	}
 	return strings.TrimSpace(tok)
@@ -119,7 +127,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 		return false
 	}
 	sReq.Header.Set("apikey", supabaseKey)
-	sReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	sReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 	sRes, err := httpClient.Do(sReq)
 	if err != nil || sRes.StatusCode != http.StatusOK {
@@ -156,7 +164,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 		return false
 	}
 	uReq.Header.Set("apikey", supabaseKey)
-	uReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	uReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 	uRes, err := httpClient.Do(uReq)
 	if err != nil || uRes.StatusCode != http.StatusOK {
@@ -179,7 +187,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 }
 
 func jsonResponse(w http.ResponseWriter, status int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
 }
@@ -215,9 +223,9 @@ func migratePlaintextPassword(username, plaintext string) string {
 	body, _ := json.Marshal(map[string]string{"password": hashedStr, "password_hash": hashedStr})
 	httpReq, err := http.NewRequest(http.MethodPatch, targetURL, bytes.NewBuffer(body))
 	if err == nil {
-		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set(headerContentType, contentTypeJSON)
 		httpReq.Header.Set("apikey", supabaseKey)
-		httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		if res, err := httpClient.Do(httpReq); err == nil {
 			_ = res.Body.Close()
 		}
@@ -253,7 +261,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 	res, err := httpClient.Do(httpReq)
 	if err != nil {
@@ -308,10 +316,10 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 	sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", supabaseURL), bytes.NewBuffer(sessReqPayload))
 	if sErr == nil {
-		sessReq.Header.Set("Content-Type", "application/json")
+		sessReq.Header.Set(headerContentType, contentTypeJSON)
 		sessReq.Header.Set("apikey", supabaseKey)
-		sessReq.Header.Set("Authorization", "Bearer "+supabaseKey)
-		sessReq.Header.Set("Prefer", "return=representation")
+		sessReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
+		sessReq.Header.Set("Prefer", preferRepresentation)
 		if sessRes, sDoErr := httpClient.Do(sessReq); sDoErr == nil {
 			defer sessRes.Body.Close()
 			if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
@@ -367,7 +375,7 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	checkURL := fmt.Sprintf("%s/rest/v1/user_accounts?username=eq.%s&select=id", supabaseURL, url.QueryEscape(req.Username))
 	cReq, _ := http.NewRequest(http.MethodGet, checkURL, nil)
 	cReq.Header.Set("apikey", supabaseKey)
-	cReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	cReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 	cRes, cErr := httpClient.Do(cReq)
 	if cErr == nil {
 		defer cRes.Body.Close()
@@ -400,10 +408,10 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set(headerContentType, contentTypeJSON)
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
-	httpReq.Header.Set("Prefer", "return=representation")
+	httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
+	httpReq.Header.Set("Prefer", preferRepresentation)
 
 	res, err := httpClient.Do(httpReq)
 	if err != nil {
@@ -449,10 +457,10 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	})
 	sessReq, sErr := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/rest/v1/active_sessions", supabaseURL), bytes.NewBuffer(sessReqPayload))
 	if sErr == nil {
-		sessReq.Header.Set("Content-Type", "application/json")
+		sessReq.Header.Set(headerContentType, contentTypeJSON)
 		sessReq.Header.Set("apikey", supabaseKey)
-		sessReq.Header.Set("Authorization", "Bearer "+supabaseKey)
-		sessReq.Header.Set("Prefer", "return=representation")
+		sessReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
+		sessReq.Header.Set("Prefer", preferRepresentation)
 		if sessRes, sDoErr := httpClient.Do(sessReq); sDoErr == nil {
 			defer sessRes.Body.Close()
 			if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
@@ -523,7 +531,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if uErr == nil {
 		uReq.Header.Set("apikey", supabaseKey)
-		uReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		uReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		if uRes, err := httpClient.Do(uReq); err == nil && uRes.StatusCode == http.StatusOK {
 			defer uRes.Body.Close()
 			uBody, _ := io.ReadAll(uRes.Body)
@@ -546,7 +554,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	nbReq.Header.Set("apikey", supabaseKey)
-	nbReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	nbReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 	nbRes, err := httpClient.Do(nbReq)
 	if err != nil {
@@ -577,7 +585,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	logMap := make(map[string][]map[string]interface{})
 	if lErr == nil {
 		lReq.Header.Set("apikey", supabaseKey)
-		lReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		lReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		if lRes, err := httpClient.Do(lReq); err == nil && lRes.StatusCode == http.StatusOK {
 			defer lRes.Body.Close()
 			lBody, _ := io.ReadAll(lRes.Body)
@@ -646,7 +654,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httpReq.Header.Set("apikey", supabaseKey)
-		httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 		res, err := httpClient.Do(httpReq)
 		if err != nil {
@@ -704,9 +712,9 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set(headerContentType, contentTypeJSON)
 		httpReq.Header.Set("apikey", supabaseKey)
-		httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 		res, err := httpClient.Do(httpReq)
 		if err != nil {
@@ -741,7 +749,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httpReq.Header.Set("apikey", supabaseKey)
-		httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+		httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 		res, err := httpClient.Do(httpReq)
 		if err != nil {
@@ -793,7 +801,7 @@ func handleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpReq.Header.Set("apikey", supabaseKey)
-	httpReq.Header.Set("Authorization", "Bearer "+supabaseKey)
+	httpReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 
 	res, err := httpClient.Do(httpReq)
 	if err != nil || res.StatusCode != http.StatusOK {

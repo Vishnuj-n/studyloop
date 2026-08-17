@@ -21,8 +21,14 @@ WAILS_BRIDGE_CALL = re.compile(r"(?:appBridge\(\)|bridge)\.([a-zA-Z0-9_]+)\(")
 GO_APP_METHOD = re.compile(r"func\s*\(\s*\w+\s+\*?App\s*\)\s*([a-zA-Z0-9_]+)\s*\(")
 # Go general method: func (r *Repository) Name(...)
 GO_METHOD = re.compile(r"func\s*\(\s*\w+\s+\*?([a-zA-Z0-9_]+)\s*\)\s*([a-zA-Z0-9_]+)\s*\(")
-# Go general function: func Name(...)
 GO_FUNC = re.compile(r"func\s+([a-zA-Z0-9_]+)\s*\(")
+# ponytail: path validation to prevent path traversal (pythonsecurity:S8707)
+def validate_path(path, root):
+    abs_path = os.path.abspath(path)
+    abs_root = os.path.abspath(root)
+    if os.path.commonpath([abs_path, abs_root]) != abs_root:
+        raise ValueError(f"Access denied: {path} escapes project root {root}")
+    return abs_path
 
 def parse_app_api(filepath):
     """
@@ -225,9 +231,11 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     
-    api_js_path = os.path.join(project_root, args.api)
-    frontend_dir = os.path.join(project_root, args.frontend)
-    go_dir = os.path.join(project_root, args.go)
+    api_js_path = validate_path(os.path.join(project_root, args.api), project_root)
+    frontend_dir = validate_path(os.path.join(project_root, args.frontend), project_root)
+    go_dir = validate_path(os.path.join(project_root, args.go), project_root)
+    if args.output:
+        validate_path(os.path.join(project_root, args.output), project_root)
     
     print("Step 1: Parsing appApi.js...")
     api_mappings = parse_app_api(api_js_path)
@@ -310,7 +318,7 @@ def main():
     unused_js = []
     for js_f, wails_m in sorted(api_mappings.items()):
         count = js_usages.get(js_f, 0)
-        status = "✅ Active" if count > 0 else "❌ Unused"
+        status = "Active" if count > 0 else "Unused"
         if count == 0:
             unused_js.append(js_f)
         lines.append(f"| `{js_f}` | `{wails_m}` | {count} | {status} |")
@@ -323,7 +331,7 @@ def main():
     lines.append("| --- | --- |")
     
     for m in sorted(wails_api_methods):
-        status = "✅ Yes" if m in reachable else "❌ No (Unused API)"
+        status = "Yes" if m in reachable else "No (Unused API)"
         lines.append(f"| `{m}` | {status} |")
     lines.append("")
     
@@ -372,7 +380,7 @@ def main():
     report = "\n".join(lines)
     
     if args.output:
-        out_path = os.path.abspath(args.output)
+        out_path = validate_path(os.path.join(project_root, args.output), project_root)
         with open(out_path, "w", encoding="utf-8") as out_f:
             out_f.write(report)
         print(f"Report written to {out_path}")
