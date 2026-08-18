@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -16,17 +15,7 @@ var embeddedVersion string
 
 // getAppVersion retrieves current app version dynamically from the embedded VERSION file.
 func getAppVersion() string {
-	ver := strings.TrimSpace(embeddedVersion)
-	if ver != "" {
-		return strings.TrimPrefix(ver, "v")
-	}
-	if data, err := os.ReadFile("internal/app/VERSION"); err == nil {
-		return strings.TrimPrefix(strings.TrimSpace(string(data)), "v")
-	}
-	if data, err := os.ReadFile("VERSION"); err == nil {
-		return strings.TrimPrefix(strings.TrimSpace(string(data)), "v")
-	}
-	return "1.0.0"
+	return strings.TrimPrefix(strings.TrimSpace(embeddedVersion), "v")
 }
 
 // CheckForUpdates checks the remote version file and returns if an update is available.

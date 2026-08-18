@@ -18,12 +18,25 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-// AppVersion is the application version string, injected at build time via ldflags:
+// getAppVersionTag returns the version tag from internal/app/VERSION or default.
+func getAppVersionTag() string {
+	for _, p := range []string{"internal/app/VERSION", "../app/VERSION"} {
+		if data, err := os.ReadFile(p); err == nil {
+			v := strings.TrimSpace(string(data))
+			if v != "" {
+				if !strings.HasPrefix(v, "v") {
+					v = "v" + v
+				}
+				return v
+			}
+		}
+	}
+	return "v1.3.0"
+}
+
+// AppVersion is injected at build time via ldflags:
 //
-//	wails build -ldflags "-X ai-tutor/internal/runtime.AppVersion=v1.0.0"
-//
-// CRITICAL: the module name is "ai-tutor" (see go.mod), NOT the full GitHub path.
-// Using the full GitHub path as the ldflags key silently fails — AppVersion stays "v0.0.0-dev".
+//	wails build -ldflags "-X ai-tutor/internal/runtime.AppVersion=v1.3.0"
 var AppVersion = "v0.0.0-dev"
 
 // BaseReleaseURL is the GitHub Releases download base URL for this repository.
@@ -47,40 +60,27 @@ type AssetManager struct {
 	ctx            context.Context
 }
 
-// GetPlatformAssetFilename returns the zip filename for the current OS and version.
-func GetPlatformAssetFilename(version string) string {
-	return fmt.Sprintf("asset_%s.zip", runtime.GOOS)
+// BuildDownloadURL constructs the GitHub Release asset download URL.
+func BuildDownloadURL(ver string) string {
+	tag := ver
+	if tag == "" || strings.Contains(tag, "dev") {
+		tag = getAppVersionTag()
+	}
+	return fmt.Sprintf("%s/%s/rag-assets.zip", BaseReleaseURL, tag)
 }
 
 // GetPlatformRequiredFiles returns the list of required asset files for the current OS.
-// On Windows: .dll files. On macOS: .dylib files. On Linux: .so files.
 func GetPlatformRequiredFiles() []string {
 	switch runtime.GOOS {
 	case "windows":
-		return []string{
-			"tokenizer.json",
-			"model_int8.onnx",
-			"onnxruntime.dll",
-			"vec0.dll",
-		}
+		return []string{"tokenizer.json", "model_int8.onnx", "onnxruntime.dll", "vec0.dll"}
 	case "darwin":
-		return []string{
-			"tokenizer.json",
-			"model_int8.onnx",
-			"libonnxruntime.dylib",
-			"vec0.dylib",
-		}
-	default: // linux and others
-		return []string{
-			"tokenizer.json",
-			"model_int8.onnx",
-			"libonnxruntime.so",
-			"vec0.so",
-		}
+		return []string{"tokenizer.json", "model_int8.onnx", "libonnxruntime.dylib", "vec0.dylib"}
+	default:
+		return []string{"tokenizer.json", "model_int8.onnx", "libonnxruntime.so", "vec0.so"}
 	}
 }
 
-// getPlatformOnnxLibName returns the OS-specific ONNX runtime library filename.
 func getPlatformOnnxLibName() string {
 	switch runtime.GOOS {
 	case "windows":
@@ -92,7 +92,6 @@ func getPlatformOnnxLibName() string {
 	}
 }
 
-// getPlatformVecLibName returns the OS-specific sqlite-vec extension filename.
 func getPlatformVecLibName() string {
 	switch runtime.GOOS {
 	case "windows":
@@ -104,25 +103,11 @@ func getPlatformVecLibName() string {
 	}
 }
 
-// IsVersionCompatible returns true when assetVersion (from manifest) is compatible with appVersion.
-// A dev version ("v0.0.0-dev") is always compatible (local dev bypass).
 func IsVersionCompatible(appVer, manifestVer string) bool {
-	if appVer == "v0.0.0-dev" || appVer == "0.0.0-dev" {
+	if strings.Contains(appVer, "dev") {
 		return true
 	}
-	// Normalize both: strip leading "v"
 	return strings.TrimPrefix(appVer, "v") == strings.TrimPrefix(manifestVer, "v")
-}
-
-// BuildDownloadURL constructs the GitHub Release asset download URL.
-func BuildDownloadURL(version string) string {
-	filename := GetPlatformAssetFilename(version)
-	// For dev version, point to v1.0.0 so we always have a valid URL.
-	releaseTag := version
-	if releaseTag == "v0.0.0-dev" {
-		releaseTag = "v1.0.0"
-	}
-	return fmt.Sprintf("%s/%s/%s", BaseReleaseURL, releaseTag, filename)
 }
 
 // NewAssetManager creates a new AssetManager.
