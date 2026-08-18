@@ -224,6 +224,54 @@ func GetParentSection(parentID string) (map[string]string, error) {
 	}, nil
 }
 
+// GetParentSections retrieves multiple parent sections by their IDs in a single batch query
+func GetParentSections(parentIDs []string) (map[string]map[string]string, error) {
+	if len(parentIDs) == 0 {
+		return make(map[string]map[string]string), nil
+	}
+
+	// Build IN clause placeholders
+	placeholders := make([]string, len(parentIDs))
+	args := make([]interface{}, len(parentIDs))
+	for i, id := range parentIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, heading, content_text
+		FROM parents
+		WHERE id IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	results := make(map[string]map[string]string)
+	for rows.Next() {
+		var id, heading, content string
+		if err := rows.Scan(&id, &heading, &content); err != nil {
+			return nil, err
+		}
+		results[id] = map[string]string{
+			"id":      id,
+			"heading": heading,
+			"content": content,
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
 // GetTotalChunkTokens returns estimated total tokens for one topic.
 // It prefers stored token_count values and falls back to len(chunk_text)/4 when token_count is zero or missing.
 func GetTotalChunkTokens(topicID string) (int, error) {

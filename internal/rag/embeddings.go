@@ -236,20 +236,34 @@ func BuildContext(results []RetrievalResult, topicID string) (*RetrievalContext,
 		ChunkHits: len(results),
 	}
 
+	var uniqueParentIDs []string
 	seenParents := make(map[string]bool)
 
 	for _, result := range results {
 		if !seenParents[result.ParentID] {
-			section, err := db.GetParentSection(result.ParentID)
-			if err != nil {
-				return nil, err
-			}
-			heading := section["heading"]
-			content := section["content"]
-			context.Sections[result.ParentID] = fmt.Sprintf("**%s**\n%s", heading, content)
-			context.ParentIDs = append(context.ParentIDs, result.ParentID)
+			uniqueParentIDs = append(uniqueParentIDs, result.ParentID)
 			seenParents[result.ParentID] = true
 		}
+	}
+
+	if len(uniqueParentIDs) == 0 {
+		return context, nil
+	}
+
+	sections, err := db.GetParentSections(uniqueParentIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, parentID := range uniqueParentIDs {
+		section, ok := sections[parentID]
+		if !ok {
+			continue
+		}
+		heading := section["heading"]
+		content := section["content"]
+		context.Sections[parentID] = fmt.Sprintf("**%s**\n%s", heading, content)
+		context.ParentIDs = append(context.ParentIDs, parentID)
 	}
 
 	return context, nil
