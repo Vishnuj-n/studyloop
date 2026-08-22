@@ -46,7 +46,9 @@ type App struct {
 	notebookUploadDir string
 	aiReady           bool
 	aiInitError       string
-	indexQueue        *retrieval.VectorIndexQueue
+	indexQueue          *retrieval.VectorIndexQueue
+	audioOverviewMu     sync.Mutex
+	audioOverviewCancel context.CancelFunc
 }
 
 func NewApp() *App {
@@ -142,6 +144,7 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	a.StopTopicAudioOverview()
 	if a.indexQueue != nil {
 		a.indexQueue.Stop()
 	}
@@ -612,4 +615,76 @@ func emitRagSetupFailed(a *App, reason string) {
 		"detail":      reason,
 		"errorReason": reason,
 	})
+}
+
+// StartTopicAudioOverview initiates streaming audio overview generation for a topic.
+func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice string) map[string]interface{} {
+	a.waitForReady()
+	a.aiMutex.Lock()
+	studySvc := a.studyService
+	a.aiMutex.Unlock()
+
+	if studySvc == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+
+	a.audioOverviewMu.Lock()
+	if a.audioOverviewCancel != nil {
+		a.audioOverviewCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.audioOverviewCancel = cancel
+	a.audioOverviewMu.Unlock()
+
+	go func() {
+		defer func() {
+			a.audioOverviewMu.Lock()
+			a.audioOverviewCancel = nil
+			a.audioOverviewMu.Unlock()
+		}()
+
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "audio:overview:start", map[string]interface{}{
+				"topic_id": topicID,
+			})
+		}
+
+		err := studySvc.GenerateAudioOverview(ctx, topicID, notebookID, voice, func(chunk study.AudioChunk) error {
+			if a.ctx != nil {
+				wailsruntime.EventsEmit(a.ctx, "audio:overview:chunk", chunk)
+			}
+			return nil
+		})
+
+		if err != nil {
+			if ctx.Err() == context.Canceled {
+				return
+			}
+			if a.ctx != nil {
+				wailsruntime.EventsEmit(a.ctx, "audio:overview:error", map[string]interface{}{
+					"error": err.Error(),
+				})
+			}
+			return
+		}
+
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "audio:overview:complete", map[string]interface{}{
+				"topic_id": topicID,
+			})
+		}
+	}()
+
+	return map[string]interface{}{"status": "started", "topic_id": topicID}
+}
+
+// StopTopicAudioOverview stops any active audio overview streaming session.
+func (a *App) StopTopicAudioOverview() map[string]interface{} {
+	a.audioOverviewMu.Lock()
+	defer a.audioOverviewMu.Unlock()
+	if a.audioOverviewCancel != nil {
+		a.audioOverviewCancel()
+		a.audioOverviewCancel = nil
+	}
+	return map[string]interface{}{"status": "stopped"}
 }

@@ -295,6 +295,14 @@ export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
 
+export function startTopicAudioOverview(topicID, notebookID = '', voice = 'en-US-ChristopherNeural') {
+  return appBridge().StartTopicAudioOverview(topicID, notebookID, voice)
+}
+
+export function stopTopicAudioOverview() {
+  return appBridge().StopTopicAudioOverview()
+}
+
 export function logFrontendEvent(level, component, event, details = '') {
   try {
     const bridge = window?.go?.main?.App

@@ -99,6 +99,14 @@
             >
               {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
             </button>
+            <button
+              class="secondary audio-overview-btn"
+              :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
+              :title="showAudioOverview ? 'Hide Audio Overview' : 'Listen to Audio Overview'"
+              @click="showAudioOverview = !showAudioOverview"
+            >
+              {{ showAudioOverview ? '🎧 Audio Active' : '🎧 Audio Overview' }}
+            </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
             </span>
@@ -218,6 +226,15 @@
         Chat is currently disabled in queue study mode.
       </div>
     </div>
+
+    <!-- Floating Audio Overview Bar -->
+    <AudioOverviewBar
+      v-if="showAudioOverview && reader.selectedTopicID.value"
+      :topic-id="reader.selectedTopicID.value"
+      :notebook-id="reader.selectedNotebookID.value"
+      :topic-title="reader.topicTitle.value"
+      @close="showAudioOverview = false"
+    />
   </section>
 </template>
 
@@ -235,9 +252,12 @@ import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
+import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
+
+const showAudioOverview = ref(false)
 
 const route = useRoute()
 const router = useRouter()
