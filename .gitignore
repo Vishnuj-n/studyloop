@@ -26,8 +26,8 @@ graphify-out/*
 doc/NOTES/
 .tmp
 .exe
-.scannerwork/
 doc/ORIGINAL_NOTES/
 __pycache__/
 bin/
 cloud-dashboard/dist/
+/extensions/
