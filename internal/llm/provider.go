@@ -271,7 +271,15 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		return "", err
 	}
 
-	url := strings.TrimSuffix(p.config.BaseURL, "/") + "/v1/chat/completions"
+	baseURL := strings.TrimSuffix(p.config.BaseURL, "/")
+	var url string
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		url = baseURL
+	} else if strings.HasSuffix(baseURL, "/v1") {
+		url = baseURL + "/chat/completions"
+	} else {
+		url = baseURL + "/v1/chat/completions"
+	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return "", err

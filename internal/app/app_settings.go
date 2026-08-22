@@ -258,6 +258,14 @@ func (a *App) DeleteLLMAPIKey(tier string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+func (a *App) TestLLMConnection(baseURL, model, apiKey string) map[string]interface{} {
+	provider := llm.NewProvider(&llm.Config{BaseURL: baseURL, Model: model, APIKey: apiKey, TimeoutMs: 10000})
+	if _, err := provider.GenerateAnswer("Hi"); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
 func (a *App) reloadLLMProviders() error {
 	repo := a.getRepo()
 	if repo == nil {

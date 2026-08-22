@@ -34,25 +34,6 @@
           <input id="profile-deadline" v-model="profileDeadline" type="date" required />
         </div>
 
-        <div class="form-group">
-          <label for="max-flashcards">Max Flashcards per Session</label>
-          <input
-            id="max-flashcards"
-            v-model.number="maxFlashcards"
-            type="number"
-            min="5"
-            max="200"
-            step="5"
-            required
-          />
-          <p
-            class="hint"
-            style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2"
-          >
-            Caps spacing repetition reviews active in any single study session.
-          </p>
-        </div>
-
         <div class="time-range-section">
           <div class="time-range-header">
             <label>Study Schedule</label>
@@ -105,6 +86,35 @@
               {{ preset.label }}
             </button>
           </div>
+        </div>
+
+        <button class="action-button" :disabled="!isStep1Valid" @click="step = 2">Next Step</button>
+      </div>
+
+      <!-- Step 2: Study & Remediation Preferences -->
+      <div v-else-if="step === 2" class="step-container">
+        <h2>2. Study Preferences</h2>
+        <p class="description">
+          Configure spaced repetition limits and your quiz remediation rescue track.
+        </p>
+
+        <div class="form-group">
+          <label for="max-flashcards">Max Flashcards per Session</label>
+          <input
+            id="max-flashcards"
+            v-model.number="maxFlashcards"
+            type="number"
+            min="5"
+            max="200"
+            step="5"
+            required
+          />
+          <p
+            class="hint"
+            style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2"
+          >
+            Caps spaced repetition reviews active in any single study session.
+          </p>
         </div>
 
         <fieldset class="form-group" style="border: none; padding: 0; margin: 0 0 16px 0;">
@@ -177,12 +187,15 @@
           </label>
         </div>
 
-        <button class="action-button" :disabled="!isStep1Valid" @click="step = 2">Next Step</button>
+        <div class="button-row">
+          <button class="secondary-button" @click="step = 1">Back</button>
+          <button class="action-button" :disabled="!isStep2Valid" @click="step = 3">Next Step</button>
+        </div>
       </div>
 
-      <!-- Step 2: LLM Provider -->
-      <div v-else-if="step === 2" class="step-container">
-        <h2>2. AI Provider</h2>
+      <!-- Step 3: LLM Provider -->
+      <div v-else-if="step === 3" class="step-container">
+        <h2>3. AI Provider</h2>
         <p class="description">
           Choose an OpenAI-compatible provider. API keys are stored in your OS credential manager,
           not SQLite.
@@ -255,11 +268,21 @@
           </div>
           <div class="form-group">
             <label for="heavy-base-url">Heavy Base URL</label>
-            <input id="heavy-base-url" v-model="llmHeavy.base_url" type="url" />
+            <input
+              id="heavy-base-url"
+              v-model="llmHeavy.base_url"
+              type="url"
+              placeholder="https://api.groq.com/openai"
+            />
           </div>
           <div class="form-group">
             <label for="heavy-model">Heavy Model</label>
-            <input id="heavy-model" v-model="llmHeavy.model" type="text" />
+            <input
+              id="heavy-model"
+              v-model="llmHeavy.model"
+              type="text"
+              placeholder="openai/gpt-oss-120b"
+            />
           </div>
           <div class="form-group">
             <label for="heavy-api-key">Heavy API Key</label>
@@ -267,41 +290,38 @@
               id="heavy-api-key"
               v-model="llmHeavyKey"
               type="password"
-              placeholder="Leave blank to use the fast key"
+              placeholder="Paste key to save in OS credential manager"
             />
           </div>
         </div>
 
-        <div
-          v-if="error"
-          class="error-banner"
-          style="
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          "
-        >
-          <span>{{ error }}</span>
+        <div v-if="presetLoading" class="notice-info">Loading provider preset...</div>
+        <div v-if="error" class="error-banner">{{ error }}</div>
+
+        <div class="test-connection-section">
           <button
+            class="test-connection-btn"
+            :class="{
+              'is-loading': isTestingLLM,
+              'is-success': testStatus === 'success',
+              'is-error': testStatus === 'error'
+            }"
             type="button"
-            style="
-              background: none;
-              border: none;
-              color: inherit;
-              font-size: 16px;
-              cursor: pointer;
-              padding: 0 4px;
-              line-height: 1;
-            "
-            @click="error = ''"
+            :disabled="presetLoading || isTestingLLM"
+            @click="testLLMConnection"
           >
-            &times;
+            <span v-if="testStatus === 'success'">✓ Connected</span>
+            <span v-else-if="testStatus === 'error'">✕ Connection Failed</span>
+            <span v-else-if="isTestingLLM">Testing Connection...</span>
+            <span v-else>Test Connection</span>
           </button>
+          <span v-if="testStatusMsg" :class="['test-status-msg', testStatus]">
+            {{ testStatusMsg }}
+          </span>
         </div>
 
         <div class="button-row">
-          <button class="secondary-button" @click="step = 1">Back</button>
+          <button class="secondary-button" @click="step = 2">Back</button>
           <button
             class="action-button"
             :disabled="llmSaving || presetLoading || !isLLMStepValid"
@@ -312,9 +332,9 @@
         </div>
       </div>
 
-      <!-- Step 3: Cloud Sync Settings -->
-      <div v-else-if="step === 3" class="step-container">
-        <h2>3. Teacher Cloud Sync (Optional)</h2>
+      <!-- Step 4: Cloud Sync Settings -->
+      <div v-else-if="step === 4" class="step-container">
+        <h2>4. Teacher Cloud Sync (Optional)</h2>
         <p class="description">
           If your teacher sends assigned books and tracks progress, enter the sync details below.
         </p>
@@ -340,14 +360,14 @@
         </div>
 
         <div class="button-row">
-          <button class="secondary-button" @click="step = 2">Back</button>
-          <button class="action-button" @click="step = 4">Next Step</button>
+          <button class="secondary-button" @click="step = 3">Back</button>
+          <button class="action-button" @click="step = 5">Next Step</button>
         </div>
       </div>
 
-      <!-- Step 4: RAG Settings -->
-      <div v-else-if="step === 4" class="step-container">
-        <h2>4. Local AI Retrieval</h2>
+      <!-- Step 5: RAG Settings -->
+      <div v-else-if="step === 5" class="step-container">
+        <h2>5. Local AI Retrieval</h2>
         <p class="description">
           Enable smart, context-aware helper tools. This sets up a local search and query system to
           ask questions about your textbooks completely offline.
@@ -390,7 +410,7 @@
         </div>
 
         <div class="button-row">
-          <button class="secondary-button" :disabled="isSettingUpRag" @click="step = 3">
+          <button class="secondary-button" :disabled="isSettingUpRag" @click="step = 4">
             Back
           </button>
 
@@ -403,13 +423,13 @@
             {{ isSettingUpRag ? 'Setting Up...' : 'Initialize Local AI' }}
           </button>
 
-          <button v-else class="action-button" @click="step = 5">Next Step</button>
+          <button v-else class="action-button" @click="step = 6">Next Step</button>
         </div>
       </div>
 
-      <!-- Step 5: Aesthetics -->
-      <div v-else-if="step === 5" class="step-container">
-        <h2>5. Choose Workspace Aesthetic</h2>
+      <!-- Step 6: Aesthetics -->
+      <div v-else-if="step === 6" class="step-container">
+        <h2>6. Choose Workspace Aesthetic</h2>
         <p class="description">
           Select a visual theme. Changing themes alters the colors of your study desk in real-time.
         </p>
@@ -484,7 +504,7 @@
         <div v-if="error" class="error-banner">{{ error }}</div>
 
         <div class="button-row">
-          <button class="secondary-button" @click="step = 4">Back</button>
+          <button class="secondary-button" @click="step = 5">Back</button>
           <button class="action-button" :disabled="loading" @click="completeOnboarding">
             {{ loading ? 'Configuring...' : 'Initialize Workspace' }}
           </button>
@@ -495,7 +515,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, onMounted } from 'vue'
+import { ref, computed, onUnmounted, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BRANDING } from '../config/branding'
 import {
@@ -505,6 +525,7 @@ import {
   updateLLMSettings,
   saveLLMAPIKey,
   getLLMProviderPreset,
+  testLLMConnection as testLLMConnectionApi,
 } from '../services/appApi'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 
@@ -512,6 +533,9 @@ const router = useRouter()
 const step = ref(1)
 const loading = ref(false)
 const error = ref('')
+const isTestingLLM = ref(false)
+const testStatus = ref(null) // 'success' | 'error' | null
+const testStatusMsg = ref('')
 
 const appInitials = computed(() => {
   const name = BRANDING.appName || ''
@@ -610,11 +634,16 @@ const isStep1Valid = computed(() => {
   return (
     profileName.value.trim() !== '' &&
     profileDeadline.value !== '' &&
-    maxFlashcards.value >= 5 &&
-    maxFlashcards.value <= 200 &&
     studyStartTime.value !== '' &&
     studyEndTime.value !== '' &&
     studyStartTime.value < studyEndTime.value
+  )
+})
+
+const isStep2Valid = computed(() => {
+  return (
+    maxFlashcards.value >= 5 &&
+    maxFlashcards.value <= 200
   )
 })
 
@@ -638,6 +667,48 @@ async function applyProviderPreset(tier) {
     error.value = err.message || `Failed to load preset for ${target.provider}.`
   } finally {
     presetLoading.value = false
+  }
+}
+
+watch(
+  [
+    () => llmFast.value.provider,
+    () => llmFast.value.base_url,
+    () => llmFast.value.model,
+    () => llmFastKey.value,
+  ],
+  () => {
+    testStatus.value = null
+    testStatusMsg.value = ''
+  }
+)
+
+async function testLLMConnection() {
+  if (isTestingLLM.value || presetLoading.value) return
+  isTestingLLM.value = true
+  testStatus.value = null
+  testStatusMsg.value = ''
+  error.value = ''
+
+  try {
+    const res = await testLLMConnectionApi(
+      llmFast.value.base_url,
+      llmFast.value.model,
+      llmFastKey.value.trim()
+    )
+
+    if (res.error) {
+      testStatus.value = 'error'
+      testStatusMsg.value = res.error
+    } else {
+      testStatus.value = 'success'
+      testStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+    }
+  } catch (err) {
+    testStatus.value = 'error'
+    testStatusMsg.value = err.message || 'Connection test failed.'
+  } finally {
+    isTestingLLM.value = false
   }
 }
 
@@ -693,7 +764,7 @@ async function saveLLMAndContinue() {
         }
       }
     }
-    step.value = 3
+    step.value = 4
   } catch (err) {
     error.value = err.message || 'Failed to save AI provider settings.'
   } finally {
@@ -733,7 +804,7 @@ function startRagSetup() {
       isSettingUpRag.value = false
       EventsOff('rag-setup-progress')
       setTimeout(() => {
-        step.value = 5
+        step.value = 6
       }, 1000)
     }
   })
@@ -818,10 +889,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 24px; /* 8px grid */
-  color: var(--on-surface);
-  font-family: 'Inter', sans-serif;
+  padding: 24px;
 }
 
 .onboarding-card {
@@ -1370,5 +1438,66 @@ select:focus {
   color: var(--muted-text);
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.test-connection-section {
+  margin: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.test-connection-btn {
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.test-connection-btn:hover:not(:disabled) {
+  background: var(--surface-container);
+  border-color: var(--primary);
+}
+
+.test-connection-btn.is-success {
+  background: #10b981 !important;
+  border-color: #059669 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+}
+
+.test-connection-btn.is-error {
+  background: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.test-connection-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.test-status-msg {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+.test-status-msg.success {
+  color: #10b981;
+}
+
+.test-status-msg.error {
+  color: #ef4444;
 }
 </style>

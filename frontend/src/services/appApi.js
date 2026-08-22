@@ -203,6 +203,10 @@ export function deleteLLMAPIKey(tier) {
   return appBridge().DeleteLLMAPIKey(tier)
 }
 
+export function testLLMConnection(baseURL, model, apiKey) {
+  return appBridge().TestLLMConnection(baseURL || '', model || '', apiKey || '')
+}
+
 export function initializeRAG() {
   return appBridge().InitializeRAG()
 }

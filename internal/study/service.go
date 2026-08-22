@@ -527,10 +527,6 @@ var (
 	QuizQuestionCountMedium  = getEnvInt("QUIZ_QUESTION_COUNT_MEDIUM", 5)
 	QuizQuestionCountHigh    = getEnvInt("QUIZ_QUESTION_COUNT_HIGH", 7)
 	QuizQuestionCountMax     = getEnvInt("QUIZ_QUESTION_COUNT_MAX", 10)
-	FlashcardCountLow        = getEnvInt("FLASHCARD_COUNT_LOW", 5)
-	FlashcardCountMedium     = getEnvInt("FLASHCARD_COUNT_MEDIUM", 8)
-	FlashcardCountHigh       = getEnvInt("FLASHCARD_COUNT_HIGH", 12)
-	FlashcardCountMax        = getEnvInt("FLASHCARD_COUNT_MAX", 16)
 )
 
 func getEnvInt(key string, defaultValue int) int {
@@ -552,21 +548,6 @@ func scaledQuizQuestionCount(wordCount int) int {
 		return QuizQuestionCountHigh
 	default:
 		return QuizQuestionCountMax
-	}
-}
-
-// ScaledFlashcardCount is exported as a test-observable constant-mapping.
-// Called from quiz_flashcard_test.go; not dead code.
-func ScaledFlashcardCount(wordCount int) int { //nolint:deadcode,unused
-	switch {
-	case wordCount <= QuizTokenThresholdLow:
-		return FlashcardCountLow
-	case wordCount <= QuizTokenThresholdMedium:
-		return FlashcardCountMedium
-	case wordCount <= QuizTokenThresholdHigh:
-		return FlashcardCountHigh
-	default:
-		return FlashcardCountMax
 	}
 }
 
