@@ -142,7 +142,6 @@
                 : 0,
             transition: 'opacity 0.2s ease',
           }"
-          @keydown="handleViewportKeydown"
         >
           <div v-if="pdfLoadError" class="empty error">{{ pdfLoadError }}</div>
           <div
@@ -192,14 +191,6 @@
             @click="zoomIn"
           >
             +
-          </button>
-          <div class="edge-sep"></div>
-          <button
-            class="edge-btn info-btn"
-            title="Keyboard Zoom: Ctrl + '+' / '-'"
-            aria-label="Keyboard shortcuts info"
-          >
-            i
           </button>
         </div>
 
@@ -646,15 +637,6 @@ function zoomOut() {
   zoomScale.value = Math.max(0.5, Math.round((zoomScale.value - 0.1) * 100) / 100)
 }
 
-function handleViewportKeydown(e) {
-  if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
-    e.preventDefault()
-    zoomIn()
-  } else if (e.ctrlKey && e.key === '-') {
-    e.preventDefault()
-    zoomOut()
-  }
-}
 
 onUnmounted(() => {
   if (resizeObserver) {
@@ -1203,18 +1185,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.info-btn {
-  font-family: serif;
-  font-style: italic;
-  font-weight: bold;
-  font-size: 14px;
-  color: var(--muted-text);
-}
 
-.info-btn:hover {
-  color: var(--on-surface);
-  background: color-mix(in srgb, var(--surface-container-low) 70%, transparent);
-}
 
 .chat-disabled {
   color: var(--muted-text);
