@@ -90,6 +90,12 @@ func LoadConfigFromSettingsForPrefix(prefix string, settings models.LLMTierSetti
 		config.TimeoutMs = 30000
 	}
 	config.Limits = getModelLimits(config.Model)
+	if settings.MaxInputTokens > 0 {
+		config.Limits.MaxInputTokens = settings.MaxInputTokens
+	}
+	if settings.MaxOutputTokens > 0 {
+		config.Limits.MaxOutputTokens = settings.MaxOutputTokens
+	}
 	applyEnvLimitsOverride(prefix, &config.Limits)
 	return config
 }
@@ -130,33 +136,11 @@ func defaultModelForProvider(provider string) string {
 	}
 }
 
-// getModelLimits returns model-specific token limits with safety margins.
-// Uses 60% of model's max context as safe input limit, reserves 15-20% margin.
+// getModelLimits returns token limits with safe conservative defaults.
 func getModelLimits(model string) ModelLimits {
-	model = strings.TrimSpace(strings.ToLower(model))
-
-	switch {
-	case strings.Contains(model, "llama-3.1-8b"):
-		return ModelLimits{
-			MaxInputTokens:  5500, // Safe fit for 6K TPM free tier
-			MaxOutputTokens: 1500,
-		}
-	case strings.Contains(model, "llama-3.3-70b"):
-		return ModelLimits{
-			MaxInputTokens:  11000, // Safe fit for 12K TPM free tier
-			MaxOutputTokens: 2500,
-		}
-	case strings.Contains(model, "gpt-oss-120b"), strings.Contains(model, "gpt-oss-20b"):
-		return ModelLimits{
-			MaxInputTokens:  7500, // Safe fit for 8K TPM free tier
-			MaxOutputTokens: 1500,
-		}
-	default:
-		// Conservative defaults for unknown models
-		return ModelLimits{
-			MaxInputTokens:  7500,
-			MaxOutputTokens: 1500,
-		}
+	return ModelLimits{
+		MaxInputTokens:  4000,
+		MaxOutputTokens: 1000,
 	}
 }
 

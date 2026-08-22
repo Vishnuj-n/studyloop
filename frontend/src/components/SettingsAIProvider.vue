@@ -61,6 +61,19 @@
       </p>
     </div>
 
+    <div class="form-group">
+      <label for="settings-llm-max-input">Max Input Tokens</label>
+      <input
+        id="settings-llm-max-input"
+        v-model.number="llmSettings.fast.max_input_tokens"
+        type="number"
+        placeholder="4000 (Default)"
+        min="500"
+        :disabled="disabled"
+      />
+      <p class="hint">Prompt token budget per request. Default is 4000 (safe for Groq/free tiers). Increase for Gemini or paid high-TPM tiers.</p>
+    </div>
+
     <SettingsToggle
       v-model="llmSettings.use_same_for_heavy"
       :disabled="disabled"
@@ -118,6 +131,18 @@
               : 'No heavy-tier key stored yet.'
           }}
         </p>
+      </div>
+      <div class="form-group">
+        <label for="settings-heavy-max-input">Heavy Max Input Tokens</label>
+        <input
+          id="settings-heavy-max-input"
+          v-model.number="llmSettings.heavy.max_input_tokens"
+          type="number"
+          placeholder="4000 (Default)"
+          min="500"
+          :disabled="disabled"
+        />
+        <p class="hint">Prompt token budget for heavy tasks (Socratic, syllabus, large context).</p>
       </div>
     </div>
 

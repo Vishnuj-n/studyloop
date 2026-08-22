@@ -445,7 +445,7 @@ func (r *Repository) SetLastSyncedAt(ts int64) error {
 
 func (r *Repository) GetLLMSettings() (*models.LLMSettings, error) {
 	rows, err := r.db.Query(`
-		SELECT tier, provider, base_url, model, timeout_ms, api_key_source, COALESCE(has_api_key, 0)
+		SELECT tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, COALESCE(has_api_key, 0)
 		FROM llm_settings
 		WHERE tier IN ('fast', 'heavy')
 	`)
@@ -463,7 +463,7 @@ func (r *Repository) GetLLMSettings() (*models.LLMSettings, error) {
 	seenHeavy := false
 	for rows.Next() {
 		var tier models.LLMTierSettings
-		if err := rows.Scan(&tier.Tier, &tier.Provider, &tier.BaseURL, &tier.Model, &tier.TimeoutMs, &tier.APIKeySource, &tier.HasAPIKey); err != nil {
+		if err := rows.Scan(&tier.Tier, &tier.Provider, &tier.BaseURL, &tier.Model, &tier.TimeoutMs, &tier.MaxInputTokens, &tier.MaxOutputTokens, &tier.APIKeySource, &tier.HasAPIKey); err != nil {
 			return nil, err
 		}
 		tier = normalizeLLMTierSettings(tier)
@@ -499,6 +499,8 @@ func (r *Repository) UpdateLLMSettings(settings models.LLMSettings) error {
 		heavy.BaseURL = fast.BaseURL
 		heavy.Model = fast.Model
 		heavy.TimeoutMs = fast.TimeoutMs
+		heavy.MaxInputTokens = fast.MaxInputTokens
+		heavy.MaxOutputTokens = fast.MaxOutputTokens
 		heavy.APIKeySource = fast.APIKeySource
 		heavy.HasAPIKey = fast.HasAPIKey
 	}
@@ -511,17 +513,19 @@ func (r *Repository) UpdateLLMSettings(settings models.LLMSettings) error {
 
 	for _, tier := range []models.LLMTierSettings{fast, heavy} {
 		if _, err := tx.Exec(`
-			INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, api_key_source, has_api_key)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(tier) DO UPDATE SET
 				provider = excluded.provider,
 				base_url = excluded.base_url,
 				model = excluded.model,
 				timeout_ms = excluded.timeout_ms,
+				max_input_tokens = excluded.max_input_tokens,
+				max_output_tokens = excluded.max_output_tokens,
 				api_key_source = excluded.api_key_source,
 				has_api_key = excluded.has_api_key,
 				updated_at = CURRENT_TIMESTAMP
-		`, tier.Tier, tier.Provider, tier.BaseURL, tier.Model, tier.TimeoutMs, tier.APIKeySource, tier.HasAPIKey); err != nil {
+		`, tier.Tier, tier.Provider, tier.BaseURL, tier.Model, tier.TimeoutMs, tier.MaxInputTokens, tier.MaxOutputTokens, tier.APIKeySource, tier.HasAPIKey); err != nil {
 			return err
 		}
 	}
@@ -555,13 +559,15 @@ func defaultLLMTier(tier string) models.LLMTierSettings {
 		timeout = 90000
 	}
 	return models.LLMTierSettings{
-		Tier:         tier,
-		Provider:     "groq",
-		BaseURL:      "https://api.groq.com/openai",
-		Model:        "openai/gpt-oss-120b",
-		TimeoutMs:    timeout,
-		APIKeySource: "keyring",
-		HasAPIKey:    false,
+		Tier:            tier,
+		Provider:        "groq",
+		BaseURL:         "https://api.groq.com/openai",
+		Model:           "openai/gpt-oss-120b",
+		TimeoutMs:       timeout,
+		MaxInputTokens:  4000,
+		MaxOutputTokens: 1000,
+		APIKeySource:    "keyring",
+		HasAPIKey:       false,
 	}
 }
 
@@ -584,6 +590,12 @@ func normalizeLLMTierSettings(tier models.LLMTierSettings) models.LLMTierSetting
 	}
 	if tier.TimeoutMs <= 0 {
 		tier.TimeoutMs = 30000
+	}
+	if tier.MaxInputTokens <= 0 {
+		tier.MaxInputTokens = 4000
+	}
+	if tier.MaxOutputTokens <= 0 {
+		tier.MaxOutputTokens = 1000
 	}
 	tier.APIKeySource = strings.TrimSpace(strings.ToLower(tier.APIKeySource))
 	if tier.APIKeySource == "" {

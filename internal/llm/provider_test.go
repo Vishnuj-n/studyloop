@@ -1,6 +1,10 @@
 package llm
 
-import "testing"
+import (
+	"testing"
+
+	"ai-tutor/internal/models"
+)
 
 func TestLoadConfigFromEnvForPrefixUsesPrefixedValues(t *testing.T) {
 	t.Setenv("FAST_LLM_BASE_URL", "https://fast.example.com")
@@ -47,22 +51,12 @@ func TestLoadConfigFromEnvForPrefixFallsBackToLegacyVars(t *testing.T) {
 }
 
 func TestGetModelLimitsDefault(t *testing.T) {
-	limits := getModelLimits("unknown/custom-model")
-	if limits.MaxInputTokens != 7500 {
-		t.Errorf("expected default MaxInputTokens for unknown model to be 7500, got %d", limits.MaxInputTokens)
+	limits := getModelLimits("any-model")
+	if limits.MaxInputTokens != 4000 {
+		t.Errorf("expected default MaxInputTokens to be 4000, got %d", limits.MaxInputTokens)
 	}
-	if limits.MaxOutputTokens != 1500 {
-		t.Errorf("expected default MaxOutputTokens for unknown model to be 1500, got %d", limits.MaxOutputTokens)
-	}
-}
-
-func TestGetModelLimitsGPTOss(t *testing.T) {
-	limits := getModelLimits("openai/gpt-oss-120b")
-	if limits.MaxInputTokens != 7500 {
-		t.Errorf("expected MaxInputTokens for gpt-oss-120b to be 7500, got %d", limits.MaxInputTokens)
-	}
-	if limits.MaxOutputTokens != 1500 {
-		t.Errorf("expected MaxOutputTokens for gpt-oss-120b to be 1500, got %d", limits.MaxOutputTokens)
+	if limits.MaxOutputTokens != 1000 {
+		t.Errorf("expected default MaxOutputTokens to be 1000, got %d", limits.MaxOutputTokens)
 	}
 }
 
@@ -77,6 +71,23 @@ func TestLoadConfigLimitsOverride(t *testing.T) {
 	}
 	if config.Limits.MaxOutputTokens != 54321 {
 		t.Fatalf("expected MaxOutputTokens override 54321, got %d", config.Limits.MaxOutputTokens)
+	}
+}
+
+func TestLoadConfigFromSettingsLimitsOverride(t *testing.T) {
+	settings := models.LLMTierSettings{
+		Tier:            "fast",
+		Provider:        "groq",
+		Model:           "openai/gpt-oss-120b",
+		MaxInputTokens:  5000,
+		MaxOutputTokens: 2000,
+	}
+	config := LoadConfigFromSettingsForPrefix("", settings, "test-key")
+	if config.Limits.MaxInputTokens != 5000 {
+		t.Fatalf("expected settings MaxInputTokens 5000, got %d", config.Limits.MaxInputTokens)
+	}
+	if config.Limits.MaxOutputTokens != 2000 {
+		t.Fatalf("expected settings MaxOutputTokens 2000, got %d", config.Limits.MaxOutputTokens)
 	}
 }
 

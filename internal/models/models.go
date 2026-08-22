@@ -553,13 +553,15 @@ type AnalyticsEventSync struct {
 // LLMTierSettings stores non-secret OpenAI-compatible provider config.
 // API keys live in the OS credential store via go-keyring.
 type LLMTierSettings struct {
-	Tier         string `json:"tier"`
-	Provider     string `json:"provider"`
-	BaseURL      string `json:"base_url"`
-	Model        string `json:"model"`
-	TimeoutMs    int    `json:"timeout_ms"`
-	APIKeySource string `json:"api_key_source"`
-	HasAPIKey    bool   `json:"has_api_key"`
+	Tier            string `json:"tier"`
+	Provider        string `json:"provider"`
+	BaseURL         string `json:"base_url"`
+	Model           string `json:"model"`
+	TimeoutMs       int    `json:"timeout_ms"`
+	MaxInputTokens  int    `json:"max_input_tokens,omitempty"`
+	MaxOutputTokens int    `json:"max_output_tokens,omitempty"`
+	APIKeySource    string `json:"api_key_source"`
+	HasAPIKey       bool   `json:"has_api_key"`
 }
 
 type LLMSettings struct {
