@@ -26,6 +26,7 @@
         <SettingsStudyBudget
           :settings="settings"
           :study-duration="studyDuration"
+          :max-input-tokens="llmSettings.fast?.max_input_tokens || 4000"
           :disabled="loading || saving"
           @apply-duration-preset="applyDurationPreset"
         />
@@ -40,6 +41,7 @@
           :llm-settings="llmSettings"
           :llm-fast-key="llmFastKey"
           :llm-heavy-key="llmHeavyKey"
+          :target-session-words="settings.target_session_words || 3000"
           :disabled="loading || savingLLM"
           @apply-preset="applyProviderPreset"
           @remove-keys="removeLLMKeys"

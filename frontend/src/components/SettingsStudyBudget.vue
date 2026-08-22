@@ -32,6 +32,9 @@
       <p class="hint">
         Target word count per reading session (3,000 words ≈ 15 minutes of standard reading).
       </p>
+      <p v-if="hasTokenWarning" class="warning-hint">
+        ⚠️ {{ settings.target_session_words }} words (~{{ Math.round(settings.target_session_words * 1.3) }} tokens) may exceed your Max Input Tokens limit ({{ maxInputTokens }} tokens). Content may be truncated during quizzes.
+      </p>
     </div>
 
     <TimeRangeInput
@@ -68,13 +71,21 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import TimeRangeInput from './TimeRangeInput.vue'
 
-defineProps({
+const props = defineProps({
   settings: { type: Object, required: true },
   studyDuration: { type: String, default: '' },
+  maxInputTokens: { type: Number, default: 4000 },
   disabled: { type: Boolean, default: false },
+})
+
+const hasTokenWarning = computed(() => {
+  const words = Number(props.settings?.target_session_words) || 0
+  const maxTokens = Number(props.maxInputTokens) || 4000
+  return words * 1.3 > maxTokens
 })
 
 const emit = defineEmits(['apply-duration-preset'])
@@ -115,6 +126,14 @@ input[type='number']:focus {
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
+}
+
+.warning-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warning, #f59e0b);
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .form-grid {

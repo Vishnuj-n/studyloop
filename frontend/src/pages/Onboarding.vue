@@ -464,6 +464,32 @@
           <button
             type="button"
             class="theme-card"
+            :class="{ active: selectedTheme === 'light-sage' }"
+            @click="selectTheme('light-sage')"
+          >
+            <div class="theme-preview light-sage">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Sage Garden</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
+            :class="{ active: selectedTheme === 'dark-gruvbox' }"
+            @click="selectTheme('dark-gruvbox')"
+          >
+            <div class="theme-preview dark-gruvbox">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Gruvbox Dark</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
             :class="{ active: selectedTheme === 'dark-indigo' }"
             @click="selectTheme('dark-indigo')"
           >
@@ -472,19 +498,6 @@
               <span class="preview-dot surface"></span>
             </div>
             <span class="theme-label">Deep Indigo</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-nord' }"
-            @click="selectTheme('dark-nord')"
-          >
-            <div class="theme-preview dark-nord">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Nord Frost</span>
           </button>
 
           <button
@@ -1263,6 +1276,16 @@ select:focus {
   background: #f3eae1;
 }
 
+.theme-preview.light-sage {
+  background: #f4f7f4;
+}
+.theme-preview.light-sage .preview-dot.primary {
+  background: #2e7d32;
+}
+.theme-preview.light-sage .preview-dot.surface {
+  background: #e2ebe2;
+}
+
 .theme-preview.dark-indigo {
   background: #0b0d16;
 }
@@ -1273,14 +1296,14 @@ select:focus {
   background: #171a2b;
 }
 
-.theme-preview.dark-nord {
-  background: #2e3440;
+.theme-preview.dark-gruvbox {
+  background: #1d2021;
 }
-.theme-preview.dark-nord .preview-dot.primary {
-  background: #88c0d0;
+.theme-preview.dark-gruvbox .preview-dot.primary {
+  background: #d79921;
 }
-.theme-preview.dark-nord .preview-dot.surface {
-  background: #3b4252;
+.theme-preview.dark-gruvbox .preview-dot.surface {
+  background: #282828;
 }
 
 .theme-preview.dark-emerald {
