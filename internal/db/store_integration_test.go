@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"ai-tutor/internal/models"
 	"fmt"
 	"os"
@@ -1137,5 +1138,53 @@ func TestMarkTopicExternalHelpRequiredTx(t *testing.T) {
 		t.Errorf("expected MarkTopicExternalHelpRequiredTx to return error for nonexistent topic, got nil")
 	}
 }
+
+func TestInitOnLegacyDatabaseAddsMissingColumns(t *testing.T) {
+	tempDB, err := os.CreateTemp("", "legacy_test_*.db")
+	if err != nil {
+		t.Fatalf("failed to create temp db: %v", err)
+	}
+	tempDBPath := tempDB.Name()
+	_ = tempDB.Close()
+	defer os.Remove(tempDBPath)
+
+	// Pre-create llm_settings table with legacy schema (missing max_input_tokens and max_output_tokens)
+	sqlDB, err := sql.Open("sqlite3", tempDBPath)
+	if err != nil {
+		t.Fatalf("failed to open temp db: %v", err)
+	}
+	_, err = sqlDB.Exec(`
+		CREATE TABLE llm_settings (
+			tier TEXT PRIMARY KEY,
+			provider TEXT NOT NULL,
+			base_url TEXT NOT NULL,
+			model TEXT NOT NULL,
+			timeout_ms INTEGER NOT NULL DEFAULT 60000,
+			api_key_source TEXT NOT NULL DEFAULT 'keyring',
+			has_api_key BOOLEAN NOT NULL DEFAULT 0
+		);
+	`)
+	if err != nil {
+		_ = sqlDB.Close()
+		t.Fatalf("failed to create legacy table: %v", err)
+	}
+	_ = sqlDB.Close()
+
+	// Init should run alterStatements before seed inserts and succeed
+	repo, err := Init(tempDBPath, "")
+	if err != nil {
+		t.Fatalf("Init failed on legacy database: %v", err)
+	}
+	defer repo.Close()
+
+	settings, err := repo.GetLLMSettings()
+	if err != nil {
+		t.Fatalf("GetLLMSettings failed after migration: %v", err)
+	}
+	if settings == nil || settings.Fast.MaxInputTokens == 0 {
+		t.Fatalf("expected valid LLM settings with max_input_tokens populated, got %+v", settings)
+	}
+}
+
 
 

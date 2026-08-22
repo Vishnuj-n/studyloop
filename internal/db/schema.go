@@ -350,6 +350,19 @@ func InitSchema(tx *sql.Tx) error {
 		}
 	}
 
+	// Run alterStatements migration before seeding defaults so existing databases have all columns
+	for _, alter := range alterStatements {
+		exists, err := columnExists(tx, alter.Table, alter.Column)
+		if err != nil {
+			return fmt.Errorf("failed to check column %s in table %s: %w", alter.Column, alter.Table, err)
+		}
+		if !exists {
+			if _, err := tx.Exec(alter.SQL); err != nil {
+				return fmt.Errorf("failed to execute alter statement for %s.%s: %w", alter.Table, alter.Column, err)
+			}
+		}
+	}
+
 	// Initialize default user settings
 	if _, err := tx.Exec(`
 		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled)
@@ -367,19 +380,6 @@ func InitSchema(tx *sql.Tx) error {
 		ON CONFLICT(tier) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
-	}
-
-	// Run alterStatements migration
-	for _, alter := range alterStatements {
-		exists, err := columnExists(tx, alter.Table, alter.Column)
-		if err != nil {
-			return fmt.Errorf("failed to check column %s in table %s: %w", alter.Column, alter.Table, err)
-		}
-		if !exists {
-			if _, err := tx.Exec(alter.SQL); err != nil {
-				return fmt.Errorf("failed to execute alter statement for %s.%s: %w", alter.Table, alter.Column, err)
-			}
-		}
 	}
 
 	return nil
