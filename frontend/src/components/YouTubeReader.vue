@@ -1,5 +1,13 @@
 <template>
   <div class="youtube-player-container">
+    <div v-if="startSeconds > 0 || endSeconds > 0" class="video-timecode-banner">
+      <div class="timecode-info">
+        <span class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
+        <span v-if="durationText" class="duration-badge">Duration: {{ durationText }}</span>
+      </div>
+      <p class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
+    </div>
+
     <div class="video-wrapper">
       <iframe
         :src="embedUrl"
@@ -9,6 +17,7 @@
         allowfullscreen
       ></iframe>
     </div>
+
     <div class="transcript-drawer">
       <div class="transcript-drawer-header" @click="showTranscript = !showTranscript">
         <span class="transcript-header-title">📖 Chapter Transcript & Notes</span>
@@ -31,10 +40,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import MarkdownReader from './MarkdownReader.vue'
 
-defineProps({
+const props = defineProps({
   embedUrl: {
     type: String,
     default: '',
@@ -55,6 +64,14 @@ defineProps({
     type: Number,
     default: 1,
   },
+  videoStartSeconds: {
+    type: Number,
+    default: 0,
+  },
+  videoEndSeconds: {
+    type: Number,
+    default: 0,
+  },
   isTaskFlow: {
     type: Boolean,
     default: false,
@@ -72,14 +89,97 @@ defineProps({
 defineEmits(['complete'])
 
 const showTranscript = ref(true)
+
+const startSeconds = computed(() => {
+  if (props.videoStartSeconds > 0) return props.videoStartSeconds
+  try {
+    const url = new URL(props.embedUrl)
+    return parseInt(url.searchParams.get('start') || '0', 10)
+  } catch {
+    return 0
+  }
+})
+
+const endSeconds = computed(() => {
+  if (props.videoEndSeconds > 0) return props.videoEndSeconds
+  try {
+    const url = new URL(props.embedUrl)
+    return parseInt(url.searchParams.get('end') || '0', 10)
+  } catch {
+    return 0
+  }
+})
+
+function formatTime(totalSeconds) {
+  if (!totalSeconds || isNaN(totalSeconds) || totalSeconds < 0) return '0:00'
+  const hrs = Math.floor(totalSeconds / 3600)
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+  const secs = Math.floor(totalSeconds % 60)
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+const durationText = computed(() => {
+  if (!endSeconds.value || endSeconds.value <= startSeconds.value) return ''
+  const durSec = endSeconds.value - startSeconds.value
+  const mins = Math.floor(durSec / 60)
+  const secs = durSec % 60
+  if (mins > 0 && secs > 0) return `${mins}m ${secs}s`
+  if (mins > 0) return `${mins} min`
+  return `${secs}s`
+})
 </script>
 
 <style scoped>
 .youtube-player-container {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   width: 100%;
+}
+
+.video-timecode-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+}
+
+.timecode-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timecode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--primary);
+  background: var(--surface-container-high);
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.duration-badge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.timecode-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  line-height: 1.4;
 }
 
 .video-wrapper {

@@ -84,17 +84,7 @@ export function useReaderBase(taskID) {
 
   const isYouTube = computed(() => fileType.value === 'youtube')
 
-  const youtubeEmbedUrl = computed(() => {
-    if (!notebookUrl.value) return ''
-    let url = notebookUrl.value
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const match = /(?:watch\?v=|embed\/|youtu\.be\/)([a-zA-Z0-9_-]+)/.exec(url)
-      if (match) {
-        url = `https://www.youtube-nocookie.com/embed/${match[1]}`
-      }
-    }
-    return url
-  })
+  const youtubeEmbedUrl = computed(() => notebookUrl.value || '')
 
   const isPdf = computed(() => fileType.value === 'pdf')
 
