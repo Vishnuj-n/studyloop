@@ -2,6 +2,7 @@ package notebook
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -329,6 +330,39 @@ func (s *Service) ExtractDocumentRange(filePath string, fileType string, startPa
 			}
 		}
 
+	case "youtube":
+		raw, err := s.readFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read youtube notebook file: %w", err)
+		}
+		var ingestResult YouTubeIngestResult
+		if err := json.Unmarshal(raw, &ingestResult); err != nil {
+			return nil, fmt.Errorf("failed to parse youtube notebook json: %w", err)
+		}
+		doc.Title = ingestResult.Title
+		doc.PageCount = len(ingestResult.Chapters)
+		if doc.PageCount <= 0 {
+			doc.PageCount = 1
+		}
+		doc.WordCount = 0
+		doc.Sections = make([]ExtractedSection, 0, len(ingestResult.Chapters))
+		for _, ch := range ingestResult.Chapters {
+			pageNum := ch.ChapterIndex
+			if startPage > 0 && pageNum < startPage {
+				continue
+			}
+			if endPage > 0 && pageNum > endPage {
+				continue
+			}
+			doc.Sections = append(doc.Sections, ExtractedSection{
+				Heading: ch.Title,
+				Text:    ch.Transcript,
+				PageNum: pageNum,
+			})
+			doc.WordCount += len(strings.Fields(ch.Transcript))
+		}
+
+
 	default:
 		return nil, fmt.Errorf("unsupported file type: %s", fileType)
 	}
@@ -404,6 +438,32 @@ func (s *Service) ExtractDocumentSample(filePath string, fileType string, maxPag
 		if err := s.extractPDFSample(filePath, doc, maxPages); err != nil {
 			return nil, err
 		}
+
+	case "youtube":
+		raw, err := s.readFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read youtube notebook file: %w", err)
+		}
+		var ingestResult YouTubeIngestResult
+		if err := json.Unmarshal(raw, &ingestResult); err != nil {
+			return nil, fmt.Errorf("failed to parse youtube notebook json: %w", err)
+		}
+		doc.Title = ingestResult.Title
+		doc.PageCount = len(ingestResult.Chapters)
+		if doc.PageCount <= 0 {
+			doc.PageCount = 1
+		}
+		limit := min(maxPages, len(ingestResult.Chapters))
+		doc.Sections = make([]ExtractedSection, limit)
+		for i := 0; i < limit; i++ {
+			ch := ingestResult.Chapters[i]
+			doc.Sections[i] = ExtractedSection{
+				Heading: ch.Title,
+				Text:    ch.Transcript,
+				PageNum: ch.ChapterIndex,
+			}
+		}
+
 
 	default:
 		return nil, fmt.Errorf("unsupported file type: %s", fileType)

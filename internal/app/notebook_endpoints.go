@@ -1,19 +1,23 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"ai-tutor/internal/db"
+	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/notebook"
 	"ai-tutor/internal/utils"
 
+	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -74,6 +78,105 @@ func (a *App) UploadNotebookFromPath(filePath string) map[string]interface{} {
 	}
 
 	return a.finalizeNotebookUpload(uploadResult)
+}
+
+// UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
+func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{
+			"error": "notebook service not initialized",
+		}
+	}
+
+	cleanURL := strings.TrimSpace(videoURL)
+	if cleanURL == "" {
+		return map[string]interface{}{"error": "YouTube URL or video ID is required"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("youtube")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "YouTube Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	doc, result, err := a.notebookService.IngestYouTubeVideo(ctx, cleanURL, a.extRunner, ext)
+	if err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to ingest YouTube video: %v", err),
+		}
+	}
+
+	notebookID := uuid.New().String()
+	jsonFileName := fmt.Sprintf("%s.json", notebookID)
+	jsonFilePath := filepath.Join(a.notebookUploadDir, jsonFileName)
+
+	jsonBytes, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to serialize video metadata: %v", err),
+		}
+	}
+
+	if err := os.WriteFile(jsonFilePath, jsonBytes, 0o644); err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to save video metadata: %v", err),
+		}
+	}
+
+	fileHash := utils.MD5Hex(result.VideoID)
+	profileID := a.resolveExplicitActiveProfileID()
+	title := strings.TrimSpace(result.Title)
+	if title == "" {
+		title = "YouTube Video"
+	}
+
+	err = repo.CreateNotebook(notebookID, title, jsonFilePath, "youtube", "", fileHash, len(result.Chapters), profileID)
+	if err != nil {
+		_ = os.Remove(jsonFilePath)
+		return map[string]interface{}{
+			"error": err.Error(),
+		}
+	}
+
+	_ = repo.UpdateNotebookStatus(notebookID, "uploaded")
+
+	// Pre-create syllabus draft from chapters
+	chaptersDraft := make([]models.SyllabusChapterDraft, 0, len(result.Chapters))
+	for _, ch := range result.Chapters {
+		chaptersDraft = append(chaptersDraft, models.SyllabusChapterDraft{
+			Title:     ch.Title,
+			StartPage: ch.ChapterIndex,
+			EndPage:   ch.ChapterIndex,
+		})
+	}
+	_ = persistSyllabusDraft(repo, notebookID, len(result.Chapters), chaptersDraft, false)
+
+	return map[string]interface{}{
+		"id":            notebookID,
+		"file_name":     title,
+		"file_type":     "youtube",
+		"page_count":    len(result.Chapters),
+		"word_count":    doc.WordCount,
+		"chunk_count":   0,
+		"indexed_count": 0,
+		"failed_count":  0,
+		"status":        "uploaded",
+		"video_id":      result.VideoID,
+		"uploader":      result.Uploader,
+		"duration":      result.DurationSeconds,
+	}
 }
 
 func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[string]interface{} {
