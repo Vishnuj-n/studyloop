@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -229,10 +230,18 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		}
 	}
 
-	// For text and markdown files, load raw content directly from disk for instant, 100% fidelity rendering
+	// For text, markdown, and youtube files, load raw content directly from disk for instant, 100% fidelity rendering
 	if !strings.EqualFold(bundle.FileType, "pdf") && filePath.Valid && filePath.String != "" {
 		if contentBytes, err := os.ReadFile(filePath.String); err == nil {
 			bundle.RawContent = string(contentBytes)
+			if strings.EqualFold(bundle.FileType, "youtube") {
+				var ytMeta struct {
+					VideoID string `json:"video_id"`
+				}
+				if jsonErr := json.Unmarshal(contentBytes, &ytMeta); jsonErr == nil && ytMeta.VideoID != "" {
+					bundle.NotebookURL = "https://www.youtube-nocookie.com/embed/" + ytMeta.VideoID
+				}
+			}
 		}
 	}
 

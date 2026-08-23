@@ -230,9 +230,12 @@ func (a *App) GetTopicSectionsContent(topicID string, notebookID string) map[str
 		}
 	}
 
+	fullText := strings.Join(sectionsContent, "\n\n")
 	return map[string]interface{}{
-		"content":        strings.Join(sectionsContent, "\n\n"),
-		"notebook_title": bundle.NotebookTitle,
+		"content":          fullText,
+		"sections_content": fullText,
+		"notebook_title":   bundle.NotebookTitle,
+		"topic_title":      bundle.TopicTitle,
 	}
 }
 

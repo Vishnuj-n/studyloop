@@ -82,6 +82,20 @@ export function useReaderBase(taskID) {
       fileType.value === 'text'
   )
 
+  const isYouTube = computed(() => fileType.value === 'youtube')
+
+  const youtubeEmbedUrl = computed(() => {
+    if (!notebookUrl.value) return ''
+    let url = notebookUrl.value
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const match = /(?:watch\?v=|embed\/|youtu\.be\/)([a-zA-Z0-9_-]+)/.exec(url)
+      if (match) {
+        url = `https://www.youtube-nocookie.com/embed/${match[1]}`
+      }
+    }
+    return url
+  })
+
   const isPdf = computed(() => fileType.value === 'pdf')
 
   const availableTopics = computed(() => {
@@ -449,6 +463,8 @@ export function useReaderBase(taskID) {
     availableTopics,
     selectedTopicTitle,
     isMarkdown,
+    isYouTube,
+    youtubeEmbedUrl,
     isPdf,
     pdfVisible,
     hasNavigationBounds,

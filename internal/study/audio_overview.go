@@ -178,14 +178,27 @@ func (s *StudyService) GenerateAudioOverview(
 	}
 
 	// Resolve edge_tts_stream.py script path
-	scriptPath := filepath.Join("extensions", "edge_tts_stream.py")
-	if _, err := os.Stat(scriptPath); err != nil {
-		// Try resolving via extension dir
-		extDir := extension.ResolveExtensionsDir("")
-		candidate := filepath.Join(extDir, "edge_tts_stream.py")
+	scriptCandidates := []string{
+		filepath.Join("extensions", "audio_overview", "edge_tts_stream.py"),
+		filepath.Join("extensions", "edge_tts_stream.py"),
+	}
+	extDir := extension.ResolveExtensionsDir("")
+	if extDir != "" {
+		scriptCandidates = append(scriptCandidates,
+			filepath.Join(extDir, "audio_overview", "edge_tts_stream.py"),
+			filepath.Join(extDir, "edge_tts_stream.py"),
+		)
+	}
+
+	scriptPath := ""
+	for _, candidate := range scriptCandidates {
 		if _, err := os.Stat(candidate); err == nil {
 			scriptPath = candidate
+			break
 		}
+	}
+	if scriptPath == "" {
+		scriptPath = filepath.Join("extensions", "audio_overview", "edge_tts_stream.py")
 	}
 
 	var sentenceItems []SentenceItem
