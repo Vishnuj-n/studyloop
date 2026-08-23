@@ -8,11 +8,14 @@ import (
 
 // Manifest represents the metadata defined in an extension's manifest.json.
 type Manifest struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	Runtime    string `json:"runtime"`
-	Entrypoint string `json:"entrypoint"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Runtime     string `json:"runtime"`
+	Entrypoint  string `json:"entrypoint"`
+	Tier        string `json:"tier,omitempty"`        // "free" (default) or "pro"
+	Description string `json:"description,omitempty"` // Brief summary
+	Category    string `json:"category,omitempty"`    // "reader", "study", "utility", etc.
 }
 
 // Validate checks that required fields are present and safe.
@@ -37,6 +40,13 @@ func (m *Manifest) Validate() error {
 	}
 	if strings.Contains(m.Entrypoint, "..") {
 		return fmt.Errorf("invalid entrypoint path traversal: %q", m.Entrypoint)
+	}
+	if strings.TrimSpace(m.Tier) == "" {
+		m.Tier = "free"
+	}
+	m.Tier = strings.ToLower(strings.TrimSpace(m.Tier))
+	if m.Tier != "free" && m.Tier != "pro" {
+		m.Tier = "free"
 	}
 	return nil
 }

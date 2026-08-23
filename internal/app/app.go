@@ -10,6 +10,7 @@ import (
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
+	"ai-tutor/internal/extension"
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/notebook"
 	"ai-tutor/internal/retrieval"
@@ -43,6 +44,8 @@ type App struct {
 	scheduler         scheduler.Service
 	notebookService   *notebook.Service
 	studyService      *study.StudyService
+	extManager        *extension.Manager
+	extRunner         *extension.Runner
 	notebookUploadDir string
 	aiReady           bool
 	aiInitError       string
@@ -52,8 +55,12 @@ type App struct {
 }
 
 func NewApp() *App {
+	mgr := extension.NewManager()
+	_, _ = mgr.Discover()
 	return &App{
-		readyChan: make(chan struct{}),
+		readyChan:  make(chan struct{}),
+		extManager: mgr,
+		extRunner:  extension.NewRunner(),
 	}
 }
 
