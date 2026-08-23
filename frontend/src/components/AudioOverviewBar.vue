@@ -246,12 +246,14 @@ onMounted(() => {
     errorMessage.value = ''
   })
 
-  EventsOn('audio:overview:chunk', (chunk) => {
+    EventsOn('audio:overview:chunk', (chunk) => {
     if (!chunk || chunk.status === 'error') {
       if (chunk && chunk.error) {
-        errorMessage.value = chunk.error
+        console.warn('[AudioOverview] Chunk synthesis error:', chunk.error)
+        if (chunks.value.length === 0) {
+          errorMessage.value = chunk.error
+        }
       }
-      isLoading.value = false
       return
     }
 
@@ -260,6 +262,10 @@ onMounted(() => {
     }
 
     chunks.value.push(chunk)
+    // Clear any previous error message now that a valid chunk has landed
+    if (errorMessage.value) {
+      errorMessage.value = ''
+    }
 
     // ponytail: play chunk 1 immediately as it lands (< 1.5s latency)
     if (chunks.value.length === 1) {
@@ -281,7 +287,9 @@ onMounted(() => {
 
   EventsOn('audio:overview:error', (data) => {
     isLoading.value = false
-    errorMessage.value = data?.error || 'Audio overview generation failed'
+    if (chunks.value.length === 0) {
+      errorMessage.value = data?.error || 'Audio overview generation failed'
+    }
   })
 
   handleStart()
@@ -312,11 +320,12 @@ watch(
   left: 0;
   right: 0;
   z-index: 99;
-  background: var(--bg-card, #ffffff);
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-  padding: 10px 16px;
-  animation: slideUp 0.25s ease-out;
+  background: var(--surface-container-lowest, #141617);
+  border-top: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.1));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
+  padding: 10px 18px;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--on-surface, #ebdbb2);
 }
 
 @keyframes slideUp {
@@ -335,7 +344,7 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
 }
 
@@ -347,47 +356,53 @@ watch(
 }
 
 .play-btn {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: var(--color-primary, #3b82f6);
-  color: #ffffff;
+  background: var(--primary, #d79921);
+  color: var(--on-primary, #1d2021);
   border: none;
-  font-size: 16px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.2s ease;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 25%, transparent);
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .play-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover, #2563eb);
-  transform: scale(1.05);
+  background: var(--primary-dim, #b57614);
+  transform: scale(1.06);
+}
+
+.play-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 .play-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .nav-btn {
-  background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
-  color: var(--text-primary, #1f2937);
-  border-radius: 6px;
-  padding: 6px 10px;
+  background: var(--surface-container, #282828);
+  border: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.1));
+  color: var(--on-surface, #ebdbb2);
+  border-radius: 8px;
+  padding: 7px 11px;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .nav-btn:hover:not(:disabled) {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--surface-container-highest, #3c3836);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .nav-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
@@ -397,12 +412,14 @@ watch(
 }
 
 .chunk-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary, #6b7280);
-  background: var(--bg-secondary, #f3f4f6);
-  padding: 4px 8px;
-  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--muted-text, #a89984);
+  background: var(--surface-container-low, #232526);
+  border: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.08));
+  padding: 4px 10px;
+  border-radius: 20px;
   white-space: nowrap;
 }
 
@@ -415,8 +432,8 @@ watch(
 .caption-text {
   margin: 0;
   font-size: 13.5px;
-  line-height: 1.4;
-  color: var(--text-primary, #111827);
+  line-height: 1.45;
+  color: var(--on-surface, #ebdbb2);
   font-weight: 500;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -428,8 +445,8 @@ watch(
 .buffering-text {
   margin: 0;
   font-size: 13px;
-  color: var(--color-primary, #3b82f6);
-  font-weight: 500;
+  color: var(--primary, #d79921);
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -447,7 +464,7 @@ watch(
 .error-text {
   margin: 0;
   font-size: 13px;
-  color: #dc2626;
+  color: #ef4444;
   font-weight: 500;
 }
 
@@ -459,44 +476,58 @@ watch(
 }
 
 .voice-select {
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-card, #ffffff);
-  color: var(--text-primary, #1f2937);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.speed-btn {
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color, #e5e7eb);
-  background: var(--bg-secondary, #f3f4f6);
-  color: var(--text-primary, #1f2937);
+  padding: 6px 30px 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.12));
+  background-color: var(--surface-container-low, #232526);
+  color: var(--on-surface, #ebdbb2);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  min-width: 42px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.voice-select:hover:not(:disabled) {
+  border-color: var(--primary);
+  background-color: var(--surface-container);
+}
+
+.voice-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.speed-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.12));
+  background: var(--surface-container-low, #232526);
+  color: var(--on-surface, #ebdbb2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 44px;
+  transition: all 0.15s ease;
 }
 
 .speed-btn:hover {
-  background: var(--bg-hover, #e5e7eb);
+  background: var(--surface-container);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .close-btn {
   background: transparent;
   border: none;
-  font-size: 16px;
-  color: var(--text-secondary, #9ca3af);
+  font-size: 15px;
+  color: var(--muted-text, #a89984);
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: color 0.15s ease;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .close-btn:hover {
-  color: var(--text-primary, #111827);
-  background: var(--bg-hover, #f3f4f6);
+  color: var(--on-surface, #ebdbb2);
+  background: var(--surface-container-highest, #3c3836);
 }
 </style>

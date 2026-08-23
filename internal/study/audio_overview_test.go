@@ -6,11 +6,17 @@ import (
 )
 
 func TestCleanOverviewText(t *testing.T) {
-	input := "# Heading 1\nThis is **bold** text with a [link](http://example.com) and `code`."
+	// 0xED 0xB2 0x9D is UTF-8 encoding of surrogate \udc9d
+	surrogateBytes := []byte{0xed, 0xb2, 0x9d}
+	input := "# Heading 1\nThis is **bold** text with a [link](http://example.com) and `code` " + string(surrogateBytes) + "."
 	cleaned := CleanOverviewText(input)
 
 	if strings.Contains(cleaned, "#") || strings.Contains(cleaned, "**") || strings.Contains(cleaned, "`") {
 		t.Fatalf("markdown symbols not cleaned: %s", cleaned)
+	}
+
+	if strings.Contains(cleaned, string(surrogateBytes)) {
+		t.Fatalf("surrogate bytes were not stripped from output: %s", cleaned)
 	}
 
 	if !strings.Contains(cleaned, "Heading 1") || !strings.Contains(cleaned, "This is bold text") {

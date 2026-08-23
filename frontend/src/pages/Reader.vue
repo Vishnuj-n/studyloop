@@ -101,11 +101,12 @@
             </button>
             <button
               class="secondary audio-overview-btn"
+              :class="{ active: showAudioOverview }"
               :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
-              :title="showAudioOverview ? 'Hide Audio Overview' : 'Listen to Audio Overview'"
+              :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
               @click="showAudioOverview = !showAudioOverview"
             >
-              {{ showAudioOverview ? '🎧 Audio Active' : '🎧 Audio Overview' }}
+              {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
             </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
@@ -1071,6 +1072,12 @@ button:disabled {
 .secondary {
   color: var(--on-surface);
   background: var(--surface-container-low);
+}
+
+.audio-overview-btn.active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .error {

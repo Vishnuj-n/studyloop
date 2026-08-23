@@ -36,9 +36,18 @@ type AudioOverviewPayload struct {
 
 var markdownCleanupRegex = regexp.MustCompile(`[#*` + "`" + `_~>\[\]\(\)]+`)
 
-// CleanOverviewText removes markdown formatting to make text speech-friendly.
+// CleanOverviewText removes markdown formatting and invalid/surrogate unicode to make text speech-friendly.
 func CleanOverviewText(text string) string {
-	cleaned := markdownCleanupRegex.ReplaceAllString(text, " ")
+	var b strings.Builder
+	for _, r := range text {
+		// Filter out UTF-16 surrogates (0xD800-0xDFFF) and replacement rune errors
+		if (r >= 0xD800 && r <= 0xDFFF) || r == '\uFFFD' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+
+	cleaned := markdownCleanupRegex.ReplaceAllString(b.String(), " ")
 	cleaned = strings.ReplaceAll(cleaned, "\n", " ")
 	cleaned = regexp.MustCompile(`\s+`).ReplaceAllString(cleaned, " ")
 	return strings.TrimSpace(cleaned)
