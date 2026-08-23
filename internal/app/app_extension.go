@@ -70,13 +70,42 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	output, err := a.extRunner.Run(ctx, ext, input)
+	var output []byte
+	var err error
+
+	runtimeType := strings.ToLower(strings.TrimSpace(ext.Runtime()))
+	switch runtimeType {
+	case "python", "py":
+		pyExe, pErr := extension.FindPythonExecutable()
+		if pErr != nil {
+			return map[string]interface{}{"error": fmt.Sprintf("Python executable not found on system: %v", pErr)}
+		}
+		var args []string
+		args = append(args, ext.EntrypointPath())
+		if strings.TrimSpace(input) != "" {
+			args = append(args, strings.TrimSpace(input))
+		}
+		output, err = a.extRunner.Run(ctx, ext, pyExe, args...)
+	case "binary", "executable", "exe":
+		var args []string
+		if strings.TrimSpace(input) != "" {
+			args = append(args, strings.TrimSpace(input))
+		}
+		output, err = a.extRunner.Run(ctx, ext, ext.EntrypointPath(), args...)
+	default:
+		output, err = a.extRunner.Run(ctx, ext, ext.EntrypointPath())
+	}
+
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]interface{}{
+			"error":  err.Error(),
+			"output": string(output),
+			"id":     id,
+		}
 	}
 
 	return map[string]interface{}{
-		"output": output,
+		"output": string(output),
 		"id":     id,
 	}
 }

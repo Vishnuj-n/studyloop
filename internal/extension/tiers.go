@@ -9,6 +9,7 @@ var officialExtensionTiers = map[string]string{
 	"markdown-export": "free",
 	"anki-sync":       "pro",
 	"python-runtime":  "pro",
+	"youtube":         "pro",
 }
 
 // GetEffectiveTier returns the authoritative tier for an extension.
