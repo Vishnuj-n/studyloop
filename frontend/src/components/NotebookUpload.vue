@@ -47,6 +47,28 @@
           </p>
         </div>
 
+        <div class="youtube-divider"><span>OR IMPORT VIDEO</span></div>
+
+        <div class="youtube-box">
+          <input
+            v-model="youtubeUrl"
+            type="text"
+            placeholder="Paste YouTube lecture URL (e.g. https://www.youtube.com/watch?v=...)"
+            class="youtube-input"
+            :disabled="uploadProgress > 0"
+            @keydown.enter="submitYouTube"
+          />
+          <button
+            type="button"
+            class="youtube-cta"
+            :disabled="!youtubeUrl.trim() || uploadProgress > 0"
+            @click="submitYouTube"
+          >
+            🎥 Ingest Video
+          </button>
+        </div>
+
+
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">
           <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
           <span>{{ uploadProgress }}%</span>
@@ -81,12 +103,21 @@ defineProps({
   successMessage: { type: String, default: '' },
 })
 
-const emit = defineEmits(['upload-file'])
+const emit = defineEmits(['upload-file', 'upload-youtube'])
 const { confirm } = useDialog()
 
 const fileInput = ref(null)
 const isDragging = ref(false)
 const localError = ref('')
+const youtubeUrl = ref('')
+
+function submitYouTube() {
+  const url = youtubeUrl.value.trim()
+  if (!url) return
+  localError.value = ''
+  emit('upload-youtube', url)
+  youtubeUrl.value = ''
+}
 
 function triggerFilePicker() {
   localError.value = ''
@@ -322,5 +353,64 @@ function handleFileDrop(e) {
   color: #2e7d32;
   border-radius: 6px;
   font-size: 14px;
+}
+
+.youtube-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0 14px;
+  color: var(--muted-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.youtube-divider::before,
+.youtube-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed var(--outline-variant);
+}
+.youtube-divider span {
+  padding: 0 10px;
+}
+
+.youtube-box {
+  display: flex;
+  gap: 8px;
+}
+
+.youtube-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-size: 13.5px;
+}
+.youtube-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.youtube-cta {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #cc0000;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.youtube-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.youtube-cta:not(:disabled):hover {
+  opacity: 0.9;
 }
 </style>

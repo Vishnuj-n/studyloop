@@ -138,6 +138,11 @@ export function getNotebookTopicTree() {
   return appBridge().GetNotebookTopicTree()
 }
 
+export function uploadYouTubeNotebook(videoURL, isPro = false) {
+  return appBridge().UploadYouTubeNotebook(videoURL, isPro)
+}
+
+
 export function uploadNotebook(fileBytes, fileName) {
   return appBridge().UploadNotebook(fileBytes, fileName)
 }
