@@ -1,7 +1,8 @@
 <template>
   <div class="extensions-page">
+    <!-- Header -->
     <header class="page-header">
-      <div>
+      <div class="header-intro">
         <h1 class="page-title">Extensions Hub</h1>
         <p class="page-subtitle">
           Customize and extend your StudyLoop environment with local tools and integrations.
@@ -9,7 +10,7 @@
       </div>
       <div class="header-actions">
         <div v-if="isPro" class="tier-pill pro">
-          <span class="sparkle">★</span> PRO ACTIVE
+          <span class="pro-dot"></span> PRO ACTIVE
         </div>
         <div v-else class="tier-pill free">
           FREE PLAN
@@ -20,44 +21,80 @@
       </div>
     </header>
 
-    <!-- Error message banner if any -->
+    <!-- Error Banner -->
     <div v-if="errorMessage" class="error-banner">
-      {{ errorMessage }}
-      <button class="close-err" @click="errorMessage = ''">×</button>
+      <span>{{ errorMessage }}</span>
+      <button class="close-err" @click="errorMessage = ''" aria-label="Close error">×</button>
     </div>
 
     <!-- Free Extensions Section -->
     <section class="extension-section">
       <div class="section-title-row">
-        <h2>Free Extensions</h2>
-        <span class="count-badge">{{ freeExtensions.length }} available</span>
+        <div class="section-heading">
+          <h2>Free Extensions</h2>
+          <span class="count-badge">{{ freeExtensions.length }} available</span>
+        </div>
       </div>
 
       <div class="extensions-grid">
-        <div v-for="ext in freeExtensions" :key="ext.id" class="ext-card">
-          <div class="card-header">
-            <div class="icon-box">🧩</div>
-            <div class="ext-meta">
-              <h3 class="ext-name">{{ ext.name }}</h3>
-              <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Utility' }}</span>
+        <div
+          v-for="ext in freeExtensions"
+          :key="ext.id"
+          class="ext-card"
+          :class="{ 'is-disabled': !isExtensionEnabled(ext.id) }"
+        >
+          <div class="card-top">
+            <div class="icon-box">
+              <!-- Monochromatic SVG Icon for clean editorial feel -->
+              <svg v-if="ext.id === 'text_simplifier'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
             </div>
-            <span class="tier-badge free">FREE</span>
+
+            <div class="ext-meta">
+              <div class="title-line">
+                <h3 class="ext-name">{{ ext.name }}</h3>
+                <span class="tier-tag free">FREE</span>
+              </div>
+              <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Reader' }}</span>
+            </div>
+
+            <!-- Toggle Switch -->
+            <label class="switch" :title="isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension'">
+              <input
+                type="checkbox"
+                :checked="isExtensionEnabled(ext.id)"
+                @change="toggleExtension(ext.id)"
+              />
+              <span class="slider"></span>
+            </label>
           </div>
 
-          <p class="ext-desc">{{ ext.description || 'Local StudyLoop extension.' }}</p>
+          <p class="ext-desc">{{ ext.description || 'Local StudyLoop reader extension.' }}</p>
 
-          <div class="card-actions">
+          <div class="card-bottom">
             <button
               v-if="ext.id === 'text_simplifier'"
-              class="run-btn"
+              class="action-btn primary-action"
+              :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/simplify')"
             >
               Open Simplifier ➔
             </button>
             <button
               v-else
-              class="run-btn"
-              :disabled="runningId === ext.id"
+              class="action-btn primary-action"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
               @click="handleRun(ext)"
             >
               {{ runningId === ext.id ? 'Running...' : 'Run Extension' }}
@@ -70,43 +107,71 @@
     <!-- Pro Extensions Section -->
     <section class="extension-section pro-section">
       <div class="section-title-row">
-        <div class="pro-heading">
+        <div class="section-heading">
           <h2>Pro Extensions</h2>
-          <span class="pro-crown">👑</span>
+          <span class="pro-crown-symbol" title="Pro Features">👑</span>
+          <span class="count-badge pro">{{ displayProExtensions.length }} pro tools</span>
         </div>
-        <span class="count-badge pro">{{ proExtensions.length }} pro tools</span>
       </div>
 
       <div class="extensions-grid">
         <div
-          v-for="ext in proExtensions"
+          v-for="ext in displayProExtensions"
           :key="ext.id"
           class="ext-card pro-card"
-          :class="{ 'pro-locked': !isPro }"
+          :class="{ 'pro-locked': !isPro, 'is-disabled': isPro && !isExtensionEnabled(ext.id) }"
         >
-          <div class="card-header">
-            <div class="icon-box pro-icon">⚡</div>
+          <div class="card-top">
+            <div class="icon-box pro-icon">
+              <!-- Audio icon -->
+              <svg v-if="ext.id === 'audio_overview' || ext.category === 'audio'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+              </svg>
+              <!-- Video/YouTube icon -->
+              <svg v-else-if="ext.id === 'youtube_transcripts' || ext.category === 'ingestion'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              <!-- Default Pro icon -->
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+
             <div class="ext-meta">
-              <h3 class="ext-name">{{ ext.name }}</h3>
+              <div class="title-line">
+                <h3 class="ext-name">{{ ext.name }}</h3>
+                <span class="tier-tag pro">PRO</span>
+              </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Advanced' }}</span>
             </div>
-            <span class="tier-badge pro">PRO</span>
+
+            <!-- Pro Toggle Switch: Active if user is Pro; if Free, clicking triggers upgrade prompt -->
+            <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Pro'">
+              <input
+                type="checkbox"
+                :checked="isPro && isExtensionEnabled(ext.id)"
+                @change="handleProToggle(ext.id)"
+              />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <p class="ext-desc">{{ ext.description || 'Advanced StudyLoop Pro integration.' }}</p>
 
-          <div class="card-actions">
+          <div class="card-bottom">
             <button
               v-if="isPro"
-              class="run-btn pro-run"
-              :disabled="runningId === ext.id"
+              class="action-btn pro-action"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
               @click="handleRun(ext)"
             >
               {{ runningId === ext.id ? 'Running...' : 'Run Extension' }}
             </button>
             <button
               v-else
-              class="upgrade-card-btn"
+              class="action-btn unlock-action"
               @click="handleUpgrade"
             >
               Unlock with Pro
@@ -116,7 +181,7 @@
       </div>
     </section>
 
-    <!-- Output Modal -->
+    <!-- Output Modal (Aligned with Digital Sanctuary elevation & typography) -->
     <div v-if="outputModalOpen" class="modal-overlay" @click.self="outputModalOpen = false">
       <div class="modal-card">
         <div class="modal-header">
@@ -127,7 +192,7 @@
           <pre class="output-pre">{{ extensionOutput }}</pre>
         </div>
         <div class="modal-footer">
-          <button class="secondary-btn" @click="outputModalOpen = false">Close</button>
+          <button class="modal-close-btn" @click="outputModalOpen = false">Close</button>
         </div>
       </div>
     </div>
@@ -151,6 +216,67 @@ const outputModalOpen = ref(false)
 const activeExtName = ref('')
 const extensionOutput = ref('')
 
+// Local state for toggling enabled/disabled extensions
+const enabledMap = ref({})
+
+const fallbackProExtensions = [
+  {
+    id: 'audio_overview',
+    name: 'AI Audio Overview',
+    version: '1.0.0',
+    category: 'audio',
+    tier: 'pro',
+    description: 'Generate dynamic conversational podcast-style audio summaries of reading topics using Edge TTS.'
+  },
+  {
+    id: 'youtube_transcripts',
+    name: 'YouTube Ingestion & Transcripts',
+    version: '0.1.0',
+    category: 'ingestion',
+    tier: 'pro',
+    description: 'Ingest YouTube video lectures, extract timestamped transcripts with chapters, and study with embedded video player and quizzes.'
+  }
+]
+
+function loadEnabledState() {
+  try {
+    const saved = localStorage.getItem('studyloop_extensions_enabled')
+    if (saved) {
+      enabledMap.value = JSON.parse(saved)
+    } else {
+      // Default: all enabled
+      enabledMap.value = {
+        text_simplifier: true,
+        audio_overview: true,
+        youtube_transcripts: true
+      }
+    }
+  } catch (e) {
+    enabledMap.value = { text_simplifier: true, audio_overview: true, youtube_transcripts: true }
+  }
+}
+
+function isExtensionEnabled(id) {
+  return enabledMap.value[id] !== false
+}
+
+function toggleExtension(id) {
+  enabledMap.value[id] = !isExtensionEnabled(id)
+  try {
+    localStorage.setItem('studyloop_extensions_enabled', JSON.stringify(enabledMap.value))
+  } catch (e) {
+    // Ignore storage issues
+  }
+}
+
+function handleProToggle(id) {
+  if (!isPro.value) {
+    handleUpgrade()
+  } else {
+    toggleExtension(id)
+  }
+}
+
 const freeExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'free')
 )
@@ -158,6 +284,14 @@ const freeExtensions = computed(() =>
 const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
+
+// Ensure 2 Pro tools are always available/displayed
+const displayProExtensions = computed(() => {
+  if (proExtensions.value.length > 0) {
+    return proExtensions.value
+  }
+  return fallbackProExtensions
+})
 
 async function fetchExtensions() {
   try {
@@ -169,6 +303,7 @@ async function fetchExtensions() {
 }
 
 async function handleRun(ext) {
+  if (!isExtensionEnabled(ext.id)) return
   errorMessage.value = ''
   runningId.value = ext.id
   try {
@@ -192,6 +327,7 @@ function handleUpgrade() {
 }
 
 onMounted(async () => {
+  loadEnabledState()
   await initClerk()
   await fetchExtensions()
 })
@@ -199,29 +335,39 @@ onMounted(async () => {
 
 <style scoped>
 .extensions-page {
-  padding: 32px 40px;
+  padding: 40px 48px;
   max-width: 1200px;
   margin: 0 auto;
   color: var(--on-surface);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* Header */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 36px;
+  margin-bottom: 40px;
+  gap: 24px;
+}
+
+.header-intro {
+  max-width: 680px;
 }
 
 .page-title {
+  font-family: 'Manrope', sans-serif;
   font-size: 28px;
   font-weight: 700;
   margin: 0 0 8px 0;
   letter-spacing: -0.02em;
+  color: var(--on-surface);
 }
 
 .page-subtitle {
   color: var(--muted-text);
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.5;
   margin: 0;
 }
 
@@ -229,157 +375,177 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .tier-pill {
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tier-pill.free {
-  background: var(--surface-container-high);
-  color: var(--on-surface-variant);
-  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--muted-text);
 }
 
 .tier-pill.pro {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  background: var(--surface-container-lowest);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(45, 51, 56, 0.04);
 }
 
-.sparkle {
-  color: #fff;
-  margin-right: 2px;
+.pro-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
 }
 
 .upgrade-btn-header {
-  background: var(--primary);
+  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
   color: var(--on-primary);
   border: none;
-  padding: 8px 16px;
-  border-radius: 10px;
+  padding: 8px 18px;
+  border-radius: 12px;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.15s ease;
 }
 
 .upgrade-btn-header:hover {
-  opacity: 0.9;
+  opacity: 0.95;
+  transform: translateY(-1px);
 }
 
+.upgrade-btn-header:active {
+  transform: scale(0.97);
+}
+
+/* Error Banner */
 .error-banner {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+  background: rgba(159, 64, 61, 0.08);
+  color: #9f403d;
   padding: 12px 16px;
-  border-radius: 10px;
-  margin-bottom: 24px;
+  border-radius: 12px;
+  margin-bottom: 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  font-size: 13.5px;
 }
 
 .close-err {
   background: transparent;
   border: none;
-  color: #ef4444;
+  color: #9f403d;
   font-size: 18px;
   cursor: pointer;
+  padding: 0 4px;
 }
 
+/* Sections */
 .extension-section {
-  margin-bottom: 40px;
+  margin-bottom: 44px;
 }
 
 .section-title-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  justify-content: space-between;
+  margin-bottom: 20px;
 }
 
-.section-title-row h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.pro-heading {
+.section-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.pro-crown {
+.section-heading h2 {
+  font-family: 'Manrope', sans-serif;
   font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--on-surface);
+  letter-spacing: -0.01em;
+}
+
+.pro-crown-symbol {
+  font-size: 16px;
+  opacity: 0.85;
 }
 
 .count-badge {
   font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--surface-container-high);
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-container-low);
   color: var(--muted-text);
 }
 
 .count-badge.pro {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  background: var(--surface-container);
+  color: var(--primary);
+  font-weight: 600;
 }
 
+/* Grid & Cards - Clean No-Line Sanctuary System */
 .extensions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 20px;
 }
 
 .ext-card {
-  background: var(--surface-container);
-  border: 1px solid var(--outline-variant);
-  border-radius: 14px;
-  padding: 20px;
+  background: var(--surface-container-lowest);
+  border-radius: 16px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  gap: 18px;
+  box-shadow: 0 2px 10px rgba(45, 51, 56, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .ext-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(45, 51, 56, 0.06);
 }
 
-.pro-card {
-  border-color: color-mix(in srgb, #f59e0b 30%, var(--outline-variant));
+.ext-card.is-disabled {
+  opacity: 0.7;
 }
 
-.card-header {
+.card-top {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
 }
 
 .icon-box {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--surface-container-highest);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
   display: grid;
   place-items: center;
-  font-size: 18px;
   flex-shrink: 0;
 }
 
 .pro-icon {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  background: var(--surface-container);
+  color: var(--primary);
 }
 
 .ext-meta {
@@ -387,10 +553,19 @@ onMounted(async () => {
   min-width: 0;
 }
 
+.title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
 .ext-name {
-  font-size: 16px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px;
   font-weight: 600;
-  margin: 0 0 2px 0;
+  margin: 0;
+  color: var(--on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -402,88 +577,145 @@ onMounted(async () => {
   text-transform: capitalize;
 }
 
-.tier-badge {
+.tier-tag {
   font-size: 10px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
   letter-spacing: 0.05em;
 }
 
-.tier-badge.free {
-  background: var(--surface-container-highest);
-  color: var(--on-surface-variant);
+.tier-tag.free {
+  background: var(--surface-container-low);
+  color: var(--muted-text);
 }
 
-.tier-badge.pro {
-  background: #f59e0b;
-  color: #000;
+.tier-tag.pro {
+  background: var(--surface-container);
+  color: var(--primary);
 }
 
+/* Switch Component */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--surface-container-low);
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--on-surface);
+  opacity: 0.6;
+  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+  background-color: #ffffff;
+  opacity: 1;
+}
+
+/* Descriptions */
 .ext-desc {
   font-size: 13.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--muted-text);
   margin: 0;
   flex-grow: 1;
 }
 
-.card-actions {
+/* Actions */
+.card-bottom {
   display: flex;
   gap: 8px;
 }
 
-.run-btn {
+.action-btn {
   width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--surface-container-highest);
-  border: 1px solid var(--outline-variant);
-  color: var(--primary);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 13.5px;
   cursor: pointer;
+  border: none;
   transition: all 0.2s ease;
+  font-family: inherit;
 }
 
-.run-btn:hover:not(:disabled) {
-  background: var(--primary);
+.action-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primary-action {
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+}
+
+.primary-action:hover:not(:disabled) {
+  background: var(--surface-container);
+  color: var(--primary);
+}
+
+.pro-action {
+  background: var(--surface-container);
+  color: var(--primary);
+}
+
+.pro-action:hover:not(:disabled) {
+  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
   color: var(--on-primary);
 }
 
-.run-btn.pro-run {
-  background: color-mix(in srgb, #f59e0b 20%, transparent);
-  border-color: #f59e0b;
-  color: #f59e0b;
+.unlock-action {
+  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
+  color: var(--on-primary);
 }
 
-.run-btn.pro-run:hover:not(:disabled) {
-  background: #f59e0b;
-  color: #000;
+.unlock-action:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
 }
 
-.upgrade-card-btn {
-  width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  border: none;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 13.5px;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.upgrade-card-btn:hover {
-  opacity: 0.9;
-}
-
-/* Modal styles */
+/* Modal */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(45, 51, 56, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -493,28 +725,29 @@ onMounted(async () => {
 
 .modal-card {
   background: var(--surface-container-lowest);
-  border: 1px solid var(--outline-variant);
   border-radius: 16px;
   width: 100%;
-  max-width: 680px;
+  max-width: 640px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 20px 40px rgba(45, 51, 56, 0.08);
 }
 
 .modal-header {
-  padding: 18px 24px;
+  padding: 20px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--outline-variant);
 }
 
 .modal-header h3 {
+  font-family: 'Manrope', sans-serif;
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
+  color: var(--on-surface);
 }
 
 .close-modal-btn {
@@ -523,41 +756,47 @@ onMounted(async () => {
   font-size: 16px;
   cursor: pointer;
   color: var(--muted-text);
+  padding: 4px;
 }
 
 .modal-body {
-  padding: 20px 24px;
+  padding: 0 24px 20px;
   overflow-y: auto;
   flex: 1;
 }
 
 .output-pre {
   margin: 0;
-  font-family: monospace;
-  font-size: 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12.5px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--on-surface);
   background: var(--surface-container-low);
-  padding: 14px;
-  border-radius: 10px;
+  padding: 16px;
+  border-radius: 12px;
 }
 
 .modal-footer {
-  padding: 14px 24px;
-  border-top: 1px solid var(--outline-variant);
+  padding: 16px 24px;
   display: flex;
   justify-content: flex-end;
 }
 
-.secondary-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  background: var(--surface-container-high);
-  border: 1px solid var(--outline-variant);
+.modal-close-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  background: var(--surface-container-low);
+  border: none;
   color: var(--on-surface);
   font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: var(--surface-container);
 }
 </style>

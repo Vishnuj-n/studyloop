@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"ai-tutor/internal/extension"
-	"ai-tutor/internal/utils"
 )
 
 // ExtensionDTO represents an extension serialized for the frontend.
@@ -164,43 +163,13 @@ func (a *App) UninstallExtension(id string) map[string]interface{} {
 // SimplifyReadingContent takes dense text content and simplifies it using the LLM
 // while preserving all core technical concepts, formulas, and definitions.
 func (a *App) SimplifyReadingContent(content string) map[string]interface{} {
-	a.aiMutex.Lock()
-	provider := a.fastLLMProvider
-	if provider == nil {
-		provider = a.heavyLLMProvider
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not available"}
 	}
-	a.aiMutex.Unlock()
-
-	if provider == nil {
-		return map[string]interface{}{"error": "AI provider not available. Please check your API key in Settings."}
-	}
-
-	if strings.TrimSpace(content) == "" {
-		return map[string]interface{}{"error": "content cannot be empty"}
-	}
-
-	prompt := fmt.Sprintf(`You are an expert tutor and text clarifier.
-Your goal is to rewrite and simplify the following reading material so that it is intuitive, crystal clear, and easy to understand, WITHOUT LOSING any technical accuracy, formulas, key definitions, or essential details.
-
-Format your output in clean Markdown with:
-1. **TL;DR Overview**: 1-2 sentence core intuition.
-2. **Key Concepts Explained Simply**: Clear, intuitive explanations using real-world analogies where helpful.
-3. **Step-by-Step Breakdown**: Detailed, structured explanation with all core facts intact.
-4. **Quick Summary / Key Takeaways**: Bullet points of what to remember.
-
-Reading Material:
-"""
-%s
-"""
-
-Return only the markdown response without meta-commentary.`, content)
-
-	simplified, err := provider.GenerateAnswer(prompt)
+	simplified, err := a.studyService.SimplifyReadingContent(context.Background(), content)
 	if err != nil {
-		utils.Warnf("[SIMPLIFY] LLM simplification error: %v", err)
-		return map[string]interface{}{"error": fmt.Sprintf("failed to simplify content: %v", err)}
+		return map[string]interface{}{"error": err.Error()}
 	}
-
 	return map[string]interface{}{
 		"simplified": simplified,
 	}
