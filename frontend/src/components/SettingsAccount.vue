@@ -1,174 +1,113 @@
 <template>
   <article class="panel form-grid">
     <div class="header-row">
-      <h2>Account &amp; Cloud</h2>
+      <h2>Account &amp; Subscription</h2>
       <span v-if="activeProfileName" class="profile-pill">
         Profile: <strong>{{ activeProfileName }}</strong>
       </span>
     </div>
 
-    <div v-if="settings.cloud_api_token" class="signed-in-box">
+    <!-- Signed In with Clerk -->
+    <div v-if="clerkAuth.isSignedIn.value" class="signed-in-box">
       <div class="status-indicator">
         <span class="pulse-dot active"></span>
-        <strong>Cloud Sync Active</strong>
+        <strong>Connected Account</strong>
       </div>
+
       <div class="user-details">
-        <p><strong>Username:</strong> {{ settings.student_username || 'Student' }}</p>
-        <p><strong>Classroom:</strong> {{ settings.classroom_code }}</p>
+        <p class="user-email">
+          <strong>Email:</strong> {{ clerkAuth.user.value?.email || 'User' }}
+        </p>
+        <div class="plan-row">
+          <span><strong>Current Plan:</strong></span>
+          <span v-if="clerkAuth.isPro.value" class="plan-pill pro">
+            ★ PRO PLAN
+          </span>
+          <span v-else class="plan-pill free">
+            FREE PLAN
+          </span>
+        </div>
       </div>
-      <button type="button" class="sync-btn danger-btn" @click="$emit('logout')">Sign Out</button>
+
+      <div class="account-actions">
+        <button
+          v-if="!clerkAuth.isPro.value"
+          type="button"
+          class="upgrade-btn"
+          @click="clerkAuth.openBilling()"
+        >
+          Upgrade to Pro
+        </button>
+        <button
+          type="button"
+          class="billing-btn"
+          @click="clerkAuth.openBilling()"
+        >
+          Manage Billing
+        </button>
+        <button
+          type="button"
+          class="danger-btn"
+          @click="clerkAuth.signOut()"
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
 
-    <div v-else class="login-form-container">
-      <div class="auth-toggle-bar">
-        <button
-          type="button"
-          class="auth-tab"
-          :class="{ active: !isSignUpMode }"
-          @click="$emit('toggleMode')"
-        >
-          Sign In
-        </button>
-        <button
-          type="button"
-          class="auth-tab"
-          :class="{ active: isSignUpMode }"
-          @click="$emit('toggleMode')"
-        >
-          Create Account
-        </button>
-      </div>
-
-      <p class="field-hint" style="margin-bottom: 0.75rem">
-        {{
-          isSignUpMode
-            ? 'Register a student account using your classroom code to enable cloud sync.'
-            : 'Sign in with your student credentials to enable cloud sync for this profile.'
-        }}
+    <!-- Signed Out / Anonymous State -->
+    <div v-else class="signed-out-box">
+      <p class="field-hint">
+        Sign in to your StudyLoop account to activate your Pro subscription, unlock custom extensions, and access cloud backup.
       </p>
 
-      <div v-if="loginError" class="login-error-message">
-        {{ loginError }}
+      <div class="signed-out-plan-card">
+        <div class="plan-info">
+          <span class="plan-pill free">CURRENT: FREE PLAN</span>
+          <p class="plan-desc">Access to core study queue, Reader, Quiz, FSRS flashcards, and Free extensions.</p>
+        </div>
+        <button type="button" class="sign-in-btn" @click="clerkAuth.signIn()">
+          Sign In / Create Account
+        </button>
       </div>
-
-      <template v-if="!isSignUpMode">
-        <div class="form-group">
-          <label for="student-username">Student Username / ID</label>
-          <input
-            id="student-username"
-            :value="loginUsername"
-            type="text"
-            placeholder="e.g. john_doe"
-            :disabled="loggingIn"
-            @input="$emit('update:loginUsername', $event.target.value)"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="student-password">Password</label>
-          <input
-            id="student-password"
-            :value="loginPassword"
-            type="password"
-            placeholder="••••••••"
-            :disabled="loggingIn"
-            @input="$emit('update:loginPassword', $event.target.value)"
-          />
-        </div>
-
-        <button type="button" class="sync-btn" :disabled="loggingIn" @click="$emit('login')">
-          {{ loggingIn ? 'Signing In...' : 'Sign In & Sync' }}
-        </button>
-      </template>
-
-      <template v-else>
-        <div class="form-group">
-          <label for="signup-username">Student Username / ID</label>
-          <input
-            id="signup-username"
-            :value="signupUsername"
-            type="text"
-            placeholder="e.g. john_doe"
-            :disabled="loggingIn"
-            @input="$emit('update:signupUsername', $event.target.value)"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="signup-password">Create Password</label>
-          <input
-            id="signup-password"
-            :value="signupPassword"
-            type="password"
-            placeholder="Min. 6 characters"
-            :disabled="loggingIn"
-            @input="$emit('update:signupPassword', $event.target.value)"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="signup-classroom">Classroom Code</label>
-          <input
-            id="signup-classroom"
-            :value="signupClassroomCode"
-            type="text"
-            placeholder="e.g. BCD601"
-            style="text-transform: uppercase"
-            :disabled="loggingIn"
-            @input="$emit('update:signupClassroomCode', $event.target.value)"
-          />
-          <p class="field-hint">Obtain this 6-character code from your teacher.</p>
-        </div>
-
-        <button type="button" class="sync-btn" :disabled="loggingIn" @click="$emit('signup')">
-          {{ loggingIn ? 'Creating Account...' : 'Sign Up & Sync' }}
-        </button>
-      </template>
     </div>
 
-    <div v-if="isDev" class="form-group dev-section">
-      <label for="cloud-url">
-        Sync Server URL
+    <!-- Local Dev / Testing Helper -->
+    <div v-if="isDev" class="dev-section">
+      <label class="dev-label">
+        Developer Testing
         <span class="dev-badge">DEV</span>
       </label>
-      <input
-        id="cloud-url"
-        v-model="settings.cloud_sync_url"
-        type="url"
-        placeholder="https://example.com/api/sync"
-        :disabled="disabled"
-      />
+      <div class="dev-toggle-row">
+        <span>Simulate Pro Subscription:</span>
+        <button
+          type="button"
+          class="dev-toggle-btn"
+          :class="{ active: clerkAuth.isPro.value }"
+          @click="clerkAuth.setMockPro(!clerkAuth.isPro.value)"
+        >
+          {{ clerkAuth.isPro.value ? 'Pro Simulated (Active)' : 'Free Mode (Click to Toggle)' }}
+        </button>
+      </div>
     </div>
   </article>
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
+import { useClerkAuth, initClerk } from '../services/clerkAuth'
+
 defineProps({
-  settings: { type: Object, required: true },
+  settings: { type: Object, default: () => ({}) },
   isDev: { type: Boolean, default: false },
-  disabled: { type: Boolean, default: false },
   activeProfileName: { type: String, default: '' },
-  isSignUpMode: { type: Boolean, default: false },
-  loginUsername: { type: String, default: '' },
-  loginPassword: { type: String, default: '' },
-  signupUsername: { type: String, default: '' },
-  signupPassword: { type: String, default: '' },
-  signupClassroomCode: { type: String, default: '' },
-  loginError: { type: String, default: '' },
-  loggingIn: { type: Boolean, default: false },
 })
 
-defineEmits([
-  'login',
-  'signup',
-  'logout',
-  'toggleMode',
-  'update:loginUsername',
-  'update:loginPassword',
-  'update:signupUsername',
-  'update:signupPassword',
-  'update:signupClassroomCode',
-])
+const clerkAuth = useClerkAuth()
+
+onMounted(async () => {
+  await initClerk()
+})
 </script>
 
 <style scoped>
@@ -188,102 +127,28 @@ defineEmits([
   border: 1px solid color-mix(in srgb, var(--outline-variant) 30%, transparent);
 }
 
-.auth-toggle-bar {
-  display: flex;
-  gap: 8px;
-  background: var(--surface-container-low);
-  padding: 4px;
-  border-radius: 10px;
-  margin-bottom: 4px;
-}
-
-.auth-tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--muted-text);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.auth-tab.active {
-  background: var(--surface-container-highest);
-  color: var(--primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
-
-label {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--on-surface);
-}
-
-input[type='text'],
-input[type='password'],
-input[type='url'] {
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
-  border-radius: 12px;
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  padding: 12px 14px;
-  font-size: 14px;
-  font-family: inherit;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
-  outline: none;
-}
-
-.form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-h2 {
-  font-size: 20px;
-  margin: 0 0 16px;
-  font-weight: 700;
-}
-
-.panel {
-  background: var(--surface-container-lowest);
-  border-radius: 16px;
-  padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
-  box-shadow: 0 4px 20px color-mix(in srgb, var(--on-surface) 3%, transparent);
-}
-
 .signed-in-box {
-  background: var(--surface-low);
-  border: 1px solid var(--border);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .status-indicator {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--success);
+  color: #10b981;
+  font-size: 14px;
 }
 
 .pulse-dot.active {
   width: 8px;
   height: 8px;
-  background: var(--success);
+  background: #10b981;
   border-radius: 50%;
   box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
   animation: pulse 1.5s infinite;
@@ -305,68 +170,143 @@ h2 {
 }
 
 .user-details {
-  font-size: 0.9rem;
-  color: var(--on-surface);
-  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
 }
 
-.user-details p {
-  margin: 0.25rem 0;
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+}
+
+.plan-pill.free {
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+}
+
+.plan-pill.pro {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.upgrade-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.billing-btn {
+  background: var(--surface-container-highest);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
 }
 
 .danger-btn {
-  background: rgba(239, 68, 68, 0.1) !important;
-  border: 1px solid rgba(239, 68, 68, 0.3) !important;
-  color: #ef4444 !important;
-  transition: all 0.2s ease;
-}
-
-.danger-btn:hover {
-  background: rgba(239, 68, 68, 0.2) !important;
-  border-color: rgba(239, 68, 68, 0.5) !important;
-}
-
-.sync-btn {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
-  color: var(--primary);
-  font-weight: 700;
-  background: var(--surface-container-highest);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13.5px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  margin-left: auto;
 }
 
-.sync-btn:hover {
-  background: var(--surface-container-low);
-}
-
-.login-form-container {
+.signed-out-box {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 16px;
 }
 
-.login-error-message {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
+.signed-out-plan-card {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.plan-desc {
+  font-size: 13px;
+  color: var(--muted-text);
+  margin: 6px 0 0 0;
+}
+
+.sign-in-btn {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--surface-container-lowest);
+  border-radius: 16px;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
 }
 
 .field-hint {
-  margin: 2px 0 8px;
   color: var(--muted-text);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .dev-section {
-  margin-top: 1.5rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1.5rem;
+  margin-top: 10px;
+  border-top: 1px solid var(--outline-variant);
+  padding-top: 16px;
+}
+
+.dev-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-text);
+  display: block;
+  margin-bottom: 8px;
 }
 
 .dev-badge {
@@ -376,9 +316,30 @@ h2 {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  background: color-mix(in srgb, var(--warning, #f0a000) 20%, transparent);
-  color: var(--warning, #f0a000);
-  vertical-align: middle;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.dev-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+}
+
+.dev-toggle-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.dev-toggle-btn.active {
+  background: #f59e0b;
+  color: #000;
+  font-weight: 700;
 }
 </style>

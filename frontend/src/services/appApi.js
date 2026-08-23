@@ -318,3 +318,24 @@ export function logFrontendEvent(level, component, event, details = '') {
     console.error('Failed to forward log to backend:', err)
   }
 }
+
+export function listExtensions() {
+  return appBridge().ListExtensions()
+}
+
+export function runExtension(id, input = '', isPro = false) {
+  return appBridge().RunExtension(id, input, !!isPro)
+}
+
+export function installExtensionZip(zipPath) {
+  return appBridge().InstallExtensionZip(zipPath)
+}
+
+export function uninstallExtension(id) {
+  return appBridge().UninstallExtension(id)
+}
+
+export function simplifyReadingContent(content) {
+  return appBridge().SimplifyReadingContent(content)
+}
+

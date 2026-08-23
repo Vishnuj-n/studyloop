@@ -108,6 +108,14 @@
             >
               {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
             </button>
+            <button
+              class="secondary simplify-btn"
+              :disabled="reader.loadingBundle.value || simplifying"
+              title="Convert session text into an easy-to-understand breakdown"
+              @click="handleSimplify"
+            >
+              {{ simplifying ? '✨ Simplifying...' : '✨ Simplify' }}
+            </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
             </span>
@@ -236,6 +244,28 @@
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />
+
+    <!-- Simplify Modal -->
+    <div v-if="simplifyModalOpen" class="simplify-modal-overlay" @click.self="simplifyModalOpen = false">
+      <div class="simplify-modal-card">
+        <div class="simplify-modal-header">
+          <div class="simplify-header-title">
+            <span class="sparkle-icon">✨</span>
+            <h3>AI Simplified Breakdown</h3>
+          </div>
+          <button class="close-modal-btn" @click="simplifyModalOpen = false">✕</button>
+        </div>
+        <div class="simplify-modal-body">
+          <MarkdownReader :content="simplifiedText" :is-task-flow="false" />
+        </div>
+        <div class="simplify-modal-footer">
+          <button class="secondary" @click="copySimplifiedText">
+            {{ copiedSimplified ? 'Copied! ✓' : '📋 Copy Markdown' }}
+          </button>
+          <button class="primary" @click="simplifyModalOpen = false">Done</button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -247,6 +277,8 @@ import {
   getUserSettings,
   logFrontendEvent,
   trackAnalyticsEvent,
+  simplifyReadingContent,
+  getTopicSectionsContent,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
@@ -259,6 +291,51 @@ import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
 
 const showAudioOverview = ref(false)
+const simplifying = ref(false)
+const simplifyModalOpen = ref(false)
+const simplifiedText = ref('')
+const copiedSimplified = ref(false)
+
+async function handleSimplify() {
+  if (simplifying.value) return
+  simplifying.value = true
+  try {
+    let contentToSimplify = reader.textContent.value || ''
+    if (!contentToSimplify.trim() && reader.selectedTopicID.value) {
+      const bundle = await getTopicSectionsContent(
+        reader.selectedTopicID.value,
+        reader.selectedNotebookID.value
+      )
+      if (bundle?.sections_content) {
+        contentToSimplify = bundle.sections_content
+      }
+    }
+    if (!contentToSimplify.trim()) {
+      showError('No text available to simplify.')
+      return
+    }
+    const res = await simplifyReadingContent(contentToSimplify)
+    if (res?.error) {
+      showError(res.error)
+    } else if (res?.simplified) {
+      simplifiedText.value = res.simplified
+      simplifyModalOpen.value = true
+    }
+  } catch (err) {
+    showError(String(err))
+  } finally {
+    simplifying.value = false
+  }
+}
+
+async function copySimplifiedText() {
+  if (!simplifiedText.value) return
+  await navigator.clipboard.writeText(simplifiedText.value)
+  copiedSimplified.value = true
+  setTimeout(() => {
+    copiedSimplified.value = false
+  }, 2500)
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -1245,4 +1322,84 @@ button:disabled {
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.simplify-btn {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.simplify-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.simplify-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.simplify-modal-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 820px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.simplify-modal-header {
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.simplify-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simplify-header-title h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sparkle-icon {
+  font-size: 18px;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--muted-text);
+}
+
+.simplify-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.simplify-modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--outline-variant);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 </style>
