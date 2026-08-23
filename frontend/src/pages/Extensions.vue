@@ -110,13 +110,13 @@
         <div class="section-heading">
           <h2>Pro Extensions</h2>
           <span class="pro-crown-symbol" title="Pro Features">👑</span>
-          <span class="count-badge pro">{{ displayProExtensions.length }} pro tools</span>
+          <span class="count-badge pro">{{ proExtensions.length }} pro tools</span>
         </div>
       </div>
 
       <div class="extensions-grid">
         <div
-          v-for="ext in displayProExtensions"
+          v-for="ext in proExtensions"
           :key="ext.id"
           class="ext-card pro-card"
           :class="{ 'pro-locked': !isPro, 'is-disabled': isPro && !isExtensionEnabled(ext.id) }"
@@ -204,10 +204,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listExtensions, runExtension } from '../services/appApi'
 import { useClerkAuth, initClerk } from '../services/clerkAuth'
+import { useExtensions } from '../composables/useExtensions'
 
 const router = useRouter()
 const clerkAuth = useClerkAuth()
 const isPro = computed(() => clerkAuth.isPro.value)
+const { isEnabled: isExtensionEnabled, toggleExtension } = useExtensions()
 
 const extensions = ref([])
 const runningId = ref(null)
@@ -215,67 +217,6 @@ const errorMessage = ref('')
 const outputModalOpen = ref(false)
 const activeExtName = ref('')
 const extensionOutput = ref('')
-
-// Local state for toggling enabled/disabled extensions
-const enabledMap = ref({})
-
-const fallbackProExtensions = [
-  {
-    id: 'audio_overview',
-    name: 'AI Audio Overview',
-    version: '1.0.0',
-    category: 'audio',
-    tier: 'pro',
-    description: 'Generate dynamic conversational podcast-style audio summaries of reading topics using Edge TTS.'
-  },
-  {
-    id: 'youtube_transcripts',
-    name: 'YouTube Ingestion & Transcripts',
-    version: '0.1.0',
-    category: 'ingestion',
-    tier: 'pro',
-    description: 'Ingest YouTube video lectures, extract timestamped transcripts with chapters, and study with embedded video player and quizzes.'
-  }
-]
-
-function loadEnabledState() {
-  try {
-    const saved = localStorage.getItem('studyloop_extensions_enabled')
-    if (saved) {
-      enabledMap.value = JSON.parse(saved)
-    } else {
-      // Default: all enabled
-      enabledMap.value = {
-        text_simplifier: true,
-        audio_overview: true,
-        youtube_transcripts: true
-      }
-    }
-  } catch (e) {
-    enabledMap.value = { text_simplifier: true, audio_overview: true, youtube_transcripts: true }
-  }
-}
-
-function isExtensionEnabled(id) {
-  return enabledMap.value[id] !== false
-}
-
-function toggleExtension(id) {
-  enabledMap.value[id] = !isExtensionEnabled(id)
-  try {
-    localStorage.setItem('studyloop_extensions_enabled', JSON.stringify(enabledMap.value))
-  } catch (e) {
-    // Ignore storage issues
-  }
-}
-
-function handleProToggle(id) {
-  if (!isPro.value) {
-    handleUpgrade()
-  } else {
-    toggleExtension(id)
-  }
-}
 
 const freeExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'free')
@@ -285,13 +226,13 @@ const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
 
-// Ensure 2 Pro tools are always available/displayed
-const displayProExtensions = computed(() => {
-  if (proExtensions.value.length > 0) {
-    return proExtensions.value
+function handleProToggle(id) {
+  if (!isPro.value) {
+    handleUpgrade()
+  } else {
+    toggleExtension(id)
   }
-  return fallbackProExtensions
-})
+}
 
 async function fetchExtensions() {
   try {
@@ -327,7 +268,6 @@ function handleUpgrade() {
 }
 
 onMounted(async () => {
-  loadEnabledState()
   await initClerk()
   await fetchExtensions()
 })

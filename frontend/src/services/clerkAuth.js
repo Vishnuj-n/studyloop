@@ -7,16 +7,57 @@ const clerkInstance = ref(null)
 
 const publishableKey =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  'pk_test_placeholder_for_studyloop'
+  'pk_test_aW5ub2NlbnQtb3JjYS01NjA1LmNsZXJrLmFjY291bnRzLmRldiQ'
+
+function getClerkAccountsUrl(pubKey) {
+  try {
+    const parts = (pubKey || '').split('_')
+    if (parts.length >= 3) {
+      const decoded = atob(parts[2])
+      const domain = decoded.endsWith('$') ? decoded.slice(0, -1) : decoded
+      if (domain) {
+        return `https://${domain}`
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return 'https://clerk.com'
+}
 
 // Initialize Clerk
 export async function initClerk() {
-  if (isLoaded.value) return clerkInstance.value
+  if (isLoaded.value && clerkInstance.value) return clerkInstance.value
 
   try {
-    // Dynamic import to support offline / zero-network bundling
-    const { Clerk } = await import('@clerk/clerk-js')
-    const clerk = new Clerk(publishableKey)
+    let ClerkClass = null
+    try {
+      const mod = await import('@clerk/clerk-js')
+      ClerkClass = mod.Clerk || mod.default?.Clerk || mod.default
+    } catch {
+      // If npm import isn't bundled, load from Clerk CDN
+      if (window.Clerk) {
+        ClerkClass = window.Clerk
+      } else {
+        const domain = getClerkAccountsUrl(publishableKey).replace('https://', '')
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+          script.src = `https://${domain}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`
+          script.async = true
+          script.crossOrigin = 'anonymous'
+          script.onload = () => resolve()
+          script.onerror = () => reject(new Error('Failed to load Clerk script from CDN'))
+          document.head.appendChild(script)
+        })
+        ClerkClass = window.Clerk
+      }
+    }
+
+    if (!ClerkClass) {
+      throw new Error('Clerk class could not be resolved')
+    }
+
+    const clerk = new ClerkClass(publishableKey)
     await clerk.load()
 
     clerkInstance.value = clerk
@@ -100,7 +141,7 @@ export function useClerkAuth() {
       if (clerkInstance.value) {
         clerkInstance.value.openSignIn()
       } else {
-        alert('Clerk publishable key not configured. Set VITE_CLERK_PUBLISHABLE_KEY.')
+        window.open(getClerkAccountsUrl(publishableKey), '_blank')
       }
     },
     signOut: async () => {
@@ -114,7 +155,7 @@ export function useClerkAuth() {
       if (clerkInstance.value) {
         clerkInstance.value.openUserProfile()
       } else {
-        window.open('https://clerk.com', '_blank')
+        window.open(getClerkAccountsUrl(publishableKey), '_blank')
       }
     },
   }

@@ -13,16 +13,7 @@
       </div>
 
       <template v-else>
-        <div class="upload-icon">📄</div>
-        <h3>Upload Your Study Material</h3>
-        <p class="upload-desc">
-          Upload a PDF, Markdown (.md), or Text (.txt) file to create a notebook.
-          <span class="upload-note"
-            >You can also upload multiple files of the same type — they’ll be combined into one
-            notebook.</span
-          >
-        </p>
-
+        <!-- Core File & Folder Dropzone -->
         <input
           ref="fileInput"
           type="file"
@@ -40,35 +31,38 @@
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleFileDrop"
         >
-          <p class="drop-title">Drop files or a folder here</p>
-          <button type="button" class="upload-cta">Choose Files</button>
+          <div class="drop-icon-wrapper">
+            <span class="drop-main-icon">📂</span>
+          </div>
+          <p class="drop-title">Drag & drop your study material</p>
+          <p class="drop-subtitle">
+            Upload a PDF, Markdown (.md), or Text (.txt) file or folder
+          </p>
+          <button type="button" class="upload-cta">Browse Files</button>
           <p class="drop-hint">
-            PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multiple files must be the same type
+            PDF, MD, TXT &bull; Up to 50 MB per file &bull; Multi-files combine into one notebook
           </p>
         </div>
 
-        <div class="youtube-divider"><span>OR IMPORT VIDEO</span></div>
-
-        <div class="youtube-box">
-          <input
-            v-model="youtubeUrl"
-            type="text"
-            placeholder="Paste YouTube lecture URL (e.g. https://www.youtube.com/watch?v=...)"
-            class="youtube-input"
-            :disabled="uploadProgress > 0"
-            @keydown.enter="submitYouTube"
-          />
-          <button
-            type="button"
-            class="youtube-cta"
-            :disabled="!youtubeUrl.trim() || uploadProgress > 0"
-            @click="submitYouTube"
-          >
-            🎥 Ingest Video
-          </button>
+        <!-- Dynamic Extension Importers Tray -->
+        <div v-if="activeImporters.length > 0" class="extension-importers-tray">
+          <span class="tray-label">Import from extensions:</span>
+          <div class="importer-buttons">
+            <button
+              v-for="importer in activeImporters"
+              :key="importer.id"
+              type="button"
+              class="importer-pill-btn"
+              :title="importer.description"
+              @click="openImporter(importer)"
+            >
+              <span class="importer-icon">{{ importer.icon }}</span>
+              <span class="importer-name">{{ importer.name }}</span>
+            </button>
+          </div>
         </div>
 
-
+        <!-- Progress and Alerts -->
         <div v-if="uploadProgress > 0 && uploadProgress < 100" class="progress">
           <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
           <span>{{ uploadProgress }}%</span>
@@ -84,16 +78,29 @@
         </div>
 
         <div v-if="successMessage" class="success-message">{{ successMessage }}</div>
+
+        <!-- Dynamic Importer Modals -->
+        <YoutubeImportModal
+          :show="activeModal === 'youtube'"
+          :is-loading="uploadProgress > 0 && uploadProgress < 100"
+          :status-message="ingestionStatusMessage"
+          :error="uploadError || localError"
+          @close="closeActiveModal"
+          @submit="handleYoutubeSubmit"
+        />
       </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useDialog } from '../composables/useDialog'
+import { useExtensions } from '../composables/useExtensions'
+import { getAvailableImporters } from '../services/importerRegistry'
+import YoutubeImportModal from './YoutubeImportModal.vue'
 
-defineProps({
+const props = defineProps({
   isCloudProfile: { type: Boolean, default: false },
   classroomCode: { type: String, default: '' },
   uploadProgress: { type: Number, default: 0 },
@@ -105,18 +112,27 @@ defineProps({
 
 const emit = defineEmits(['upload-file', 'upload-youtube'])
 const { confirm } = useDialog()
+const { isExtensionActive } = useExtensions()
 
 const fileInput = ref(null)
 const isDragging = ref(false)
 const localError = ref('')
-const youtubeUrl = ref('')
+const activeModal = ref(null)
 
-function submitYouTube() {
-  const url = youtubeUrl.value.trim()
-  if (!url) return
+const activeImporters = computed(() => getAvailableImporters(isExtensionActive))
+
+function openImporter(importer) {
+  localError.value = ''
+  activeModal.value = importer.modalName
+}
+
+function closeActiveModal() {
+  activeModal.value = null
+}
+
+function handleYoutubeSubmit(url) {
   localError.value = ''
   emit('upload-youtube', url)
-  youtubeUrl.value = ''
 }
 
 function triggerFilePicker() {
@@ -162,7 +178,6 @@ async function processFiles(fileList) {
 
   const folderName = files[0].webkitRelativePath?.split('/')[0] || 'Course Notes'
 
-  // ponytail: reuse global useDialog() confirm modal instead of custom modal component
   const ok = await confirm({
     title: `Upload ${files.length} files to this site?`,
     message: `This will upload all files from "${folderName}". Do this only if you trust the site.`,
@@ -202,91 +217,88 @@ function handleFileDrop(e) {
 <style scoped>
 .upload-section {
   display: block;
-  margin-bottom: 48px;
+  margin-bottom: 40px;
 }
 
 .upload-card {
   background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.cloud-locked-container {
+  text-align: center;
   padding: 24px;
 }
 
-.upload-icon {
-  font-size: 48px;
-  text-align: center;
-  margin-bottom: 16px;
+.cloud-locked-container .upload-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
 }
 
-.upload-card h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  color: var(--on-surface);
-}
-
-.upload-card p {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--muted-text);
-}
-
-.upload-desc {
-  margin: 0 0 18px !important;
-  line-height: 1.5;
-}
-
-.upload-desc strong {
-  color: var(--on-surface);
-  font-weight: 600;
-}
-
-.upload-note {
-  display: block;
-  margin-top: 4px;
-  font-size: 12.5px;
-  color: var(--muted-text);
-  opacity: 0.9;
-}
-
+/* File Drop Zone */
 .drop-zone {
-  border: 1px solid var(--outline-variant);
-  border-radius: 14px;
-  padding: 28px;
+  border: 1.5px dashed var(--outline-variant);
+  border-radius: 12px;
+  padding: 32px 24px;
   text-align: center;
   cursor: pointer;
   background: var(--surface-container-lowest);
-  min-height: 170px;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
+  transition: all 0.2s ease;
 }
 
 .drop-zone:hover,
 .drop-zone.dragging {
-  background: rgba(0, 91, 193, 0.06);
   border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-container-lowest));
+  transform: translateY(-1px);
+}
+
+.drop-icon-wrapper {
+  margin-bottom: 2px;
+}
+
+.drop-main-icon {
+  font-size: 32px;
 }
 
 .drop-title {
   margin: 0;
-  font-size: 18px;
-  font-family: 'Manrope', sans-serif;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--on-surface);
 }
 
+.drop-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-text);
+}
+
 .upload-cta {
+  margin: 8px 0 4px;
   border: none;
-  border-radius: 12px;
-  padding: 12px 20px;
-  font-size: 14px;
-  font-family: 'Manrope', sans-serif;
-  font-weight: 700;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
   color: var(--on-primary);
-  background: linear-gradient(15deg, var(--primary), var(--primary-dim));
+  background: var(--primary);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.upload-cta:hover {
+  filter: brightness(1.08);
 }
 
 .upload-cta:active {
@@ -295,10 +307,67 @@ function handleFileDrop(e) {
 
 .drop-hint {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--muted-text);
+  opacity: 0.8;
+}
+
+/* Extension Importers Tray */
+.extension-importers-tray {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+}
+
+.tray-label {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--muted-text);
 }
 
+.importer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.importer-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.importer-pill-btn:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container));
+  transform: translateY(-1px);
+}
+
+.importer-pill-btn:active {
+  transform: scale(0.97);
+}
+
+.importer-icon {
+  font-size: 13px;
+}
+
+/* Progress & Feedback */
 .progress {
   margin-top: 16px;
 }
@@ -340,77 +409,21 @@ function handleFileDrop(e) {
 .error-message {
   margin-top: 12px;
   padding: 12px;
-  background: #ffebee;
-  color: #c62828;
-  border-radius: 6px;
-  font-size: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 8px;
+  font-size: 13.5px;
 }
 
 .success-message {
   margin-top: 12px;
   padding: 12px;
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.youtube-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 18px 0 14px;
-  color: var(--muted-text);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.youtube-divider::before,
-.youtube-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px dashed var(--outline-variant);
-}
-.youtube-divider span {
-  padding: 0 10px;
-}
-
-.youtube-box {
-  display: flex;
-  gap: 8px;
-}
-
-.youtube-input {
-  flex: 1;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  border-radius: 8px;
   font-size: 13.5px;
 }
-.youtube-input:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-.youtube-cta {
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: none;
-  background: #cc0000;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity 0.15s;
-}
-.youtube-cta:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.youtube-cta:not(:disabled):hover {
-  opacity: 0.9;
-}
 </style>
+

@@ -39,7 +39,9 @@ Implemented YouTube video lecture ingestion into StudyLoop using **`yt-dlp`** in
 - **[internal/app/notebook_endpoints.go](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/app/notebook_endpoints.go)**:
   - `UploadYouTubeNotebook(url, isPro)`: Ingests video, verifies Pro entitlement, stores video metadata to disk, creates notebook record, and pre-populates chapter syllabus draft.
 - **[internal/db/reader_bundle_repo.go](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/db/reader_bundle_repo.go)**:
-  - Ensures YouTube notebook bundles set `NotebookURL = "https://www.youtube-nocookie.com/embed/<video_id>"`.
+  - For YouTube notebooks, inspects the active chapter's `start_seconds` and `end_seconds` from metadata JSON on disk.
+  - Generates the authoritative embed URL with query parameters: `https://www.youtube-nocookie.com/embed/<video_id>?enablejsapi=1&start=<start>&end=<end>`.
+  - Populates `bundle.RawContent` with the chapter's actual transcript text rather than the raw JSON string.
 
 ### 3. Frontend Video Reader & Ingestion UI
 - **[frontend/src/services/appApi.js](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/services/appApi.js)**:
@@ -49,9 +51,13 @@ Implemented YouTube video lecture ingestion into StudyLoop using **`yt-dlp`** in
 - **[frontend/src/pages/Notebook.vue](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/pages/Notebook.vue)**:
   - Handles `@upload-youtube` event, verifies Clerk Pro state, and automatically opens syllabus draft confirmation modal.
 - **[frontend/src/composables/useReaderBase.js](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/composables/useReaderBase.js)**:
-  - Added `isYouTube` and `youtubeEmbedUrl` computed helpers.
+  - Added `isYouTube` flag and streamlined `youtubeEmbedUrl` computed helper that preserves the authoritative backend query parameters.
+- **[frontend/src/components/YouTubeReader.vue](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/components/YouTubeReader.vue)**:
+  - Self-contained timestamp parsing from `embedUrl` query parameters (`start`, `end`).
+  - Added timecode & duration banner: `⏱️ 03:17 – 27:39 • Duration: 24m 22s`.
+  - Added clear study session scope hints and collapsible transcript drawer.
 - **[frontend/src/pages/Reader.vue](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/pages/Reader.vue)**:
-  - Added video player mode with embedded 16:9 YouTube player and collapsible transcript drawer.
+  - Renders `YouTubeReader` seamlessly in task and browse modes.
 
 ---
 

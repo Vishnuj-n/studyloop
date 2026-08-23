@@ -100,6 +100,7 @@
               {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
             </button>
             <button
+              v-if="isExtensionActive('audio_overview')"
               class="secondary audio-overview-btn"
               :class="{ active: showAudioOverview }"
               :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
@@ -109,6 +110,7 @@
               {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
             </button>
             <button
+              v-if="isExtensionActive('text_simplifier')"
               class="secondary simplify-btn"
               :disabled="reader.loadingBundle.value || simplifying"
               title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
@@ -274,6 +276,7 @@ import {
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
+import { useExtensions } from '../composables/useExtensions'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
@@ -282,6 +285,7 @@ import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
 
+const { isExtensionActive } = useExtensions()
 const showAudioOverview = ref(false)
 const simplifying = ref(false)
 
