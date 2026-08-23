@@ -48,6 +48,14 @@
 
           <div class="card-actions">
             <button
+              v-if="ext.id === 'text_simplifier'"
+              class="run-btn"
+              @click="router.push('/simplify')"
+            >
+              Open Simplifier ➔
+            </button>
+            <button
+              v-else
               class="run-btn"
               :disabled="runningId === ext.id"
               @click="handleRun(ext)"
@@ -128,9 +136,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { listExtensions, runExtension } from '../services/appApi'
 import { useClerkAuth, initClerk } from '../services/clerkAuth'
 
+const router = useRouter()
 const clerkAuth = useClerkAuth()
 const isPro = computed(() => clerkAuth.isPro.value)
 

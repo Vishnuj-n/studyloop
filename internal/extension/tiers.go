@@ -5,10 +5,8 @@ import "strings"
 // officialExtensionTiers defines the compiled authoritative tiers for official extensions.
 // This prevents users from circumventing Pro requirements by editing local manifest.json files.
 var officialExtensionTiers = map[string]string{
-	"text-simplifier": "free",
-	"markdown-export": "free",
-	"anki-sync":       "pro",
-	"python-runtime":  "pro",
+	"text_simplifier": "free",
+	"audio_overview":  "pro",
 	"youtube":         "pro",
 }
 

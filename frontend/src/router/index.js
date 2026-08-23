@@ -31,6 +31,11 @@ const routes = [
     name: 'extensions',
     component: () => import('../pages/Extensions.vue'),
   },
+  {
+    path: '/simplify',
+    name: 'simplify',
+    component: () => import('../pages/Simplify.vue'),
+  },
   { path: '/settings', name: 'settings', component: Settings },
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
 ]

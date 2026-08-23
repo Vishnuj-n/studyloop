@@ -110,20 +110,11 @@
             </button>
             <button
               class="secondary simplify-btn"
-              :class="{ active: isSimplifiedView }"
               :disabled="reader.loadingBundle.value || simplifying"
-              :title="isSimplifiedView ? 'Switch back to original view' : 'Convert session text into an easy-to-understand breakdown'"
+              title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
               @click="handleSimplify"
             >
-              {{ simplifying ? '✨ Simplifying...' : (isSimplifiedView ? '📄 Original View' : '✨ Simplify') }}
-            </button>
-            <button
-              v-if="isSimplifiedView"
-              class="secondary copy-simplified-btn"
-              title="Copy simplified markdown text"
-              @click="copySimplifiedText"
-            >
-              {{ copiedSimplified ? 'Copied! ✓' : '📋 Copy Simplified' }}
+              {{ simplifying ? '✨ Opening...' : '✨ Simplify' }}
             </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
@@ -141,58 +132,18 @@
         <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">
           Loading document...
         </div>
-        <div v-else-if="isSimplifiedView" class="simplified-session-screen">
-          <div class="simplified-banner-bar">
-            <div class="simplified-banner-left">
-              <span class="sparkle-tag">✨ AI Simplified View</span>
-              <span class="simplified-subtext">Clear, structured breakdown &bull; {{ reader.topicTitle.value }}</span>
-            </div>
-            <button class="return-original-btn" @click="isSimplifiedView = false">
-              📄 Return to Original Document
-            </button>
-          </div>
-          <div class="simplified-reader-body">
-            <MarkdownReader
-              :content="simplifiedText"
-              :topic-title="reader.topicTitle.value"
-              :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-              :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
-              :is-task-flow="isTaskFlow"
-              :completing="completingSession"
-              :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
-              @complete="completeSession"
-            />
-          </div>
-        </div>
-        <div v-else-if="reader.isYouTube.value" class="youtube-player-container">
-          <div class="video-wrapper">
-            <iframe
-              :src="reader.youtubeEmbedUrl.value"
-              class="youtube-iframe"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen
-            ></iframe>
-          </div>
-          <div class="transcript-drawer">
-            <div class="transcript-drawer-header" @click="showTranscript = !showTranscript">
-              <span class="transcript-header-title">📖 Chapter Transcript & Notes</span>
-              <span class="transcript-toggle-btn">{{ showTranscript ? '▲ Hide Transcript' : '▼ View Transcript' }}</span>
-            </div>
-            <div v-if="showTranscript" class="transcript-body">
-              <MarkdownReader
-                :content="reader.textContent.value"
-                :topic-title="reader.topicTitle.value"
-                :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-                :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
-                :is-task-flow="isTaskFlow"
-                :completing="completingSession"
-                :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
-                @complete="completeSession"
-              />
-            </div>
-          </div>
-        </div>
+        <YouTubeReader
+          v-else-if="reader.isYouTube.value"
+          :embed-url="reader.youtubeEmbedUrl.value"
+          :transcript-content="reader.textContent.value"
+          :topic-title="reader.topicTitle.value"
+          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
+          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :is-task-flow="isTaskFlow"
+          :completing="completingSession"
+          :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+          @complete="completeSession"
+        />
         <MarkdownReader
           v-else-if="reader.isMarkdown.value"
           :content="reader.textContent.value"
@@ -325,65 +276,87 @@ import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
+import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
 
 const showAudioOverview = ref(false)
-const showTranscript = ref(true)
 const simplifying = ref(false)
-const isSimplifiedView = ref(false)
-const simplifiedText = ref('')
-const copiedSimplified = ref(false)
 
 async function handleSimplify() {
-  if (isSimplifiedView.value) {
-    isSimplifiedView.value = false
-    return
-  }
-  if (simplifiedText.value) {
-    isSimplifiedView.value = true
-    return
-  }
   if (simplifying.value) return
   simplifying.value = true
   try {
-    let contentToSimplify = reader.textContent.value || ''
-    if (!contentToSimplify.trim() && reader.selectedTopicID.value) {
+    const startPage =
+      reader.navigationMinPage.value ||
+      reader.topicStartPage.value ||
+      reader.currentPage.value ||
+      1
+    const endPage =
+      reader.navigationMaxPage.value ||
+      reader.topicEndPage.value ||
+      reader.pageCount.value ||
+      startPage
+    const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
+    const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+    const topicTitle = cleanTopicTitle(rawTopic)
+
+    let sessionText = ''
+    if (Array.isArray(reader.sections.value) && reader.sections.value.length > 0) {
+      const rangeSections = reader.sections.value.filter(
+        (s) => !s.page_num || (s.page_num >= startPage && s.page_num <= endPage)
+      )
+      sessionText = (rangeSections.length > 0 ? rangeSections : reader.sections.value)
+        .map((s) => s.content || s.text || '')
+        .filter(Boolean)
+        .join('\n\n')
+    }
+    if (!sessionText) {
+      sessionText = reader.textContent.value || ''
+    }
+    if (!sessionText.trim() && reader.selectedTopicID.value) {
       const bundle = await getTopicSectionsContent(
         reader.selectedTopicID.value,
         reader.selectedNotebookID.value
       )
       if (bundle?.content || bundle?.sections_content) {
-        contentToSimplify = bundle.content || bundle.sections_content
+        sessionText = bundle.content || bundle.sections_content
       }
     }
-    if (!contentToSimplify.trim()) {
+
+    if (!sessionText.trim()) {
       showError('No text available to simplify.')
       return
     }
-    const res = await simplifyReadingContent(contentToSimplify)
-    if (res?.error) {
-      showError(res.error)
-    } else if (res?.simplified) {
-      simplifiedText.value = res.simplified
-      isSimplifiedView.value = true
-    }
+
+    try {
+      sessionStorage.setItem('simplify_session_data', JSON.stringify({
+        bookTitle,
+        topicTitle,
+        startPage,
+        endPage,
+        text: sessionText.trim(),
+        taskId: resolvedTaskID.value,
+        topicId: reader.selectedTopicID.value,
+        notebookId: reader.selectedNotebookID.value,
+      }))
+    } catch (e) {}
+
+    router.push({
+      path: '/simplify',
+      query: {
+        taskId: resolvedTaskID.value || undefined,
+        topicId: reader.selectedTopicID.value || undefined,
+        notebookId: reader.selectedNotebookID.value || undefined,
+      }
+    })
   } catch (err) {
-    showError(String(err))
+    showError(String(err?.message || err))
   } finally {
     simplifying.value = false
   }
-}
-
-async function copySimplifiedText() {
-  if (!simplifiedText.value) return
-  await navigator.clipboard.writeText(simplifiedText.value)
-  copiedSimplified.value = true
-  setTimeout(() => {
-    copiedSimplified.value = false
-  }, 2500)
 }
 
 const route = useRoute()
@@ -441,8 +414,6 @@ const progressPercentage = computed(() => {
 
 watch([resolvedTaskID, () => reader.selectedTopicID.value], (next, prev) => {
   console.warn('[READER_STATE] task/topic changed', { previous: prev, next })
-  isSimplifiedView.value = false
-  simplifiedText.value = ''
 })
 
 // Custom PDF Viewer Refs
@@ -1384,138 +1355,5 @@ button:disabled {
   background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
-.simplify-btn.active {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
-}
 
-.copy-simplified-btn {
-  background: var(--surface-container-high);
-  border-color: var(--outline-variant);
-  color: var(--on-surface);
-  font-weight: 600;
-}
-
-.simplified-session-screen {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  padding-bottom: 24px;
-}
-
-.simplified-banner-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface-container));
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--outline-variant));
-  border-radius: 12px;
-}
-
-.simplified-banner-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sparkle-tag {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 15%, transparent);
-  padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.simplified-subtext {
-  font-size: 13.5px;
-  color: var(--muted-text);
-  font-weight: 500;
-}
-
-.return-original-btn {
-  background: var(--surface-container-highest);
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface);
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.return-original-btn:hover {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
-}
-
-.simplified-reader-body {
-  width: 100%;
-}
-
-.youtube-player-container {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: 100%;
-}
-
-.video-wrapper {
-  position: relative;
-  width: 100%;
-  padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-  background: #000000;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.youtube-iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.transcript-drawer {
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.transcript-drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  cursor: pointer;
-  background: var(--surface-container);
-  user-select: none;
-}
-
-.transcript-header-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--on-surface);
-}
-
-.transcript-toggle-btn {
-  font-size: 12.5px;
-  color: var(--primary);
-  font-weight: 600;
-}
-
-.transcript-body {
-  padding: 16px 20px;
-  max-height: 500px;
-  overflow-y: auto;
-}
 </style>

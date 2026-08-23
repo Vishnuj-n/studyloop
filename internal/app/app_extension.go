@@ -75,6 +75,22 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 
 	runtimeType := strings.ToLower(strings.TrimSpace(ext.Runtime()))
 	switch runtimeType {
+	case "internal", "builtin":
+		if ext.ID() == "text_simplifier" {
+			sampleText := strings.TrimSpace(input)
+			if sampleText == "" {
+				sampleText = "StudyLoop is an intelligent study queue platform designed to help students master complex subjects through active recall, spaced repetition, and clear conceptual explanations."
+			}
+			res := a.SimplifyReadingContent(sampleText)
+			if errStr, ok := res["error"].(string); ok && errStr != "" {
+				return map[string]interface{}{"error": errStr, "id": id}
+			}
+			if simplified, ok := res["simplified"].(string); ok {
+				return map[string]interface{}{"output": simplified, "id": id}
+			}
+			return map[string]interface{}{"output": "No output generated", "id": id}
+		}
+		return map[string]interface{}{"output": "Built-in extension executed successfully.", "id": id}
 	case "python", "py":
 		pyExe, pErr := extension.FindPythonExecutable()
 		if pErr != nil {
