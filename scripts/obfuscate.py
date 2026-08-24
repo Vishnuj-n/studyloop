@@ -4,10 +4,13 @@ Obfuscate Python extensions using PyArmor for production release.
 Preserves manifest.json and requirements.txt while protecting Python entrypoint code.
 """
 
+import argparse
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 try:
@@ -37,9 +40,7 @@ def ensure_pyarmor():
         return False
 
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-def _process_single_extension(item: Path, output_dir: Path, has_pyarmor: bool):
+def _process_single_extension(item: Path, output_dir: Path, has_pyarmor: bool, secret_key: str = ""):
     ext_id = item.name
     dest_ext_dir = output_dir / ext_id
     dest_ext_dir.mkdir(parents=True, exist_ok=True)
@@ -53,33 +54,44 @@ def _process_single_extension(item: Path, output_dir: Path, has_pyarmor: bool):
     if not py_files:
         return f"Processed asset-only extension: {ext_id}"
 
-    if has_pyarmor:
+    # Stage Python files with injected build secret
+    with tempfile.TemporaryDirectory() as staging_dir_str:
+        staging_dir = Path(staging_dir_str)
+        staged_py_names = []
+        for py_file in py_files:
+            content = py_file.read_text(encoding="utf-8")
+            if secret_key:
+                content = content.replace('__STUDYLOOP_SECRET__ = "DEV_UNRESTRICTED_TOKEN"', f'__STUDYLOOP_SECRET__ = "{secret_key}"')
+            staged_py = staging_dir / py_file.name
+            staged_py.write_text(content, encoding="utf-8")
+            staged_py_names.append(staged_py.name)
+
+        if has_pyarmor:
+            try:
+                py_args = staged_py_names
+                if shutil.which("pyarmor"):
+                    cmd = ["pyarmor", "gen", "-O", str(dest_ext_dir), *py_args]
+                else:
+                    cmd = [sys.executable, "-m", "pyarmor.cli", "gen", "-O", str(dest_ext_dir), *py_args]
+
+                subprocess.run(cmd, check=True, cwd=str(staging_dir), capture_output=True, text=True)
+                return f"  [OK] PyArmor obfuscation successful for {ext_id}"
+            except Exception as e:
+                print(f"  Warning: PyArmor failed for {ext_id} ({e}), falling back to standard copy/compile.")
+
+        # Fallback: Copy staged .py and compile to .pyc
+        for py_file_name in staged_py_names:
+            shutil.copy2(staging_dir / py_file_name, dest_ext_dir / py_file_name)
+
         try:
-            py_args = [str(f.name) for f in py_files]
-            if shutil.which("pyarmor"):
-                cmd = ["pyarmor", "gen", "-O", str(dest_ext_dir), *py_args]
-            else:
-                cmd = [sys.executable, "-m", "pyarmor.cli", "gen", "-O", str(dest_ext_dir), *py_args]
-
-            subprocess.run(cmd, check=True, cwd=str(item), capture_output=True, text=True)
-            return f"  [OK] PyArmor obfuscation successful for {ext_id}"
+            import compileall
+            compileall.compile_dir(str(dest_ext_dir), force=True, quiet=1)
+            return f"  [OK] Bytecode compilation completed for {ext_id}"
         except Exception as e:
-            print(f"  Warning: PyArmor failed for {ext_id} ({e}), falling back to standard copy/compile.")
-
-    # Fallback: Copy .py and compile to .pyc
-    for py_file in py_files:
-        dest_py = dest_ext_dir / py_file.name
-        shutil.copy2(py_file, dest_py)
-
-    try:
-        import compileall
-        compileall.compile_dir(str(dest_ext_dir), force=True, quiet=1)
-        return f"  [OK] Bytecode compilation completed for {ext_id}"
-    except Exception as e:
-        return f"  Notice: Bytecode compilation skipped for {ext_id} ({e})"
+            return f"  Notice: Bytecode compilation skipped for {ext_id} ({e})"
 
 
-def obfuscate_extensions(output_dir: Path):
+def obfuscate_extensions(output_dir: Path, secret_key: str = ""):
     """Obfuscate all extensions into the target output directory concurrently."""
     output_dir.mkdir(parents=True, exist_ok=True)
     has_pyarmor = ensure_pyarmor()
@@ -89,10 +101,10 @@ def obfuscate_extensions(output_dir: Path):
         print("No extension directories found to obfuscate.")
         return
 
-    print(f"Obfuscating {len(ext_dirs)} extension(s) in parallel...")
+    print(f"Obfuscating {len(ext_dirs)} extension(s) in parallel (Secret injected: {'yes' if secret_key else 'no'})...")
     with ThreadPoolExecutor(max_workers=min(len(ext_dirs), 4)) as executor:
         future_to_ext = {
-            executor.submit(_process_single_extension, item, output_dir, has_pyarmor): item.name
+            executor.submit(_process_single_extension, item, output_dir, has_pyarmor, secret_key): item.name
             for item in ext_dirs
         }
         for future in as_completed(future_to_ext):
@@ -105,12 +117,15 @@ def obfuscate_extensions(output_dir: Path):
 
 
 def main():
-    out_dir = DEFAULT_OUTPUT_DIR
-    if len(sys.argv) > 1 and sys.argv[1].strip():
-        out_dir = Path(sys.argv[1]).resolve()
+    parser = argparse.ArgumentParser(description="Obfuscate StudyLoop extensions with PyArmor.")
+    parser.add_argument("output_dir", nargs="?", default=str(DEFAULT_OUTPUT_DIR), help="Target output directory")
+    parser.add_argument("--secret", default=os.environ.get("EXTENSION_SECRET_KEY", ""), help="Build-time authorization secret")
+    args = parser.parse_args()
+
+    out_dir = Path(args.output_dir).resolve()
 
     print(f"Obfuscating extensions from {EXTENSIONS_SRC} -> {out_dir}")
-    obfuscate_extensions(out_dir)
+    obfuscate_extensions(out_dir, secret_key=args.secret.strip())
     print("\nExtension processing finished successfully.")
 
 

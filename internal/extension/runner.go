@@ -10,6 +10,19 @@ import (
 	"os/exec"
 )
 
+// ExtensionAuthKey is injected at build-time via -ldflags. Defaults to dev fallback.
+var ExtensionAuthKey = "DEV_UNRESTRICTED_TOKEN"
+
+// AttachAuthEnv appends the authorization key to a command's environment.
+func AttachAuthEnv(cmd *exec.Cmd) {
+	if cmd != nil {
+		if len(cmd.Env) == 0 {
+			cmd.Env = os.Environ()
+		}
+		cmd.Env = append(cmd.Env, "STUDYLOOP_AUTH_KEY="+ExtensionAuthKey)
+	}
+}
+
 // Runner manages execution of external processes for extensions.
 type Runner struct{}
 
@@ -50,6 +63,7 @@ func (r *Runner) Run(ctx context.Context, ext *Extension, executable string, arg
 
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = ext.Dir
+	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
 
 	var stdout, stderr bytes.Buffer
@@ -76,6 +90,7 @@ func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable 
 	if dir != "" {
 		cmd.Dir = dir
 	}
+	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
 
 	stdinPipe, err := cmd.StdinPipe()

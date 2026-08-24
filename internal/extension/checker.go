@@ -95,6 +95,7 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 
 	cmd := exec.CommandContext(testCtx, pythonPath, ext.EntrypointPath(), "--test")
 	cmd.Dir = ext.Dir
+	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
 
 	var stdout, stderr bytes.Buffer
