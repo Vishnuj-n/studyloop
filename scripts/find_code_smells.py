@@ -116,8 +116,8 @@ JS_EXCESSIVE_OPTIONAL_CHAIN = re.compile(r"\b[a-zA-Z0-9_]+(?:\?\.[a-zA-Z0-9_]+){
 JS_TRIPLE_OR_FALLBACK = re.compile(r"\b([a-zA-Z0-9_\.]+\s*(?:\|\||\?\?)\s*){3,}")
 # 4. Redundant boolean conversions: Boolean(!!x) or !!Boolean(x) or Boolean(x === true)
 JS_REDUNDANT_BOOLEAN = re.compile(r"(?:Boolean\(\s*!!|!!\s*Boolean\(|Boolean\(\s*[a-zA-Z0-9_\.]+\s*===?\s*(?:true|false)\s*\))")
-# 5. Redundant String/Number conversions: String(x || '') or Number(n || 0) || 0
-JS_REDUNDANT_COERCION = re.compile(r"(?:String\(\s*[a-zA-Z0-9_\.]+\s*\|\|\s*['\"]\s*['\"]\s*\)|Number\(\s*[a-zA-Z0-9_\.]+\s*\|\|\s*0\s*\)\s*\|\|\s*0)")
+# 5. Redundant String/Number double conversions: Number(n || 0) || 0 or String(String(x))
+JS_REDUNDANT_COERCION = re.compile(r"(?:String\(\s*String\(|Number\(\s*Number\(|Number\(\s*[a-zA-Z0-9_\.]+\s*\|\|\s*0\s*\)\s*\|\|\s*0)")
 # 6. Swallowing catch blocks: catch (e) {} or catch (err) { /* ignore */ }
 JS_SWALLOWING_CATCH = re.compile(r"catch\s*\([^\)]*\)\s*\{\s*(?://[^\n]*)?\s*\}")
 # 7. Paranoid typeof stack: typeof x !== 'undefined' && x !== null && x !== ''

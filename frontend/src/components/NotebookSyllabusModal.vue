@@ -32,7 +32,7 @@
           :disabled="isCleaning"
         >
           <option v-for="n in 10" :key="n" :value="n">
-            {{ n }} - {{ n === 1 ? 'Lowest' : n === 10 ? 'Highest' : n === 5 ? 'Default' : '' }}
+            {{ getPriorityLabel(n) }}
           </option>
         </select>
         <p class="priority-hint">Higher-priority notebooks appear earlier in your study queue.</p>
@@ -145,6 +145,13 @@ const emit = defineEmits(['close', 'ai-cleanup', 'confirm'])
 const localTitle = ref('')
 const localPriority = ref(5)
 const localChapters = ref([])
+
+function getPriorityLabel(n) {
+  if (n === 1) return '1 - Lowest'
+  if (n === 10) return '10 - Highest'
+  if (n === 5) return '5 - Default'
+  return String(n)
+}
 
 watch(
   () => props.notebookTitle,

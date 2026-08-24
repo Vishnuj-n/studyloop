@@ -112,7 +112,9 @@ try {
       isPro.value = !!parsed.isPro
     }
   }
-} catch (_) {}
+} catch (err) {
+  console.warn('[AUTH] Could not restore saved local user session:', err)
+}
 
 export function useClerkAuth() {
   return {
@@ -139,7 +141,11 @@ export function useClerkAuth() {
     },
     signOut: async () => {
       if (clerkInstance.value) {
-        try { await clerkInstance.value.signOut() } catch (_) {}
+        try {
+          await clerkInstance.value.signOut()
+        } catch (err) {
+          console.warn('[AUTH] Clerk instance sign-out failed, continuing with local cleanup:', err)
+        }
       }
       user.value = null
       isPro.value = false

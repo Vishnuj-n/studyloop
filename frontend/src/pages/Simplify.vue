@@ -151,7 +151,9 @@ async function generateSimplification() {
           taskId: taskId.value,
           simplified: res.simplified
         }))
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[Simplify] Failed to cache simplified result in sessionStorage:', e)
+      }
     } else {
       errorMessage.value = 'Failed to generate simplified breakdown.'
     }
@@ -174,7 +176,9 @@ onMounted(async () => {
         topicTitle.value = parsed.topicTitle || ''
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Simplify] Failed to read simplify_session_data from sessionStorage:', e)
+  }
 
   // 2. If raw content is still empty, load topic content via API if topicId is provided
   if (!rawContent.value.trim() && topicId.value) {
@@ -200,7 +204,9 @@ onMounted(async () => {
         return
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Simplify] Failed to read simplify_cached_result from sessionStorage:', e)
+  }
 
   // 4. Generate if content is available
   if (rawContent.value.trim()) {

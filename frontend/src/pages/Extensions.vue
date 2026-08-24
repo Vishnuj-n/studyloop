@@ -98,7 +98,7 @@
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"
             >
-              {{ isSettingUp(ext.id) ? 'Setting up...' : runningId === ext.id ? 'Running...' : 'Run Extension' }}
+              {{ getActionButtonLabel(ext.id) }}
             </button>
           </div>
         </div>
@@ -169,7 +169,7 @@
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"
             >
-              {{ isSettingUp(ext.id) ? 'Setting up...' : runningId === ext.id ? 'Running...' : 'Run Extension' }}
+              {{ getActionButtonLabel(ext.id) }}
             </button>
             <button
               v-else
@@ -245,6 +245,12 @@ const proExtensions = computed(() =>
 
 function isSettingUp(id) {
   return !!settingUpMap.value[id]
+}
+
+function getActionButtonLabel(extId) {
+  if (isSettingUp(extId)) return 'Setting up...'
+  if (runningId.value === extId) return 'Running...'
+  return 'Run Extension'
 }
 
 async function handleToggle(ext) {

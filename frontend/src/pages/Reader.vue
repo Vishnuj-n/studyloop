@@ -346,7 +346,9 @@ async function handleSimplify() {
         topicId: reader.selectedTopicID.value,
         notebookId: reader.selectedNotebookID.value,
       }))
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Reader] Failed to store simplify_session_data in sessionStorage:', e)
+    }
 
     router.push({
       path: '/simplify',
