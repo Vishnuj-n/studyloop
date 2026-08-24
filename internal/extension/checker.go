@@ -143,10 +143,10 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	logLine(fmt.Sprintf("Using uv engine: %s", uvPath))
 	logLine(fmt.Sprintf("Configuring isolated environment in: %s", venvDir))
 
-	// 1. Create venv with uv (uv venv <venvDir> --system-site-packages)
+	// 1. Create venv with uv (uv venv <venvDir> --allow-existing --system-site-packages)
 	// uv automatically detects system Python and reuses already-installed global packages (e.g. yt-dlp, edge-tts)
 	logLine("Step 1/3: Initializing Python virtual environment...")
-	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--system-site-packages")
+	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--allow-existing", "--system-site-packages")
 	venvCmd.Dir = ext.Dir
 	hideConsoleWindow(venvCmd)
 
