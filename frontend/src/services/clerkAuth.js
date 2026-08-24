@@ -11,6 +11,9 @@ export async function initClerk() {
 
 import { startBrowserAuth } from './appApi'
 
+const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
+const lastVerifiedAt = ref(Date.now())
+
 // Listen for loopback authentication callback from Go backend
 if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
   window.runtime.EventsOn('clerk_auth_success', (data) => {
@@ -21,23 +24,34 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
         fullName: 'Authenticated User',
       }
       isPro.value = !!data.isPro
+      lastVerifiedAt.value = Date.now()
       authError.value = ''
       localStorage.setItem('studyloop_user_session', JSON.stringify({
         user: user.value,
         isPro: isPro.value,
+        lastVerifiedAt: lastVerifiedAt.value,
       }))
     }
   })
 }
 
-// Restore saved session if present
+// Restore saved session if present with 10-day validity check
 try {
   const saved = localStorage.getItem('studyloop_user_session')
   if (saved) {
     const parsed = JSON.parse(saved)
     if (parsed && parsed.user) {
       user.value = parsed.user
-      isPro.value = !!parsed.isPro
+      const savedTime = parsed.lastVerifiedAt || 0
+      const isWithinGracePeriod = (Date.now() - savedTime) < TEN_DAYS_MS
+
+      if (parsed.isPro && !isWithinGracePeriod) {
+        console.warn('[AUTH] 10-day offline Pro grace period expired. Re-verification required.')
+        isPro.value = false
+      } else {
+        isPro.value = !!parsed.isPro
+      }
+      lastVerifiedAt.value = savedTime || Date.now()
     }
   }
 } catch (err) {
@@ -50,6 +64,7 @@ export function useClerkAuth() {
     isSignedIn: computed(() => !!user.value),
     user: computed(() => user.value),
     isPro: computed(() => isPro.value),
+    lastVerifiedAt: computed(() => lastVerifiedAt.value),
     authError: computed(() => authError.value),
     clearAuthError: () => {
       authError.value = ''
