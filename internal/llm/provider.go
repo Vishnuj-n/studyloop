@@ -278,11 +278,16 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		},
 	}
 
-	// Debug: write prompt to file for inspection
-	_ = os.MkdirAll("dev_data/logs", 0755)
-	debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
-		time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)
-	_ = os.WriteFile("dev_data/logs/llm_prompt.log", append(mustReadFile("dev_data/logs/llm_prompt.log"), []byte(debugLog)...), 0644)
+	// Debug: write prompt to file for inspection when explicit env var is set
+	if os.Getenv("DEBUG_LLM_PROMPTS") != "" {
+		_ = os.MkdirAll("dev_data/logs", 0755)
+		debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
+			time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)
+		if f, err := os.OpenFile("dev_data/logs/llm_prompt.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			_, _ = f.WriteString(debugLog)
+			_ = f.Close()
+		}
+	}
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
@@ -354,9 +359,4 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	return apiResp.Choices[0].Message.Content, nil
-}
-
-func mustReadFile(path string) []byte {
-	data, _ := os.ReadFile(path)
-	return data
 }

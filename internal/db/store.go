@@ -645,6 +645,8 @@ func sameLLMConfig(a, b models.LLMTierSettings) bool {
 		strings.TrimSpace(a.BaseURL) == strings.TrimSpace(b.BaseURL) &&
 		strings.TrimSpace(a.Model) == strings.TrimSpace(b.Model) &&
 		a.TimeoutMs == b.TimeoutMs &&
+		a.MaxInputTokens == b.MaxInputTokens &&
+		a.MaxOutputTokens == b.MaxOutputTokens &&
 		strings.EqualFold(a.APIKeySource, b.APIKeySource) &&
 		a.HasAPIKey == b.HasAPIKey
 }

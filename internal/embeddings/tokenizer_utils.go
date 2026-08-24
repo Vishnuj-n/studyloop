@@ -33,7 +33,7 @@ func InitPromptTokenizer(tokenizerPath string) error {
 	return nil
 }
 
-// CountTokens counts tokens using configured tokenizer.
+// CountTokens counts tokens using configured tokenizer or an approximation fallback if uninitialized.
 func CountTokens(text string) (int, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -42,7 +42,15 @@ func CountTokens(text string) (int, error) {
 
 	tok := getPromptTokenizer()
 	if tok == nil {
-		return 0, fmt.Errorf("prompt tokenizer not initialized")
+		words := len(strings.Fields(text))
+		approx := int(float64(words) * 1.3)
+		if approx < 1 {
+			approx = (len(text) + 3) / 4
+		}
+		if approx < 1 {
+			approx = 1
+		}
+		return approx, nil
 	}
 
 	enc, err := tok.EncodeSingle(text, true)
@@ -62,7 +70,23 @@ func TruncateToTokens(text string, limit int) (string, error) {
 
 	tok := getPromptTokenizer()
 	if tok == nil {
-		return "", fmt.Errorf("prompt tokenizer not initialized")
+		words := strings.Fields(text)
+		if len(words) == 0 {
+			return "", nil
+		}
+		maxWords := int(float64(limit) / 1.3)
+		if maxWords <= 0 {
+			maxWords = 1
+		}
+		if maxWords >= len(words) {
+			return text, nil
+		}
+		truncated := strings.Join(words[:maxWords], " ")
+		trimmed := trimToSentenceBoundary(truncated)
+		if trimmed == "" {
+			return truncated, nil
+		}
+		return trimmed, nil
 	}
 
 	enc, err := tok.EncodeSingle(text, true)
