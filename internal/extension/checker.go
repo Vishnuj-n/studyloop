@@ -155,6 +155,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	venvCmd.Stderr = &venvErr
 
 	if err := venvCmd.Run(); err != nil {
+		if ctx.Err() == context.Canceled {
+			return fmt.Errorf("setup canceled by user")
+		}
 		errMsg := strings.TrimSpace(venvErr.String())
 		if errMsg == "" {
 			errMsg = strings.TrimSpace(venvOut.String())
@@ -176,6 +179,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 		pipCmd.Stderr = &pipErr
 
 		if err := pipCmd.Run(); err != nil {
+			if ctx.Err() == context.Canceled {
+				return fmt.Errorf("setup canceled by user")
+			}
 			errMsg := strings.TrimSpace(pipErr.String())
 			if errMsg == "" {
 				errMsg = strings.TrimSpace(pipOut.String())
@@ -191,6 +197,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	logLine("Step 3/3: Running extension verification self-test...")
 	pyPath := GetVenvPython(venvDir)
 	if err := RunSmokeTest(ctx, ext, pyPath); err != nil {
+		if ctx.Err() == context.Canceled {
+			return fmt.Errorf("setup canceled by user")
+		}
 		return fmt.Errorf("extension self-test failed after installation: %w", err)
 	}
 

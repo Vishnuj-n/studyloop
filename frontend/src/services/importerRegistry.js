@@ -5,6 +5,22 @@
  */
 export const NOTEBOOK_IMPORTERS = [
   {
+    id: 'fast_pdf',
+    name: 'Fast Structured PDF',
+    icon: '⚡',
+    badge: 'Pro',
+    description: 'High-speed Markdown extraction with tables, headers, and code blocks.',
+    fileType: 'pdf',
+  },
+  {
+    id: 'docling_pdf',
+    name: 'Docling Deep AI PDF',
+    icon: '🔬',
+    badge: 'Pro',
+    description: 'Deep neural ingestion with OCR, LaTeX formulas, and multi-column tables.',
+    fileType: 'pdf',
+  },
+  {
     id: 'youtube_transcripts',
     name: 'YouTube Lecture',
     icon: '🎥',

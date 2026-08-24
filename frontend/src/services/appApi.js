@@ -336,6 +336,10 @@ export function setupExtension(id) {
   return appBridge().SetupExtension(id)
 }
 
+export function cancelExtensionSetup() {
+  return appBridge().CancelExtensionSetup()
+}
+
 export function runExtension(id, input = '', isPro = false) {
   return appBridge().RunExtension(id, input, !!isPro)
 }

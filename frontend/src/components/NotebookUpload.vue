@@ -123,6 +123,18 @@ const activeImporters = computed(() => getAvailableImporters(isExtensionActive))
 
 function openImporter(importer) {
   localError.value = ''
+  if (importer.fileType === 'pdf') {
+    const tempInput = document.createElement('input')
+    tempInput.type = 'file'
+    tempInput.accept = '.pdf'
+    tempInput.onchange = (e) => {
+      if (e.target.files?.length) {
+        emit('upload-file', e.target.files[0], { engine: importer.id })
+      }
+    }
+    tempInput.click()
+    return
+  }
   activeModal.value = importer.modalName
 }
 

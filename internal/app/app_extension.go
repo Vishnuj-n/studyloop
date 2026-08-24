@@ -163,6 +163,17 @@ func (a *App) CheckExtensionReadiness(id string) extension.ReadinessStatus {
 	return extension.CheckReadiness(ctx, ext)
 }
 
+// CancelExtensionSetup aborts any ongoing extension environment setup.
+func (a *App) CancelExtensionSetup() map[string]interface{} {
+	a.extSetupMu.Lock()
+	if a.extSetupCancel != nil {
+		a.extSetupCancel()
+		a.extSetupCancel = nil
+	}
+	a.extSetupMu.Unlock()
+	return map[string]interface{}{"success": true}
+}
+
 // SetupExtension automatically provisions the Python virtual environment via uv,
 // installs requirements, and runs verification self-tests.
 func (a *App) SetupExtension(id string) map[string]interface{} {
@@ -175,8 +186,21 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id)}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
+	// ponytail: cancelable context without arbitrary hardcoded timeout limit; cancel via user action
+	a.extSetupMu.Lock()
+	if a.extSetupCancel != nil {
+		a.extSetupCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.extSetupCancel = cancel
+	a.extSetupMu.Unlock()
+
+	defer func() {
+		a.extSetupMu.Lock()
+		a.extSetupCancel = nil
+		a.extSetupMu.Unlock()
+		cancel()
+	}()
 
 	var logs []string
 	logCallback := func(line string) {
