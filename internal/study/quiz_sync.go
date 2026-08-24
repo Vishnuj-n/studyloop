@@ -211,7 +211,7 @@ func buildQuizContext(
 		chunkLine := fmt.Sprintf("- chunk_id: %s | text: %s\n", chunkID, text)
 		chunkTokens, err := embeddings.CountTokens(chunkLine)
 		if err != nil {
-			chunkTokens = len(strings.Fields(chunkLine))
+			return quizContextResult{}, fmt.Errorf("failed to count tokens for chunk %s: %w", chunkID, err)
 		}
 
 		if currentTokens+chunkTokens > availableBudget {
@@ -323,11 +323,14 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	utils.Warnf("[QUIZ_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
 
 	// Estimate token limits and budget
+	if maxInputTokens <= 0 {
+		return models.QuizTaskPayload{}, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
+	}
 	const baseOverheadTokens = 300
 	const safetyMarginTokens = 500
 	availableBudget := maxInputTokens - baseOverheadTokens - safetyMarginTokens
-	if availableBudget < 1000 {
-		availableBudget = 1000
+	if availableBudget <= 0 {
+		return models.QuizTaskPayload{}, fmt.Errorf("insufficient token budget: maxInputTokens (%d) is too small for prompt overhead", maxInputTokens)
 	}
 
 	ctxRes, err := buildQuizContext(normalizedChunkIDs, chunkTextByID, availableBudget)

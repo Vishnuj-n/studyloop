@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/extension"
 )
 
@@ -160,6 +161,19 @@ func (s *StudyService) GenerateAudioOverview(
 	if llmProvider == nil {
 		return fmt.Errorf("no LLM provider available")
 	}
+
+	limits := llmProvider.GetLimits()
+	templatePrompt := BuildAudioOverviewPrompt(bundle.TopicTitle, "")
+	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
+	if err != nil {
+		return err
+	}
+
+	truncatedContent, err := embeddings.TruncateToTokens(topicContent, availableBudget)
+	if err != nil {
+		return fmt.Errorf("failed to budget topic content tokens: %w", err)
+	}
+	topicContent = truncatedContent
 
 	prompt := BuildAudioOverviewPrompt(bundle.TopicTitle, topicContent)
 	script, err := llmProvider.GenerateAnswer(prompt)

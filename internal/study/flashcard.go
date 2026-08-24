@@ -183,6 +183,9 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	maxInputTokens := limits.MaxInputTokens
 	maxOutputTokens := limits.MaxOutputTokens
 	utils.Warnf("[FLASHCARD_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
+	if maxInputTokens <= 0 {
+		return nil, "", fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
+	}
 
 	// Default to 5 base flashcards. Additional cards will be added for failed questions in buildMarathonFlashcardPromptWithBudget.
 	targetCount := 5
