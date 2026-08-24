@@ -344,3 +344,7 @@ export function simplifyReadingContent(content) {
   return appBridge().SimplifyReadingContent(content)
 }
 
+export function startBrowserAuth(mode = 'sign-in') {
+  return appBridge().StartBrowserAuth(mode)
+}
+

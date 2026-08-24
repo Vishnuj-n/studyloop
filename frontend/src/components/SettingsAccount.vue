@@ -255,6 +255,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { SignInButton } from '@clerk/vue'
 import { useClerkAuth, initClerk } from '../services/clerkAuth'
 
 defineProps({
