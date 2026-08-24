@@ -328,6 +328,14 @@ export function listExtensions() {
   return appBridge().ListExtensions()
 }
 
+export function checkExtensionReadiness(id) {
+  return appBridge().CheckExtensionReadiness(id)
+}
+
+export function setupExtension(id) {
+  return appBridge().SetupExtension(id)
+}
+
 export function runExtension(id, input = '', isPro = false) {
   return appBridge().RunExtension(id, input, !!isPro)
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 )
 
@@ -25,6 +26,19 @@ func FindPythonExecutable() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no python executable found in PATH")
+}
+
+// FindExtensionPython resolves the isolated Python interpreter for a specific extension,
+// falling back to system Python if the virtual environment is not yet initialized.
+func FindExtensionPython(ext *Extension) (string, error) {
+	if ext != nil {
+		venvDir := ResolveExtensionVenvDir(ext)
+		pyPath := GetVenvPython(venvDir)
+		if info, err := os.Stat(pyPath); err == nil && !info.IsDir() {
+			return pyPath, nil
+		}
+	}
+	return FindPythonExecutable()
 }
 
 // Run executes a command with the specified executable and arguments within the extension directory.

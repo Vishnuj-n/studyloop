@@ -74,7 +74,8 @@
               <input
                 type="checkbox"
                 :checked="isExtensionEnabled(ext.id)"
-                @change="toggleExtension(ext.id)"
+                :disabled="isSettingUp(ext.id)"
+                @change="handleToggle(ext)"
               />
               <span class="slider"></span>
             </label>
@@ -94,10 +95,10 @@
             <button
               v-else
               class="action-btn primary-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"
             >
-              {{ runningId === ext.id ? 'Running...' : 'Run Extension' }}
+              {{ isSettingUp(ext.id) ? 'Setting up...' : runningId === ext.id ? 'Running...' : 'Run Extension' }}
             </button>
           </div>
         </div>
@@ -147,12 +148,13 @@
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Advanced' }}</span>
             </div>
 
-            <!-- Pro Toggle Switch: Active if user is Pro; if Free, clicking triggers upgrade prompt -->
+            <!-- Pro Toggle Switch -->
             <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Pro'">
               <input
                 type="checkbox"
                 :checked="isPro && isExtensionEnabled(ext.id)"
-                @change="handleProToggle(ext.id)"
+                :disabled="isSettingUp(ext.id)"
+                @change="handleProToggle(ext)"
               />
               <span class="slider"></span>
             </label>
@@ -164,10 +166,10 @@
             <button
               v-if="isPro"
               class="action-btn pro-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"
             >
-              {{ runningId === ext.id ? 'Running...' : 'Run Extension' }}
+              {{ isSettingUp(ext.id) ? 'Setting up...' : runningId === ext.id ? 'Running...' : 'Run Extension' }}
             </button>
             <button
               v-else
@@ -180,6 +182,14 @@
         </div>
       </div>
     </section>
+
+    <!-- Reusable Setup / Verification Progress Popup Modal -->
+    <ExtensionSetupModal
+      :is-open="setupModalOpen"
+      :extension="currentSetupExt"
+      @close="setupModalOpen = false"
+      @success="handleSetupSuccess"
+    />
 
     <!-- Output Modal (Aligned with Digital Sanctuary elevation & typography) -->
     <div v-if="outputModalOpen" class="modal-overlay" @click.self="outputModalOpen = false">
@@ -202,21 +212,28 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listExtensions, runExtension } from '../services/appApi'
+import { listExtensions, runExtension, checkExtensionReadiness } from '../services/appApi'
 import { useClerkAuth, initClerk } from '../services/clerkAuth'
 import { useExtensions } from '../composables/useExtensions'
+import ExtensionSetupModal from '../components/ExtensionSetupModal.vue'
 
 const router = useRouter()
 const clerkAuth = useClerkAuth()
 const isPro = computed(() => clerkAuth.isPro.value)
-const { isEnabled: isExtensionEnabled, toggleExtension } = useExtensions()
+const { isEnabled: isExtensionEnabled, setExtensionEnabled } = useExtensions()
 
 const extensions = ref([])
 const runningId = ref(null)
+const settingUpMap = ref({})
 const errorMessage = ref('')
+
 const outputModalOpen = ref(false)
 const activeExtName = ref('')
 const extensionOutput = ref('')
+
+// Setup Modal State
+const setupModalOpen = ref(false)
+const currentSetupExt = ref(null)
 
 const freeExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'free')
@@ -226,11 +243,54 @@ const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
 
-function handleProToggle(id) {
+function isSettingUp(id) {
+  return !!settingUpMap.value[id]
+}
+
+async function handleToggle(ext) {
+  if (isExtensionEnabled(ext.id)) {
+    // User is turning it off
+    setExtensionEnabled(ext.id, false)
+    return
+  }
+
+  // User is turning it on: check runtime readiness
+  const runtime = (ext.runtime || '').toLowerCase()
+  if (runtime === 'python' || runtime === 'py') {
+    try {
+      const readiness = await checkExtensionReadiness(ext.id)
+      if (readiness && readiness.is_ready) {
+        setExtensionEnabled(ext.id, true)
+        return
+      }
+    } catch (e) {
+      console.warn('Readiness check returned error, initiating setup:', e)
+    }
+
+    // Needs setup: trigger setup popup modal
+    triggerSetup(ext)
+  } else {
+    setExtensionEnabled(ext.id, true)
+  }
+}
+
+async function handleProToggle(ext) {
   if (!isPro.value) {
     handleUpgrade()
-  } else {
-    toggleExtension(id)
+    return
+  }
+  await handleToggle(ext)
+}
+
+function triggerSetup(ext) {
+  currentSetupExt.value = ext
+  activeExtName.value = ext.name
+  setupModalOpen.value = true
+}
+
+function handleSetupSuccess(ext) {
+  if (ext && ext.id) {
+    setExtensionEnabled(ext.id, true)
   }
 }
 
@@ -738,5 +798,100 @@ input:checked + .slider:before {
 
 .modal-close-btn:hover {
   background: var(--surface-container);
+}
+
+/* Setup Modal Specific Styles */
+.setup-card {
+  max-width: 580px;
+}
+
+.setup-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-icon-spinner {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.loading-spin-circle {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--surface-container);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.setup-icon-success {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2e7d32;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.setup-icon-error {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #c62828;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.setup-desc {
+  font-size: 13.5px;
+  color: var(--muted-text);
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+.setup-logs-box {
+  background: var(--surface-container-low);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--on-surface);
+}
+
+.setup-log-line {
+  margin-bottom: 4px;
+}
+
+.log-pending {
+  color: var(--primary);
+  font-style: italic;
+}
+
+.modal-action-btn.retry-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
+  color: var(--on-primary);
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  margin-right: 8px;
 }
 </style>

@@ -91,9 +91,9 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 		}
 		return map[string]interface{}{"output": "Built-in extension executed successfully.", "id": id}
 	case "python", "py":
-		pyExe, pErr := extension.FindPythonExecutable()
+		pyExe, pErr := extension.FindExtensionPython(ext)
 		if pErr != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("Python executable not found on system: %v", pErr)}
+			return map[string]interface{}{"error": fmt.Sprintf("Python executable not found for extension %q: %v. Please initialize environment via Setup.", ext.Name(), pErr)}
 		}
 		var args []string
 		args = append(args, ext.EntrypointPath())
@@ -122,6 +122,69 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 	return map[string]interface{}{
 		"output": string(output),
 		"id":     id,
+	}
+}
+
+// CheckExtensionReadiness inspects an extension's environment, virtual environment, and smoke test status.
+func (a *App) CheckExtensionReadiness(id string) extension.ReadinessStatus {
+	if a.extManager == nil {
+		return extension.ReadinessStatus{
+			ID:      id,
+			IsReady: false,
+			Error:   "extension manager not initialized",
+		}
+	}
+
+	ext, ok := a.extManager.Get(id)
+	if !ok {
+		return extension.ReadinessStatus{
+			ID:      id,
+			IsReady: false,
+			Error:   fmt.Sprintf("extension %q not found", id),
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return extension.CheckReadiness(ctx, ext)
+}
+
+// SetupExtension automatically provisions the Python virtual environment via uv,
+// installs requirements, and runs verification self-tests.
+func (a *App) SetupExtension(id string) map[string]interface{} {
+	if a.extManager == nil {
+		return map[string]interface{}{"error": "extension manager not initialized"}
+	}
+
+	ext, ok := a.extManager.Get(id)
+	if !ok {
+		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id)}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	var logs []string
+	logCallback := func(line string) {
+		logs = append(logs, line)
+	}
+
+	err := extension.SetupExtensionEnv(ctx, ext, logCallback)
+	if err != nil {
+		return map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"logs":    logs,
+			"id":      id,
+		}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"logs":    logs,
+		"id":      id,
+		"name":    ext.Name(),
 	}
 }
 

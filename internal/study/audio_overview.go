@@ -172,9 +172,14 @@ func (s *StudyService) GenerateAudioOverview(
 		return fmt.Errorf("failed to extract sentences from audio script")
 	}
 
-	pythonPath, err := extension.FindPythonExecutable()
+	extDir := extension.ResolveExtensionsDir("")
+	audioExt := &extension.Extension{
+		Manifest: extension.Manifest{ID: "audio_overview", Name: "Audio Overview", Runtime: "python", Entrypoint: "edge_tts_stream.py"},
+		Dir:      filepath.Join(extDir, "audio_overview"),
+	}
+	pythonPath, err := extension.FindExtensionPython(audioExt)
 	if err != nil {
-		return fmt.Errorf("Python executable not found in PATH: %w", err)
+		return fmt.Errorf("Python executable not found for Audio Overview: %w", err)
 	}
 
 	// Resolve edge_tts_stream.py script path
@@ -182,7 +187,6 @@ func (s *StudyService) GenerateAudioOverview(
 		filepath.Join("extensions", "audio_overview", "edge_tts_stream.py"),
 		filepath.Join("extensions", "edge_tts_stream.py"),
 	}
-	extDir := extension.ResolveExtensionsDir("")
 	if extDir != "" {
 		scriptCandidates = append(scriptCandidates,
 			filepath.Join(extDir, "audio_overview", "edge_tts_stream.py"),

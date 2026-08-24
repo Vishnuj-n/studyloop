@@ -37,16 +37,6 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 	if runner == nil {
 		runner = extension.NewRunner()
 	}
-	pythonPath, err := extension.FindPythonExecutable()
-	if err != nil {
-		return nil, nil, fmt.Errorf("python is required for youtube ingestion: %w", err)
-	}
-
-	if ctx == nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-	}
 
 	entrypoint := "ingest.py"
 	if ext != nil && ext.Entrypoint() != "" {
@@ -57,6 +47,17 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 			Manifest: extension.Manifest{ID: "youtube", Name: "YouTube", Runtime: "python", Entrypoint: "ingest.py"},
 			Dir:      filepath.Join(extDir, "youtube"),
 		}
+	}
+
+	pythonPath, err := extension.FindExtensionPython(ext)
+	if err != nil {
+		return nil, nil, fmt.Errorf("python is required for youtube ingestion: %w", err)
+	}
+
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
 	}
 
 	outputBytes, err := runner.Run(ctx, ext, pythonPath, entrypoint, cleanURL)

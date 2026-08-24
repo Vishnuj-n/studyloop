@@ -32,6 +32,18 @@ def main():
         print("Error: Wails CLI not found in PATH.")
         sys.exit(1)
 
+    # 1. Ensure uv binary is installed
+    uv_bin = PROJECT_ROOT / "build" / "bin" / ("uv.exe" if sys.platform == "win32" else "uv")
+    if not uv_bin.exists():
+        print("uv binary not found in build/bin. Running scripts/install_uv.py...")
+        subprocess.run([sys.executable, str(PROJECT_ROOT / "scripts" / "install_uv.py")], check=True)
+
+    # 2. Obfuscate and stage extensions for packaging
+    obfuscate_script = PROJECT_ROOT / "scripts" / "obfuscate.py"
+    if obfuscate_script.exists():
+        print("\nStaging & Obfuscating extensions...")
+        subprocess.run([sys.executable, str(obfuscate_script)], check=True)
+
     ldflags = (
         f"-X ai-tutor/internal/study.DefaultProductionSyncURL={PRODUCTION_SYNC_URL} "
         f"-X ai-tutor/internal/study.DefaultProductionAnonKey={PRODUCTION_ANON_KEY} "
@@ -41,7 +53,7 @@ def main():
 
     cmd = ["wails", "build", "-nsis", "-ldflags", ldflags, *sys.argv[1:]]
 
-    print("Executing:", " ".join(cmd))
+    print("\nExecuting:", " ".join(cmd))
 
     try:
         subprocess.run(cmd, check=True)
