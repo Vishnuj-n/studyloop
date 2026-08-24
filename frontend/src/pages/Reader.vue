@@ -103,7 +103,7 @@
               v-if="isExtensionActive('audio_overview')"
               class="secondary audio-overview-btn"
               :class="{ active: showAudioOverview }"
-              :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
+              :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
               :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
               @click="showAudioOverview = !showAudioOverview"
             >
@@ -356,6 +356,8 @@ async function handleSimplify() {
         taskId: resolvedTaskID.value || undefined,
         topicId: reader.selectedTopicID.value || undefined,
         notebookId: reader.selectedNotebookID.value || undefined,
+        startPage: startPage || undefined,
+        endPage: endPage || undefined,
       }
     })
   } catch (err) {

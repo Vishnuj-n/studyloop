@@ -213,7 +213,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listExtensions, runExtension, checkExtensionReadiness } from '../services/appApi'
-import { useClerkAuth, initClerk } from '../services/clerkAuth'
+import { useClerkAuth } from '../services/clerkAuth'
 import { useExtensions } from '../composables/useExtensions'
 import ExtensionSetupModal from '../components/ExtensionSetupModal.vue'
 
@@ -334,7 +334,6 @@ function handleUpgrade() {
 }
 
 onMounted(async () => {
-  await initClerk()
   await fetchExtensions()
 })
 </script>

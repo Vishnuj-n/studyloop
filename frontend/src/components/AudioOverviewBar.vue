@@ -112,6 +112,30 @@ const selectedVoice = ref('en-US-ChristopherNeural')
 const playbackRate = ref(1.0)
 
 let audio = null
+let errorTimer = null
+let pendingError = ''
+
+function clearErrorTimer() {
+  if (errorTimer) {
+    clearTimeout(errorTimer)
+    errorTimer = null
+  }
+  pendingError = ''
+}
+
+function scheduleOrShowError(msg) {
+  pendingError = msg || 'Audio overview generation failed'
+  if (chunks.value.length > 0) return
+  if (!errorTimer) {
+    errorTimer = setTimeout(() => {
+      if (chunks.value.length === 0 && pendingError) {
+        errorMessage.value = pendingError
+        isLoading.value = false
+      }
+      errorTimer = null
+    }, 10000)
+  }
+}
 
 const currentChunkText = computed(() => {
   if (chunks.value.length === 0 || currentIndex.value >= chunks.value.length) {
@@ -138,10 +162,15 @@ function initAudio() {
     }
 
     audio.onerror = (e) => {
-      console.error('[AudioOverview] Audio element error:', e)
-      errorMessage.value = 'Playback error encountered on current audio chunk.'
+      // Ignore errors caused by resetting/clearing src or uninitialized state
+      if (!audio || !audio.getAttribute('src')) {
+        return
+      }
+      console.warn('[AudioOverview] Audio element error:', e)
+      if (chunks.value.length === 0) {
+        scheduleOrShowError('Playback error encountered on current audio chunk.')
+      }
       isPlaying.value = false
-      isLoading.value = false
     }
   }
 }
@@ -210,13 +239,13 @@ function handleStart() {
   initAudio()
   isLoading.value = true
   errorMessage.value = ''
+  clearErrorTimer()
   isFinished.value = false
   chunks.value = []
   currentIndex.value = 0
 
   startTopicAudioOverview(props.topicId, props.notebookId, selectedVoice.value).catch((err) => {
-    errorMessage.value = err.message || 'Failed to start audio overview'
-    isLoading.value = false
+    scheduleOrShowError(err.message || 'Failed to start audio overview')
   })
 }
 
@@ -225,9 +254,11 @@ function restartWithVoice() {
 }
 
 function cleanupSession() {
+  clearErrorTimer()
   if (audio) {
     audio.pause()
-    audio.src = ''
+    audio.removeAttribute('src')
+    audio.load()
   }
   isPlaying.value = false
   stopTopicAudioOverview().catch(() => {})
@@ -244,14 +275,15 @@ onMounted(() => {
   EventsOn('audio:overview:start', () => {
     isLoading.value = true
     errorMessage.value = ''
+    clearErrorTimer()
   })
 
-    EventsOn('audio:overview:chunk', (chunk) => {
+  EventsOn('audio:overview:chunk', (chunk) => {
     if (!chunk || chunk.status === 'error') {
       if (chunk && chunk.error) {
         console.warn('[AudioOverview] Chunk synthesis error:', chunk.error)
         if (chunks.value.length === 0) {
-          errorMessage.value = chunk.error
+          scheduleOrShowError(chunk.error)
         }
       }
       return
@@ -261,13 +293,15 @@ onMounted(() => {
       totalChunks.value = chunk.total_chunks
     }
 
-    chunks.value.push(chunk)
-    // Clear any previous error message now that a valid chunk has landed
+    // A valid chunk arrived: dismiss pending error and timer immediately
+    clearErrorTimer()
     if (errorMessage.value) {
       errorMessage.value = ''
     }
 
-    // ponytail: play chunk 1 immediately as it lands (< 1.5s latency)
+    chunks.value.push(chunk)
+
+    // Play chunk 1 immediately as soon as it lands without waiting
     if (chunks.value.length === 1) {
       currentIndex.value = 0
       playChunk(0)
@@ -280,15 +314,15 @@ onMounted(() => {
   EventsOn('audio:overview:complete', (data) => {
     isFinished.value = true
     isLoading.value = false
+    clearErrorTimer()
     if (data && data.total_chunks) {
       totalChunks.value = data.total_chunks
     }
   })
 
   EventsOn('audio:overview:error', (data) => {
-    isLoading.value = false
     if (chunks.value.length === 0) {
-      errorMessage.value = data?.error || 'Audio overview generation failed'
+      scheduleOrShowError(data?.error || 'Audio overview generation failed')
     }
   })
 

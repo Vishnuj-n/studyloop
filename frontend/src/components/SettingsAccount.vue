@@ -34,21 +34,21 @@
           v-if="!clerkAuth.isPro.value"
           type="button"
           class="upgrade-btn"
-          @click="clerkAuth.openBilling()"
+          @click="onBillingClick"
         >
           Upgrade to Pro
         </button>
         <button
           type="button"
           class="billing-btn"
-          @click="clerkAuth.openBilling()"
+          @click="onBillingClick"
         >
           Manage Billing
         </button>
         <button
           type="button"
           class="danger-btn"
-          @click="clerkAuth.signOut()"
+          @click="onSignOutClick"
         >
           Sign Out
         </button>
@@ -66,7 +66,7 @@
           <span class="plan-pill free">CURRENT: FREE PLAN</span>
           <p class="plan-desc">Access to core study queue, Reader, Quiz, FSRS flashcards, and Free extensions.</p>
         </div>
-        <button type="button" class="sign-in-btn" @click="clerkAuth.signIn()">
+        <button type="button" class="sign-in-btn" @click="onSignInClick">
           Sign In / Create Account
         </button>
       </div>
@@ -84,7 +84,7 @@
           type="button"
           class="dev-toggle-btn"
           :class="{ active: clerkAuth.isPro.value }"
-          @click="clerkAuth.setMockPro(!clerkAuth.isPro.value)"
+          @click="onToggleProClick"
         >
           {{ clerkAuth.isPro.value ? 'Pro Simulated (Active)' : 'Free Mode (Click to Toggle)' }}
         </button>
@@ -255,8 +255,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { SignInButton } from '@clerk/vue'
-import { useClerkAuth, initClerk } from '../services/clerkAuth'
+import { useClerkAuth } from '../services/clerkAuth'
 
 defineProps({
   settings: { type: Object, required: true },
@@ -288,8 +287,28 @@ defineEmits([
 const clerkAuth = useClerkAuth()
 const showSchoolLogin = ref(false)
 
-onMounted(async () => {
-  await initClerk()
+function onSignInClick() {
+  console.log('[SETTINGS_ACCOUNT] Sign In clicked')
+  clerkAuth.signIn()
+}
+
+function onBillingClick() {
+  console.log('[SETTINGS_ACCOUNT] Billing clicked')
+  clerkAuth.openBilling()
+}
+
+function onSignOutClick() {
+  console.log('[SETTINGS_ACCOUNT] Sign Out clicked')
+  clerkAuth.signOut()
+}
+
+function onToggleProClick() {
+  console.log('[SETTINGS_ACCOUNT] Toggle Dev Pro clicked, current isPro:', clerkAuth.isPro.value)
+  clerkAuth.setMockPro(!clerkAuth.isPro.value)
+}
+
+onMounted(() => {
+  console.log('[SETTINGS_ACCOUNT] Mounted: isSignedIn =', clerkAuth.isSignedIn.value, 'isPro =', clerkAuth.isPro.value)
 })
 </script>
 

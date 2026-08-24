@@ -3,83 +3,9 @@ import { ref, computed } from 'vue'
 const isLoaded = ref(false)
 const user = ref(null)
 const isPro = ref(false)
-const clerkInstance = ref(null)
-
-const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || ''
-
 export async function initClerk() {
-  if (isLoaded.value && clerkInstance.value) return clerkInstance.value
-
-  try {
-    const clerkVue = await import('@clerk/vue').catch(() => ({}))
-    if (clerkVue && typeof clerkVue.useClerk === 'function') {
-      const clerk = clerkVue.useClerk()
-      if (clerk && clerk.value) {
-        clerkInstance.value = clerk.value
-        isLoaded.value = true
-
-        const syncUser = async () => {
-          if (clerk.value?.user) {
-            user.value = {
-              id: clerk.value.user.id,
-              email: clerk.value.user.primaryEmailAddress?.emailAddress || 'User',
-              fullName: clerk.value.user.fullName,
-            }
-            await refreshSubscriptionStatus()
-          } else {
-            user.value = null
-            isPro.value = false
-          }
-        }
-
-        await syncUser()
-
-        if (typeof clerk.value.addListener === 'function') {
-          clerk.value.addListener(syncUser)
-        }
-
-        return clerk.value
-      }
-    }
-  } catch (err) {
-    console.warn('[CLERK] Initialization note (running in local mode):', err)
-  }
-
   isLoaded.value = true
   return null
-}
-
-export async function refreshSubscriptionStatus() {
-  if (!clerkInstance.value || !clerkInstance.value.user) {
-    isPro.value = false
-    return false
-  }
-
-  try {
-    const clerk = clerkInstance.value
-    // 1. Check Clerk Billing API if available
-    if (clerk.billing && typeof clerk.billing.getSubscription === 'function') {
-      const sub = await clerk.billing.getSubscription()
-      if (sub && (sub.status === 'active' || sub.plan?.name?.toLowerCase() === 'pro')) {
-        isPro.value = true
-        return true
-      }
-    }
-
-    // 2. Check user publicMetadata / plan claims
-    const metadata = clerk.user.publicMetadata || {}
-    if (metadata.is_pro || metadata.tier === 'pro' || metadata.plan === 'pro') {
-      isPro.value = true
-      return true
-    }
-
-    isPro.value = false
-    return false
-  } catch (err) {
-    console.warn('[CLERK] Billing subscription check error:', err)
-    isPro.value = false
-    return false
-  }
 }
 
 import { startBrowserAuth } from './appApi'
@@ -123,46 +49,67 @@ export function useClerkAuth() {
     user: computed(() => user.value),
     isPro: computed(() => isPro.value),
     setMockPro: (val) => {
-      // For local testing & verification
+      console.log('[CLERK_AUTH] setMockPro called, setting isPro to:', val)
       isPro.value = !!val
+      if (user.value) {
+        localStorage.setItem(
+          'studyloop_user_session',
+          JSON.stringify({
+            user: user.value,
+            isPro: isPro.value,
+          })
+        )
+      }
     },
     signIn: async () => {
+      console.log('[CLERK_AUTH] signIn() triggered, calling backend startBrowserAuth...')
       try {
         const res = await startBrowserAuth('sign-in')
+        console.log('[CLERK_AUTH] startBrowserAuth response:', res)
         if (res?.url) {
-          window.open(res.url, '_blank')
-          return
+          if (window?.runtime?.BrowserOpenURL) {
+            window.runtime.BrowserOpenURL(res.url)
+          } else {
+            window.open(res.url, '_blank')
+          }
         }
       } catch (err) {
-        console.warn('[AUTH] Loopback auth bridge not available, falling back:', err)
-      }
-      const redirect = encodeURIComponent(window.location.origin)
-      window.open(`https://innocent-orca-5605.accounts.dev/sign-in?redirect_url=${redirect}`, '_blank')
-    },
-    signOut: async () => {
-      if (clerkInstance.value) {
-        try {
-          await clerkInstance.value.signOut()
-        } catch (err) {
-          console.warn('[AUTH] Clerk instance sign-out failed, continuing with local cleanup:', err)
+        console.error('[CLERK_AUTH] signIn error:', err)
+        const fallback = 'https://innocent-orca-5605.accounts.dev/sign-in'
+        if (window?.runtime?.BrowserOpenURL) {
+          window.runtime.BrowserOpenURL(fallback)
+        } else {
+          window.open(fallback, '_blank')
         }
       }
+    },
+    signOut: () => {
+      console.log('[CLERK_AUTH] signOut() triggered')
       user.value = null
       isPro.value = false
       localStorage.removeItem('studyloop_user_session')
     },
     openBilling: async () => {
+      console.log('[CLERK_AUTH] openBilling() triggered, calling backend startBrowserAuth...')
       try {
         const res = await startBrowserAuth('billing')
+        console.log('[CLERK_AUTH] openBilling response:', res)
         if (res?.url) {
-          window.open(res.url, '_blank')
-          return
+          if (window?.runtime?.BrowserOpenURL) {
+            window.runtime.BrowserOpenURL(res.url)
+          } else {
+            window.open(res.url, '_blank')
+          }
         }
       } catch (err) {
-        console.warn('[AUTH] Loopback auth bridge not available, falling back:', err)
+        console.error('[CLERK_AUTH] openBilling error:', err)
+        const fallback = 'https://innocent-orca-5605.accounts.dev/user'
+        if (window?.runtime?.BrowserOpenURL) {
+          window.runtime.BrowserOpenURL(fallback)
+        } else {
+          window.open(fallback, '_blank')
+        }
       }
-      const redirect = encodeURIComponent(window.location.origin)
-      window.open(`https://innocent-orca-5605.accounts.dev/user?redirect_url=${redirect}`, '_blank')
     },
   }
 }

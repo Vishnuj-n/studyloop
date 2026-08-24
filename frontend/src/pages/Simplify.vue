@@ -72,20 +72,9 @@ import MarkdownReader from '../components/MarkdownReader.vue'
 const route = useRoute()
 const router = useRouter()
 
-const taskId = computed(() => {
-  const q = route.query.taskId || route.query.task_id
-  return typeof q === 'string' ? q.trim() : ''
-})
-
-const topicId = computed(() => {
-  const q = route.query.topicId || route.query.topic_id
-  return typeof q === 'string' ? q.trim() : ''
-})
-
-const notebookId = computed(() => {
-  const q = route.query.notebookId || route.query.notebook_id
-  return typeof q === 'string' ? q.trim() : ''
-})
+const taskId = computed(() => (route.query.taskId || route.query.task_id || '').trim())
+const topicId = computed(() => (route.query.topicId || route.query.topic_id || '').trim())
+const notebookId = computed(() => (route.query.notebookId || route.query.notebook_id || '').trim())
 
 const bookTitle = ref('')
 const topicTitle = ref('')
@@ -96,10 +85,7 @@ const errorMessage = ref('')
 const copied = ref(false)
 
 const backButtonText = computed(() => {
-  if (taskId.value) {
-    return '← Back to Reader'
-  }
-  return '← Back to Dashboard'
+  return window.history.length > 1 ? '← Back' : '← Back to Dashboard'
 })
 
 const displayTitle = computed(() => {
@@ -107,10 +93,8 @@ const displayTitle = computed(() => {
 })
 
 function handleBack() {
-  if (taskId.value) {
-    router.push({ path: '/reader', query: { taskId: taskId.value } })
-  } else if (topicId.value && notebookId.value) {
-    router.push({ path: '/reader', query: { topicId: topicId.value, notebookId: notebookId.value } })
+  if (window.history.length > 1) {
+    router.back()
   } else {
     router.push('/dashboard')
   }
@@ -170,10 +154,12 @@ onMounted(async () => {
     const saved = sessionStorage.getItem('simplify_session_data')
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (parsed.text) {
-        rawContent.value = parsed.text
-        bookTitle.value = parsed.bookTitle || ''
-        topicTitle.value = parsed.topicTitle || ''
+      if (parsed) {
+        if (parsed.text) {
+          rawContent.value = parsed.text
+        }
+        if (parsed.bookTitle) bookTitle.value = parsed.bookTitle
+        if (parsed.topicTitle) topicTitle.value = parsed.topicTitle
       }
     }
   } catch (e) {
