@@ -17,7 +17,7 @@ build/
 # User data (local SQLite + uploads)
 *.db
 uploads/
-/dev_data/
+dev_data/
 .config/
 .agents/
 .windsurf/

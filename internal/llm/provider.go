@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 const minTimeoutMs = 1
@@ -241,6 +242,11 @@ type openAIResponse struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
 }
 
 // GenerateAnswer calls the LLM to generate an answer.
@@ -251,6 +257,16 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	if strings.TrimSpace(p.config.APIKey) == "" {
 		return "", fmt.Errorf("LLM API key not configured")
 	}
+
+	words := len(strings.Fields(prompt))
+	estPromptTokens := int(float64(words) * 1.3)
+	if estPromptTokens == 0 && len(prompt) > 0 {
+		estPromptTokens = (len(prompt) + 3) / 4
+	}
+
+	limits := p.GetLimits()
+	utils.Warnf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d max_output_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
+		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, limits.MaxOutputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
 		Model: p.config.Model,
@@ -263,7 +279,9 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	// Debug: write prompt to file for inspection
-	debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s] ---\n%s\n--- END PROMPT ---\n", time.Now().Format("2006-01-02 15:04:05"), p.config.Model, prompt)
+	_ = os.MkdirAll("dev_data/logs", 0755)
+	debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
+		time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)
 	_ = os.WriteFile("dev_data/logs/llm_prompt.log", append(mustReadFile("dev_data/logs/llm_prompt.log"), []byte(debugLog)...), 0644)
 
 	body, err := json.Marshal(requestBody)
@@ -298,16 +316,21 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	client := &http.Client{
 		Timeout: time.Duration(effectiveTimeoutMs) * time.Millisecond,
 	}
+
+	startTime := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
+		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d err=%v", p.config.Model, time.Since(startTime).Milliseconds(), err)
 		return "", err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
+	respDuration := time.Since(startTime)
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d status=%d err_body=%s", p.config.Model, respDuration.Milliseconds(), resp.StatusCode, string(bodyBytes))
 		return "", fmt.Errorf("LLM API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -318,6 +341,16 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 
 	if len(apiResp.Choices) == 0 {
 		return "", fmt.Errorf("no response from LLM")
+	}
+
+	if apiResp.Usage.TotalTokens > 0 {
+		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d prompt_tokens=%d completion_tokens=%d total_tokens=%d configured_max_input=%d",
+			p.config.Model, respDuration.Milliseconds(), apiResp.Usage.PromptTokens, apiResp.Usage.CompletionTokens, apiResp.Usage.TotalTokens, limits.MaxInputTokens)
+	} else {
+		outWords := len(strings.Fields(apiResp.Choices[0].Message.Content))
+		estCompletionTokens := int(float64(outWords) * 1.3)
+		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d est_completion_tokens=%d resp_chars=%d configured_max_input=%d",
+			p.config.Model, respDuration.Milliseconds(), estCompletionTokens, len(apiResp.Choices[0].Message.Content), limits.MaxInputTokens)
 	}
 
 	return apiResp.Choices[0].Message.Content, nil
