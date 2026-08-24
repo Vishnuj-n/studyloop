@@ -32,17 +32,27 @@ def main():
         print("Error: Wails CLI not found in PATH.")
         sys.exit(1)
 
-    # 1. Ensure uv binary is installed
-    uv_bin = PROJECT_ROOT / "build" / "bin" / ("uv.exe" if sys.platform == "win32" else "uv")
-    if not uv_bin.exists():
-        print("uv binary not found in build/bin. Running scripts/install_uv.py...")
-        subprocess.run([sys.executable, str(PROJECT_ROOT / "scripts" / "install_uv.py")], check=True)
+    from concurrent.futures import ThreadPoolExecutor
 
-    # 2. Obfuscate and stage extensions for packaging
-    obfuscate_script = PROJECT_ROOT / "scripts" / "obfuscate.py"
-    if obfuscate_script.exists():
-        print("\nStaging & Obfuscating extensions...")
-        subprocess.run([sys.executable, str(obfuscate_script)], check=True)
+    def ensure_uv():
+        uv_bin = PROJECT_ROOT / "build" / "bin" / ("uv.exe" if sys.platform == "win32" else "uv")
+        if not uv_bin.exists():
+            print("uv binary not found in build/bin. Running scripts/install_uv.py...")
+            subprocess.run([sys.executable, str(PROJECT_ROOT / "scripts" / "install_uv.py")], check=True)
+
+    def run_obfuscation():
+        obfuscate_script = PROJECT_ROOT / "scripts" / "obfuscate.py"
+        if obfuscate_script.exists():
+            print("Staging & Obfuscating extensions in parallel...")
+            subprocess.run([sys.executable, str(obfuscate_script)], check=True)
+
+    print("\n--- Running Pre-Build Preparation (Parallel) ---")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f_uv = executor.submit(ensure_uv)
+        f_obf = executor.submit(run_obfuscation)
+        f_uv.result()
+        f_obf.result()
+    print("--- Pre-Build Preparation Complete ---\n")
 
     ldflags = (
         f"-X ai-tutor/internal/study.DefaultProductionSyncURL={PRODUCTION_SYNC_URL} "

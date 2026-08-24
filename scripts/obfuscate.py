@@ -37,59 +37,71 @@ def ensure_pyarmor():
         return False
 
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def _process_single_extension(item: Path, output_dir: Path, has_pyarmor: bool):
+    ext_id = item.name
+    dest_ext_dir = output_dir / ext_id
+    dest_ext_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy non-python files (manifest.json, requirements.txt, etc.)
+    for file in item.iterdir():
+        if file.is_file() and file.suffix != ".py":
+            shutil.copy2(file, dest_ext_dir / file.name)
+
+    py_files = list(item.glob("*.py"))
+    if not py_files:
+        return f"Processed asset-only extension: {ext_id}"
+
+    if has_pyarmor:
+        try:
+            py_args = [str(f.name) for f in py_files]
+            if shutil.which("pyarmor"):
+                cmd = ["pyarmor", "gen", "-O", str(dest_ext_dir), *py_args]
+            else:
+                cmd = [sys.executable, "-m", "pyarmor.cli", "gen", "-O", str(dest_ext_dir), *py_args]
+
+            subprocess.run(cmd, check=True, cwd=str(item), capture_output=True, text=True)
+            return f"  [OK] PyArmor obfuscation successful for {ext_id}"
+        except Exception as e:
+            print(f"  Warning: PyArmor failed for {ext_id} ({e}), falling back to standard copy/compile.")
+
+    # Fallback: Copy .py and compile to .pyc
+    for py_file in py_files:
+        dest_py = dest_ext_dir / py_file.name
+        shutil.copy2(py_file, dest_py)
+
+    try:
+        import compileall
+        compileall.compile_dir(str(dest_ext_dir), force=True, quiet=1)
+        return f"  [OK] Bytecode compilation completed for {ext_id}"
+    except Exception as e:
+        return f"  Notice: Bytecode compilation skipped for {ext_id} ({e})"
+
+
 def obfuscate_extensions(output_dir: Path):
-    """Obfuscate all extensions into the target output directory."""
+    """Obfuscate all extensions into the target output directory concurrently."""
     output_dir.mkdir(parents=True, exist_ok=True)
     has_pyarmor = ensure_pyarmor()
 
-    for item in EXTENSIONS_SRC.iterdir():
-        if not item.is_dir() or item.name.startswith("."):
-            continue
+    ext_dirs = [item for item in EXTENSIONS_SRC.iterdir() if item.is_dir() and not item.name.startswith(".")]
+    if not ext_dirs:
+        print("No extension directories found to obfuscate.")
+        return
 
-        ext_id = item.name
-        dest_ext_dir = output_dir / ext_id
-        dest_ext_dir.mkdir(parents=True, exist_ok=True)
-
-        print(f"\nProcessing extension: {ext_id}")
-
-        # Copy non-python files (manifest.json, requirements.txt, etc.)
-        for file in item.iterdir():
-            if file.is_file() and file.suffix != ".py":
-                shutil.copy2(file, dest_ext_dir / file.name)
-                print(f"  Copied asset: {file.name}")
-
-        py_files = list(item.glob("*.py"))
-        if not py_files:
-            continue
-
-        if has_pyarmor:
+    print(f"Obfuscating {len(ext_dirs)} extension(s) in parallel...")
+    with ThreadPoolExecutor(max_workers=min(len(ext_dirs), 4)) as executor:
+        future_to_ext = {
+            executor.submit(_process_single_extension, item, output_dir, has_pyarmor): item.name
+            for item in ext_dirs
+        }
+        for future in as_completed(future_to_ext):
+            ext_name = future_to_ext[future]
             try:
-                print(f"  Obfuscating {len(py_files)} Python script(s) with PyArmor...")
-                # Check if pyarmor is executable directly or as python module
-                py_args = [str(f.name) for f in py_files]
-                if shutil.which("pyarmor"):
-                    cmd = ["pyarmor", "gen", "-O", str(dest_ext_dir), *py_args]
-                else:
-                    cmd = [sys.executable, "-m", "pyarmor.cli", "gen", "-O", str(dest_ext_dir), *py_args]
-
-                subprocess.run(cmd, check=True, cwd=str(item), capture_output=True, text=True)
-                print(f"  [OK] PyArmor obfuscation successful for {ext_id}")
-                continue
+                res = future.result()
+                print(res)
             except Exception as e:
-                print(f"  Warning: PyArmor failed ({e}), falling back to standard copy/compile.")
-
-        # Fallback: Copy .py and compile to .pyc
-        for py_file in py_files:
-            dest_py = dest_ext_dir / py_file.name
-            shutil.copy2(py_file, dest_py)
-            print(f"  Copied script: {py_file.name}")
-
-        try:
-            import compileall
-            compileall.compile_dir(str(dest_ext_dir), force=True, quiet=1)
-            print(f"  [OK] Bytecode compilation completed for {ext_id}")
-        except Exception as e:
-            print(f"  Notice: Bytecode compilation skipped ({e})")
+                print(f"  [ERROR] Failed to process extension {ext_name}: {e}")
 
 
 def main():
