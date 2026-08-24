@@ -662,12 +662,15 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 	// Seed initial READING task into study_queue if active
 	if isActivated {
-		targetWords := 3000
-		if settings, err := repo.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
-			targetWords = settings.TargetSessionWords
-		}
-		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
-			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
+		settings, err := repo.GetUserSettings()
+		if err != nil {
+			utils.Warnf("[INGESTION] failed to load user settings for notebook %s: %v", notebookID, err)
+		} else if settings == nil || settings.TargetSessionWords <= 0 {
+			utils.Warnf("[INGESTION] invalid target_session_words in user settings for notebook %s", notebookID)
+		} else {
+			if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, settings.TargetSessionWords); err != nil {
+				utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
+			}
 		}
 	}
 
@@ -717,6 +720,8 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"uploaded_at":     nb.UploadedAt,
 			"profile_id":      nb.ProfileID,
 			"study_status":    nb.StudyStatus,
+			"start_page":      nb.StartPage,
+			"end_page":        nb.EndPage,
 		})
 	}
 
@@ -872,14 +877,14 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		dailyPace = remainingWords
 	}
 
-	targetWords := 3000
 	settings, err := repo.GetUserSettings()
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]interface{}{"error": fmt.Sprintf("failed to load user settings: %v", err)}
 	}
-	if settings != nil && settings.TargetSessionWords > 0 {
-		targetWords = settings.TargetSessionWords
+	if settings == nil || settings.TargetSessionWords <= 0 {
+		return map[string]interface{}{"error": "invalid target_session_words in user settings"}
 	}
+	targetWords := settings.TargetSessionWords
 
 	sessionsPerDay := 0.0
 	if dailyPace > 0 {

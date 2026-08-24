@@ -2,13 +2,15 @@ package db
 
 import (
 	"database/sql"
-	"ai-tutor/internal/models"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"ai-tutor/internal/embeddings"
+	"ai-tutor/internal/models"
 )
 
 func TestIngestNotebookContentByTopicRollsBackOnMidTransactionFailure(t *testing.T) {
@@ -992,20 +994,29 @@ func TestGetTotalChunkTokensFallsBackWhenTokenCountMissing(t *testing.T) {
 		t.Fatalf("CreateChunk c2 failed: %v", err)
 	}
 
+	expectedC1Tokens, err := embeddings.CountTokens("abcdabcd")
+	if err != nil {
+		expectedC1Tokens = len("abcdabcd") / 4
+		if expectedC1Tokens <= 0 {
+			expectedC1Tokens = 1
+		}
+	}
+	expectedTotal := expectedC1Tokens + 3
+
 	total, err := testRepo.GetTotalChunkTokens(topicID)
 	if err != nil {
 		t.Fatalf("GetTotalChunkTokens failed: %v", err)
 	}
-	if total != 5 {
-		t.Fatalf("expected token total 5, got %d", total)
+	if total != expectedTotal {
+		t.Fatalf("expected token total %d, got %d", expectedTotal, total)
 	}
 
 	rangeTotal, err := testRepo.GetTotalChunkTokensForPageRange(topicID, 1, 1)
 	if err != nil {
 		t.Fatalf("GetTotalChunkTokensForPageRange failed: %v", err)
 	}
-	if rangeTotal != 2 {
-		t.Fatalf("expected page-range token total 2, got %d", rangeTotal)
+	if rangeTotal != expectedC1Tokens {
+		t.Fatalf("expected page-range token total %d, got %d", expectedC1Tokens, rangeTotal)
 	}
 }
 

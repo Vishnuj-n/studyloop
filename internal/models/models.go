@@ -211,6 +211,8 @@ type Notebook struct {
 	StudyStatus          string  `json:"study_status,omitempty"`
 	FileHash             string  `json:"file_hash"`
 	ExternalHelpRequired bool    `json:"external_help_required"`
+	StartPage            int     `json:"start_page,omitempty"`
+	EndPage              int     `json:"end_page,omitempty"`
 }
 
 // NotebookChunk links a chunk to a notebook (many chunks per notebook)

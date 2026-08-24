@@ -342,7 +342,9 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			FROM topics t
 			WHERE t.id = notebooks.topic_id
 			   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
-		), 0) AS external_help_required
+		), 0) AS external_help_required,
+		COALESCE((SELECT MIN(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), 1) AS start_page,
+		COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page
 	FROM notebooks`
 	args := []interface{}{}
 	whereClause := ""
@@ -384,7 +386,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 		if err := rows.Scan(
 			&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 			&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-			&nb.FileHash, &nb.ExternalHelpRequired,
+			&nb.FileHash, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
 		); err != nil {
 			return nil, err
 		}
@@ -410,13 +412,15 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 				FROM topics t
 				WHERE t.id = notebooks.topic_id
 				   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
-			), 0) AS external_help_required
+			), 0) AS external_help_required,
+			COALESCE((SELECT MIN(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), 1) AS start_page,
+			COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page
 		FROM notebooks
 		WHERE id = ?
 	`, notebookID).Scan(
 		&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 		&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-		&nb.FileHash, &nb.ExternalHelpRequired,
+		&nb.FileHash, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
 	)
 
 	if err == sql.ErrNoRows {
