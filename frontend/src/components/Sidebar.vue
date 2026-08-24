@@ -111,7 +111,7 @@ const topItems = [
   { to: '/flashcards', label: 'Flashcards', icon: '◧' },
   { to: '/examiner', label: 'Examiner', icon: '✎' },
   { to: '/tutor', label: 'Tutor', icon: '◎' },
-  { to: '/extensions', label: 'Extensions', icon: '🧩' },
+  { to: '/extensions', label: 'Extensions', icon: '❖' },
 ]
 </script>
 
