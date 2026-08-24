@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 const isLoaded = ref(false)
 const user = ref(null)
 const isPro = ref(false)
+const authError = ref('')
 export async function initClerk() {
   isLoaded.value = true
   return null
@@ -20,6 +21,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
         fullName: 'Authenticated User',
       }
       isPro.value = !!data.isPro
+      authError.value = ''
       localStorage.setItem('studyloop_user_session', JSON.stringify({
         user: user.value,
         isPro: isPro.value,
@@ -48,6 +50,10 @@ export function useClerkAuth() {
     isSignedIn: computed(() => !!user.value),
     user: computed(() => user.value),
     isPro: computed(() => isPro.value),
+    authError: computed(() => authError.value),
+    clearAuthError: () => {
+      authError.value = ''
+    },
     setMockPro: (val) => {
       console.log('[CLERK_AUTH] setMockPro called, setting isPro to:', val)
       isPro.value = !!val
@@ -63,52 +69,49 @@ export function useClerkAuth() {
     },
     signIn: async () => {
       console.log('[CLERK_AUTH] signIn() triggered, calling backend startBrowserAuth...')
+      authError.value = ''
       try {
         const res = await startBrowserAuth('sign-in')
         console.log('[CLERK_AUTH] startBrowserAuth response:', res)
-        if (res?.url) {
-          if (window?.runtime?.BrowserOpenURL) {
-            window.runtime.BrowserOpenURL(res.url)
-          } else {
-            window.open(res.url, '_blank')
-          }
+        if (res?.error) {
+          throw new Error(res.error)
         }
+        if (!res?.url) {
+          throw new Error('Failed to start local auth listener')
+        }
+        return { success: true }
       } catch (err) {
-        console.error('[CLERK_AUTH] signIn error:', err)
-        const fallback = 'https://innocent-orca-5605.accounts.dev/sign-in'
-        if (window?.runtime?.BrowserOpenURL) {
-          window.runtime.BrowserOpenURL(fallback)
-        } else {
-          window.open(fallback, '_blank')
-        }
+        const errMsg = err?.message || String(err) || 'Failed to start authentication'
+        console.error('[CLERK_AUTH] signIn error:', errMsg)
+        authError.value = errMsg
+        return { success: false, error: errMsg }
       }
     },
     signOut: () => {
       console.log('[CLERK_AUTH] signOut() triggered')
       user.value = null
       isPro.value = false
+      authError.value = ''
       localStorage.removeItem('studyloop_user_session')
     },
     openBilling: async () => {
       console.log('[CLERK_AUTH] openBilling() triggered, calling backend startBrowserAuth...')
+      authError.value = ''
       try {
         const res = await startBrowserAuth('billing')
         console.log('[CLERK_AUTH] openBilling response:', res)
-        if (res?.url) {
-          if (window?.runtime?.BrowserOpenURL) {
-            window.runtime.BrowserOpenURL(res.url)
-          } else {
-            window.open(res.url, '_blank')
-          }
+        if (res?.error) {
+          throw new Error(res.error)
         }
+        if (!res?.url) {
+          throw new Error('Failed to start billing server')
+        }
+        return { success: true }
       } catch (err) {
-        console.error('[CLERK_AUTH] openBilling error:', err)
-        const fallback = 'https://innocent-orca-5605.accounts.dev/user'
-        if (window?.runtime?.BrowserOpenURL) {
-          window.runtime.BrowserOpenURL(fallback)
-        } else {
-          window.open(fallback, '_blank')
-        }
+        const errMsg = err?.message || String(err) || 'Failed to open billing'
+        console.error('[CLERK_AUTH] openBilling error:', errMsg)
+        authError.value = errMsg
+        return { success: false, error: errMsg }
       }
     },
   }

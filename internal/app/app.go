@@ -19,6 +19,7 @@ import (
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 
+	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -646,6 +647,8 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice s
 	a.audioOverviewCancel = cancel
 	a.audioOverviewMu.Unlock()
 
+	generationID := uuid.NewString()
+
 	go func() {
 		defer func() {
 			a.audioOverviewMu.Lock()
@@ -655,12 +658,14 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice s
 
 		if a.ctx != nil {
 			wailsruntime.EventsEmit(a.ctx, "audio:overview:start", map[string]interface{}{
-				"topic_id": topicID,
+				"topic_id":      topicID,
+				"generation_id": generationID,
 			})
 		}
 
 		err := studySvc.GenerateAudioOverview(ctx, topicID, notebookID, voice, func(chunk study.AudioChunk) error {
 			if a.ctx != nil {
+				chunk.GenerationID = generationID
 				wailsruntime.EventsEmit(a.ctx, "audio:overview:chunk", chunk)
 			}
 			return nil
@@ -672,7 +677,9 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice s
 			}
 			if a.ctx != nil {
 				wailsruntime.EventsEmit(a.ctx, "audio:overview:error", map[string]interface{}{
-					"error": err.Error(),
+					"error":         err.Error(),
+					"topic_id":      topicID,
+					"generation_id": generationID,
 				})
 			}
 			return
@@ -680,12 +687,13 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice s
 
 		if a.ctx != nil {
 			wailsruntime.EventsEmit(a.ctx, "audio:overview:complete", map[string]interface{}{
-				"topic_id": topicID,
+				"topic_id":      topicID,
+				"generation_id": generationID,
 			})
 		}
 	}()
 
-	return map[string]interface{}{"status": "started", "topic_id": topicID}
+	return map[string]interface{}{"status": "started", "topic_id": topicID, "generation_id": generationID}
 }
 
 // StopTopicAudioOverview stops any active audio overview streaming session.

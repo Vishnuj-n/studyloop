@@ -110,31 +110,15 @@ const totalChunks = ref(0)
 const errorMessage = ref('')
 const selectedVoice = ref('en-US-ChristopherNeural')
 const playbackRate = ref(1.0)
+const activeGenerationId = ref('')
 
-let audio = null
-let errorTimer = null
-let pendingError = ''
-
-function clearErrorTimer() {
-  if (errorTimer) {
-    clearTimeout(errorTimer)
-    errorTimer = null
+function showError(msg) {
+  errorMessage.value = msg || 'Audio overview generation failed'
+  isLoading.value = false
+  if (audio) {
+    audio.pause()
   }
-  pendingError = ''
-}
-
-function scheduleOrShowError(msg) {
-  pendingError = msg || 'Audio overview generation failed'
-  if (chunks.value.length > 0) return
-  if (!errorTimer) {
-    errorTimer = setTimeout(() => {
-      if (chunks.value.length === 0 && pendingError) {
-        errorMessage.value = pendingError
-        isLoading.value = false
-      }
-      errorTimer = null
-    }, 10000)
-  }
+  isPlaying.value = false
 }
 
 const currentChunkText = computed(() => {
@@ -167,10 +151,7 @@ function initAudio() {
         return
       }
       console.warn('[AudioOverview] Audio element error:', e)
-      if (chunks.value.length === 0) {
-        scheduleOrShowError('Playback error encountered on current audio chunk.')
-      }
-      isPlaying.value = false
+      showError('Playback error encountered on current audio chunk.')
     }
   }
 }
@@ -235,18 +216,25 @@ function cycleSpeed() {
 }
 
 function handleStart() {
+  const genId = 'gen_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+  activeGenerationId.value = genId
   cleanupSession()
   initAudio()
   isLoading.value = true
   errorMessage.value = ''
-  clearErrorTimer()
   isFinished.value = false
   chunks.value = []
   currentIndex.value = 0
 
-  startTopicAudioOverview(props.topicId, props.notebookId, selectedVoice.value).catch((err) => {
-    scheduleOrShowError(err.message || 'Failed to start audio overview')
-  })
+  startTopicAudioOverview(props.topicId, props.notebookId, selectedVoice.value)
+    .then((res) => {
+      if (res?.generation_id) {
+        activeGenerationId.value = res.generation_id
+      }
+    })
+    .catch((err) => {
+      showError(err.message || 'Failed to start audio overview')
+    })
 }
 
 function restartWithVoice() {
@@ -254,7 +242,6 @@ function restartWithVoice() {
 }
 
 function cleanupSession() {
-  clearErrorTimer()
   if (audio) {
     audio.pause()
     audio.removeAttribute('src')
@@ -272,19 +259,26 @@ function handleClose() {
 onMounted(() => {
   initAudio()
 
-  EventsOn('audio:overview:start', () => {
+  EventsOn('audio:overview:start', (data) => {
+    if (data?.generation_id && activeGenerationId.value && data.generation_id !== activeGenerationId.value) {
+      return
+    }
+    if (data?.generation_id) {
+      activeGenerationId.value = data.generation_id
+    }
     isLoading.value = true
     errorMessage.value = ''
-    clearErrorTimer()
   })
 
   EventsOn('audio:overview:chunk', (chunk) => {
+    if (chunk?.generation_id && activeGenerationId.value && chunk.generation_id !== activeGenerationId.value) {
+      return
+    }
+
     if (!chunk || chunk.status === 'error') {
       if (chunk && chunk.error) {
         console.warn('[AudioOverview] Chunk synthesis error:', chunk.error)
-        if (chunks.value.length === 0) {
-          scheduleOrShowError(chunk.error)
-        }
+        showError(chunk.error)
       }
       return
     }
@@ -293,8 +287,6 @@ onMounted(() => {
       totalChunks.value = chunk.total_chunks
     }
 
-    // A valid chunk arrived: dismiss pending error and timer immediately
-    clearErrorTimer()
     if (errorMessage.value) {
       errorMessage.value = ''
     }
@@ -312,18 +304,21 @@ onMounted(() => {
   })
 
   EventsOn('audio:overview:complete', (data) => {
+    if (data?.generation_id && activeGenerationId.value && data.generation_id !== activeGenerationId.value) {
+      return
+    }
     isFinished.value = true
     isLoading.value = false
-    clearErrorTimer()
     if (data && data.total_chunks) {
       totalChunks.value = data.total_chunks
     }
   })
 
   EventsOn('audio:overview:error', (data) => {
-    if (chunks.value.length === 0) {
-      scheduleOrShowError(data?.error || 'Audio overview generation failed')
+    if (data?.generation_id && activeGenerationId.value && data.generation_id !== activeGenerationId.value) {
+      return
     }
+    showError(data?.error || 'Audio overview generation failed')
   })
 
   handleStart()

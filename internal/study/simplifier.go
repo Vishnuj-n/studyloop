@@ -7,8 +7,33 @@ import (
 	"path/filepath"
 	"strings"
 
+	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/utils"
 )
+
+// buildSimplifierPrompt formats the prompt given a template and material content.
+func buildSimplifierPrompt(promptTemplate, content string) string {
+	if promptTemplate != "" && strings.Contains(promptTemplate, "{{content}}") {
+		return strings.ReplaceAll(promptTemplate, "{{content}}", content)
+	} else if promptTemplate != "" {
+		return promptTemplate + "\n\nReading Material:\n\"\"\"\n" + content + "\n\"\"\"\n"
+	}
+	return fmt.Sprintf(`You are an expert tutor and text clarifier.
+Your goal is to rewrite and simplify the following reading material so that it is intuitive, crystal clear, and easy to understand, WITHOUT LOSING any technical accuracy, formulas, key definitions, or essential details.
+
+Format your output in clean Markdown with:
+1. **TL;DR Overview**: 1-2 sentence core intuition.
+2. **Key Concepts Explained Simply**: Clear, intuitive explanations using real-world analogies where helpful.
+3. **Step-by-Step Breakdown**: Detailed, structured explanation with all core facts intact.
+4. **Quick Summary / Key Takeaways**: Bullet points of what to remember.
+
+Reading Material:
+"""
+%s
+"""
+
+Return only the markdown response without meta-commentary.`, content)
+}
 
 // SimplifyReadingContent takes dense text content and simplifies it using the fast LLM provider,
 // loading the prompt template dynamically from extensions/text_simplifier/prompt.md if available.
@@ -29,28 +54,19 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 		promptTemplate = string(data)
 	}
 
-	var prompt string
-	if promptTemplate != "" && strings.Contains(promptTemplate, "{{content}}") {
-		prompt = strings.ReplaceAll(promptTemplate, "{{content}}", content)
-	} else if promptTemplate != "" {
-		prompt = promptTemplate + "\n\nReading Material:\n\"\"\"\n" + content + "\n\"\"\"\n"
-	} else {
-		prompt = fmt.Sprintf(`You are an expert tutor and text clarifier.
-Your goal is to rewrite and simplify the following reading material so that it is intuitive, crystal clear, and easy to understand, WITHOUT LOSING any technical accuracy, formulas, key definitions, or essential details.
-
-Format your output in clean Markdown with:
-1. **TL;DR Overview**: 1-2 sentence core intuition.
-2. **Key Concepts Explained Simply**: Clear, intuitive explanations using real-world analogies where helpful.
-3. **Step-by-Step Breakdown**: Detailed, structured explanation with all core facts intact.
-4. **Quick Summary / Key Takeaways**: Bullet points of what to remember.
-
-Reading Material:
-"""
-%s
-"""
-
-Return only the markdown response without meta-commentary.`, content)
+	limits := s.fastLLMProvider.GetLimits()
+	templateText := buildSimplifierPrompt(promptTemplate, "")
+	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templateText)
+	if err != nil {
+		return "", err
 	}
+
+	truncatedContent, err := embeddings.TruncateToTokens(content, availableBudget)
+	if err != nil {
+		return "", fmt.Errorf("failed to budget content tokens: %w", err)
+	}
+
+	prompt := buildSimplifierPrompt(promptTemplate, truncatedContent)
 
 	simplified, err := s.fastLLMProvider.GenerateAnswer(prompt)
 	if err != nil {

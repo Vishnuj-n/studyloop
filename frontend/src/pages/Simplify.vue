@@ -128,16 +128,6 @@ async function generateSimplification() {
       errorMessage.value = res.error
     } else if (res?.simplified) {
       simplifiedText.value = res.simplified
-      // Cache in session storage
-      try {
-        sessionStorage.setItem('simplify_cached_result', JSON.stringify({
-          topicId: topicId.value,
-          taskId: taskId.value,
-          simplified: res.simplified
-        }))
-      } catch (e) {
-        console.warn('[Simplify] Failed to cache simplified result in sessionStorage:', e)
-      }
     } else {
       errorMessage.value = 'Failed to generate simplified breakdown.'
     }
@@ -180,21 +170,7 @@ onMounted(async () => {
     }
   }
 
-  // 3. Check for cached result
-  try {
-    const cached = sessionStorage.getItem('simplify_cached_result')
-    if (cached) {
-      const parsed = JSON.parse(cached)
-      if (parsed.simplified && (parsed.topicId === topicId.value || parsed.taskId === taskId.value)) {
-        simplifiedText.value = parsed.simplified
-        return
-      }
-    }
-  } catch (e) {
-    console.warn('[Simplify] Failed to read simplify_cached_result from sessionStorage:', e)
-  }
-
-  // 4. Generate if content is available
+  // 3. Generate if content is available
   if (rawContent.value.trim()) {
     await generateSimplification()
   } else {

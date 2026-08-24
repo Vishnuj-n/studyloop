@@ -30,7 +30,7 @@ type authServerState struct {
 var activeAuthServer = &authServerState{}
 
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.
-func (a *App) StartBrowserAuth(mode string) map[string]interface{} {
+func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 	utils.Infof("[AUTH] StartBrowserAuth requested with mode: %s", mode)
 	activeAuthServer.mu.Lock()
 	if activeAuthServer.server != nil {
@@ -42,7 +42,7 @@ func (a *App) StartBrowserAuth(mode string) map[string]interface{} {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		utils.Warnf("[AUTH] Failed to create local loopback listener: %v", err)
-		return map[string]interface{}{"error": "Failed to start local auth listener"}
+		return nil, fmt.Errorf("failed to start local auth listener: %w", err)
 	}
 
 	port := listener.Addr().(*net.TCPAddr).Port
@@ -315,7 +315,7 @@ func (a *App) StartBrowserAuth(mode string) map[string]interface{} {
 		go func() {
 			time.Sleep(500 * time.Millisecond)
 			activeAuthServer.mu.Lock()
-			if activeAuthServer.server != nil {
+			if activeAuthServer.server == server {
 				_ = activeAuthServer.server.Close()
 				activeAuthServer.server = nil
 			}
@@ -352,5 +352,5 @@ func (a *App) StartBrowserAuth(mode string) map[string]interface{} {
 
 	return map[string]interface{}{
 		"url": targetURL,
-	}
+	}, nil
 }

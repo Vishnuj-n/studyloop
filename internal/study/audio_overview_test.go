@@ -1,6 +1,7 @@
 package study
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -44,5 +45,24 @@ func TestBuildAudioOverviewPrompt(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "Neural networks are models") {
 		t.Fatalf("prompt missing material context")
+	}
+}
+
+func TestAudioChunkUnmarshal(t *testing.T) {
+	malformedLine := "not-json-line-error"
+	var chunk AudioChunk
+	err := json.Unmarshal([]byte(malformedLine), &chunk)
+	if err == nil {
+		t.Fatalf("expected unmarshal error for malformed json stdout, got nil")
+	}
+
+	validJSON := `{"generation_id":"gen-123","status":"success","chunk_id":1,"text":"Hello world","audio_base64":"abc123"}`
+	var validChunk AudioChunk
+	err = json.Unmarshal([]byte(validJSON), &validChunk)
+	if err != nil {
+		t.Fatalf("expected valid unmarshal, got error: %v", err)
+	}
+	if validChunk.GenerationID != "gen-123" || validChunk.ChunkID != 1 {
+		t.Fatalf("unexpected unmarshaled chunk values: %+v", validChunk)
 	}
 }

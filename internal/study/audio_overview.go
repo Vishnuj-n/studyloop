@@ -15,12 +15,13 @@ import (
 
 // AudioChunk represents a synthesized audio chunk streamed to the client.
 type AudioChunk struct {
-	Status      string `json:"status"`
-	ChunkID     int    `json:"chunk_id"`
-	TotalChunks int    `json:"total_chunks,omitempty"`
-	Text        string `json:"text"`
-	AudioBase64 string `json:"audio_base64"`
-	Error       string `json:"error,omitempty"`
+	GenerationID string `json:"generation_id,omitempty"`
+	Status       string `json:"status"`
+	ChunkID      int    `json:"chunk_id"`
+	TotalChunks  int    `json:"total_chunks,omitempty"`
+	Text         string `json:"text"`
+	AudioBase64  string `json:"audio_base64"`
+	Error        string `json:"error,omitempty"`
 }
 
 // SentenceItem holds an individual numbered sentence for TTS processing.
@@ -243,7 +244,7 @@ func (s *StudyService) GenerateAudioOverview(
 	return runner.RunStreamWithInput(ctx, "", pythonPath, payloadBytes, func(line string) error {
 		var chunk AudioChunk
 		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-			return nil
+			return fmt.Errorf("failed to parse audio chunk output: %w", err)
 		}
 		chunk.TotalChunks = totalChunks
 		if onChunk != nil {

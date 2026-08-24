@@ -7,6 +7,11 @@
       </span>
     </div>
 
+    <!-- Authentication Error Alert -->
+    <div v-if="clerkAuth.authError.value" class="login-error-message animate-fade-in">
+      ⚠️ {{ clerkAuth.authError.value }}
+    </div>
+
     <!-- Signed In with Clerk -->
     <div v-if="clerkAuth.isSignedIn.value" class="signed-in-box">
       <div class="status-indicator">
