@@ -72,7 +72,6 @@ import MarkdownReader from '../components/MarkdownReader.vue'
 const route = useRoute()
 const router = useRouter()
 
-const taskId = computed(() => (route.query.taskId || route.query.task_id || '').trim())
 const topicId = computed(() => (route.query.topicId || route.query.topic_id || '').trim())
 const notebookId = computed(() => (route.query.notebookId || route.query.notebook_id || '').trim())
 

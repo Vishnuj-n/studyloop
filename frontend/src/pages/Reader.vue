@@ -270,7 +270,6 @@ import {
   getUserSettings,
   logFrontendEvent,
   trackAnalyticsEvent,
-  simplifyReadingContent,
   getTopicSectionsContent,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'

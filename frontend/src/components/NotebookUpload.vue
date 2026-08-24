@@ -100,7 +100,7 @@ import { useExtensions } from '../composables/useExtensions'
 import { getAvailableImporters } from '../services/importerRegistry'
 import YoutubeImportModal from './YoutubeImportModal.vue'
 
-const props = defineProps({
+defineProps({
   isCloudProfile: { type: Boolean, default: false },
   classroomCode: { type: String, default: '' },
   uploadProgress: { type: Number, default: 0 },

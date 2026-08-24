@@ -3,11 +3,11 @@
     <div class="modal-card setup-card">
       <div class="modal-header">
         <div class="setup-header-title">
-          <div class="setup-icon-spinner" v-if="status === 'running'">
+          <div v-if="status === 'running'" class="setup-icon-spinner">
             <div class="loading-spin-circle"></div>
           </div>
-          <div class="setup-icon-success" v-else-if="status === 'success'">✓</div>
-          <div class="setup-icon-error" v-else>!</div>
+          <div v-else-if="status === 'success'" class="setup-icon-success">✓</div>
+          <div v-else class="setup-icon-error">!</div>
           <h3>
             {{
               status === 'running'

@@ -112,6 +112,8 @@ const selectedVoice = ref('en-US-ChristopherNeural')
 const playbackRate = ref(1.0)
 const activeGenerationId = ref('')
 
+let audio = null
+
 function showError(msg) {
   errorMessage.value = msg || 'Audio overview generation failed'
   isLoading.value = false

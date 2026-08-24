@@ -24,7 +24,7 @@
     <!-- Error Banner -->
     <div v-if="errorMessage" class="error-banner">
       <span>{{ errorMessage }}</span>
-      <button class="close-err" @click="errorMessage = ''" aria-label="Close error">×</button>
+      <button class="close-err" aria-label="Close error" @click="errorMessage = ''">×</button>
     </div>
 
     <!-- Free Extensions Section -->

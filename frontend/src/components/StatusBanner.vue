@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   /** 'info' | 'rescue' | 'success' | 'error' | 'warning' */
   variant: { type: String, required: true },
   icon: { type: String, required: true },

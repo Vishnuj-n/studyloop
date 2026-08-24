@@ -9,7 +9,7 @@
             <p class="modal-subtitle">Generate structured study chapters and notes from video</p>
           </div>
         </div>
-        <button type="button" class="modal-close" @click="close" aria-label="Close modal">×</button>
+        <button type="button" class="modal-close" aria-label="Close modal" @click="close">×</button>
       </div>
 
       <div class="modal-body">

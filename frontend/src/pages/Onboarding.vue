@@ -126,8 +126,8 @@
             <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
               <input
                 id="strategy-fast"
-                name="defaultRemedialStrategy"
                 v-model="defaultRemedialStrategy"
+                name="defaultRemedialStrategy"
                 type="radio"
                 value="FAST"
                 style="cursor: pointer"
@@ -141,8 +141,8 @@
             <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
               <input
                 id="strategy-classic"
-                name="defaultRemedialStrategy"
                 v-model="defaultRemedialStrategy"
+                name="defaultRemedialStrategy"
                 type="radio"
                 value="CLASSIC"
                 style="cursor: pointer"
