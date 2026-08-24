@@ -26,14 +26,14 @@ Dashboard fetches next PENDING task
 
 | Order | Task Type |
 |-------|-----------|
-| 1 | `FLASHCARD_GENERATE` |
-| 2 | `SOCRATIC_REMEDIAL` |
-| 3 | `FLASHCARD_REVIEW` |
+| 7 | `FLASHCARD_GENERATE` |
+| 6 | `SOCRATIC_REMEDIAL` |
+| 5 | `FLASHCARD_REVIEW` |
 | 4 | `REREAD` |
-| 5 | `QUIZ` |
-| 6 | `MILESTONE_EXAM` |
-| 7 | `READING` |
-| 8 | `EXAMINER` |
+| 3 | `QUIZ` |
+| 2 | `MILESTONE_EXAM` |
+| 1 | `READING` |
+| 0 | `EXAMINER` |
 
 Then apply notebook priority bias within each tier.
 

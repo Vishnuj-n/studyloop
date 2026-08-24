@@ -155,15 +155,13 @@ wails build -tags sqlite_extension
 ## Documentation
 
 - Developer Onboarding & Handover: [doc/DEVELOPER_ONBOARDING.md](doc/DEVELOPER_ONBOARDING.md)
-- System design: [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)
+- System design & Invariants: [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)
 - App flow and user interactions: [doc/APP_FLOW.md](doc/APP_FLOW.md)
 - Database schema: [doc/SCHEMA.md](doc/SCHEMA.md)
+- Source structure: [doc/PROJECT_STRUCTURE.md](doc/PROJECT_STRUCTURE.md)
 - API contracts: [doc/DATA_API.md](doc/DATA_API.md)
 - Module responsibilities: [doc/AGENT_MAP.md](doc/AGENT_MAP.md)
-- Current sprint roadmap: [doc/SPRINT.md](doc/SPRINT.md)
 - RAG pipeline: [doc/RAG.md](doc/RAG.md)
-- UI/UX design: [doc/DESIGN.md](doc/DESIGN.md)
-- Platform support: [doc/PLATFORM_SUPPORT.md](doc/PLATFORM_SUPPORT.md)
 
 ## Constraints
 

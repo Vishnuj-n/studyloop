@@ -71,6 +71,14 @@ internal/
     boot.go           # Startup initialization
     asset_manager.go  # Asset validation + management
 
+  extension/          # Extension engine (uv-powered Python sandbox)
+    manager.go        # Extension discovery and lifecycle
+    runner.go         # Execution and isolation context
+    uv.go             # UV binary locator and env setup
+    checker.go        # Readiness smoke tests
+    installer.go      # Zip extraction and manifest parsing
+    tiers.go          # Access control (free/pro)
+
   models/             # Domain types (1 file)
     models.go         # Task, Block, Quiz types
 

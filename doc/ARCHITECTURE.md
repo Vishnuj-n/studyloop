@@ -908,3 +908,20 @@ Reader completion may immediately surface generated Quiz task as next queue item
 - Click → Quiz module mounts
 - Quiz module loads quiz_set by `block_id`
 - User completes → Queue router marks complete → Next task appears
+
+## 13. Extension System Runtime (uv-powered)
+
+### What
+Optional capabilities (e.g. YouTube audio extraction, advanced scraping) can be added dynamically using Python extensions without modifying core backend code.
+
+### Why
+- **Python Ecosystem**: The AI/ML ecosystem moves fast in Python; trying to rewrite all tools in Go is inefficient.
+- **Isolating Fragile Dependencies**: Heavy Python dependencies (`yt-dlp`, `edge-tts`) shouldn't pollute the core Go backend.
+- **Zero Global Pollution**: By using `uv`, we avoid modifying system-level Python environments and keep all dependencies sandboxed per-extension.
+
+### How
+- **Engine**: We use Astral's `uv` executable, bundled alongside our binary or downloaded on demand. `uv` resolves packages incredibly fast (10-100x faster than `pip`).
+- **Isolation**: Each Python extension receives its own dedicated virtual environment, stored typically in `%APPDATA%/Studyloop/extensions/<ext_id>/.venv` (Windows) or equivalent.
+- **PyArmor Protection**: To protect intellectual property (such as proprietary parsing algorithms), extension Python scripts can be distributed via PyArmor obfuscation, while remaining executable via the standard Python interpreter created by `uv`.
+- **Pre-Toggle Verification**: Before enabling an extension in the UI, the Go backend runs a readiness check (smoke test). If `uv` fails to build the virtual environment or dependencies are missing, the UI gracefully blocks the toggle, preventing runtime crashes.
+- **Interface**: Wails Go API handles downloading the ZIP manifest, setting up `uv venv`, and delegating input/output to the python entry point. The extension merely prints structured data (or status) to STDOUT.
