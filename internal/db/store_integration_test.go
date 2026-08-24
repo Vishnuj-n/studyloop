@@ -1,13 +1,16 @@
 package db
 
 import (
-	"ai-tutor/internal/models"
+	"database/sql"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"ai-tutor/internal/embeddings"
+	"ai-tutor/internal/models"
 )
 
 func TestIngestNotebookContentByTopicRollsBackOnMidTransactionFailure(t *testing.T) {
@@ -991,20 +994,29 @@ func TestGetTotalChunkTokensFallsBackWhenTokenCountMissing(t *testing.T) {
 		t.Fatalf("CreateChunk c2 failed: %v", err)
 	}
 
+	expectedC1Tokens, err := embeddings.CountTokens("abcdabcd")
+	if err != nil {
+		expectedC1Tokens = len("abcdabcd") / 4
+		if expectedC1Tokens <= 0 {
+			expectedC1Tokens = 1
+		}
+	}
+	expectedTotal := expectedC1Tokens + 3
+
 	total, err := testRepo.GetTotalChunkTokens(topicID)
 	if err != nil {
 		t.Fatalf("GetTotalChunkTokens failed: %v", err)
 	}
-	if total != 5 {
-		t.Fatalf("expected token total 5, got %d", total)
+	if total != expectedTotal {
+		t.Fatalf("expected token total %d, got %d", expectedTotal, total)
 	}
 
 	rangeTotal, err := testRepo.GetTotalChunkTokensForPageRange(topicID, 1, 1)
 	if err != nil {
 		t.Fatalf("GetTotalChunkTokensForPageRange failed: %v", err)
 	}
-	if rangeTotal != 2 {
-		t.Fatalf("expected page-range token total 2, got %d", rangeTotal)
+	if rangeTotal != expectedC1Tokens {
+		t.Fatalf("expected page-range token total %d, got %d", expectedC1Tokens, rangeTotal)
 	}
 }
 
@@ -1137,5 +1149,53 @@ func TestMarkTopicExternalHelpRequiredTx(t *testing.T) {
 		t.Errorf("expected MarkTopicExternalHelpRequiredTx to return error for nonexistent topic, got nil")
 	}
 }
+
+func TestInitOnLegacyDatabaseAddsMissingColumns(t *testing.T) {
+	tempDB, err := os.CreateTemp("", "legacy_test_*.db")
+	if err != nil {
+		t.Fatalf("failed to create temp db: %v", err)
+	}
+	tempDBPath := tempDB.Name()
+	_ = tempDB.Close()
+	defer os.Remove(tempDBPath)
+
+	// Pre-create llm_settings table with legacy schema (missing max_input_tokens and max_output_tokens)
+	sqlDB, err := sql.Open("sqlite3", tempDBPath)
+	if err != nil {
+		t.Fatalf("failed to open temp db: %v", err)
+	}
+	_, err = sqlDB.Exec(`
+		CREATE TABLE llm_settings (
+			tier TEXT PRIMARY KEY,
+			provider TEXT NOT NULL,
+			base_url TEXT NOT NULL,
+			model TEXT NOT NULL,
+			timeout_ms INTEGER NOT NULL DEFAULT 60000,
+			api_key_source TEXT NOT NULL DEFAULT 'keyring',
+			has_api_key BOOLEAN NOT NULL DEFAULT 0
+		);
+	`)
+	if err != nil {
+		_ = sqlDB.Close()
+		t.Fatalf("failed to create legacy table: %v", err)
+	}
+	_ = sqlDB.Close()
+
+	// Init should run alterStatements before seed inserts and succeed
+	repo, err := Init(tempDBPath, "")
+	if err != nil {
+		t.Fatalf("Init failed on legacy database: %v", err)
+	}
+	defer repo.Close()
+
+	settings, err := repo.GetLLMSettings()
+	if err != nil {
+		t.Fatalf("GetLLMSettings failed after migration: %v", err)
+	}
+	if settings == nil || settings.Fast.MaxInputTokens == 0 {
+		t.Fatalf("expected valid LLM settings with max_input_tokens populated, got %+v", settings)
+	}
+}
+
 
 

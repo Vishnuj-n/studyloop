@@ -136,6 +136,8 @@ func InitSchema(tx *sql.Tx) error {
 			base_url TEXT NOT NULL DEFAULT '',
 			model TEXT NOT NULL DEFAULT '',
 			timeout_ms INTEGER NOT NULL DEFAULT 30000,
+			max_input_tokens INTEGER NOT NULL DEFAULT 4000,
+			max_output_tokens INTEGER NOT NULL DEFAULT 1000,
 			api_key_source TEXT NOT NULL DEFAULT 'keyring',
 			has_api_key BOOLEAN DEFAULT 0,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -348,26 +350,7 @@ func InitSchema(tx *sql.Tx) error {
 		}
 	}
 
-	// Initialize default user settings
-	if _, err := tx.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled)
-		VALUES (1, 30, '17:00', '18:00', 1)
-		ON CONFLICT(id) DO NOTHING
-	`); err != nil {
-		return fmt.Errorf("failed to initialize user settings: %w", err)
-	}
-
-	if _, err := tx.Exec(`
-		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, api_key_source, has_api_key)
-		VALUES
-			('fast', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 'keyring', 0),
-			('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
-		ON CONFLICT(tier) DO NOTHING
-	`); err != nil {
-		return fmt.Errorf("failed to initialize llm settings: %w", err)
-	}
-
-	// Run alterStatements migration
+	// Run alterStatements migration before seeding defaults so existing databases have all columns
 	for _, alter := range alterStatements {
 		exists, err := columnExists(tx, alter.Table, alter.Column)
 		if err != nil {
@@ -378,6 +361,25 @@ func InitSchema(tx *sql.Tx) error {
 				return fmt.Errorf("failed to execute alter statement for %s.%s: %w", alter.Table, alter.Column, err)
 			}
 		}
+	}
+
+	// Initialize default user settings
+	if _, err := tx.Exec(`
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled)
+		VALUES (1, 30, '17:00', '18:00', 1)
+		ON CONFLICT(id) DO NOTHING
+	`); err != nil {
+		return fmt.Errorf("failed to initialize user settings: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
+		VALUES
+			('fast', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
+			('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
+		ON CONFLICT(tier) DO NOTHING
+	`); err != nil {
+		return fmt.Errorf("failed to initialize llm settings: %w", err)
 	}
 
 	return nil
@@ -403,6 +405,8 @@ var alterStatements = []struct {
 	{"study_profiles", "classroom_code", "ALTER TABLE study_profiles ADD COLUMN classroom_code TEXT DEFAULT ''"},
 	{"study_profiles", "student_username", "ALTER TABLE study_profiles ADD COLUMN student_username TEXT DEFAULT ''"},
 	{"study_profiles", "cloud_api_token", "ALTER TABLE study_profiles ADD COLUMN cloud_api_token TEXT DEFAULT ''"},
+	{"llm_settings", "max_input_tokens", "ALTER TABLE llm_settings ADD COLUMN max_input_tokens INTEGER NOT NULL DEFAULT 4000"},
+	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 1000"},
 }
 
 func columnExists(tx *sql.Tx, table, column string) (bool, error) {

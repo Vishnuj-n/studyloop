@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 const minTimeoutMs = 1
@@ -90,6 +91,12 @@ func LoadConfigFromSettingsForPrefix(prefix string, settings models.LLMTierSetti
 		config.TimeoutMs = 30000
 	}
 	config.Limits = getModelLimits(config.Model)
+	if settings.MaxInputTokens > 0 {
+		config.Limits.MaxInputTokens = settings.MaxInputTokens
+	}
+	if settings.MaxOutputTokens > 0 {
+		config.Limits.MaxOutputTokens = settings.MaxOutputTokens
+	}
 	applyEnvLimitsOverride(prefix, &config.Limits)
 	return config
 }
@@ -130,33 +137,11 @@ func defaultModelForProvider(provider string) string {
 	}
 }
 
-// getModelLimits returns model-specific token limits with safety margins.
-// Uses 60% of model's max context as safe input limit, reserves 15-20% margin.
+// getModelLimits returns token limits with safe conservative defaults.
 func getModelLimits(model string) ModelLimits {
-	model = strings.TrimSpace(strings.ToLower(model))
-
-	switch {
-	case strings.Contains(model, "llama-3.1-8b"):
-		return ModelLimits{
-			MaxInputTokens:  5500, // Safe fit for 6K TPM free tier
-			MaxOutputTokens: 1500,
-		}
-	case strings.Contains(model, "llama-3.3-70b"):
-		return ModelLimits{
-			MaxInputTokens:  11000, // Safe fit for 12K TPM free tier
-			MaxOutputTokens: 2500,
-		}
-	case strings.Contains(model, "gpt-oss-120b"), strings.Contains(model, "gpt-oss-20b"):
-		return ModelLimits{
-			MaxInputTokens:  7500, // Safe fit for 8K TPM free tier
-			MaxOutputTokens: 1500,
-		}
-	default:
-		// Conservative defaults for unknown models
-		return ModelLimits{
-			MaxInputTokens:  7500,
-			MaxOutputTokens: 1500,
-		}
+	return ModelLimits{
+		MaxInputTokens:  4000,
+		MaxOutputTokens: 1000,
 	}
 }
 
@@ -257,6 +242,11 @@ type openAIResponse struct {
 			Content string `json:"content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
 }
 
 // GenerateAnswer calls the LLM to generate an answer.
@@ -268,6 +258,16 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		return "", fmt.Errorf("LLM API key not configured")
 	}
 
+	words := len(strings.Fields(prompt))
+	estPromptTokens := int(float64(words) * 1.3)
+	if estPromptTokens == 0 && len(prompt) > 0 {
+		estPromptTokens = (len(prompt) + 3) / 4
+	}
+
+	limits := p.GetLimits()
+	utils.Warnf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d max_output_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
+		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, limits.MaxOutputTokens, estPromptTokens, len(prompt), words)
+
 	requestBody := openAIRequest{
 		Model: p.config.Model,
 		Messages: []openAIMessage{
@@ -278,16 +278,31 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		},
 	}
 
-	// Debug: write prompt to file for inspection
-	debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s] ---\n%s\n--- END PROMPT ---\n", time.Now().Format("2006-01-02 15:04:05"), p.config.Model, prompt)
-	_ = os.WriteFile("dev_data/logs/llm_prompt.log", append(mustReadFile("dev_data/logs/llm_prompt.log"), []byte(debugLog)...), 0644)
+	// Debug: write prompt to file for inspection when explicit env var is set
+	if os.Getenv("DEBUG_LLM_PROMPTS") != "" {
+		_ = os.MkdirAll("dev_data/logs", 0755)
+		debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
+			time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)
+		if f, err := os.OpenFile("dev_data/logs/llm_prompt.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			_, _ = f.WriteString(debugLog)
+			_ = f.Close()
+		}
+	}
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", err
 	}
 
-	url := strings.TrimSuffix(p.config.BaseURL, "/") + "/v1/chat/completions"
+	baseURL := strings.TrimSuffix(p.config.BaseURL, "/")
+	var url string
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		url = baseURL
+	} else if strings.HasSuffix(baseURL, "/v1") {
+		url = baseURL + "/chat/completions"
+	} else {
+		url = baseURL + "/v1/chat/completions"
+	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
@@ -306,16 +321,21 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	client := &http.Client{
 		Timeout: time.Duration(effectiveTimeoutMs) * time.Millisecond,
 	}
+
+	startTime := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
+		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d err=%v", p.config.Model, time.Since(startTime).Milliseconds(), err)
 		return "", err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
+	respDuration := time.Since(startTime)
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d status=%d err_body=%s", p.config.Model, respDuration.Milliseconds(), resp.StatusCode, string(bodyBytes))
 		return "", fmt.Errorf("LLM API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -328,10 +348,15 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		return "", fmt.Errorf("no response from LLM")
 	}
 
-	return apiResp.Choices[0].Message.Content, nil
-}
+	if apiResp.Usage.TotalTokens > 0 {
+		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d prompt_tokens=%d completion_tokens=%d total_tokens=%d configured_max_input=%d",
+			p.config.Model, respDuration.Milliseconds(), apiResp.Usage.PromptTokens, apiResp.Usage.CompletionTokens, apiResp.Usage.TotalTokens, limits.MaxInputTokens)
+	} else {
+		outWords := len(strings.Fields(apiResp.Choices[0].Message.Content))
+		estCompletionTokens := int(float64(outWords) * 1.3)
+		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d est_completion_tokens=%d resp_chars=%d configured_max_input=%d",
+			p.config.Model, respDuration.Milliseconds(), estCompletionTokens, len(apiResp.Choices[0].Message.Content), limits.MaxInputTokens)
+	}
 
-func mustReadFile(path string) []byte {
-	data, _ := os.ReadFile(path)
-	return data
+	return apiResp.Choices[0].Message.Content, nil
 }

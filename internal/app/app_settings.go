@@ -181,6 +181,12 @@ func (a *App) UpdateLLMSettings(settings models.LLMSettings) map[string]interfac
 	if settings.Fast.TimeoutMs <= 0 {
 		settings.Fast.TimeoutMs = 30000
 	}
+	if settings.Fast.MaxInputTokens <= 0 {
+		settings.Fast.MaxInputTokens = 4000
+	}
+	if settings.Fast.MaxOutputTokens <= 0 {
+		settings.Fast.MaxOutputTokens = 1000
+	}
 	if settings.UseSameForHeavy {
 		settings.Heavy = settings.Fast
 		settings.Heavy.Tier = "heavy"
@@ -188,6 +194,12 @@ func (a *App) UpdateLLMSettings(settings models.LLMSettings) map[string]interfac
 		settings.Heavy.Tier = "heavy"
 		if settings.Heavy.TimeoutMs <= 0 {
 			settings.Heavy.TimeoutMs = 90000
+		}
+		if settings.Heavy.MaxInputTokens <= 0 {
+			settings.Heavy.MaxInputTokens = 4000
+		}
+		if settings.Heavy.MaxOutputTokens <= 0 {
+			settings.Heavy.MaxOutputTokens = 1000
 		}
 	}
 	settings.Fast.HasAPIKey = current.Fast.HasAPIKey || llm.HasAPIKey("fast") || envHasLLMAPIKey("FAST_LLM")
@@ -242,6 +254,14 @@ func (a *App) DeleteLLMAPIKey(tier string) map[string]interface{} {
 	}
 	if err := a.reloadLLMProviders(); err != nil {
 		return map[string]interface{}{"error": "key deleted but LLM reload failed: " + err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
+func (a *App) TestLLMConnection(baseURL, model, apiKey string) map[string]interface{} {
+	provider := llm.NewProvider(&llm.Config{BaseURL: baseURL, Model: model, APIKey: apiKey, TimeoutMs: 10000})
+	if _, err := provider.GenerateAnswer("Hi"); err != nil {
+		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}
 }

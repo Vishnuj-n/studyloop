@@ -1,19 +1,23 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"ai-tutor/internal/db"
+	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/notebook"
 	"ai-tutor/internal/utils"
 
+	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -74,6 +78,112 @@ func (a *App) UploadNotebookFromPath(filePath string) map[string]interface{} {
 	}
 
 	return a.finalizeNotebookUpload(uploadResult)
+}
+
+// UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
+func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{
+			"error": "notebook service not initialized",
+		}
+	}
+
+	cleanURL := strings.TrimSpace(videoURL)
+	if cleanURL == "" {
+		return map[string]interface{}{"error": "YouTube URL or video ID is required"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("youtube")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "YouTube Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	doc, result, err := a.notebookService.IngestYouTubeVideo(ctx, cleanURL, a.extRunner, ext)
+	if err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to ingest YouTube video: %v", err),
+		}
+	}
+
+	notebookID := uuid.New().String()
+	jsonFileName := fmt.Sprintf("%s.json", notebookID)
+	jsonFilePath := filepath.Join(a.notebookUploadDir, jsonFileName)
+
+	jsonBytes, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to serialize video metadata: %v", err),
+		}
+	}
+
+	if err := os.WriteFile(jsonFilePath, jsonBytes, 0o644); err != nil {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to save video metadata: %v", err),
+		}
+	}
+
+	fileHash := utils.MD5Hex(result.VideoID)
+	profileID := a.resolveExplicitActiveProfileID()
+	title := strings.TrimSpace(result.Title)
+	if title == "" {
+		title = "YouTube Video"
+	}
+
+	err = repo.CreateNotebook(notebookID, title, jsonFilePath, "youtube", "", fileHash, len(result.Chapters), profileID)
+	if err != nil {
+		_ = os.Remove(jsonFilePath)
+		return map[string]interface{}{
+			"error": err.Error(),
+		}
+	}
+
+	_ = repo.UpdateNotebookStatus(notebookID, "uploaded")
+
+	// Pre-create syllabus draft from chapters (1-based page numbers)
+	chaptersDraft := make([]models.SyllabusChapterDraft, 0, len(result.Chapters))
+	for i, ch := range result.Chapters {
+		pageNum := i + 1
+		chaptersDraft = append(chaptersDraft, models.SyllabusChapterDraft{
+			Title:     ch.Title,
+			StartPage: pageNum,
+			EndPage:   pageNum,
+		})
+	}
+	if err := persistSyllabusDraft(repo, notebookID, len(result.Chapters), chaptersDraft, false); err != nil {
+		_ = os.Remove(jsonFilePath)
+		_ = repo.DeleteNotebook(notebookID)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("failed to save syllabus draft: %v", err),
+		}
+	}
+
+	return map[string]interface{}{
+		"id":            notebookID,
+		"file_name":     title,
+		"file_type":     "youtube",
+		"page_count":    len(result.Chapters),
+		"word_count":    doc.WordCount,
+		"chunk_count":   0,
+		"indexed_count": 0,
+		"failed_count":  0,
+		"status":        "uploaded",
+		"video_id":      result.VideoID,
+		"uploader":      result.Uploader,
+		"duration":      result.DurationSeconds,
+	}
 }
 
 func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[string]interface{} {
@@ -329,6 +439,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if !boundsChanged && !titlesChanged {
 			// Nothing changed (no chapter or title changes) — treat as metadata_only/no-op
 			utils.Infof("ConfirmNotebookSyllabus: metadata_only (no chapter/title changes) for %s", notebookID)
+			a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 			return map[string]interface{}{
 				"success":     true,
 				"status":      nb.Status,
@@ -356,6 +467,8 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 			if len(topicIDs) > 0 {
 				_ = repo.UpdateNotebookTopic(notebookID, topicIDs[0])
 			}
+
+			a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 
 			// Return without running extraction/ingestion or embedding updates
 			return map[string]interface{}{
@@ -542,31 +655,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 	_ = repo.UpdateNotebookStatus(notebookID, status)
 
-	isActivated := nb.StudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
-	if nb.StudyStatus == "dormant" || nb.StudyStatus == "" {
-		activeCount, err := repo.CountActiveNotebooksForActiveProfile(nb.ProfileID)
-		if err != nil {
-			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", nb.ProfileID, err)
-		} else if activeCount < 4 {
-			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
-				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
-			} else {
-				isActivated = true
-			}
-		}
-	}
-
-	// Seed initial READING task into study_queue if active
-	if isActivated {
-		targetWords := 3000
-		if settings, err := repo.GetUserSettings(); err == nil && settings != nil && settings.TargetSessionWords > 0 {
-			targetWords = settings.TargetSessionWords
-		}
-		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
-			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
-		}
-	}
+	a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 
 	ragEnabled, err := repo.GetRAGEnabled()
 	if err == nil && ragEnabled && a.indexQueue != nil {
@@ -580,6 +669,38 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		"mode":        "full_reingest",
 		"topic_ids":   topicIDs,
 		"chunk_count": len(allChunks),
+	}
+}
+
+func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
+	isActivated := currentStudyStatus == "active"
+	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
+	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
+		activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID)
+		if err != nil {
+			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, err)
+		} else if activeCount < 4 {
+			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
+				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
+			} else {
+				isActivated = true
+			}
+		}
+	}
+
+	// Seed initial READING task into study_queue if active
+	if isActivated {
+		settings, err := repo.GetUserSettings()
+		targetWords := 1500
+		if err != nil {
+			utils.Warnf("[INGESTION] failed to load user settings for notebook %s, using default: %v", notebookID, err)
+		} else if settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+
+		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
+		}
 	}
 }
 
@@ -614,6 +735,8 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"uploaded_at":     nb.UploadedAt,
 			"profile_id":      nb.ProfileID,
 			"study_status":    nb.StudyStatus,
+			"start_page":      nb.StartPage,
+			"end_page":        nb.EndPage,
 		})
 	}
 
@@ -769,14 +892,14 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		dailyPace = remainingWords
 	}
 
-	targetWords := 3000
 	settings, err := repo.GetUserSettings()
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]interface{}{"error": fmt.Sprintf("failed to load user settings: %v", err)}
 	}
-	if settings != nil && settings.TargetSessionWords > 0 {
-		targetWords = settings.TargetSessionWords
+	if settings == nil || settings.TargetSessionWords <= 0 {
+		return map[string]interface{}{"error": "invalid target_session_words in user settings"}
 	}
+	targetWords := settings.TargetSessionWords
 
 	sessionsPerDay := 0.0
 	if dailyPace > 0 {

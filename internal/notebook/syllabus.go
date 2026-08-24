@@ -103,11 +103,14 @@ Rules:
 		} else {
 			limits := llmProvider.GetLimits()
 			maxInputTokens := limits.MaxInputTokens
+			if maxInputTokens <= 0 {
+				return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
+			}
 			const baseOverheadTokens = 500
 			const safetyMarginTokens = 500
 			availableBudget := maxInputTokens - baseOverheadTokens - safetyMarginTokens
-			if availableBudget < 1000 {
-				availableBudget = 1000
+			if availableBudget <= 0 {
+				return nil, fmt.Errorf("insufficient token budget: maxInputTokens (%d) is too small for prompt overhead", maxInputTokens)
 			}
 
 			sampleChars := len(sample)
@@ -136,11 +139,14 @@ Rules:
 		// Token budgeting check
 		limits := llmProvider.GetLimits()
 		maxInputTokens := limits.MaxInputTokens
+		if maxInputTokens <= 0 {
+			return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
+		}
 		promptTokens, err := embeddings.CountTokens(prompt)
 		if err == nil && promptTokens > maxInputTokens {
 			targetTokens := maxInputTokens - 200
-			if targetTokens < 1000 {
-				targetTokens = 1000
+			if targetTokens <= 0 {
+				targetTokens = maxInputTokens
 			}
 			if truncated, err := embeddings.TruncateToTokens(prompt, targetTokens); err == nil && len(truncated) > 0 {
 				prompt = truncated

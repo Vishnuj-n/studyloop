@@ -82,6 +82,10 @@ export function useReaderBase(taskID) {
       fileType.value === 'text'
   )
 
+  const isYouTube = computed(() => fileType.value === 'youtube')
+
+  const youtubeEmbedUrl = computed(() => notebookUrl.value || '')
+
   const isPdf = computed(() => fileType.value === 'pdf')
 
   const availableTopics = computed(() => {
@@ -449,6 +453,8 @@ export function useReaderBase(taskID) {
     availableTopics,
     selectedTopicTitle,
     isMarkdown,
+    isYouTube,
+    youtubeEmbedUrl,
     isPdf,
     pdfVisible,
     hasNavigationBounds,

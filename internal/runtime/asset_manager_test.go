@@ -8,6 +8,7 @@ import (
 )
 
 func TestBuildDownloadURL(t *testing.T) {
+	currentVer := getAppVersionTag()
 	tests := []struct {
 		name        string
 		inputVer    string
@@ -16,15 +17,15 @@ func TestBuildDownloadURL(t *testing.T) {
 		{
 			name:        "Dev version fallback to latest VERSION",
 			inputVer:    "v0.0.0-dev",
-			expectedSub: "/v1.3.0/rag-assets.zip",
+			expectedSub: "/" + currentVer + "/rag-assets.zip",
 		},
 		{
 			name:        "Empty version fallback to latest VERSION",
 			inputVer:    "",
-			expectedSub: "/v1.3.0/rag-assets.zip",
+			expectedSub: "/" + currentVer + "/rag-assets.zip",
 		},
 		{
-			name:        "Explicit v1.3.0 version",
+			name:        "Explicit version",
 			inputVer:    "v1.3.0",
 			expectedSub: "/v1.3.0/rag-assets.zip",
 		},

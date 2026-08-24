@@ -25,6 +25,7 @@
       :upload-error="uploadError"
       :success-message="successMessage"
       @upload-file="uploadFile"
+      @upload-youtube="uploadYouTube"
     />
 
     <!-- Active Lane (prioritized section) -->
@@ -141,6 +142,7 @@ import {
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
   uploadNotebookFromPath as apiUploadNotebookFromPath,
+  uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
   confirmNotebookSyllabus as apiConfirmNotebookSyllabus,
@@ -150,6 +152,7 @@ import {
   updateNotebookStudyStatus,
   getUserSettings,
 } from '../services/appApi'
+import { useClerkAuth } from '../services/clerkAuth'
 import {
   CanResolveFilePaths,
   EventsOff,
@@ -163,6 +166,7 @@ import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import { useDialog } from '../composables/useDialog'
 
 const { confirm: confirmDialog } = useDialog()
+const { isPro } = useClerkAuth()
 const route = useRoute()
 
 const uploadProgress = ref(0)
@@ -367,6 +371,35 @@ async function loadNotebooks() {
     if (token === loadNotebooksToken) {
       loading.value = false
     }
+  }
+}
+
+async function uploadYouTube(url) {
+  uploadError.value = ''
+  successMessage.value = ''
+  ingestionStatusMessage.value = 'Fetching video transcript and chapters...'
+  uploadProgress.value = 30
+  try {
+    const res = await apiUploadYouTubeNotebook(url, isPro.value)
+    if (res?.error) {
+      uploadError.value = res.error
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+      return
+    }
+    uploadProgress.value = 100
+    successMessage.value = `Video ingested: ${res.file_name}`
+    await loadNotebooks()
+    if (res.id) {
+      void openSyllabusDraft(res.id, res.file_name)
+    }
+  } catch (err) {
+    uploadError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    setTimeout(() => {
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+    }, 2000)
   }
 }
 

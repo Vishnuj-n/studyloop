@@ -46,3 +46,36 @@ func TestTruncateToTokensPreservesSentenceBoundary(t *testing.T) {
 		t.Fatalf("trimmed text exceeded token limit: got=%d limit=%d", got, limit)
 	}
 }
+
+func TestCountTokensFallback(t *testing.T) {
+	// Temporarily simulate uninitialized tokenizer
+	promptTokenizerMu.Lock()
+	savedTok := promptTokenizer
+	promptTokenizer = nil
+	tokenizerUnavailable = true
+	promptTokenizerMu.Unlock()
+
+	defer func() {
+		promptTokenizerMu.Lock()
+		promptTokenizer = savedTok
+		tokenizerUnavailable = (savedTok == nil)
+		promptTokenizerMu.Unlock()
+	}()
+
+	tokens, err := CountTokens("This is a quick fallback test for token count estimation.")
+	if err != nil {
+		t.Fatalf("CountTokens fallback failed: %v", err)
+	}
+	if tokens <= 0 {
+		t.Fatalf("expected positive token count from fallback, got=%d", tokens)
+	}
+
+	truncated, err := TruncateToTokens("Sentence one. Sentence two. Sentence three.", 4)
+	if err != nil {
+		t.Fatalf("TruncateToTokens fallback failed: %v", err)
+	}
+	if truncated == "" {
+		t.Fatalf("expected non-empty truncated text from fallback")
+	}
+}
+

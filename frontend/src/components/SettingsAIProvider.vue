@@ -61,6 +61,22 @@
       </p>
     </div>
 
+    <div class="form-group">
+      <label for="settings-llm-max-input">Max Input Tokens</label>
+      <input
+        id="settings-llm-max-input"
+        v-model.number="llmSettings.fast.max_input_tokens"
+        type="number"
+        placeholder="4000 (Default)"
+        min="500"
+        :disabled="disabled"
+      />
+      <p class="hint">Prompt token budget per request. Default is 4000 (safe for Groq/free tiers). Increase for Gemini or paid high-TPM tiers.</p>
+      <p v-if="hasFastTokenWarning" class="warning-hint">
+        ⚠️ {{ llmSettings.fast.max_input_tokens || 4000 }} tokens may be lower than your Target Reading Session Words (~{{ Math.round((targetSessionWords || 3000) * 1.3) }} tokens for {{ targetSessionWords || 3000 }} words). Chapter text may be truncated during quizzes.
+      </p>
+    </div>
+
     <SettingsToggle
       v-model="llmSettings.use_same_for_heavy"
       :disabled="disabled"
@@ -119,6 +135,18 @@
           }}
         </p>
       </div>
+      <div class="form-group">
+        <label for="settings-heavy-max-input">Heavy Max Input Tokens</label>
+        <input
+          id="settings-heavy-max-input"
+          v-model.number="llmSettings.heavy.max_input_tokens"
+          type="number"
+          placeholder="4000 (Default)"
+          min="500"
+          :disabled="disabled"
+        />
+        <p class="hint">Prompt token budget for heavy tasks (Socratic, syllabus, large context).</p>
+      </div>
     </div>
 
     <div class="button-row">
@@ -130,13 +158,21 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 
-defineProps({
+const props = defineProps({
   llmSettings: { type: Object, required: true },
   llmFastKey: { type: String, required: true },
   llmHeavyKey: { type: String, required: true },
+  targetSessionWords: { type: Number, default: 3000 },
   disabled: { type: Boolean, default: false },
+})
+
+const hasFastTokenWarning = computed(() => {
+  const words = Number(props.targetSessionWords) || 3000
+  const maxTokens = Number(props.llmSettings?.fast?.max_input_tokens) || 4000
+  return words * 1.3 > maxTokens
 })
 
 defineEmits(['apply-preset', 'remove-keys', 'update:llmFastKey', 'update:llmHeavyKey'])
@@ -152,6 +188,7 @@ label {
 input[type='text'],
 input[type='url'],
 input[type='password'],
+input[type='number'],
 select {
   border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
   border-radius: 12px;
@@ -177,6 +214,14 @@ select:focus {
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
+}
+
+.warning-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warning, #f59e0b);
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .form-grid {

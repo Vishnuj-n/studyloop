@@ -10,6 +10,7 @@ import (
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
+	"ai-tutor/internal/extension"
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/notebook"
 	"ai-tutor/internal/retrieval"
@@ -18,6 +19,7 @@ import (
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 
+	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -43,15 +45,28 @@ type App struct {
 	scheduler         scheduler.Service
 	notebookService   *notebook.Service
 	studyService      *study.StudyService
+	extManager        *extension.Manager
+	extRunner         *extension.Runner
 	notebookUploadDir string
 	aiReady           bool
 	aiInitError       string
-	indexQueue        *retrieval.VectorIndexQueue
+	extInitError      string
+	indexQueue          *retrieval.VectorIndexQueue
+	audioOverviewMu     sync.Mutex
+	audioOverviewCancel context.CancelFunc
 }
 
 func NewApp() *App {
+	mgr := extension.NewManager()
+	var extInitErr string
+	if _, err := mgr.Discover(); err != nil {
+		extInitErr = err.Error()
+	}
 	return &App{
-		readyChan: make(chan struct{}),
+		readyChan:    make(chan struct{}),
+		extManager:   mgr,
+		extRunner:    extension.NewRunner(),
+		extInitError: extInitErr,
 	}
 }
 
@@ -142,6 +157,7 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	a.StopTopicAudioOverview()
 	if a.indexQueue != nil {
 		a.indexQueue.Stop()
 	}
@@ -220,9 +236,12 @@ func (a *App) GetTopicSectionsContent(topicID string, notebookID string) map[str
 		}
 	}
 
+	fullText := strings.Join(sectionsContent, "\n\n")
 	return map[string]interface{}{
-		"content":        strings.Join(sectionsContent, "\n\n"),
-		"notebook_title": bundle.NotebookTitle,
+		"content":          fullText,
+		"sections_content": fullText,
+		"notebook_title":   bundle.NotebookTitle,
+		"topic_title":      bundle.TopicTitle,
 	}
 }
 
@@ -612,4 +631,83 @@ func emitRagSetupFailed(a *App, reason string) {
 		"detail":      reason,
 		"errorReason": reason,
 	})
+}
+
+// StartTopicAudioOverview initiates streaming audio overview generation for a topic.
+func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice string) map[string]interface{} {
+	a.waitForReady()
+	a.aiMutex.Lock()
+	studySvc := a.studyService
+	a.aiMutex.Unlock()
+
+	if studySvc == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+
+	a.audioOverviewMu.Lock()
+	if a.audioOverviewCancel != nil {
+		a.audioOverviewCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.audioOverviewCancel = cancel
+	a.audioOverviewMu.Unlock()
+
+	generationID := uuid.NewString()
+
+	go func() {
+		defer func() {
+			a.audioOverviewMu.Lock()
+			a.audioOverviewCancel = nil
+			a.audioOverviewMu.Unlock()
+		}()
+
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "audio:overview:start", map[string]interface{}{
+				"topic_id":      topicID,
+				"generation_id": generationID,
+			})
+		}
+
+		err := studySvc.GenerateAudioOverview(ctx, topicID, notebookID, voice, func(chunk study.AudioChunk) error {
+			if a.ctx != nil {
+				chunk.GenerationID = generationID
+				wailsruntime.EventsEmit(a.ctx, "audio:overview:chunk", chunk)
+			}
+			return nil
+		})
+
+		if err != nil {
+			if ctx.Err() == context.Canceled {
+				return
+			}
+			if a.ctx != nil {
+				wailsruntime.EventsEmit(a.ctx, "audio:overview:error", map[string]interface{}{
+					"error":         err.Error(),
+					"topic_id":      topicID,
+					"generation_id": generationID,
+				})
+			}
+			return
+		}
+
+		if a.ctx != nil {
+			wailsruntime.EventsEmit(a.ctx, "audio:overview:complete", map[string]interface{}{
+				"topic_id":      topicID,
+				"generation_id": generationID,
+			})
+		}
+	}()
+
+	return map[string]interface{}{"status": "started", "topic_id": topicID, "generation_id": generationID}
+}
+
+// StopTopicAudioOverview stops any active audio overview streaming session.
+func (a *App) StopTopicAudioOverview() map[string]interface{} {
+	a.audioOverviewMu.Lock()
+	defer a.audioOverviewMu.Unlock()
+	if a.audioOverviewCancel != nil {
+		a.audioOverviewCancel()
+		a.audioOverviewCancel = nil
+	}
+	return map[string]interface{}{"status": "stopped"}
 }

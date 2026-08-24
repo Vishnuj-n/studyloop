@@ -138,6 +138,11 @@ export function getNotebookTopicTree() {
   return appBridge().GetNotebookTopicTree()
 }
 
+export function uploadYouTubeNotebook(videoURL, isPro = false) {
+  return appBridge().UploadYouTubeNotebook(videoURL, isPro)
+}
+
+
 export function uploadNotebook(fileBytes, fileName) {
   return appBridge().UploadNotebook(fileBytes, fileName)
 }
@@ -201,6 +206,10 @@ export function saveLLMAPIKey(tier, key) {
 
 export function deleteLLMAPIKey(tier) {
   return appBridge().DeleteLLMAPIKey(tier)
+}
+
+export function testLLMConnection(baseURL, model, apiKey) {
+  return appBridge().TestLLMConnection(baseURL || '', model || '', apiKey || '')
 }
 
 export function initializeRAG() {
@@ -295,6 +304,14 @@ export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
 
+export function startTopicAudioOverview(topicID, notebookID = '', voice = 'en-US-ChristopherNeural') {
+  return appBridge().StartTopicAudioOverview(topicID, notebookID, voice)
+}
+
+export function stopTopicAudioOverview() {
+  return appBridge().StopTopicAudioOverview()
+}
+
 export function logFrontendEvent(level, component, event, details = '') {
   try {
     const bridge = window?.go?.main?.App
@@ -306,3 +323,36 @@ export function logFrontendEvent(level, component, event, details = '') {
     console.error('Failed to forward log to backend:', err)
   }
 }
+
+export function listExtensions() {
+  return appBridge().ListExtensions()
+}
+
+export function checkExtensionReadiness(id) {
+  return appBridge().CheckExtensionReadiness(id)
+}
+
+export function setupExtension(id) {
+  return appBridge().SetupExtension(id)
+}
+
+export function runExtension(id, input = '', isPro = false) {
+  return appBridge().RunExtension(id, input, !!isPro)
+}
+
+export function installExtensionZip(zipPath) {
+  return appBridge().InstallExtensionZip(zipPath)
+}
+
+export function uninstallExtension(id) {
+  return appBridge().UninstallExtension(id)
+}
+
+export function simplifyReadingContent(content) {
+  return appBridge().SimplifyReadingContent(content)
+}
+
+export function startBrowserAuth(mode = 'sign-in') {
+  return appBridge().StartBrowserAuth(mode)
+}
+

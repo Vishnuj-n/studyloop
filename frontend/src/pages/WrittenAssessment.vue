@@ -22,6 +22,9 @@
       <div v-if="!question" class="config-panel">
         <p class="config-panel__hint">
           Select a page range and generate a long-form question drawn from your notebook.
+          <span v-if="selectedNotebook" class="range-hint">
+            (Available: Pages {{ selectedNotebook.start_page || 1 }} – {{ selectedNotebook.end_page || selectedNotebook.page_count || 1 }})
+          </span>
         </p>
         <div class="config-panel__row">
           <div class="number-field">
@@ -31,7 +34,8 @@
               v-model.number="startPage"
               class="ghost-input"
               type="number"
-              min="1"
+              :min="selectedNotebook?.start_page || 1"
+              :max="selectedNotebook?.end_page || selectedNotebook?.page_count || 99999"
               :disabled="loading"
             />
           </div>
@@ -42,7 +46,8 @@
               v-model.number="endPage"
               class="ghost-input"
               type="number"
-              min="1"
+              :min="selectedNotebook?.start_page || 1"
+              :max="selectedNotebook?.end_page || selectedNotebook?.page_count || 99999"
               :disabled="loading"
             />
           </div>
@@ -126,7 +131,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { getNotebooks, generateComprehensiveExam, scoreShortAnswer } from '../services/appApi.js'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 
@@ -140,6 +145,21 @@ const error = ref('')
 const question = ref(null)
 const userAnswer = ref('')
 const result = ref(null)
+
+const selectedNotebook = computed(() =>
+  notebooks.value.find((n) => n.id === selectedNotebookID.value)
+)
+
+watch(selectedNotebookID, (newID) => {
+  if (!newID) return
+  const nb = notebooks.value.find((n) => n.id === newID)
+  if (nb) {
+    const minP = nb.start_page || 1
+    const maxP = nb.end_page || nb.page_count || minP
+    startPage.value = minP
+    endPage.value = Math.min(minP + 5, maxP)
+  }
+})
 
 const canGenerate = computed(
   () =>
@@ -307,6 +327,13 @@ function reset() {
   font-size: 14px;
   color: var(--muted-text);
   line-height: 1.5;
+}
+
+.range-hint {
+  display: inline-block;
+  margin-left: 0.5rem;
+  color: var(--color-accent, #6366f1);
+  font-weight: 500;
 }
 
 .config-panel__row {

@@ -78,9 +78,11 @@ def should_exclude_file(filename):
             return True
     return False
 
+def is_noise_zero(val_str):
+    clean = val_str.strip().strip("'\"`")
+    return clean in ("0", "0.0", "false", '""', "''", "``", "nil", "null", "undefined")
 
-
-def scan_file(filepath):
+def scan_file(filepath, include_zeros=False, target_values=None):
     results = []
     ext = os.path.splitext(filepath)[1]
     
@@ -109,6 +111,17 @@ def scan_file(filepath):
                     # Double-check: ensure we didn't just match helper function names or keywords as variables
                     if var_name.lower() in ("true", "false", "nil", "null", "undefined"):
                         continue
+                    
+                    # Filter out noise zeros if not requested
+                    if not include_zeros and is_noise_zero(value):
+                        continue
+                    
+                    # Filter by target values if requested (e.g. 8000, 3000, 4000)
+                    if target_values:
+                        val_clean = value.strip().strip("'\"`")
+                        if not any(tv == val_clean or tv in val_clean for tv in target_values):
+                            continue
+
                     results.append({
                         "line": line_num,
                         "variable": var_name,
@@ -125,8 +138,18 @@ def main():
     parser.add_argument("--dir", action="append", help="Directories to scan (can specify multiple)")
     parser.add_argument("--file", action="append", help="Specific files to scan (can specify multiple)")
     parser.add_argument("--output", help="Write findings to a Markdown file instead of stdout")
+    parser.add_argument("--value", "-v", action="append", help="Target value(s) to search for (e.g. 8000, 3000, 4000). Can be comma-separated or repeated.")
+    parser.add_argument("--include-zeros", action="store_true", help="Include 0/false/empty zero-initializers in the report")
     
     args = parser.parse_args()
+    
+    target_values = []
+    if args.value:
+        for val_arg in args.value:
+            for v in val_arg.split(","):
+                v_clean = v.strip()
+                if v_clean:
+                    target_values.append(v_clean)
     
     # Get project root (parent directory of this script's directory)
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -141,7 +164,7 @@ def main():
     for f in scan_files:
         full_path = validate_path(os.path.join(project_root, f), project_root)
         if os.path.isfile(full_path) and not should_exclude_file(f):
-            results = scan_file(full_path)
+            results = scan_file(full_path, include_zeros=args.include_zeros, target_values=target_values)
             if results:
                 all_findings[f] = results
                 
@@ -158,14 +181,17 @@ def main():
                     rel_path = os.path.relpath(os.path.join(root, file), project_root)
                     if should_exclude_file(file):
                         continue
-                    results = scan_file(os.path.join(root, file))
+                    results = scan_file(os.path.join(root, file), include_zeros=args.include_zeros, target_values=target_values)
                     if results:
                         all_findings[rel_path] = results
 
     # Generate output
     output_lines = []
     output_lines.append("# Hardcoded Settings Scanner Report")
-    output_lines.append("This report lists variables, constants, and properties matching setting-like keywords assigned to hardcoded values.\n")
+    if target_values:
+        output_lines.append(f"**Filter**: Filtered for specific target values: `{', '.join(target_values)}`\n")
+    else:
+        output_lines.append("This report lists variables, constants, and properties matching setting-like keywords assigned to hardcoded values.\n")
     
     total_files = len(all_findings)
     total_instances = sum(len(instances) for instances in all_findings.values())

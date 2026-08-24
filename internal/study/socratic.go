@@ -227,16 +227,21 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	// Build conversation history block for the prompt
 	// Calculate baseline instructions tokens to establish the remaining history budget
-	instructionsOnlyText := socraticInstructions + "\n" + failedQuestionsSummary + "\n\nStudent question: " + question
-	instructionsTokens := embeddings.CountTokensFallback(instructionsOnlyText)
+	instructionsOnlyText := strings.Join([]string{
+		socraticInstructions,
+		failedQuestionsSummary,
+		"",
+		"Student question: " + question,
+	}, "\n")
+	instructionsTokens, err := embeddings.CountTokens(instructionsOnlyText)
+	if err != nil {
+		return nil, fmt.Errorf("error calculating prompt tokens: %w", err)
+	}
 
 	// History budget should leave space for context (e.g. 1500 tokens) and safety margin (100 tokens)
 	historyBudget := limits.MaxInputTokens - instructionsTokens - 1500 - 100
-	if historyBudget < 500 {
-		historyBudget = 500
-	}
-	if historyBudget > 1500 {
-		historyBudget = 1500
+	if historyBudget < 0 {
+		historyBudget = 0
 	}
 
 	var truncatedHistory []map[string]string
@@ -248,7 +253,10 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 			role = "Tutor"
 		}
 		msgText := fmt.Sprintf("%s: %s\n", role, msg["content"])
-		msgTokens := embeddings.CountTokensFallback(msgText)
+		msgTokens, err := embeddings.CountTokens(msgText)
+		if err != nil {
+			return nil, fmt.Errorf("error counting message tokens: %w", err)
+		}
 		if historyUsedTokens+msgTokens <= historyBudget {
 			truncatedHistory = append([]map[string]string{msg}, truncatedHistory...)
 			historyUsedTokens += msgTokens
@@ -290,7 +298,10 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		"Student question: " + question,
 	}, "\n")
 
-	overheadTokens := embeddings.CountTokensFallback(overheadText)
+	overheadTokens, err := embeddings.CountTokens(overheadText)
+	if err != nil {
+		return nil, fmt.Errorf("error counting overhead tokens: %w", err)
+	}
 	// Reserve a small safety margin for formatting and LLM internals
 	reserved := 100
 	available := limits.MaxInputTokens - overheadTokens - reserved
@@ -305,7 +316,10 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	newChunkTexts := make([]string, 0, len(chunkTexts))
 	usedTokens := 0
 	for i, blk := range blocks {
-		blkTokens := embeddings.CountTokensFallback(blk)
+		blkTokens, err := embeddings.CountTokens(blk)
+		if err != nil {
+			return nil, fmt.Errorf("error counting block tokens: %w", err)
+		}
 		if usedTokens+blkTokens <= available {
 			newBlocks = append(newBlocks, blk)
 			newCitations = append(newCitations, citations[i])

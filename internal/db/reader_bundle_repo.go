@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -229,10 +230,46 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		}
 	}
 
-	// For text and markdown files, load raw content directly from disk for instant, 100% fidelity rendering
+	// For text, markdown, and youtube files, load raw content directly from disk for instant, 100% fidelity rendering
 	if !strings.EqualFold(bundle.FileType, "pdf") && filePath.Valid && filePath.String != "" {
 		if contentBytes, err := os.ReadFile(filePath.String); err == nil {
 			bundle.RawContent = string(contentBytes)
+			if strings.EqualFold(bundle.FileType, "youtube") {
+				var meta struct {
+					VideoID  string `json:"video_id"`
+					Chapters []struct {
+						Idx   int    `json:"chapter_index"`
+						Start int    `json:"start_seconds"`
+						End   int    `json:"end_seconds"`
+						Text  string `json:"transcript"`
+					} `json:"chapters"`
+				}
+				if json.Unmarshal(contentBytes, &meta) == nil && meta.VideoID != "" {
+					target := bundle.TopicStartPage
+					if target <= 0 {
+						target = 1
+					}
+					var ch struct {
+						Idx   int    `json:"chapter_index"`
+						Start int    `json:"start_seconds"`
+						End   int    `json:"end_seconds"`
+						Text  string `json:"transcript"`
+					}
+					for _, c := range meta.Chapters {
+						if c.Idx == target || (target == 1 && c.Idx == 0) {
+							ch = c
+							break
+						}
+					}
+					if ch.Idx == 0 && len(meta.Chapters) > 0 {
+						ch = meta.Chapters[0]
+					}
+					bundle.NotebookURL = fmt.Sprintf("https://www.youtube-nocookie.com/embed/%s?enablejsapi=1&start=%d&end=%d", meta.VideoID, ch.Start, ch.End)
+					if ch.Text != "" {
+						bundle.RawContent = ch.Text
+					}
+				}
+			}
 		}
 	}
 

@@ -17,7 +17,7 @@ build/
 # User data (local SQLite + uploads)
 *.db
 uploads/
-/dev_data/
+dev_data/
 .config/
 .agents/
 .windsurf/
@@ -26,8 +26,8 @@ graphify-out/*
 doc/NOTES/
 .tmp
 .exe
-.scannerwork/
 doc/ORIGINAL_NOTES/
 __pycache__/
 bin/
 cloud-dashboard/dist/
+/extensions/

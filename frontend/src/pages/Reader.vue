@@ -99,6 +99,25 @@
             >
               {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
             </button>
+            <button
+              v-if="isExtensionActive('audio_overview')"
+              class="secondary audio-overview-btn"
+              :class="{ active: showAudioOverview }"
+              :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+              :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
+              @click="showAudioOverview = !showAudioOverview"
+            >
+              {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
+            </button>
+            <button
+              v-if="isExtensionActive('text_simplifier')"
+              class="secondary simplify-btn"
+              :disabled="reader.loadingBundle.value || simplifying"
+              title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
+              @click="handleSimplify"
+            >
+              {{ simplifying ? '✨ Opening...' : '✨ Simplify' }}
+            </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
             </span>
@@ -115,6 +134,18 @@
         <div v-if="reader.loadingBundle.value || reader.loadingText.value" class="empty">
           Loading document...
         </div>
+        <YouTubeReader
+          v-else-if="reader.isYouTube.value"
+          :embed-url="reader.youtubeEmbedUrl.value"
+          :transcript-content="reader.textContent.value"
+          :topic-title="reader.topicTitle.value"
+          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
+          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :is-task-flow="isTaskFlow"
+          :completing="completingSession"
+          :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+          @complete="completeSession"
+        />
         <MarkdownReader
           v-else-if="reader.isMarkdown.value"
           :content="reader.textContent.value"
@@ -142,7 +173,6 @@
                 : 0,
             transition: 'opacity 0.2s ease',
           }"
-          @keydown="handleViewportKeydown"
         >
           <div v-if="pdfLoadError" class="empty error">{{ pdfLoadError }}</div>
           <div
@@ -193,14 +223,6 @@
           >
             +
           </button>
-          <div class="edge-sep"></div>
-          <button
-            class="edge-btn info-btn"
-            title="Keyboard Zoom: Ctrl + '+' / '-'"
-            aria-label="Keyboard shortcuts info"
-          >
-            i
-          </button>
         </div>
 
         <p v-if="isTaskFlow && completionMessage" class="completion-message">
@@ -227,6 +249,16 @@
         Chat is currently disabled in queue study mode.
       </div>
     </div>
+
+    <!-- Floating Audio Overview Bar -->
+    <AudioOverviewBar
+      v-if="showAudioOverview && reader.selectedTopicID.value"
+      :topic-id="reader.selectedTopicID.value"
+      :notebook-id="reader.selectedNotebookID.value"
+      :topic-title="reader.topicTitle.value"
+      @close="showAudioOverview = false"
+    />
+
   </section>
 </template>
 
@@ -238,15 +270,101 @@ import {
   getUserSettings,
   logFrontendEvent,
   trackAnalyticsEvent,
+  getTopicSectionsContent,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
+import { useExtensions } from '../composables/useExtensions'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
+import YouTubeReader from '../components/YouTubeReader.vue'
+import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import VuePdfEmbed from 'vue-pdf-embed'
 import 'vue-pdf-embed/dist/styles/annotationLayer.css'
 import 'vue-pdf-embed/dist/styles/textLayer.css'
+
+const { isExtensionActive } = useExtensions()
+const showAudioOverview = ref(false)
+const simplifying = ref(false)
+
+async function handleSimplify() {
+  if (simplifying.value) return
+  simplifying.value = true
+  try {
+    const startPage =
+      reader.navigationMinPage.value ||
+      reader.topicStartPage.value ||
+      reader.currentPage.value ||
+      1
+    const endPage =
+      reader.navigationMaxPage.value ||
+      reader.topicEndPage.value ||
+      reader.pageCount.value ||
+      startPage
+    const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
+    const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
+    const topicTitle = cleanTopicTitle(rawTopic)
+
+    let sessionText = ''
+    if (Array.isArray(reader.sections.value) && reader.sections.value.length > 0) {
+      const rangeSections = reader.sections.value.filter(
+        (s) => !s.page_num || (s.page_num >= startPage && s.page_num <= endPage)
+      )
+      sessionText = (rangeSections.length > 0 ? rangeSections : reader.sections.value)
+        .map((s) => s.content || s.text || '')
+        .filter(Boolean)
+        .join('\n\n')
+    }
+    if (!sessionText) {
+      sessionText = reader.textContent.value || ''
+    }
+    if (!sessionText.trim() && reader.selectedTopicID.value) {
+      const bundle = await getTopicSectionsContent(
+        reader.selectedTopicID.value,
+        reader.selectedNotebookID.value
+      )
+      if (bundle?.content || bundle?.sections_content) {
+        sessionText = bundle.content || bundle.sections_content
+      }
+    }
+
+    if (!sessionText.trim()) {
+      showError('No text available to simplify.')
+      return
+    }
+
+    try {
+      sessionStorage.setItem('simplify_session_data', JSON.stringify({
+        bookTitle,
+        topicTitle,
+        startPage,
+        endPage,
+        text: sessionText.trim(),
+        taskId: resolvedTaskID.value,
+        topicId: reader.selectedTopicID.value,
+        notebookId: reader.selectedNotebookID.value,
+      }))
+    } catch (e) {
+      console.warn('[Reader] Failed to store simplify_session_data in sessionStorage:', e)
+    }
+
+    router.push({
+      path: '/simplify',
+      query: {
+        taskId: resolvedTaskID.value || undefined,
+        topicId: reader.selectedTopicID.value || undefined,
+        notebookId: reader.selectedNotebookID.value || undefined,
+        startPage: startPage || undefined,
+        endPage: endPage || undefined,
+      }
+    })
+  } catch (err) {
+    showError(String(err?.message || err))
+  } finally {
+    simplifying.value = false
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -301,8 +419,8 @@ const progressPercentage = computed(() => {
   }
 })
 
-watch(resolvedTaskID, (next, prev) => {
-  console.warn('[READER_STATE] resolvedTaskID changed', { previous: prev, next })
+watch([resolvedTaskID, () => reader.selectedTopicID.value], (next, prev) => {
+  console.warn('[READER_STATE] task/topic changed', { previous: prev, next })
 })
 
 // Custom PDF Viewer Refs
@@ -646,15 +764,6 @@ function zoomOut() {
   zoomScale.value = Math.max(0.5, Math.round((zoomScale.value - 0.1) * 100) / 100)
 }
 
-function handleViewportKeydown(e) {
-  if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
-    e.preventDefault()
-    zoomIn()
-  } else if (e.ctrlKey && e.key === '-') {
-    e.preventDefault()
-    zoomOut()
-  }
-}
 
 onUnmounted(() => {
   if (resizeObserver) {
@@ -1071,6 +1180,12 @@ button:disabled {
   background: var(--surface-container-low);
 }
 
+.audio-overview-btn.active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
 .error {
   color: #b42318;
   background: color-mix(in srgb, #b42318 12%, var(--surface-container-lowest));
@@ -1203,18 +1318,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.info-btn {
-  font-family: serif;
-  font-style: italic;
-  font-weight: bold;
-  font-size: 14px;
-  color: var(--muted-text);
-}
 
-.info-btn:hover {
-  color: var(--on-surface);
-  background: color-mix(in srgb, var(--surface-container-low) 70%, transparent);
-}
 
 .chat-disabled {
   color: var(--muted-text);
@@ -1246,5 +1350,17 @@ button:disabled {
   background: linear-gradient(90deg, var(--primary-dim), var(--primary));
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.simplify-btn {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.simplify-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
 
 </style>
