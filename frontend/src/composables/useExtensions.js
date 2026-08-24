@@ -1,8 +1,6 @@
 import { ref, computed } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
 
-const STORAGE_KEY = 'studyloop_extensions_enabled'
-
 // Reactive state shared across all components
 const enabledMap = ref({
   text_simplifier: true,
@@ -10,33 +8,7 @@ const enabledMap = ref({
   youtube_transcripts: true
 })
 
-let isInitialized = false
-
-function loadSettings() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      enabledMap.value = { ...enabledMap.value, ...JSON.parse(saved) }
-    }
-  } catch (e) {
-    console.error('Failed to load extension settings from localStorage', e)
-  }
-}
-
-function saveSettings() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(enabledMap.value))
-  } catch (e) {
-    console.error('Failed to save extension settings to localStorage', e)
-  }
-}
-
 export function useExtensions() {
-  if (!isInitialized) {
-    loadSettings()
-    isInitialized = true
-  }
-
   const clerkAuth = useClerkAuth()
   const isPro = computed(() => clerkAuth.isPro.value)
 
@@ -60,7 +32,6 @@ export function useExtensions() {
       ...enabledMap.value,
       [extensionId]: !!enabled
     }
-    saveSettings()
   }
 
   function toggleExtension(extensionId) {
@@ -76,3 +47,4 @@ export function useExtensions() {
     toggleExtension
   }
 }
+

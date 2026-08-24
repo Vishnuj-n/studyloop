@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -22,11 +23,16 @@ type ExtensionDTO struct {
 }
 
 // ListExtensions returns all discovered local extensions.
-func (a *App) ListExtensions() []ExtensionDTO {
+func (a *App) ListExtensions() ([]ExtensionDTO, error) {
 	if a.extManager == nil {
-		return []ExtensionDTO{}
+		if a.extInitError != "" {
+			return nil, fmt.Errorf("extension manager not initialized: %s", a.extInitError)
+		}
+		return nil, fmt.Errorf("extension manager not initialized")
 	}
-	_, _ = a.extManager.Discover()
+	if _, err := a.extManager.Discover(); err != nil {
+		return nil, fmt.Errorf("failed to discover extensions: %w", err)
+	}
 	exts := a.extManager.List()
 
 	dtos := make([]ExtensionDTO, 0, len(exts))
@@ -42,18 +48,24 @@ func (a *App) ListExtensions() []ExtensionDTO {
 			Dir:         ext.Dir,
 		})
 	}
-	return dtos
+	return dtos, nil
 }
 
 // RunExtension executes an extension by ID.
 // If the extension is marked "pro" and isPro is false, it returns an entitlement error.
 func (a *App) RunExtension(id string, input string, isPro bool) map[string]interface{} {
 	if a.extManager == nil || a.extRunner == nil {
+		if a.extInitError != "" {
+			return map[string]interface{}{"error": fmt.Sprintf("extension system not initialized: %s", a.extInitError)}
+		}
 		return map[string]interface{}{"error": "extension system not initialized"}
 	}
 
 	ext, ok := a.extManager.Get(id)
 	if !ok {
+		if a.extInitError != "" {
+			return map[string]interface{}{"error": fmt.Sprintf("extension %q not found (initialization error: %s)", id, a.extInitError)}
+		}
 		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id)}
 	}
 
@@ -91,9 +103,10 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 		}
 		return map[string]interface{}{"output": "Built-in extension executed successfully.", "id": id}
 	case "python", "py":
-		pyExe, pErr := extension.FindExtensionPython(ext)
-		if pErr != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("Python executable not found for extension %q: %v. Please initialize environment via Setup.", ext.Name(), pErr)}
+		venvDir := extension.ResolveExtensionVenvDir(ext)
+		pyExe := extension.GetVenvPython(venvDir)
+		if info, sErr := os.Stat(pyExe); sErr != nil || info.IsDir() {
+			return map[string]interface{}{"error": fmt.Sprintf("Python virtual environment not initialized for extension %q. Please initialize environment via Setup.", ext.Name())}
 		}
 		var args []string
 		args = append(args, ext.EntrypointPath())

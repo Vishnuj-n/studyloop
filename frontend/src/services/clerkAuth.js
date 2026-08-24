@@ -55,6 +55,10 @@ export function useClerkAuth() {
       authError.value = ''
     },
     setMockPro: (val) => {
+      if (!import.meta.env.DEV) {
+        console.warn('[CLERK_AUTH] setMockPro is disabled in production builds.')
+        return
+      }
       console.log('[CLERK_AUTH] setMockPro called, setting isPro to:', val)
       isPro.value = !!val
       if (user.value) {

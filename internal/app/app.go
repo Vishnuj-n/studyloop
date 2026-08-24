@@ -50,6 +50,7 @@ type App struct {
 	notebookUploadDir string
 	aiReady           bool
 	aiInitError       string
+	extInitError      string
 	indexQueue          *retrieval.VectorIndexQueue
 	audioOverviewMu     sync.Mutex
 	audioOverviewCancel context.CancelFunc
@@ -57,11 +58,15 @@ type App struct {
 
 func NewApp() *App {
 	mgr := extension.NewManager()
-	_, _ = mgr.Discover()
+	var extInitErr string
+	if _, err := mgr.Discover(); err != nil {
+		extInitErr = err.Error()
+	}
 	return &App{
-		readyChan:  make(chan struct{}),
-		extManager: mgr,
-		extRunner:  extension.NewRunner(),
+		readyChan:    make(chan struct{}),
+		extManager:   mgr,
+		extRunner:    extension.NewRunner(),
+		extInitError: extInitErr,
 	}
 }
 
