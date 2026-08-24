@@ -21,10 +21,10 @@ export const NOTEBOOK_IMPORTERS = [
     fileType: 'pdf',
   },
   {
-    id: 'youtube_transcripts',
+    id: 'youtube',
     name: 'YouTube Lecture',
     icon: '🎥',
-    badge: 'Extension',
+    badge: 'Pro',
     description: 'Fetch video transcript & auto-generate structured chapter notes from a YouTube URL.',
     modalName: 'youtube',
   },

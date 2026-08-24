@@ -194,7 +194,7 @@
     <ExtensionSetupModal
       :is-open="setupModalOpen"
       :extension="currentSetupExt"
-      @close="setupModalOpen = false"
+      @close="closeSetupModal"
       @success="handleSetupSuccess"
     />
 
@@ -299,6 +299,11 @@ function triggerSetup(ext) {
   currentSetupExt.value = ext
   activeExtName.value = ext.name
   setupModalOpen.value = true
+}
+
+function closeSetupModal() {
+  setupModalOpen.value = false
+  currentSetupExt.value = null
 }
 
 function handleSetupSuccess(ext) {

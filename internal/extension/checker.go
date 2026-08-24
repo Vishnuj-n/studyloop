@@ -90,7 +90,7 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 		return fmt.Errorf("cannot test nil extension")
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	testCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(testCtx, pythonPath, ext.EntrypointPath(), "--test")
