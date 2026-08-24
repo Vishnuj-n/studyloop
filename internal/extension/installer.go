@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Uninstall removes the extension directory for the given ID and refreshes discovery.
@@ -86,13 +87,14 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 		return nil, fmt.Errorf("failed to create extensions directory: %w", err)
 	}
 
-	targetExtDir := filepath.Join(m.extensionsDir, manifest.ID)
-	_ = os.RemoveAll(targetExtDir) // Clean up any existing installation
-	if err := os.MkdirAll(targetExtDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create target extension directory: %w", err)
+	stagingDir := filepath.Join(m.extensionsDir, fmt.Sprintf(".staging_%s_%d", manifest.ID, time.Now().UnixNano()))
+	defer os.RemoveAll(stagingDir)
+
+	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create staging directory: %w", err)
 	}
 
-	// 3. Extract all files under the manifestPrefix into targetExtDir
+	// 3. Extract all files under the manifestPrefix into stagingDir
 	for _, f := range r.File {
 		cleanName := filepath.ToSlash(f.Name)
 		if !strings.HasPrefix(cleanName, manifestPrefix) {
@@ -104,9 +106,9 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 			continue
 		}
 
-		destPath := filepath.Join(targetExtDir, filepath.FromSlash(relPath))
+		destPath := filepath.Join(stagingDir, filepath.FromSlash(relPath))
 		// Guard against ZipSlip
-		if !strings.HasPrefix(destPath, filepath.Clean(targetExtDir)+string(os.PathSeparator)) {
+		if !strings.HasPrefix(destPath, filepath.Clean(stagingDir)+string(os.PathSeparator)) {
 			return nil, fmt.Errorf("illegal file path in zip: %s", f.Name)
 		}
 
@@ -140,15 +142,45 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 		}
 	}
 
+	// Validate extracted entrypoint if runtime expects local file
+	entrypointPath := filepath.Join(stagingDir, filepath.FromSlash(manifest.Entrypoint))
+	if manifest.Runtime != "builtin" && manifest.Runtime != "internal" {
+		if info, err := os.Stat(entrypointPath); err != nil || info.IsDir() {
+			return nil, fmt.Errorf("manifest entrypoint %q missing or invalid in zip archive", manifest.Entrypoint)
+		}
+	}
+
+	targetExtDir := filepath.Join(m.extensionsDir, manifest.ID)
+	backupDir := filepath.Join(m.extensionsDir, fmt.Sprintf(".backup_%s_%d", manifest.ID, time.Now().UnixNano()))
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	hadExisting := false
+	if _, err := os.Stat(targetExtDir); err == nil {
+		hadExisting = true
+		if err := os.Rename(targetExtDir, backupDir); err != nil {
+			return nil, fmt.Errorf("failed to backup existing extension directory: %w", err)
+		}
+	}
+
+	if err := os.Rename(stagingDir, targetExtDir); err != nil {
+		if hadExisting {
+			_ = os.Rename(backupDir, targetExtDir)
+		}
+		return nil, fmt.Errorf("failed to activate extension directory: %w", err)
+	}
+
+	if hadExisting {
+		_ = os.RemoveAll(backupDir)
+	}
+
 	// 4. Register newly installed extension
 	ext := &Extension{
 		Manifest: manifest,
 		Dir:      targetExtDir,
 	}
-
-	m.mu.Lock()
 	m.extensions[manifest.ID] = ext
-	m.mu.Unlock()
 
 	return ext, nil
 }

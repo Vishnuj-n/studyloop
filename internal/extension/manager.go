@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"ai-tutor/internal/utils"
 )
 
 // Manager handles discovery, storage, and retrieval of extensions.
@@ -100,18 +102,18 @@ func (m *Manager) Discover() ([]*Extension, error) {
 
 		data, err := os.ReadFile(manifestPath)
 		if err != nil {
-			// Subdirectory without manifest.json is simply ignored
+			// Subdirectory without manifest.json is ignored
 			continue
 		}
 
 		var manifest Manifest
 		if err := json.Unmarshal(data, &manifest); err != nil {
-			// Skip corrupted/invalid JSON manifests
+			utils.Warnf("[EXTENSION_DISCOVERY] skipping %s: malformed manifest JSON (%v)", extDir, err)
 			continue
 		}
 
 		if err := manifest.Validate(); err != nil {
-			// Skip invalid manifests
+			utils.Warnf("[EXTENSION_DISCOVERY] skipping %s: invalid manifest (%v)", extDir, err)
 			continue
 		}
 

@@ -113,11 +113,21 @@ func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable 
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
+	writeErrCh := make(chan error, 1)
 	go func() {
 		defer stdinPipe.Close()
 		if len(input) > 0 {
-			_, _ = stdinPipe.Write(input)
+			n, err := stdinPipe.Write(input)
+			if err != nil {
+				writeErrCh <- fmt.Errorf("stdin write failed: %w", err)
+				return
+			}
+			if n < len(input) {
+				writeErrCh <- io.ErrShortWrite
+				return
+			}
 		}
+		writeErrCh <- nil
 	}()
 
 	scanner := bufio.NewScanner(stdoutPipe)
@@ -135,14 +145,22 @@ func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable 
 		}
 	}
 
-	scanErr := scanner.Err()
+	if lineErr != nil && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 
+	scanErr := scanner.Err()
 	waitErr := cmd.Wait()
+	writeErr := <-writeErrCh
+
 	if ctx.Err() != nil {
 		return fmt.Errorf("execution canceled: %w", ctx.Err())
 	}
 	if lineErr != nil {
 		return lineErr
+	}
+	if writeErr != nil {
+		return writeErr
 	}
 	if scanErr != nil && scanErr != io.EOF {
 		return fmt.Errorf("scanner error: %w", scanErr)

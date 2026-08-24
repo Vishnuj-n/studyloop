@@ -79,3 +79,62 @@ func TestInstallAndUninstallZip(t *testing.T) {
 		t.Errorf("expected extension to be removed from manager")
 	}
 }
+
+func TestInstallZipFailurePreservesExistingInstallation(t *testing.T) {
+	tempBase := t.TempDir()
+	mgr := NewManager(tempBase)
+
+	validManifest := `{
+		"id": "resilient-plugin",
+		"name": "Resilient Plugin",
+		"version": "1.0.0",
+		"runtime": "python",
+		"entrypoint": "main.py",
+		"tier": "free",
+		"category": "study"
+	}`
+
+	goodZip := createTestZip(t, map[string]string{
+		"resilient-plugin/manifest.json": validManifest,
+		"resilient-plugin/main.py":       "print('original')",
+	})
+
+	ext, err := mgr.InstallZip(goodZip)
+	if err != nil {
+		t.Fatalf("initial InstallZip failed: %v", err)
+	}
+
+	mainFile := filepath.Join(ext.Dir, "main.py")
+	content, err := os.ReadFile(mainFile)
+	if err != nil || string(content) != "print('original')" {
+		t.Fatalf("expected original main.py content")
+	}
+
+	// Attempt to install a broken zip (manifest says main.py is entrypoint, but main.py is missing in zip)
+	brokenManifest := `{
+		"id": "resilient-plugin",
+		"name": "Resilient Plugin Updated",
+		"version": "2.0.0",
+		"runtime": "python",
+		"entrypoint": "main.py",
+		"tier": "free",
+		"category": "study"
+	}`
+
+	badZip := createTestZip(t, map[string]string{
+		"resilient-plugin/manifest.json": brokenManifest,
+		// intentionally missing main.py
+	})
+
+	_, err = mgr.InstallZip(badZip)
+	if err == nil {
+		t.Fatalf("expected InstallZip with missing entrypoint to fail")
+	}
+
+	// Verify original installation is intact
+	contentAfter, err := os.ReadFile(mainFile)
+	if err != nil || string(contentAfter) != "print('original')" {
+		t.Fatalf("expected existing installation to be preserved after failed install")
+	}
+}
+
