@@ -69,7 +69,11 @@ def main():
 
     cmd = ["wails", "build", "-nsis", "-ldflags", ldflags, *sys.argv[1:]]
 
-    print("\nExecuting:", " ".join(cmd))
+    sanitized_cmd = [
+        arg.replace(f"ExtensionAuthKey={EXTENSION_SECRET_KEY}", "ExtensionAuthKey=***") if EXTENSION_SECRET_KEY else arg
+        for arg in cmd
+    ]
+    print("\nExecuting:", " ".join(sanitized_cmd))
 
     try:
         subprocess.run(cmd, check=True)

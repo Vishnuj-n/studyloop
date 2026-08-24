@@ -107,6 +107,7 @@ def obfuscate_extensions(output_dir: Path, secret_key: str = ""):
             executor.submit(_process_single_extension, item, output_dir, has_pyarmor, secret_key): item.name
             for item in ext_dirs
         }
+        errors = []
         for future in as_completed(future_to_ext):
             ext_name = future_to_ext[future]
             try:
@@ -114,6 +115,11 @@ def obfuscate_extensions(output_dir: Path, secret_key: str = ""):
                 print(res)
             except Exception as e:
                 print(f"  [ERROR] Failed to process extension {ext_name}: {e}")
+                errors.append((ext_name, e))
+
+        if errors:
+            print(f"\n[ERROR] {len(errors)} extension(s) failed during obfuscation.")
+            sys.exit(1)
 
 
 def main():

@@ -428,7 +428,8 @@ def format_report(findings: List[Dict[str, Any]], scanned_count: int, root_dir: 
             by_file.setdefault(item["file"], []).append(item)
 
         for file_path, file_items in by_file.items():
-            abs_link = f"file:///{os.path.abspath(os.path.join(root_dir, file_path)).replace('\\', '/')}"
+            abs_path = os.path.abspath(os.path.join(root_dir, file_path)).replace("\\", "/")
+            abs_link = f"file:///{abs_path}"
             print(f"\n{BOLD}{file_path}{RESET}  {DIM}({abs_link}){RESET}")
 
             for f in file_items:
