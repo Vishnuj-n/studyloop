@@ -84,17 +84,17 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 	}
 
 	totalWords := 0
-	for _, ch := range res.Chapters {
+	for i, ch := range res.Chapters {
 		title := utils.CleanTopicTitle(ch.Title)
 		if title == "" {
-			title = fmt.Sprintf("Chapter %d", ch.ChapterIndex)
+			title = fmt.Sprintf("Chapter %d", i+1)
 		}
 		words := strings.Fields(ch.Transcript)
 		totalWords += len(words)
 		doc.Sections = append(doc.Sections, ExtractedSection{
 			Heading: fmt.Sprintf("%s (%02d:%02d - %02d:%02d)", title, ch.StartSeconds/60, ch.StartSeconds%60, ch.EndSeconds/60, ch.EndSeconds%60),
 			Text:    ch.Transcript,
-			PageNum: ch.ChapterIndex,
+			PageNum: i + 1,
 		})
 	}
 	doc.WordCount = totalWords

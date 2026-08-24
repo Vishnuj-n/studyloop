@@ -152,16 +152,23 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 
 	_ = repo.UpdateNotebookStatus(notebookID, "uploaded")
 
-	// Pre-create syllabus draft from chapters
+	// Pre-create syllabus draft from chapters (1-based page numbers)
 	chaptersDraft := make([]models.SyllabusChapterDraft, 0, len(result.Chapters))
-	for _, ch := range result.Chapters {
+	for i, ch := range result.Chapters {
+		pageNum := i + 1
 		chaptersDraft = append(chaptersDraft, models.SyllabusChapterDraft{
 			Title:     ch.Title,
-			StartPage: ch.ChapterIndex,
-			EndPage:   ch.ChapterIndex,
+			StartPage: pageNum,
+			EndPage:   pageNum,
 		})
 	}
-	_ = persistSyllabusDraft(repo, notebookID, len(result.Chapters), chaptersDraft, false)
+	if err := persistSyllabusDraft(repo, notebookID, len(result.Chapters), chaptersDraft, false); err != nil {
+		_ = os.Remove(jsonFilePath)
+		_ = repo.DeleteNotebook(notebookID)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("failed to save syllabus draft: %v", err),
+		}
+	}
 
 	return map[string]interface{}{
 		"id":            notebookID,
@@ -432,6 +439,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if !boundsChanged && !titlesChanged {
 			// Nothing changed (no chapter or title changes) — treat as metadata_only/no-op
 			utils.Infof("ConfirmNotebookSyllabus: metadata_only (no chapter/title changes) for %s", notebookID)
+			a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 			return map[string]interface{}{
 				"success":     true,
 				"status":      nb.Status,
@@ -459,6 +467,8 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 			if len(topicIDs) > 0 {
 				_ = repo.UpdateNotebookTopic(notebookID, topicIDs[0])
 			}
+
+			a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 
 			// Return without running extraction/ingestion or embedding updates
 			return map[string]interface{}{
@@ -645,34 +655,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 	_ = repo.UpdateNotebookStatus(notebookID, status)
 
-	isActivated := nb.StudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
-	if nb.StudyStatus == "dormant" || nb.StudyStatus == "" {
-		activeCount, err := repo.CountActiveNotebooksForActiveProfile(nb.ProfileID)
-		if err != nil {
-			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", nb.ProfileID, err)
-		} else if activeCount < 4 {
-			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
-				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
-			} else {
-				isActivated = true
-			}
-		}
-	}
-
-	// Seed initial READING task into study_queue if active
-	if isActivated {
-		settings, err := repo.GetUserSettings()
-		if err != nil {
-			utils.Warnf("[INGESTION] failed to load user settings for notebook %s: %v", notebookID, err)
-		} else if settings == nil || settings.TargetSessionWords <= 0 {
-			utils.Warnf("[INGESTION] invalid target_session_words in user settings for notebook %s", notebookID)
-		} else {
-			if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, settings.TargetSessionWords); err != nil {
-				utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
-			}
-		}
-	}
+	a.reconcileConfirmedNotebookTask(repo, notebookID, nb.ProfileID, nb.StudyStatus)
 
 	ragEnabled, err := repo.GetRAGEnabled()
 	if err == nil && ragEnabled && a.indexQueue != nil {
@@ -686,6 +669,38 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		"mode":        "full_reingest",
 		"topic_ids":   topicIDs,
 		"chunk_count": len(allChunks),
+	}
+}
+
+func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
+	isActivated := currentStudyStatus == "active"
+	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
+	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
+		activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID)
+		if err != nil {
+			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, err)
+		} else if activeCount < 4 {
+			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
+				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
+			} else {
+				isActivated = true
+			}
+		}
+	}
+
+	// Seed initial READING task into study_queue if active
+	if isActivated {
+		settings, err := repo.GetUserSettings()
+		targetWords := 1500
+		if err != nil {
+			utils.Warnf("[INGESTION] failed to load user settings for notebook %s, using default: %v", notebookID, err)
+		} else if settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+
+		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
+		}
 	}
 }
 

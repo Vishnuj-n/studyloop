@@ -346,8 +346,8 @@ func (s *Service) ExtractDocumentRange(filePath string, fileType string, startPa
 		}
 		doc.WordCount = 0
 		doc.Sections = make([]ExtractedSection, 0, len(ingestResult.Chapters))
-		for _, ch := range ingestResult.Chapters {
-			pageNum := ch.ChapterIndex
+		for i, ch := range ingestResult.Chapters {
+			pageNum := i + 1
 			if startPage > 0 && pageNum < startPage {
 				continue
 			}
@@ -460,7 +460,7 @@ func (s *Service) ExtractDocumentSample(filePath string, fileType string, maxPag
 			doc.Sections[i] = ExtractedSection{
 				Heading: ch.Title,
 				Text:    ch.Transcript,
-				PageNum: ch.ChapterIndex,
+				PageNum: i + 1,
 			}
 		}
 
