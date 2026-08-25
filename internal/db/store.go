@@ -253,6 +253,68 @@ func (r *Repository) QueryDueReviewCardsForRange(start int64, end int64) (int, e
 	return count, nil
 }
 
+// QueryDueReviewCardsTimeline counts cards due across a 7-day timeline in a single query.
+// Returns an array of 7 counts corresponding to Day 0 (<= endOfToday) and Days 1-6.
+func (r *Repository) QueryDueReviewCardsTimeline(endOfToday int64) ([]int, error) {
+	var activeProfileID sql.NullString
+	err := r.db.QueryRow(`SELECT active_profile_id FROM user_settings WHERE id = 1`).Scan(&activeProfileID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("QueryDueReviewCardsTimeline: reading active_profile_id: %w", err)
+	}
+
+	activeProfileStr := ""
+	if activeProfileID.Valid {
+		activeProfileStr = activeProfileID.String
+	}
+
+	query := `
+		SELECT
+			COUNT(DISTINCT CASE WHEN fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END)
+		FROM fsrs_cards fc
+		JOIN topics t ON t.id = fc.topic_id
+		LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
+		LEFT JOIN notebooks n ON n.id = nt.notebook_id
+		WHERE fc.suspended = 0
+		  AND fc.due_at IS NOT NULL
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM review_task_cards rtc
+			JOIN study_queue sq ON sq.id = rtc.task_id
+			WHERE rtc.card_id = fc.id
+			  AND sq.task_type = 'FLASHCARD_REVIEW'
+			  AND sq.status IN ('PENDING', 'ACTIVE')
+		  )
+	`
+	args := []interface{}{
+		endOfToday,
+		endOfToday, endOfToday + 1*86400,
+		endOfToday + 1*86400, endOfToday + 2*86400,
+		endOfToday + 2*86400, endOfToday + 3*86400,
+		endOfToday + 3*86400, endOfToday + 4*86400,
+		endOfToday + 4*86400, endOfToday + 5*86400,
+		endOfToday + 5*86400, endOfToday + 6*86400,
+	}
+	if activeProfileStr != "" {
+		query += ` AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
+		args = append(args, activeProfileStr)
+	}
+
+	counts := make([]int, 7)
+	err = r.db.QueryRow(query, args...).Scan(
+		&counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5], &counts[6],
+	)
+	if err != nil {
+		return nil, fmt.Errorf("QueryDueReviewCardsTimeline: %w", err)
+	}
+	return counts, nil
+}
+
 
 
 

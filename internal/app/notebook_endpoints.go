@@ -556,11 +556,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup only topics provably created in this request; skip cleanup if existing-topic lookup failed.
 		if etErr == nil {
+			var toDelete []string
 			for _, item := range topicItems {
 				if _, existed := existingTopicIDs[item.TopicID]; !existed {
-					_ = repo.DeleteTopic(item.TopicID)
+					toDelete = append(toDelete, item.TopicID)
 				}
 			}
+			_ = repo.DeleteTopics(toDelete)
 		}
 		return map[string]interface{}{"error": "failed to persist topic bounds: " + err.Error()}
 	}
@@ -570,11 +572,11 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	}
 
 	// Track which topic IDs were newly created for cleanup
-	newlyCreatedTopicIDs := make(map[string]bool)
+	var newlyCreatedTopicIDs []string
 	if etErr == nil {
 		for _, item := range topicItems {
 			if _, existed := existingTopicIDs[item.TopicID]; !existed {
-				newlyCreatedTopicIDs[item.TopicID] = true
+				newlyCreatedTopicIDs = append(newlyCreatedTopicIDs, item.TopicID)
 			}
 		}
 	}
@@ -583,9 +585,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if len(groups) == 0 || len(allChunks) == 0 {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete only newly created topic rows to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "confirmed chapters produced no chunks"}
 	}
 
@@ -604,9 +604,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if err := repo.IngestNotebookContentByTopic(notebookID, groups); err != nil {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete only newly created topic rows to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		emitIngestionProgress(a, ingestionProgressPayload{
 			NotebookID: notebookID,
 			Status:     "failed",
@@ -623,9 +621,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if err := repo.LinkNotebookTopics(notebookID, topicIDs); err != nil {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete newly created topic rows (cascades to chunks, cards, etc.) to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "failed to link notebook topics: " + err.Error()}
 	}
 
@@ -635,11 +631,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		for _, tid := range topicIDs {
 			newTopicIDsMap[tid] = true
 		}
+		var orphanedTopicIDs []string
 		for _, et := range existingTopics {
 			if !newTopicIDsMap[et.TopicID] {
-				_ = repo.DeleteTopic(et.TopicID)
+				orphanedTopicIDs = append(orphanedTopicIDs, et.TopicID)
 			}
 		}
+		_ = repo.DeleteTopics(orphanedTopicIDs)
 	}
 
 	status := "chunked"

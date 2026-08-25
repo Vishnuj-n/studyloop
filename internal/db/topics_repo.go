@@ -476,52 +476,70 @@ func (r *Repository) UpdateTopicReadingCursor(topicID string, cursor int, markLe
 	return nil
 }
 
+// DeleteTopics removes multiple topics and all associated data in a single batch transaction.
+func (r *Repository) DeleteTopics(topicIDs []string) error {
+	var validIDs []interface{}
+	for _, id := range topicIDs {
+		trimmed := strings.TrimSpace(id)
+		if trimmed != "" {
+			validIDs = append(validIDs, trimmed)
+		}
+	}
+	if len(validIDs) == 0 {
+		return nil
+	}
+
+	placeholders := strings.Repeat("?,", len(validIDs))
+	placeholders = placeholders[:len(placeholders)-1]
+
+	return r.withTx(func(tx *sql.Tx) error {
+		// Delete dependent tables in order to respect foreign key constraints
+
+		// Delete notebook_chunks (via chunks)
+		if _, err := tx.Exec("DELETE FROM notebook_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE topic_id IN ("+placeholders+"))", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete notebook_chunks: %w", err)
+		}
+
+		// Delete fsrs_review_log
+		if _, err := tx.Exec("DELETE FROM fsrs_review_log WHERE topic_id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete fsrs_review_log: %w", err)
+		}
+
+		// Delete fsrs_cards
+		if _, err := tx.Exec("DELETE FROM fsrs_cards WHERE topic_id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete fsrs_cards: %w", err)
+		}
+
+		// Delete topic_progress
+		if _, err := tx.Exec("DELETE FROM topic_progress WHERE topic_id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete topic_progress: %w", err)
+		}
+
+		// Delete chunks
+		if _, err := tx.Exec("DELETE FROM chunks WHERE topic_id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete chunks: %w", err)
+		}
+
+		// Update notebooks that reference this topic to null
+		if _, err := tx.Exec("UPDATE notebooks SET topic_id = NULL WHERE topic_id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to update notebooks: %w", err)
+		}
+
+		// Finally delete the topics
+		if _, err := tx.Exec("DELETE FROM topics WHERE id IN ("+placeholders+")", validIDs...); err != nil {
+			return fmt.Errorf("failed to delete topics: %w", err)
+		}
+		return nil
+	})
+}
+
 // DeleteTopic removes a topic and all associated data
 func (r *Repository) DeleteTopic(topicID string) error {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
 		return fmt.Errorf("topic id is required")
 	}
-
-	return r.withTx(func(tx *sql.Tx) error {
-		// Delete dependent tables in order to respect foreign key constraints
-
-		// Delete notebook_chunks (via chunks)
-		if _, err := tx.Exec("DELETE FROM notebook_chunks WHERE chunk_id IN (SELECT id FROM chunks WHERE topic_id = ?)", topicID); err != nil {
-			return fmt.Errorf("failed to delete notebook_chunks: %w", err)
-		}
-
-		// Delete fsrs_review_log
-		if _, err := tx.Exec("DELETE FROM fsrs_review_log WHERE topic_id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to delete fsrs_review_log: %w", err)
-		}
-
-		// Delete fsrs_cards
-		if _, err := tx.Exec("DELETE FROM fsrs_cards WHERE topic_id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to delete fsrs_cards: %w", err)
-		}
-
-		// Delete topic_progress
-		if _, err := tx.Exec("DELETE FROM topic_progress WHERE topic_id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to delete topic_progress: %w", err)
-		}
-
-		// Delete chunks
-		if _, err := tx.Exec("DELETE FROM chunks WHERE topic_id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to delete chunks: %w", err)
-		}
-
-		// Update notebooks that reference this topic to null
-		if _, err := tx.Exec("UPDATE notebooks SET topic_id = NULL WHERE topic_id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to update notebooks: %w", err)
-		}
-
-		// Finally delete the topic
-		if _, err := tx.Exec("DELETE FROM topics WHERE id = ?", topicID); err != nil {
-			return fmt.Errorf("failed to delete topic: %w", err)
-		}
-		return nil
-	})
+	return r.DeleteTopics([]string{topicID})
 }
 
 // DeleteFSRSCardsByTopicIDTx deletes FSRS cards for a given topic in a transaction.
