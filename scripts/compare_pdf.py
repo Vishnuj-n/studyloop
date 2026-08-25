@@ -32,31 +32,19 @@ def extract_standard_text(pdf_path: str, start_page: int = 0, end_page: int = 0)
     extracted_text = ""
     page_count = 0
 
-    # ponytail: use pymupdf or pypdf if available, standard linear text stream
+    # Use pypdf for standard linear text stream extraction
     try:
-        import fitz
-        doc = fitz.open(pdf_path)
-        total = len(doc)
+        import pypdf
+        reader = pypdf.PdfReader(pdf_path)
+        total = len(reader.pages)
         min_p = max(0, start_page - 1) if start_page > 0 else 0
         max_p = min(total, end_page) if end_page > 0 else total
         page_count = max_p - min_p
-
         for idx in range(min_p, max_p):
-            page_text = doc[idx].get_text("text") or ""
+            page_text = reader.pages[idx].extract_text() or ""
             extracted_text += f"\n--- Page {idx + 1} ---\n" + page_text
     except ImportError:
-        try:
-            import pypdf
-            reader = pypdf.PdfReader(pdf_path)
-            total = len(reader.pages)
-            min_p = max(0, start_page - 1) if start_page > 0 else 0
-            max_p = min(total, end_page) if end_page > 0 else total
-            page_count = max_p - min_p
-            for idx in range(min_p, max_p):
-                page_text = reader.pages[idx].extract_text() or ""
-                extracted_text += f"\n--- Page {idx + 1} ---\n" + page_text
-        except ImportError:
-            extracted_text = "[Standard text extractor: neither pymupdf nor pypdf found]"
+        extracted_text = "[Standard text extractor: pypdf not found]"
 
     elapsed = time.time() - start_time
     clean_text = extracted_text.strip()

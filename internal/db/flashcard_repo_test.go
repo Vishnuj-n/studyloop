@@ -358,7 +358,7 @@ func TestQueryDueReviewCardsTimeline(t *testing.T) {
 		{ID: "card-t0", TopicID: topicID, Prompt: "Q0", Answer: "A0", DueAt: baseEndOfToday - 100, Suspended: false},
 		{ID: "card-t1", TopicID: topicID, Prompt: "Q1", Answer: "A1", DueAt: baseEndOfToday + 3600, Suspended: false},
 		{ID: "card-t2", TopicID: topicID, Prompt: "Q2", Answer: "A2", DueAt: baseEndOfToday + 86400 + 3600, Suspended: false},
-		{ID: "card-t3", TopicID: topicID, Prompt: "Q3", Answer: "A3", DueAt: baseEndOfToday + 5*86400 + 3600, Suspended: false},
+		{ID: "card-t3", TopicID: topicID, Prompt: "Q3", Answer: "A3", DueAt: baseEndOfToday + 4*86400 + 3600, Suspended: false},
 	}, map[string]models.FlashcardState{
 		"card-t0": {},
 		"card-t1": {},
