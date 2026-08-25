@@ -110,13 +110,22 @@ Suspends a card (removed from future reviews). Returns remaining pending card co
 
 ---
 
-## Milestone Exam API
+## Extension API (uv Runtime)
 
-### CompleteMilestoneExam
-Completes an active MILESTONE_EXAM task. Returns score and pass/fail result.
+### ListExtensions
+Returns a list of all discovered local extensions.
 
-### GetQuestionsForQuizAttempts
-Retrieves all quiz questions from original study_queue payload_json for given quiz attempt IDs. Used by milestone exam to reconstruct questions from past attempts.
+### RunExtension
+Executes an extension by ID. Validates `pro` entitlement before execution. Input is passed to the python script STDOUT/STDIN loop. Returns execution output or error.
+
+### SetupExtension
+Automatically provisions the Python virtual environment via `uv`, installs requirements, and runs readiness self-tests.
+
+### InstallExtensionZip
+Extracts a ZIP archive into the extensions directory and parses the manifest.
+
+### CheckExtensionReadiness
+Inspects an extension's virtual environment and executes a smoke test to ensure all dependencies are met before allowing the UI toggle.
 
 ---
 
@@ -124,6 +133,9 @@ Retrieves all quiz questions from original study_queue payload_json for given qu
 
 ### CompleteMilestoneExam
 Completes an active MILESTONE_EXAM task. Validates task type, evaluates answers against correctness arrays in `payload_json`, records attempt, and returns score/passed.
+
+### GetQuestionsForQuizAttempts
+Retrieves all quiz questions from original study_queue payload_json for given quiz attempt IDs. Used by milestone exam to reconstruct questions from past attempts.
 
 **Trigger:** Auto-inserted after every 10th completed quiz per notebook (`count % 10 == 0`).
 
