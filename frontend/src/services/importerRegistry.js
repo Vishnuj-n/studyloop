@@ -13,14 +13,6 @@ export const NOTEBOOK_IMPORTERS = [
     fileType: 'pdf',
   },
   {
-    id: 'docling_pdf',
-    name: 'Docling Deep AI PDF',
-    icon: '🔬',
-    badge: 'Pro',
-    description: 'Deep neural ingestion with OCR, LaTeX formulas, and multi-column tables.',
-    fileType: 'pdf',
-  },
-  {
     id: 'youtube',
     name: 'YouTube Lecture',
     icon: '🎥',

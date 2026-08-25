@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-PDF Ingestion Comparison Tool: Standard Text-Only vs. Docling Structured Extraction
+PDF Ingestion 2-Way Benchmark: Standard Linear Text vs. Fast PDF (PyMuPDF4LLM)
 
 Usage:
-    python scripts/compare_pdf.py <path/to/document.pdf> [--output report.md] [--json]
+    python scripts/compare_pdf.py "learning go.pdf" --start-page 25 --end-page 30 --output dev_data/comparison.md
 """
 
 import os
@@ -24,187 +24,177 @@ except Exception:
     pass
 
 
-def extract_standard_text(pdf_path: str) -> dict:
+def extract_standard_text(pdf_path: str, start_page: int = 0, end_page: int = 0) -> dict:
     """
-    Standard text-only extraction (simulating basic PDF parser like ledongthuc/pdf / pypdf).
-    Extracts raw text streams without layout, OCR, or table reconstruction.
+    Standard linear text extraction (simulates Go ledongthuc/pdf baseline).
     """
     start_time = time.time()
     extracted_text = ""
-    pages = []
-    
-    # Try pypdf first if available
+    page_count = 0
+
+    # ponytail: use pymupdf or pypdf if available, standard linear text stream
     try:
-        import pypdf
-        reader = pypdf.PdfReader(pdf_path)
-        for idx, page in enumerate(reader.pages):
-            page_text = page.extract_text() or ""
-            pages.append({"page_num": idx + 1, "text": page_text})
+        import fitz
+        doc = fitz.open(pdf_path)
+        total = len(doc)
+        min_p = max(0, start_page - 1) if start_page > 0 else 0
+        max_p = min(total, end_page) if end_page > 0 else total
+        page_count = max_p - min_p
+
+        for idx in range(min_p, max_p):
+            page_text = doc[idx].get_text("text") or ""
             extracted_text += f"\n--- Page {idx + 1} ---\n" + page_text
     except ImportError:
         try:
-            from pdfminer.high_level import extract_text as pdfminer_extract
-            extracted_text = pdfminer_extract(pdf_path)
-            pages = [{"page_num": 1, "text": extracted_text}]
+            import pypdf
+            reader = pypdf.PdfReader(pdf_path)
+            total = len(reader.pages)
+            min_p = max(0, start_page - 1) if start_page > 0 else 0
+            max_p = min(total, end_page) if end_page > 0 else total
+            page_count = max_p - min_p
+            for idx in range(min_p, max_p):
+                page_text = reader.pages[idx].extract_text() or ""
+                extracted_text += f"\n--- Page {idx + 1} ---\n" + page_text
         except ImportError:
-            extracted_text = "[Standard text extractor: install pypdf (`pip install pypdf`) for direct python extraction]"
-            pages = [{"page_num": 1, "text": extracted_text}]
+            extracted_text = "[Standard text extractor: neither pymupdf nor pypdf found]"
 
     elapsed = time.time() - start_time
-    words = len(extracted_text.split())
-    has_tables = "|" in extracted_text and "---" in extracted_text
-    has_markdown_headers = any(line.strip().startswith(("#", "##", "###")) for line in extracted_text.splitlines())
+    clean_text = extracted_text.strip()
+    words = len(clean_text.split())
+    has_tables = "|" in clean_text and "---" in clean_text
+    has_headers = any(line.strip().startswith(("#", "##", "###")) for line in clean_text.splitlines())
+    has_code_blocks = "```" in clean_text
 
     return {
-        "engine": "Standard Text-Only (Linear Stream)",
+        "engine": "Go Native / Standard Linear Text",
         "elapsed_seconds": round(elapsed, 4),
-        "page_count": len(pages),
+        "page_count": page_count,
         "word_count": words,
-        "char_count": len(extracted_text),
-        "table_structure_preserved": has_tables,
-        "headers_preserved": has_markdown_headers,
-        "raw_text": extracted_text.strip(),
-        "pages": pages,
+        "char_count": len(clean_text),
+        "table_structure": "❌ Broken / Interleaved" if not has_tables else "✅ Detected",
+        "headers": "❌ Flat / Uppercase" if not has_headers else "✅ Semantic (#)",
+        "code_blocks": "❌ Unformatted lines" if not has_code_blocks else "✅ Preserved (```)",
+        "raw_text": clean_text,
+        "status": "success",
     }
 
 
-def extract_with_docling(pdf_path: str) -> dict:
+def extract_fast_pdf(pdf_path: str, start_page: int = 0, end_page: int = 0) -> dict:
     """
-    Advanced Docling extraction via extensions/docling/ingest.py or direct docling module.
-    Preserves document structure, markdown tables, headers, and formulas.
+    Fast structured extraction using extensions/fast_pdf (PyMuPDF4LLM).
     """
     start_time = time.time()
-    script_dir = Path(__file__).resolve().parent.parent / "extensions" / "docling" / "ingest.py"
+    ext_dir = Path(__file__).resolve().parent.parent / "extensions" / "fast_pdf"
+    script = ext_dir / "ingest.py"
     
-    if script_dir.exists():
-        proc = subprocess.run(
-            [sys.executable, str(script_dir), pdf_path],
-            capture_output=True,
-            text=True,
-            encoding="utf-8"
-        )
+    cmd = ["uv", "run", "--directory", str(ext_dir), "python", str(script), str(Path(pdf_path).resolve())]
+    if start_page > 0:
+        cmd.extend(["--start-page", str(start_page)])
+    if end_page > 0:
+        cmd.extend(["--end-page", str(end_page)])
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        elapsed = time.time() - start_time
         if proc.returncode == 0:
-            try:
-                data = json.loads(proc.stdout)
-                markdown = data.get("markdown", "")
-                elapsed = time.time() - start_time
+            lines = [l for l in proc.stdout.splitlines() if l.strip().startswith("{")]
+            if lines:
+                data = json.loads(lines[-1])
+                md = data.get("markdown", "").strip()
+                has_tables = "|" in md and ("-|-" in md or "|---" in md)
+                has_headers = any(l.strip().startswith(("#", "##", "###")) for l in md.splitlines())
+                has_code = "```" in md
                 return {
-                    "engine": "Docling Advanced AI Parser",
-                    "elapsed_seconds": round(elapsed, 2),
-                    "page_count": data.get("page_count", 1),
-                    "word_count": data.get("word_count", len(markdown.split())),
-                    "char_count": len(markdown),
-                    "table_structure_preserved": "|" in markdown and ("-|-" in markdown or "|---" in markdown),
-                    "headers_preserved": any(line.strip().startswith(("#", "##", "###")) for line in markdown.splitlines()),
-                    "markdown": markdown.strip(),
-                    "status": "success"
+                    "engine": "Fast PDF (PyMuPDF4LLM)",
+                    "elapsed_seconds": round(elapsed, 3),
+                    "page_count": data.get("page_count", end_page - start_page + 1 if end_page else 1),
+                    "word_count": data.get("word_count", len(md.split())),
+                    "char_count": len(md),
+                    "table_structure": "✅ Markdown Tables" if has_tables else "None found",
+                    "headers": "✅ Semantic (#, ##)" if has_headers else "None found",
+                    "code_blocks": "✅ Fenced Code (```)" if has_code else "None found",
+                    "raw_text": md,
+                    "status": "success",
                 }
-            except Exception as e:
-                pass
+        return {
+            "engine": "Fast PDF (PyMuPDF4LLM)",
+            "elapsed_seconds": round(elapsed, 3),
+            "status": "error",
+            "error": proc.stderr or proc.stdout,
+        }
+    except Exception as e:
+        return {"engine": "Fast PDF (PyMuPDF4LLM)", "status": "error", "error": str(e)}
+
+
+def build_markdown_report(results: list, file_name: str, pages_label: str) -> str:
+    md = []
+    md.append(f"# PDF Extraction 2-Way Benchmark Report")
+    md.append(f"**Target Document**: `{file_name}` | **Scope**: {pages_label}\n")
+    md.append("## 1. Metric Comparison Matrix\n")
+    
+    headers = ["Metric / Capability", "Go / Linear Stream", "Fast PDF (PyMuPDF4LLM)"]
+    md.append("| " + " | ".join(headers) + " |")
+    md.append("| " + " | ".join(["---"] * len(headers)) + " |")
+    
+    r_std, r_fast = results[0], results[1]
+    
+    md.append(f"| **Execution Time** | `{r_std.get('elapsed_seconds', 'N/A')}s` | `{r_fast.get('elapsed_seconds', 'N/A')}s` |")
+    md.append(f"| **Pages Processed** | {r_std.get('page_count', 'N/A')} | {r_fast.get('page_count', 'N/A')} |")
+    md.append(f"| **Word Count** | {r_std.get('word_count', 'N/A')} | {r_fast.get('word_count', 'N/A')} |")
+    md.append(f"| **Character Count** | {r_std.get('char_count', 'N/A')} | {r_fast.get('char_count', 'N/A')} |")
+    md.append(f"| **Heading Hierarchy** | {r_std.get('headers', 'N/A')} | {r_fast.get('headers', 'N/A')} |")
+    md.append(f"| **Table Reconstruction** | {r_std.get('table_structure', 'N/A')} | {r_fast.get('table_structure', 'N/A')} |")
+    md.append(f"| **Code Indentation & Fences** | {r_std.get('code_blocks', 'N/A')} | {r_fast.get('code_blocks', 'N/A')} |")
+    md.append("")
+    md.append("## 2. Output Snippet Comparison\n")
+
+    for res in results:
+        md.append(f"### Engine: {res['engine']}")
+        if res.get("status") == "success":
+            snippet = res.get("raw_text", "")[:800].strip()
+            md.append("```markdown")
+            md.append(snippet if snippet else "[Empty output]")
+            md.append("```\n")
         else:
-            err_msg = (proc.stderr or proc.stdout).strip()
-            return {
-                "engine": "Docling Advanced AI Parser",
-                "status": "error",
-                "error": err_msg or "Docling package not installed in environment.",
-                "note": "Run `pip install docling` or activate your docling virtual environment."
-            }
+            md.append(f"> ⚠️ **Error / Unavailable**: {res.get('error', 'Unknown')}\n")
 
-    return {
-        "engine": "Docling Advanced AI Parser",
-        "status": "missing_extension_script",
-        "error": f"Could not find {script_dir}"
-    }
-
-
-def print_comparison(standard: dict, docling: dict, out_file: str = None):
-    separator = "=" * 80
-    sub_sep = "-" * 80
-
-    report = []
-    report.append(separator)
-    report.append("  STUDYLOOP PDF EXTRACTION COMPARISON BENCHMARK")
-    report.append(separator)
-    report.append("")
-    report.append("METRICS & CAPABILITY MATRIX:")
-    report.append(f"{'Feature / Metric':<30} | {'Text-Only Extraction':<25} | {'Docling Advanced Parser':<25}")
-    report.append("-" * 86)
-    
-    report.append(f"{'Page Count':<30} | {standard.get('page_count', 'N/A'):<25} | {docling.get('page_count', 'N/A'):<25}")
-    report.append(f"{'Word Count':<30} | {standard.get('word_count', 0):<25} | {docling.get('word_count', 'N/A'):<25}")
-    report.append(f"{'Character Count':<30} | {standard.get('char_count', 0):<25} | {docling.get('char_count', 'N/A'):<25}")
-    
-    t_std = "Scrambled / Raw Text" if not standard.get("table_structure_preserved") else "Detected"
-    t_doc = "Markdown Tables (| col |)" if docling.get("table_structure_preserved") else ("Unavailable" if docling.get("status") != "success" else "None found")
-    report.append(f"{'Table Structure':<30} | {t_std:<25} | {t_doc:<25}")
-    
-    h_std = "Flat Lines" if not standard.get("headers_preserved") else "Preserved"
-    h_doc = "Semantic Markdown (#, ##)" if docling.get("headers_preserved") else ("Unavailable" if docling.get("status") != "success" else "None found")
-    report.append(f"{'Heading Hierarchy':<30} | {h_std:<25} | {h_doc:<25}")
-    
-    f_std = "Broken / Unicode noise"
-    f_doc = "LaTeX / Math syntax" if docling.get("status") == "success" else "Unavailable"
-    report.append(f"{'Math & Equation Extract':<30} | {f_std:<25} | {f_doc:<25}")
-    
-    report.append(f"{'RAG Chunking Readiness':<30} | {'Low (loses context)':<25} | {'High (preserves blocks)':<25}")
-    report.append(sub_sep)
-    report.append("")
-
-    report.append("OUTPUT STRUCTURAL PREVIEW:")
-    report.append("")
-    report.append("--- [1] Standard Text-Only Output Preview ---")
-    std_preview = standard.get("raw_text", "")[:600]
-    report.append(std_preview if std_preview else "[Empty text]")
-    report.append("...\n")
-
-    report.append("--- [2] Docling Structured Markdown Preview ---")
-    if docling.get("status") == "success":
-        doc_preview = docling.get("markdown", "")[:600]
-        report.append(doc_preview if doc_preview else "[Empty markdown]")
-        report.append("...\n")
-    else:
-        report.append(f"[!] Docling engine status: {docling.get('error')}")
-        if "note" in docling:
-            report.append(f"[*] Hint: {docling['note']}\n")
-
-    report.append(separator)
-
-    output_str = "\n".join(report)
-    print(output_str)
-
-    if out_file:
-        Path(out_file).write_text(output_str, encoding="utf-8")
-        print(f"\n[+] Comparison report written to: {out_file}")
+    return "\n".join(md)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare PDF Text-Only extraction vs Docling Structured output")
-    parser.add_argument("pdf_path", nargs="?", help="Path to PDF document to test")
-    parser.add_argument("--output", "-o", help="Save comparison markdown report to file")
-    parser.add_argument("--json", action="store_true", help="Output raw JSON data")
+    parser = argparse.ArgumentParser(description="2-Way Benchmark: Go Standard vs Fast PDF (PyMuPDF4LLM)")
+    parser.add_argument("pdf_path", nargs="?", default="learning go.pdf", help="Path to PDF")
+    parser.add_argument("--start-page", type=int, default=25, help="Start page number (1-indexed)")
+    parser.add_argument("--end-page", type=int, default=30, help="End page number (1-indexed)")
+    parser.add_argument("--output", "-o", default="dev_data/comparison.md", help="Save markdown report to file")
 
     args = parser.parse_args()
-
-    if not args.pdf_path:
-        print("Usage: python scripts/compare_pdf.py <path_to_pdf> [--output report.md] [--json]")
-        print("\nExample:")
-        print("  python scripts/compare_pdf.py dev_data/sample.pdf")
-        sys.exit(1)
-
     pdf_file = Path(args.pdf_path)
     if not pdf_file.exists():
         print(f"Error: File not found: {args.pdf_path}")
         sys.exit(1)
 
-    print(f"[*] Analyzing PDF: {pdf_file.name} ({pdf_file.stat().st_size / 1024:.1f} KB)...")
-    standard_res = extract_standard_text(str(pdf_file))
-    docling_res = extract_with_docling(str(pdf_file))
+    pages_label = f"Pages {args.start_page} to {args.end_page}" if args.start_page and args.end_page else "Full Document"
+    print(f"[*] Running 2-way PDF benchmark on '{pdf_file.name}' ({pages_label})...")
 
-    if args.json:
-        print(json.dumps({"standard": standard_res, "docling": docling_res}, indent=2, ensure_ascii=False))
-    else:
-        print_comparison(standard_res, docling_res, args.output)
+    print(" [1/2] Running Go/Standard Linear Extraction...")
+    res_std = extract_standard_text(str(pdf_file), args.start_page, args.end_page)
+
+    print(" [2/2] Running Fast PDF (PyMuPDF4LLM)...")
+    res_fast = extract_fast_pdf(str(pdf_file), args.start_page, args.end_page)
+
+    results = [res_std, res_fast]
+    report_md = build_markdown_report(results, pdf_file.name, pages_label)
+
+    print("\n" + report_md + "\n")
+
+    if args.output:
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(report_md, encoding="utf-8")
+        print(f"[+] Markdown report saved to: {out_path.resolve()}")
 
 
 if __name__ == "__main__":
     main()
+

@@ -13,7 +13,7 @@ import (
 	"github.com/ledongthuc/pdf"
 )
 
-type DoclingOutput struct {
+type FastPDFOutput struct {
 	Title     string `json:"title"`
 	PageCount int    `json:"page_count"`
 	Markdown  string `json:"markdown"`
@@ -82,11 +82,11 @@ func extractNativeGoText(pdfPath string) (*TextOnlyOutput, error) {
 	}, nil
 }
 
-func extractDocling(pdfPath string) (*DoclingOutput, time.Duration, error) {
+func extractFastPDF(pdfPath string) (*FastPDFOutput, time.Duration, error) {
 	start := time.Now()
-	doclingScript := filepath.Join("extensions", "docling", "ingest.py")
+	fastPdfScript := filepath.Join("extensions", "fast_pdf", "ingest.py")
 
-	cmd := exec.Command("python", doclingScript, pdfPath)
+	cmd := exec.Command("python", fastPdfScript, pdfPath)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -99,12 +99,12 @@ func extractDocling(pdfPath string) (*DoclingOutput, time.Duration, error) {
 		if errMsg == "" {
 			errMsg = strings.TrimSpace(stdout.String())
 		}
-		return nil, duration, fmt.Errorf("docling run error: %v (details: %s)", err, errMsg)
+		return nil, duration, fmt.Errorf("fast_pdf run error: %v (details: %s)", err, errMsg)
 	}
 
-	var out DoclingOutput
+	var out FastPDFOutput
 	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
-		return nil, duration, fmt.Errorf("failed to parse docling JSON output: %w", err)
+		return nil, duration, fmt.Errorf("failed to parse fast_pdf JSON output: %w", err)
 	}
 
 	return &out, duration, nil
@@ -130,7 +130,7 @@ func main() {
 	}
 
 	fmt.Printf("\n================================================================================\n")
-	fmt.Printf("           PDF EXTRACTION COMPARISON: Text-Only vs Docling Advanced             \n")
+	fmt.Printf("           PDF EXTRACTION COMPARISON: Text-Only vs Fast PDF (PyMuPDF4LLM)       \n")
 	fmt.Printf(" Target: %s\n", filepath.Base(absPath))
 	fmt.Printf("================================================================================\n\n")
 
@@ -143,20 +143,20 @@ func main() {
 		fmt.Printf("    -> Extracted %d pages, %d words in %v\n", textResult.PageCount, textResult.WordCount, textResult.Duration)
 	}
 
-	// 2. Docling extraction
-	fmt.Println("[2/2] Running Docling Advanced AI Extraction (extensions/docling/ingest.py)...")
-	doclingResult, doclingDur, doclingErr := extractDocling(absPath)
-	if doclingErr != nil {
-		fmt.Printf("    [-] Docling extraction note: %v\n", doclingErr)
+	// 2. Fast PDF extraction
+	fmt.Println("[2/2] Running Fast PDF Extraction (extensions/fast_pdf/ingest.py)...")
+	fastPdfResult, fastPdfDur, fastPdfErr := extractFastPDF(absPath)
+	if fastPdfErr != nil {
+		fmt.Printf("    [-] Fast PDF extraction note: %v\n", fastPdfErr)
 	} else {
-		fmt.Printf("    -> Extracted %d pages, %d words in %v\n", doclingResult.PageCount, doclingResult.WordCount, doclingDur)
+		fmt.Printf("    -> Extracted %d pages, %d words in %v\n", fastPdfResult.PageCount, fastPdfResult.WordCount, fastPdfDur)
 	}
 
 	// 3. Comparison Matrix
 	fmt.Println("\n--------------------------------------------------------------------------------")
 	fmt.Println(" STRUCTURAL & CAPABILITY COMPARISON")
 	fmt.Println("--------------------------------------------------------------------------------")
-	fmt.Printf("%-30s | %-22s | %-22s\n", "Feature / Attribute", "Native Text-Only", "Docling Structured")
+	fmt.Printf("%-30s | %-22s | %-22s\n", "Feature / Attribute", "Native Text-Only", "Fast PDF Structured")
 	fmt.Println("--------------------------------------------------------------------------------")
 	
 	if textResult != nil {
@@ -164,8 +164,8 @@ func main() {
 	} else {
 		fmt.Printf("%-30s | %-22s | ", "Page Count", "N/A")
 	}
-	if doclingResult != nil {
-		fmt.Printf("%-22d\n", doclingResult.PageCount)
+	if fastPdfResult != nil {
+		fmt.Printf("%-22d\n", fastPdfResult.PageCount)
 	} else {
 		fmt.Printf("%-22s\n", "N/A")
 	}
@@ -175,19 +175,19 @@ func main() {
 	} else {
 		fmt.Printf("%-30s | %-22s | ", "Word Count", "N/A")
 	}
-	if doclingResult != nil {
-		fmt.Printf("%-22d\n", doclingResult.WordCount)
+	if fastPdfResult != nil {
+		fmt.Printf("%-22d\n", fastPdfResult.WordCount)
 	} else {
 		fmt.Printf("%-22s\n", "N/A")
 	}
 
 	hasTableText := "Plain text string"
-	hasTableDocling := "Markdown | col1 | col2 |"
-	fmt.Printf("%-30s | %-22s | %-22s\n", "Table Format", hasTableText, hasTableDocling)
+	hasTableFast := "Markdown | col1 | col2 |"
+	fmt.Printf("%-30s | %-22s | %-22s\n", "Table Format", hasTableText, hasTableFast)
 	fmt.Printf("%-30s | %-22s | %-22s\n", "Heading Tree (# / ##)", "No (flat text)", "Yes (semantic tags)")
 	fmt.Printf("%-30s | %-22s | %-22s\n", "Math / LaTeX Equations", "Unformatted/Noise", "Preserved ($..$, $$..$$)")
 	fmt.Printf("%-30s | %-22s | %-22s\n", "Multi-column Flow", "Interleaved/Mixed", "True Reading Order")
-	fmt.Printf("%-30s | %-22s | %-22s\n", "Output Schema", "[]ExtractedSection", "Docling Markdown + JSON")
+	fmt.Printf("%-30s | %-22s | %-22s\n", "Output Schema", "[]ExtractedSection", "Fast PDF Markdown + JSON")
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	// 4. Preview sample comparison
@@ -204,9 +204,9 @@ func main() {
 		fmt.Println(preview)
 	}
 
-	if doclingResult != nil && len(doclingResult.Markdown) > 0 {
-		fmt.Println("\n[--- B. Docling Advanced Extraction (Rich Structured Markdown) ---]")
-		preview := doclingResult.Markdown
+	if fastPdfResult != nil && len(fastPdfResult.Markdown) > 0 {
+		fmt.Println("\n[--- B. Fast PDF Structured Extraction (Rich Structured Markdown) ---]")
+		preview := fastPdfResult.Markdown
 		if len(preview) > 500 {
 			preview = preview[:500] + "..."
 		}

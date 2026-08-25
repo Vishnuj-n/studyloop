@@ -406,9 +406,7 @@ async function uploadYouTube(url) {
 async function uploadFile(file, options = {}) {
   uploadError.value = ''
   successMessage.value = ''
-  ingestionStatusMessage.value = options.engine === 'docling_pdf'
-    ? 'Processing with Docling Deep AI parser...'
-    : options.engine === 'fast_pdf'
+  ingestionStatusMessage.value = options.engine === 'fast_pdf'
     ? 'Processing with Fast Structured Markdown parser...'
     : ''
   ingestionNotebookID.value = ''
