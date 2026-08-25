@@ -161,10 +161,14 @@ wails build -tags sqlite_extension
 - Source structure: [doc/PROJECT_STRUCTURE.md](doc/PROJECT_STRUCTURE.md)
 - API contracts: [doc/DATA_API.md](doc/DATA_API.md)
 - Module responsibilities: [doc/AGENT_MAP.md](doc/AGENT_MAP.md)
-- RAG pipeline: [doc/RAG.md](doc/RAG.md)
+## Open-Source Credits & Acknowledgments
+
+- **yt-dlp**: Video lecture metadata and transcript extraction tooling is powered by the open-source [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
+- **sqlite-vec**: Fast local embedding vector storage by [sqlite-vec](https://github.com/asg017/sqlite-vec).
+- **FSRS**: Modern spaced repetition scheduling via [go-fsrs](https://github.com/open-spaced-repetition/go-fsrs).
 
 ## Constraints
 
 - Keep the system simple and implementation-ready
 - Avoid unnecessary abstraction and premature optimization
-- Do not use LangChain, agent orchestration, or chatbot-style memory
+- Do not use LangChain, agent orchestration, or chatbot-style memory
