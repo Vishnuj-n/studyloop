@@ -21,8 +21,23 @@ type FastPDFIngestResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
+// FastPDFProgress represents a progress event from the fast_pdf Python worker.
+type FastPDFProgress struct {
+	Type      string `json:"type"`
+	Processed int    `json:"processed"`
+	Total     int    `json:"total"`
+	Percent   int    `json:"percent"`
+	Message   string `json:"message"`
+	Error     string `json:"error,omitempty"`
+}
+
 // IngestFastPDF runs the fast_pdf Pro extension to rapidly convert a PDF into structured Markdown.
 func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension) (*ExtractedDocument, *FastPDFIngestResult, error) {
+	return s.IngestFastPDFWithProgress(ctx, filePath, runner, ext, nil)
+}
+
+// IngestFastPDFWithProgress runs the fast_pdf Pro extension with live progress callbacks.
+func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension, onProgress func(processed, total, percent int, message string)) (*ExtractedDocument, *FastPDFIngestResult, error) {
 	cleanPath := strings.TrimSpace(filePath)
 	if cleanPath == "" {
 		return nil, nil, fmt.Errorf("pdf file path cannot be empty")
@@ -32,14 +47,7 @@ func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *ex
 		return nil, nil, fmt.Errorf("pdf file not found: %w", err)
 	}
 
-	if runner == nil {
-		runner = extension.NewRunner()
-	}
-
-	entrypoint := "ingest.py"
-	if ext != nil && ext.Entrypoint() != "" {
-		entrypoint = ext.Entrypoint()
-	} else {
+	if ext == nil {
 		extDir := extension.ResolveExtensionsDir("")
 		ext = &extension.Extension{
 			Manifest: extension.Manifest{
@@ -53,6 +61,10 @@ func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *ex
 		}
 	}
 
+	if runner == nil {
+		runner = extension.NewRunner()
+	}
+
 	pythonPath, err := extension.FindExtensionPython(ext)
 	if err != nil {
 		return nil, nil, fmt.Errorf("python runtime is required for fast_pdf ingestion: %w", err)
@@ -60,25 +72,48 @@ func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *ex
 
 	if ctx == nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), 3*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 	}
 
-	outputBytes, err := runner.Run(ctx, ext, pythonPath, entrypoint, cleanPath)
-	if err != nil && len(outputBytes) == 0 {
-		return nil, nil, fmt.Errorf("fast_pdf extension execution failed: %w", err)
-	}
-
-	// Extract json string (in case there's any stdout prelude)
 	var res FastPDFIngestResult
-	trimmedOutput := strings.TrimSpace(string(outputBytes))
-	lastOpenBrace := strings.LastIndex(trimmedOutput, "{")
-	if lastOpenBrace >= 0 {
-		trimmedOutput = trimmedOutput[lastOpenBrace:]
+	var lastErr string
+
+	onLine := func(line string) error {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return nil
+		}
+
+		var prog FastPDFProgress
+		if pErr := json.Unmarshal([]byte(line), &prog); pErr == nil {
+			if prog.Type == "progress" {
+				if onProgress != nil {
+					onProgress(prog.Processed, prog.Total, prog.Percent, prog.Message)
+				}
+				return nil
+			}
+			if prog.Error != "" {
+				lastErr = prog.Error
+			}
+		}
+
+		var r FastPDFIngestResult
+		if rErr := json.Unmarshal([]byte(line), &r); rErr == nil && (r.Markdown != "" || r.Error != "") {
+			res = r
+			if r.Error != "" {
+				lastErr = r.Error
+			}
+		}
+		return nil
 	}
 
-	if err := json.Unmarshal([]byte(trimmedOutput), &res); err != nil {
-		return nil, nil, fmt.Errorf("invalid fast_pdf JSON output: %w (raw: %s)", err, string(outputBytes))
+	err = runner.RunStreamWithInput(ctx, ext.Dir, pythonPath, nil, onLine, ext.EntrypointPath(), cleanPath)
+	if err != nil && strings.TrimSpace(res.Markdown) == "" {
+		if lastErr != "" {
+			return nil, nil, fmt.Errorf("%s", lastErr)
+		}
+		return nil, nil, fmt.Errorf("fast_pdf extension execution failed: %w", err)
 	}
 
 	if res.Error != "" {

@@ -23,7 +23,7 @@
       v-if="pendingIngestionBook"
       variant="warning"
       icon="⚡"
-      title="New Assignment — Ingestion Needed"
+      :title="pendingIngestionBannerTitle"
       :subtitle="`${pendingIngestionBook.title} is ready for chapter extraction and ingestion.`"
       action-label="✨ Ingest Book"
       @action="goToIngestBook(pendingIngestionBook.id)"
@@ -326,6 +326,11 @@ const hasSocraticRescueTask = computed(() => {
 
 // ponytail: pending ingestion notification state
 const pendingIngestionBook = ref(null)
+
+const pendingIngestionBannerTitle = computed(() => {
+  const isCloud = Boolean(userSettings.value?.classroom_code)
+  return isCloud ? 'New Assignment — Ingestion Needed' : 'New Book — Ingestion Needed'
+})
 
 function goToIngestBook(notebookId) {
   router.push({ path: '/notebooks', query: { ingest: notebookId } })

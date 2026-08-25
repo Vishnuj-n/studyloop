@@ -481,6 +481,28 @@ func (r *Repository) UpdateNotebookChunkCount(notebookID string, count int) erro
 	return nil
 }
 
+// UpdateNotebookPageCount updates the page count for a notebook.
+func (r *Repository) UpdateNotebookPageCount(notebookID string, count int) error {
+	result, err := r.db.Exec(`
+		UPDATE notebooks
+		SET page_count = ?
+		WHERE id = ?
+	`, count, notebookID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 // UpdateNotebookPriority updates the notebook priority
 func (r *Repository) UpdateNotebookPriority(notebookID string, priority int) error {
 	result, err := r.db.Exec(`

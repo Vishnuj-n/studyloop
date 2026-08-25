@@ -144,17 +144,6 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-
-	doc, result, err := a.notebookService.IngestFastPDF(ctx, uploadResult.FilePath, a.extRunner, ext)
-	if err != nil {
-		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
-		return map[string]interface{}{
-			"error": fmt.Sprintf("Failed to run Fast PDF structured extraction: %v", err),
-		}
-	}
-
 	fileHash, hashErr := utils.FileSHA256(uploadResult.FilePath)
 	if hashErr != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
@@ -169,46 +158,65 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 		title = filepath.Base(uploadResult.FilePath)
 	}
 
-	err = repo.CreateNotebook(uploadResult.ID, title, uploadResult.FilePath, uploadResult.FileType, "", fileHash, doc.PageCount, profileID)
+	// Register notebook immediately in SQLite
+	err := repo.CreateNotebook(uploadResult.ID, title, uploadResult.FilePath, uploadResult.FileType, "", fileHash, 0, profileID)
 	if err != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
 			"error": err.Error(),
 		}
 	}
-
 	_ = repo.UpdateNotebookStatus(uploadResult.ID, "uploaded")
 
-	chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
-	if len(chaptersDraft) == 0 {
-		chaptersDraft = []models.SyllabusChapterDraft{
-			{
-				Title:     title,
-				StartPage: 1,
-				EndPage:   doc.PageCount,
-			},
-		}
-	}
+	// Run deep extraction asynchronously in background — zero main thread blocking
+	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
 
-	if persistErr := persistSyllabusDraft(repo, uploadResult.ID, doc.PageCount, chaptersDraft, false); persistErr != nil {
-		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
-		_ = repo.DeleteNotebook(uploadResult.ID)
-		return map[string]interface{}{
-			"error": fmt.Sprintf("failed to save syllabus draft: %v", persistErr),
+		doc, result, extErr := a.notebookService.IngestFastPDF(ctx, filePath, a.extRunner, extObj)
+		if extErr != nil {
+			utils.Warnf("[FAST_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Extraction failed: %v", extErr),
+			})
+			return
 		}
-	}
+
+		_ = repo.UpdateNotebookPageCount(nbID, doc.PageCount)
+
+		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		if len(chaptersDraft) == 0 {
+			chaptersDraft = []models.SyllabusChapterDraft{
+				{
+					Title:     fileName,
+					StartPage: 1,
+					EndPage:   doc.PageCount,
+				},
+			}
+		}
+
+		_ = persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false)
+		emitIngestionProgress(a, ingestionProgressPayload{
+			NotebookID: nbID,
+			Status:     "draft_ready",
+			Message:    "Syllabus draft ready",
+		})
+	}(uploadResult.ID, uploadResult.FilePath, title, ext)
 
 	return map[string]interface{}{
 		"id":            uploadResult.ID,
 		"file_name":     title,
 		"file_type":     uploadResult.FileType,
 		"size":          uploadResult.Size,
-		"page_count":    doc.PageCount,
-		"word_count":    doc.WordCount,
+		"page_count":    0,
+		"word_count":    0,
 		"chunk_count":   0,
 		"indexed_count": 0,
 		"failed_count":  0,
-		"status":        "draft_ready",
+		"status":        "uploaded",
 	}
 }
 
