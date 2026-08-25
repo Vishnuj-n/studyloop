@@ -16,6 +16,7 @@ Generated from + must stay synchronized with `internal/db/schema.go`. Every `CRE
 | Retention     | `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`                                    |
 | Configuration | `user_settings`, `llm_settings`, `study_profiles`                                       |
 | Utility       | `internal/utils/hash.go` — `CleanTopicTitle`, `MD5Hex`, `FileSHA256`                    |
+| Analytics     | `analytics_events`                                                                      |
 
 ## Queue Tables
 
@@ -30,7 +31,7 @@ Central task table.
 | `topic_id`     | TEXT                                | Optional task context. FK → `topics(id)`                    |
 | `task_type`    | TEXT NOT NULL                       | `READING`, `QUIZ`, `REREAD`, `FLASHCARD_REVIEW`, `MILESTONE_EXAM`, `EXAMINER`, `SOCRATIC_REMEDIAL`, `FLASHCARD_GENERATE` |
 
-**Note:** `MILESTONE_EXAM` is an aggregate exam task composed from multiple past quiz attempts for a notebook. It does not generate new questions — it reuses questions from completed quiz tasks.
+**Note:** `MILESTONE_EXAM` is an aggregate exam task composed from multiple past quiz attempts for a notebook. It does not generate new questions — it reuses questions from completed quiz tasks. `FLASHCARD_GENERATE` is used when cloud sync fails to re-trigger local generation.
 | `status`       | TEXT NOT NULL                       | `PENDING`, `ACTIVE`, `COMPLETED`, `SKIPPED`, `FAILED`       |
 | `priority`     | INTEGER DEFAULT 0                   | Task priority: lower = higher priority (ASC). Distinct from notebook priority (higher = more frequent). |
 | `created_at`   | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time                                               |
@@ -381,6 +382,15 @@ Singleton table for global preferences.
 **Foreign keys:** `active_profile_id` → `study_profiles(id)` ON DELETE SET NULL.
 
 **Bootstrap:** Single row with default settings `(id=1, max_flashcards_per_session=30, study_start_time='17:00', study_end_time='18:00', reminders_enabled=1)` inserted on initial schema creation.
+
+### `analytics_events`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Event identifier |
+| `event_type` | TEXT NOT NULL | Type of event (e.g., 'task_completed') |
+| `payload_json` | TEXT | JSON representation of the event payload |
+| `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Record creation time |
 
 ### `llm_settings`
 

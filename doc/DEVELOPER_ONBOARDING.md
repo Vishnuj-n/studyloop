@@ -33,8 +33,8 @@ Make sure you have the following installed on your machine:
   * **macOS:** Xcode Command Line Tools
   * **Linux:** `build-essential`
 
-### Step 1: Initialize Local RAG Assets
-Local RAG requires runtime dependencies (DLL/dylib/so files) and the embedding model. Run the dependency sync script to download them:
+### Step 1: Initialize Local Assets (RAG & uv)
+Local capabilities require runtime dependencies (DLL/dylib/so files), the embedding model, and the `uv` package manager for Python extensions. Run the dependency sync script to download them:
 
 * **Windows (PowerShell):**
   ```powershell
@@ -74,9 +74,11 @@ All learning progression in the application is managed via a **deterministic que
    3. `FLASHCARD_REVIEW` (Due cards via FSRS)
    4. `REREAD` (Remediation study tasks)
    5. `QUIZ` (Short-term comprehension check)
-   6. `READING` (New conceptual material)
+   6. `MILESTONE_EXAM` (Aggregated exam every 10 quizzes)
+   7. `READING` (New conceptual material)
+   8. `EXAMINER` (Formal written assessment)
 
-Review the full schema details in [doc/SCHEMA.md](./doc/SCHEMA.md) and module mapping in [doc/AGENT_MAP.md](./doc/AGENT_MAP.md).
+Review the full schema details in [SCHEMA.md](SCHEMA.md), the system design in [ARCHITECTURE.md](ARCHITECTURE.md), and module mapping in [AGENT_MAP.md](AGENT_MAP.md).
 
 ---
 
