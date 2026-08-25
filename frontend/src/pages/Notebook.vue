@@ -142,6 +142,8 @@ import {
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
   uploadNotebookFromPath as apiUploadNotebookFromPath,
+  uploadFastPDFNotebook as apiUploadFastPDFNotebook,
+  uploadFastPDFNotebookFromPath as apiUploadFastPDFNotebookFromPath,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
@@ -434,7 +436,17 @@ async function uploadFile(file, options = {}) {
   try {
     const localPath = await resolveLocalFilePath(file)
     let result
-    if (localPath) {
+    if (options.engine === 'fast_pdf') {
+      if (localPath) {
+        uploadProgress.value = 40
+        result = await apiUploadFastPDFNotebookFromPath(localPath, isPro.value)
+      } else {
+        const arrayBuffer = await file.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
+        uploadProgress.value = 50
+        result = await apiUploadFastPDFNotebook(Array.from(bytes), file.name, isPro.value)
+      }
+    } else if (localPath) {
       uploadProgress.value = 40
       result = await apiUploadNotebookFromPath(localPath)
     } else {

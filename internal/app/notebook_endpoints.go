@@ -80,6 +80,138 @@ func (a *App) UploadNotebookFromPath(filePath string) map[string]interface{} {
 	return a.finalizeNotebookUpload(uploadResult)
 }
 
+// UploadFastPDFNotebook handles file bytes upload using the fast_pdf Pro structured markdown parser.
+func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{"error": "notebook service not initialized"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("fast_pdf")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "Fast Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFile(fileData, fileName)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return a.finalizeFastPDFUpload(uploadResult, ext)
+}
+
+// UploadFastPDFNotebookFromPath handles local file upload using the fast_pdf Pro structured markdown parser.
+func (a *App) UploadFastPDFNotebookFromPath(filePath string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{"error": "notebook service not initialized"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("fast_pdf")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "Fast Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(filePath)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return a.finalizeFastPDFUpload(uploadResult, ext)
+}
+
+func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	doc, result, err := a.notebookService.IngestFastPDF(ctx, uploadResult.FilePath, a.extRunner, ext)
+	if err != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("Failed to run Fast PDF structured extraction: %v", err),
+		}
+	}
+
+	fileHash, hashErr := utils.FileSHA256(uploadResult.FilePath)
+	if hashErr != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("failed to compute file hash: %v", hashErr),
+		}
+	}
+
+	profileID := a.resolveExplicitActiveProfileID()
+	title := strings.TrimSpace(uploadResult.FileName)
+	if title == "" {
+		title = filepath.Base(uploadResult.FilePath)
+	}
+
+	err = repo.CreateNotebook(uploadResult.ID, title, uploadResult.FilePath, uploadResult.FileType, "", fileHash, doc.PageCount, profileID)
+	if err != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"error": err.Error(),
+		}
+	}
+
+	_ = repo.UpdateNotebookStatus(uploadResult.ID, "uploaded")
+
+	chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+	if len(chaptersDraft) == 0 {
+		chaptersDraft = []models.SyllabusChapterDraft{
+			{
+				Title:     title,
+				StartPage: 1,
+				EndPage:   doc.PageCount,
+			},
+		}
+	}
+
+	if persistErr := persistSyllabusDraft(repo, uploadResult.ID, doc.PageCount, chaptersDraft, false); persistErr != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		_ = repo.DeleteNotebook(uploadResult.ID)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("failed to save syllabus draft: %v", persistErr),
+		}
+	}
+
+	return map[string]interface{}{
+		"id":            uploadResult.ID,
+		"file_name":     title,
+		"file_type":     uploadResult.FileType,
+		"size":          uploadResult.Size,
+		"page_count":    doc.PageCount,
+		"word_count":    doc.WordCount,
+		"chunk_count":   0,
+		"indexed_count": 0,
+		"failed_count":  0,
+		"status":        "draft_ready",
+	}
+}
+
 // UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
 func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]interface{} {
 	repo := a.getRepo()

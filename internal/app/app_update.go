@@ -84,3 +84,11 @@ func (a *App) OpenRepoURL() {
 	// ponytail: use native OS browser via Wails runtime wrapper
 	wailsruntime.BrowserOpenURL(a.ctx, "https://github.com/Vishnuj-n/studyloop/releases")
 }
+
+// OpenURLInBrowser opens any external URL in the user's default system browser.
+func (a *App) OpenURLInBrowser(urlStr string) {
+	if a.ctx != nil && strings.TrimSpace(urlStr) != "" {
+		wailsruntime.BrowserOpenURL(a.ctx, strings.TrimSpace(urlStr))
+	}
+}
+

@@ -7,7 +7,8 @@ import "strings"
 var officialExtensionTiers = map[string]string{
 	"text_simplifier": "free",
 	"audio_overview":  "pro",
-	"youtube":         "pro",
+	"youtube":         "free",
+	"fast_pdf":        "pro",
 }
 
 // GetEffectiveTier returns the authoritative tier for an extension.

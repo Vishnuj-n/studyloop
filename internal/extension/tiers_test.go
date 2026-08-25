@@ -36,10 +36,20 @@ func TestGetEffectiveTier(t *testing.T) {
 			expected: "pro",
 		},
 		{
-			name: "official youtube returns pro",
+			name: "official youtube returns free",
 			ext: &Extension{
 				Manifest: Manifest{
 					ID:   "youtube",
+					Tier: "pro", // Manifest claim ignored for official extension
+				},
+			},
+			expected: "free",
+		},
+		{
+			name: "official fast_pdf returns pro",
+			ext: &Extension{
+				Manifest: Manifest{
+					ID:   "fast_pdf",
 					Tier: "free", // Manifest claim ignored for official extension
 				},
 			},

@@ -142,6 +142,13 @@ export function uploadYouTubeNotebook(videoURL, isPro = false) {
   return appBridge().UploadYouTubeNotebook(videoURL, isPro)
 }
 
+export function uploadFastPDFNotebook(fileBytes, fileName, isPro = false) {
+  return appBridge().UploadFastPDFNotebook(fileBytes, fileName, isPro)
+}
+
+export function uploadFastPDFNotebookFromPath(filePath, isPro = false) {
+  return appBridge().UploadFastPDFNotebookFromPath(filePath, isPro)
+}
 
 export function uploadNotebook(fileBytes, fileName) {
   return appBridge().UploadNotebook(fileBytes, fileName)
@@ -358,5 +365,9 @@ export function simplifyReadingContent(content) {
 
 export function startBrowserAuth(mode = 'sign-in') {
   return appBridge().StartBrowserAuth(mode)
+}
+
+export function openURLInBrowser(url) {
+  return appBridge().OpenURLInBrowser(url)
 }
 

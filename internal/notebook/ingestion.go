@@ -38,7 +38,12 @@ func BuildTopicGroupsFromChapters(notebookID string, doc *ExtractedDocument, top
 		builder := builders[topicIdx]
 		builder.order++
 
-		chunkTexts := SplitPageIntoChunks(sectionText, DefaultChunkTargetWords)
+		var chunkTexts []string
+		if strings.Contains(sectionText, "\n#") || strings.HasPrefix(sectionText, "#") || strings.Contains(sectionText, "```") || strings.Contains(sectionText, "|---") || strings.Contains(sectionText, "-|-") {
+			chunkTexts = SplitMarkdownIntoChunks(sectionText, DefaultChunkTargetWords)
+		} else {
+			chunkTexts = SplitPageIntoChunks(sectionText, DefaultChunkTargetWords)
+		}
 		for chunkIndex, chunkText := range chunkTexts {
 			chunkID := fmt.Sprintf("nbc_%s_%02d_%04d_%03d", notebookID, topicIdx+1, builder.order, chunkIndex+1)
 			builder.chunks = append(builder.chunks, db.NotebookChunkInput{

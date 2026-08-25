@@ -1,11 +1,20 @@
 <template>
   <div class="youtube-player-container">
-    <div v-if="startSeconds > 0 || endSeconds > 0" class="video-timecode-banner">
+    <div v-if="startSeconds > 0 || endSeconds > 0 || videoId" class="video-timecode-banner">
       <div class="timecode-info">
-        <span class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
+        <span v-if="startSeconds > 0 || endSeconds > 0" class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
         <span v-if="durationText" class="duration-badge">Duration: {{ durationText }}</span>
+        <button
+          v-if="externalWatchUrl"
+          type="button"
+          class="open-browser-btn"
+          title="Play this chapter in your default browser (Chrome/Edge/Firefox)"
+          @click="openInExternalBrowser"
+        >
+          ↗ Open in Browser
+        </button>
       </div>
-      <p class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
+      <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
     </div>
 
     <div class="video-wrapper">
@@ -42,6 +51,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import MarkdownReader from './MarkdownReader.vue'
+import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   embedUrl: {
@@ -130,6 +140,26 @@ const durationText = computed(() => {
   if (mins > 0) return `${mins} min`
   return `${secs}s`
 })
+const videoId = computed(() => {
+  if (!props.embedUrl) return ''
+  const match = props.embedUrl.match(/\/embed\/([^/?#]+)/)
+  return match ? match[1] : ''
+})
+
+const externalWatchUrl = computed(() => {
+  if (!videoId.value) return ''
+  let url = `https://www.youtube.com/watch?v=${videoId.value}`
+  if (startSeconds.value > 0) {
+    url += `&t=${startSeconds.value}s`
+  }
+  return url
+})
+
+function openInExternalBrowser() {
+  if (externalWatchUrl.value) {
+    openURLInBrowser(externalWatchUrl.value)
+  }
+}
 </script>
 
 <style scoped>
@@ -154,6 +184,34 @@ const durationText = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.open-browser-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.open-browser-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--surface-container-highest);
+}
+
+.open-browser-btn:active {
+  transform: scale(0.97);
 }
 
 .timecode-badge {
