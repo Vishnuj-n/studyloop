@@ -366,8 +366,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 			estimationSource = "no_chunks_yet"
 			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinMinutesPerPage))
 		}
-		utils.Debugf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
-			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
+		utils.LogReadingEstimate(task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
 	case task.StartPage > 0 && task.EndPage >= task.StartPage:
 		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinMinutesPerPage))
 	}

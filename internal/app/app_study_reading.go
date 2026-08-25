@@ -90,7 +90,7 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 			utils.QueueLogger.Info("queue task activated", "taskID", taskID)
 		}
 	case models.StudyTaskStatusActive:
-		utils.QueueLogger.Info("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)
+		utils.QueueLogger.Debug("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)
 	default:
 		utils.QueueLogger.Info("task terminal", "status", qTask.Status, "taskID", taskID)
 		return map[string]interface{}{"error": "task is in terminal status: " + string(qTask.Status), "code": 409}

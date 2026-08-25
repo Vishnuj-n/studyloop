@@ -451,7 +451,7 @@ func (a *App) IsOnboarded() map[string]interface{} {
 		return map[string]interface{}{"error": err.Error(), "onboarded": false}
 	}
 	onboarded := len(profiles) > 0
-	utils.QueueLogger.Info("onboarding_check", "status", "success", "onboarded", onboarded, "profile_count", len(profiles))
+	utils.QueueLogger.Debug("onboarding_check", "status", "success", "onboarded", onboarded, "profile_count", len(profiles))
 	return map[string]interface{}{"onboarded": onboarded}
 }
 
