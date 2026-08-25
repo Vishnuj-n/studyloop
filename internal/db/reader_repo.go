@@ -199,6 +199,39 @@ func (r *Repository) GetTokensPerPageMap(topicID string, startPage int, endPage 
 	return result, nil
 }
 
+// GetTopicWordsInRange returns the total words/tokens across chunks in a topic and page range using a single aggregate query.
+func (r *Repository) GetTopicWordsInRange(topicID string, startPage, endPage int) (int, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return 0, fmt.Errorf("topic id is required")
+	}
+	if startPage <= 0 || endPage <= 0 {
+		return 0, fmt.Errorf("start page and end page must be positive")
+	}
+	if startPage > endPage {
+		startPage, endPage = endPage, startPage
+	}
+
+	query := `
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN token_count > 0 THEN token_count
+				WHEN length(chunk_text) > 0 THEN length(chunk_text)/4
+				ELSE 0
+			END
+		), 0)
+		FROM chunks
+		WHERE topic_id = ?
+		  AND page_num BETWEEN ? AND ?
+	`
+	var totalWords int
+	err := r.db.QueryRow(query, topicID, startPage, endPage).Scan(&totalWords)
+	if err != nil {
+		return 0, err
+	}
+	return totalWords, nil
+}
+
 func (r *Repository) getTotalChunkTokens(topicID string, startPage int, endPage int) (int, error) {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {

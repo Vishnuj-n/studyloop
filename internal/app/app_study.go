@@ -353,12 +353,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
 		// Word-count based estimation (words / 200 WPM).
 		// Falls back to page-count if chunks have not been ingested yet.
-		totalWords := 0
-		if tokenMap, err := repo.GetTokensPerPageMap(task.TopicID, task.StartPage, task.EndPage); err == nil {
-			for _, w := range tokenMap {
-				totalWords += w
-			}
-		}
+		totalWords, _ := repo.GetTopicWordsInRange(task.TopicID, task.StartPage, task.EndPage)
 		pageCount := task.EndPage - task.StartPage + 1
 		estimationSource := "word_count"
 		if totalWords > 0 {
@@ -519,30 +514,20 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
 	endOfToday := midnight.Add(24 * time.Hour).Unix()
 
-	timeline := make([]FlashcardDuePoint, 7)
-
-	// Day 0: Today (due_at in (0, endOfToday])
-	count, err := repo.QueryDueReviewCardsForRange(-1, endOfToday)
+	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+
+	timeline := make([]FlashcardDuePoint, 7)
 	timeline[0] = FlashcardDuePoint{
 		Date:      midnight.Format(dateFormatYYYYMMDD),
 		DayLabel:  "Today",
-		CardCount: count,
+		CardCount: counts[0],
 	}
 
-	// Days 1 to 6
 	dayNames := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	for i := 1; i < 7; i++ {
-		dayStart := endOfToday + int64(i-1)*24*3600
-		dayEnd := endOfToday + int64(i)*24*3600
-
-		count, err := repo.QueryDueReviewCardsForRange(dayStart, dayEnd)
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-
 		targetDay := midnight.Add(time.Duration(i*24) * time.Hour)
 		dayLabel := ""
 		if i == 1 {
@@ -554,7 +539,7 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 		timeline[i] = FlashcardDuePoint{
 			Date:      targetDay.Format(dateFormatYYYYMMDD),
 			DayLabel:  dayLabel,
-			CardCount: count,
+			CardCount: counts[i],
 		}
 	}
 
