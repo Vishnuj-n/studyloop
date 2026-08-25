@@ -33,7 +33,7 @@ UI sends `block_id` with request. Backend validates block exists. Retrieval quer
 **Removed:** parent-child hierarchy, semantic boundaries, LLM-drafted sections, heading/parent expansion.
 **Added:** sliding window, uniform chunk storage, simpler retrieval.
 
-### 4.1 Pro Extension Ingestion (Fast Structured PDF & Markdown)
+### 4.1 Pro Extension Ingestion (Deep Structured PDF & Markdown)
 - **Engine**: PyMuPDF4LLM (`fast_pdf` extension) converts documents to structured Markdown.
 - **Markdown-Aware Chunking**: Uses `SplitMarkdownIntoChunks` to align splits with `#` / `##` headings while preserving tables (`|---|`) and code fences (` ``` `) as unbroken semantic units.
 - **Heading Context**: Chunk text retains heading metadata for higher retrieval precision.

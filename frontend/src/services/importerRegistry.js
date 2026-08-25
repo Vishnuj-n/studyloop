@@ -6,10 +6,10 @@
 export const NOTEBOOK_IMPORTERS = [
   {
     id: 'fast_pdf',
-    name: 'Fast Structured PDF',
+    name: 'Deep Structured PDF',
     icon: '⚡',
     badge: 'Pro',
-    description: 'High-speed Markdown extraction with tables, headers, and code blocks.',
+    description: 'Deep high-speed Markdown extraction with tables, headers, and code blocks.',
     fileType: 'pdf',
   },
   {

@@ -93,6 +93,14 @@
               Open Simplifier ➔
             </button>
             <button
+              v-else-if="ext.id === 'youtube'"
+              class="action-btn primary-action"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/notebooks')"
+            >
+              Import in Notebooks ➔
+            </button>
+            <button
               v-else
               class="action-btn primary-action"
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
@@ -124,7 +132,7 @@
         >
           <div class="card-top">
             <div class="icon-box pro-icon">
-              <!-- PDF (Fast PDF) icon -->
+              <!-- PDF (Deep PDF) icon -->
               <svg v-if="ext.id === 'fast_pdf' || ext.id.includes('pdf')" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
@@ -171,7 +179,15 @@
 
           <div class="card-bottom">
             <button
-              v-if="isPro"
+              v-if="isPro && (ext.id === 'fast_pdf' || ext.id.includes('pdf'))"
+              class="action-btn pro-action"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/notebooks')"
+            >
+              Import in Notebooks ➔
+            </button>
+            <button
+              v-else-if="isPro"
               class="action-btn pro-action"
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"

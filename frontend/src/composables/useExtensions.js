@@ -3,12 +3,22 @@ import { useClerkAuth } from '../services/clerkAuth'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 
+// Official extensions are enabled by default out-of-the-box
+const DEFAULT_ENABLED_EXTENSIONS = {
+  text_simplifier: true,
+  fast_pdf: true,
+  youtube: true,
+  audio_overview: true,
+}
+
 function loadPersistedState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
+    if (!raw) return { ...DEFAULT_ENABLED_EXTENSIONS }
+    const parsed = JSON.parse(raw)
+    return { ...DEFAULT_ENABLED_EXTENSIONS, ...parsed }
   } catch {
-    return {}
+    return { ...DEFAULT_ENABLED_EXTENSIONS }
   }
 }
 

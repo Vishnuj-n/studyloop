@@ -44,7 +44,7 @@ func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *ex
 		ext = &extension.Extension{
 			Manifest: extension.Manifest{
 				ID:         "fast_pdf",
-				Name:       "Fast Structured PDF Parser",
+				Name:       "Deep Structured PDF Parser",
 				Runtime:    "python",
 				Entrypoint: "ingest.py",
 				Tier:       "pro",

@@ -95,7 +95,7 @@ func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool
 		ext, _ = a.extManager.Get("fast_pdf")
 		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
 			return map[string]interface{}{
-				"error":        "Fast Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
 				"requires_pro": true,
 			}
 		}
@@ -124,7 +124,7 @@ func (a *App) UploadFastPDFNotebookFromPath(filePath string, isPro bool) map[str
 		ext, _ = a.extManager.Get("fast_pdf")
 		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
 			return map[string]interface{}{
-				"error":        "Fast Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
 				"requires_pro": true,
 			}
 		}

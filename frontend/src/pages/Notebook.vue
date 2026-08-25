@@ -409,7 +409,7 @@ async function uploadFile(file, options = {}) {
   uploadError.value = ''
   successMessage.value = ''
   ingestionStatusMessage.value = options.engine === 'fast_pdf'
-    ? 'Processing with Fast Structured Markdown parser...'
+    ? 'Processing with Deep Structured Markdown parser...'
     : ''
   ingestionNotebookID.value = ''
   draftError.value = ''
