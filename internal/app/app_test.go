@@ -852,3 +852,47 @@ func TestLoginStudent_AutomaticProfileCreation(t *testing.T) {
 		t.Fatalf("expected still 1 profile, got %d", len(profilesAfter))
 	}
 }
+
+func TestGetStreakState_CompletedToday(t *testing.T) {
+	app := newTestApp(t)
+
+	// Initially 0 completed today
+	initialState := app.GetStreakState(0)
+	if initialState["error"] != nil {
+		t.Fatalf("GetStreakState failed: %v", initialState["error"])
+	}
+	if count, ok := initialState["completed_today"].(int); !ok || count != 0 {
+		t.Fatalf("expected 0 completed_today initially, got %v", initialState["completed_today"])
+	}
+
+	// Insert and complete a task
+	taskID := "streak-test-task-1"
+	task := models.StudyQueueTask{
+		ID:         taskID,
+		NotebookID: "os-notebook",
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+	}
+	if err := testRepo.InsertStudyTask(task); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
+	if err := testRepo.ActivateTask(taskID); err != nil {
+		t.Fatalf("ActivateTask failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(taskID, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("CompleteTask failed: %v", err)
+	}
+
+	state := app.GetStreakState(0)
+	if state["error"] != nil {
+		t.Fatalf("GetStreakState failed: %v", state["error"])
+	}
+	if count, ok := state["completed_today"].(int); !ok || count != 1 {
+		t.Fatalf("expected 1 completed_today, got %v", state["completed_today"])
+	}
+	if todayCompleted, ok := state["today_completed"].(bool); !ok || !todayCompleted {
+		t.Fatalf("expected today_completed to be true, got %v", state["today_completed"])
+	}
+}
+

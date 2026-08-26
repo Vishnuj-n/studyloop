@@ -409,6 +409,11 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+// GetStreakState computes current and longest streaks and daily completed task count.
+func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
+	return a.getStreakState(timezoneOffsetMinutes)
+}
+
 func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
@@ -423,20 +428,21 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	currentStreak, longestStreak, activeDates := calculateStreak(times, timezoneOffsetMinutes)
 
 	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
-	todayStr := time.Now().In(loc).Format("2006-01-02")
-	todayCompleted := false
-	for _, d := range activeDates {
-		if d == todayStr {
-			todayCompleted = true
-			break
+	todayStr := time.Now().In(loc).Format(dateFormatYYYYMMDD)
+	completedToday := 0
+	for _, t := range times {
+		if t.In(loc).Format(dateFormatYYYYMMDD) == todayStr {
+			completedToday++
 		}
 	}
+	todayCompleted := completedToday > 0
 
 	return map[string]interface{}{
 		"current_streak":  currentStreak,
 		"longest_streak":  longestStreak,
 		"active_dates":    activeDates,
 		"today_completed": todayCompleted,
+		"completed_today": completedToday,
 	}
 }
 

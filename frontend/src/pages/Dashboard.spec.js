@@ -74,6 +74,7 @@ function makeOverview(overrides = {}) {
       longest_streak: 5,
       active_dates: [],
       today_completed: false,
+      completed_today: 0,
       ...overrides.streak_state,
     },
   }
@@ -162,5 +163,32 @@ describe('Dashboard.vue Integration', () => {
 
     expect(wrapper.find('.banner--rescue').exists()).toBe(true)
     expect(wrapper.find('.banner-title').text()).toBe('Concept Rescue Active')
+  })
+
+  it('renders completed sessions today count in telemetry widget', async () => {
+    appApi.getProfileDailyPace.mockResolvedValue({
+      has_deadline: true,
+      sessions_per_day: 3,
+      days_remaining: 10,
+      daily_pace: 900,
+    })
+    appApi.getDashboardOverview.mockResolvedValue(
+      makeOverview({
+        streak_state: {
+          current_streak: 3,
+          longest_streak: 5,
+          active_dates: ['2026-08-26'],
+          today_completed: true,
+          completed_today: 2,
+        },
+      })
+    )
+
+    const wrapper = mount(Dashboard)
+    await flushPromises()
+
+    const sessionPill = wrapper.find('.session-pill')
+    expect(sessionPill.exists()).toBe(true)
+    expect(sessionPill.text()).toContain('2 / 3 Sessions Today')
   })
 })

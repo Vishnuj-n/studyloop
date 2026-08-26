@@ -257,6 +257,7 @@ const streakState = ref({
   longest_streak: 0,
   active_dates: [],
   today_completed: false,
+  completed_today: 0,
 })
 const streakError = ref('')
 
@@ -337,8 +338,7 @@ function goToIngestBook(notebookId) {
 }
 
 const completedSessionsToday = computed(() => {
-  const todayKey = `study_completed_${new Date().toISOString().slice(0, 10)}`
-  return Number(localStorage.getItem(todayKey)) || 0
+  return Number(streakState.value?.completed_today) || 0
 })
 
 // --- Lifecycle ---
