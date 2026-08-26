@@ -94,7 +94,7 @@ Section
 
     # Package default extensions
     SetOutPath "$INSTDIR\extensions"
-    File /r /x ".git*" /x "__pycache__" /x ".venv*" "..\..\..\extensions\*.*"
+    File /r /x ".git*" /x "__pycache__" /x ".venv*" "..\..\bin\extensions\*.*"
 
     SetOutPath $INSTDIR
 

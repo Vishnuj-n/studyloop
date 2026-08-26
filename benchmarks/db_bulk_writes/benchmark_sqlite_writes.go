@@ -73,40 +73,48 @@ func setupTempDB(walMode bool) (*sql.DB, string, error) {
 }
 
 // Strategy 1: Individual auto-commit inserts (slowest)
-func benchmarkIndividualAutoCommit(db *sql.DB, records []ChunkRecord) time.Duration {
+func benchmarkIndividualAutoCommit(db *sql.DB, records []ChunkRecord) (time.Duration, error) {
 	t0 := time.Now()
 	for _, r := range records {
-		_, _ = db.Exec(
+		_, err := db.Exec(
 			"INSERT INTO chunks (id, doc_id, chunk_index, content, page_number, created_at) VALUES (?, ?, ?, ?, ?, ?)",
 			r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt,
 		)
+		if err != nil {
+			return 0, err
+		}
 	}
-	return time.Since(t0)
+	return time.Since(t0), nil
 }
 
 // Strategy 2: Single explicit transaction with prepared statement
-func benchmarkSingleTxPrepared(db *sql.DB, records []ChunkRecord) time.Duration {
+func benchmarkSingleTxPrepared(db *sql.DB, records []ChunkRecord) (time.Duration, error) {
 	t0 := time.Now()
 	tx, err := db.Begin()
 	if err != nil {
-		return 0
+		return 0, err
 	}
 	stmt, err := tx.Prepare("INSERT INTO chunks (id, doc_id, chunk_index, content, page_number, created_at) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		tx.Rollback()
-		return 0
+		_ = tx.Rollback()
+		return 0, err
 	}
 	defer stmt.Close()
 
 	for _, r := range records {
-		_, _ = stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt)
+		if _, err := stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
 	}
-	_ = tx.Commit()
-	return time.Since(t0)
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return time.Since(t0), nil
 }
 
 // Strategy 3: Chunked transactions (Batch size = 500)
-func benchmarkChunkedTx(db *sql.DB, records []ChunkRecord, batchSize int) time.Duration {
+func benchmarkChunkedTx(db *sql.DB, records []ChunkRecord, batchSize int) (time.Duration, error) {
 	t0 := time.Now()
 	total := len(records)
 	for i := 0; i < total; i += batchSize {
@@ -118,24 +126,30 @@ func benchmarkChunkedTx(db *sql.DB, records []ChunkRecord, batchSize int) time.D
 
 		tx, err := db.Begin()
 		if err != nil {
-			break
+			return 0, err
 		}
 		stmt, err := tx.Prepare("INSERT INTO chunks (id, doc_id, chunk_index, content, page_number, created_at) VALUES (?, ?, ?, ?, ?, ?)")
 		if err != nil {
-			tx.Rollback()
-			break
+			_ = tx.Rollback()
+			return 0, err
 		}
 		for _, r := range slice {
-			_, _ = stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt)
+			if _, err := stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt); err != nil {
+				stmt.Close()
+				_ = tx.Rollback()
+				return 0, err
+			}
 		}
 		stmt.Close()
-		_ = tx.Commit()
+		if err := tx.Commit(); err != nil {
+			return 0, err
+		}
 	}
-	return time.Since(t0)
+	return time.Since(t0), nil
 }
 
 // Strategy 4: Multi-row VALUES (?, ?, ?), (?, ?, ?) batches
-func benchmarkMultiRowValues(db *sql.DB, records []ChunkRecord, batchSize int) time.Duration {
+func benchmarkMultiRowValues(db *sql.DB, records []ChunkRecord, batchSize int) (time.Duration, error) {
 	t0 := time.Now()
 	total := len(records)
 	for i := 0; i < total; i += batchSize {
@@ -159,12 +173,17 @@ func benchmarkMultiRowValues(db *sql.DB, records []ChunkRecord, batchSize int) t
 
 		tx, err := db.Begin()
 		if err != nil {
-			break
+			return 0, err
 		}
-		_, _ = tx.Exec(query, args...)
-		_ = tx.Commit()
+		if _, err := tx.Exec(query, args...); err != nil {
+			_ = tx.Rollback()
+			return 0, err
+		}
+		if err := tx.Commit(); err != nil {
+			return 0, err
+		}
 	}
-	return time.Since(t0)
+	return time.Since(t0), nil
 }
 
 func main() {
@@ -189,10 +208,18 @@ func main() {
 
 	// Test 1: Auto-commit (extrapolated from sample)
 	{
-		db, tempDir, _ := setupTempDB(false)
-		dur := benchmarkIndividualAutoCommit(db, records[:autoCommitSample])
+		db, tempDir, err := setupTempDB(false)
+		if err != nil {
+			fmt.Printf("setupTempDB error: %v\n", err)
+			return
+		}
+		dur, err := benchmarkIndividualAutoCommit(db, records[:autoCommitSample])
 		db.Close()
 		os.RemoveAll(tempDir)
+		if err != nil {
+			fmt.Printf("Test 1 error: %v\n", err)
+			return
+		}
 
 		extrapolatedDur := dur * (totalRecords / autoCommitSample)
 		baselineDur = extrapolatedDur
@@ -208,10 +235,18 @@ func main() {
 
 	// Test 2: Single Tx with Prepared Statement (Delete Mode)
 	{
-		db, tempDir, _ := setupTempDB(false)
-		dur := benchmarkSingleTxPrepared(db, records)
+		db, tempDir, err := setupTempDB(false)
+		if err != nil {
+			fmt.Printf("setupTempDB error: %v\n", err)
+			return
+		}
+		dur, err := benchmarkSingleTxPrepared(db, records)
 		db.Close()
 		os.RemoveAll(tempDir)
+		if err != nil {
+			fmt.Printf("Test 2 error: %v\n", err)
+			return
+		}
 
 		rate := float64(totalRecords) / dur.Seconds()
 		speedup := float64(baselineDur) / float64(dur)
@@ -226,10 +261,18 @@ func main() {
 
 	// Test 3: Single Tx with Prepared Statement + WAL Mode
 	{
-		db, tempDir, _ := setupTempDB(true)
-		dur := benchmarkSingleTxPrepared(db, records)
+		db, tempDir, err := setupTempDB(true)
+		if err != nil {
+			fmt.Printf("setupTempDB error: %v\n", err)
+			return
+		}
+		dur, err := benchmarkSingleTxPrepared(db, records)
 		db.Close()
 		os.RemoveAll(tempDir)
+		if err != nil {
+			fmt.Printf("Test 3 error: %v\n", err)
+			return
+		}
 
 		rate := float64(totalRecords) / dur.Seconds()
 		speedup := float64(baselineDur) / float64(dur)
@@ -244,10 +287,18 @@ func main() {
 
 	// Test 4: Chunked Transactions (WAL mode, batch=500)
 	{
-		db, tempDir, _ := setupTempDB(true)
-		dur := benchmarkChunkedTx(db, records, 500)
+		db, tempDir, err := setupTempDB(true)
+		if err != nil {
+			fmt.Printf("setupTempDB error: %v\n", err)
+			return
+		}
+		dur, err := benchmarkChunkedTx(db, records, 500)
 		db.Close()
 		os.RemoveAll(tempDir)
+		if err != nil {
+			fmt.Printf("Test 4 error: %v\n", err)
+			return
+		}
 
 		rate := float64(totalRecords) / dur.Seconds()
 		speedup := float64(baselineDur) / float64(dur)
@@ -262,10 +313,18 @@ func main() {
 
 	// Test 5: Multi-row VALUES batches (WAL mode, batch=250)
 	{
-		db, tempDir, _ := setupTempDB(true)
-		dur := benchmarkMultiRowValues(db, records, 250)
+		db, tempDir, err := setupTempDB(true)
+		if err != nil {
+			fmt.Printf("setupTempDB error: %v\n", err)
+			return
+		}
+		dur, err := benchmarkMultiRowValues(db, records, 250)
 		db.Close()
 		os.RemoveAll(tempDir)
+		if err != nil {
+			fmt.Printf("Test 5 error: %v\n", err)
+			return
+		}
 
 		rate := float64(totalRecords) / dur.Seconds()
 		speedup := float64(baselineDur) / float64(dur)

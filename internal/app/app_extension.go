@@ -197,7 +197,10 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 
 	defer func() {
 		a.extSetupMu.Lock()
-		a.extSetupCancel = nil
+		if a.extSetupCancel != nil {
+			// ponytail: ensure we only clear if this setup was the active one
+			a.extSetupCancel = nil
+		}
 		a.extSetupMu.Unlock()
 		cancel()
 	}()

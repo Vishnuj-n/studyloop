@@ -185,7 +185,16 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 			return
 		}
 
-		_ = repo.UpdateNotebookPageCount(nbID, doc.PageCount)
+		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
+			utils.Warnf("[FAST_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Failed to update page count: %v", err),
+			})
+			return
+		}
 
 		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
 		if len(chaptersDraft) == 0 {
@@ -198,7 +207,17 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 			}
 		}
 
-		_ = persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false)
+		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
+			utils.Warnf("[FAST_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
+			})
+			return
+		}
+
 		emitIngestionProgress(a, ingestionProgressPayload{
 			NotebookID: nbID,
 			Status:     "draft_ready",

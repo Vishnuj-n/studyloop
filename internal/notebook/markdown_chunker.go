@@ -229,6 +229,22 @@ func ExtractSyllabusChaptersFromMarkdown(markdownText string, totalPages int) []
 	}
 
 	chapters := make([]models.SyllabusChapterDraft, 0, len(headings))
+	if len(headings) >= totalPages {
+		// ponytail: 1 page per chapter clamped to totalPages
+		for i, h := range headings {
+			p := i + 1
+			if p > totalPages {
+				p = totalPages
+			}
+			chapters = append(chapters, models.SyllabusChapterDraft{
+				Title:     h,
+				StartPage: p,
+				EndPage:   p,
+			})
+		}
+		return chapters
+	}
+
 	pagesPerChapter := totalPages / len(headings)
 	if pagesPerChapter < 1 {
 		pagesPerChapter = 1

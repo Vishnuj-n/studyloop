@@ -142,12 +142,12 @@ export function uploadYouTubeNotebook(videoURL, isPro = false) {
   return appBridge().UploadYouTubeNotebook(videoURL, isPro)
 }
 
-export function uploadFastPDFNotebook(fileBytes, fileName, isPro = false) {
-  return appBridge().UploadFastPDFNotebook(fileBytes, fileName, isPro)
+export async function uploadFastPDFNotebook(fileBytes, fileName, isPro = false) {
+  return await appBridge().UploadFastPDFNotebook(fileBytes, fileName, isPro)
 }
 
-export function uploadFastPDFNotebookFromPath(filePath, isPro = false) {
-  return appBridge().UploadFastPDFNotebookFromPath(filePath, isPro)
+export async function uploadFastPDFNotebookFromPath(filePath, isPro = false) {
+  return await appBridge().UploadFastPDFNotebookFromPath(filePath, isPro)
 }
 
 export function uploadNotebook(fileBytes, fileName) {

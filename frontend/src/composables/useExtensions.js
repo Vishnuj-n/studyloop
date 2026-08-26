@@ -39,6 +39,9 @@ export function useExtensions() {
   }
 
   function isExtensionActive(extensionId) {
+    if (extensionId === 'audio_overview') {
+      return isEnabled(extensionId) && Boolean(isPro.value)
+    }
     return isEnabled(extensionId)
   }
 

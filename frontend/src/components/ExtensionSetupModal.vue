@@ -132,7 +132,11 @@ async function handleCancelOrClose() {
   if (status.value === 'running') {
     try {
       await cancelExtensionSetup()
-    } catch (_) {}
+    } catch (err) {
+      status.value = 'error'
+      errorMessage.value = err?.message || String(err) || 'Failed to cancel setup'
+      return
+    }
   }
   emitClose()
 }

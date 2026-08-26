@@ -54,7 +54,7 @@ def extract_standard_text(pdf_path: str, start_page: int = 0, end_page: int = 0)
     has_code_blocks = "```" in clean_text
 
     return {
-        "engine": "Go Native / Standard Linear Text",
+        "engine": "pypdf / Standard Linear Text",
         "elapsed_seconds": round(elapsed, 4),
         "page_count": page_count,
         "word_count": words,
@@ -150,7 +150,7 @@ def build_markdown_report(results: list, file_name: str, pages_label: str) -> st
 
 
 def main():
-    parser = argparse.ArgumentParser(description="2-Way Benchmark: Go Standard vs Fast PDF (PyMuPDF4LLM)")
+    parser = argparse.ArgumentParser(description="2-Way Benchmark: pypdf Standard vs Fast PDF (PyMuPDF4LLM)")
     parser.add_argument("pdf_path", nargs="?", default="learning go.pdf", help="Path to PDF")
     parser.add_argument("--start-page", type=int, default=25, help="Start page number (1-indexed)")
     parser.add_argument("--end-page", type=int, default=30, help="End page number (1-indexed)")
@@ -165,7 +165,7 @@ def main():
     pages_label = f"Pages {args.start_page} to {args.end_page}" if args.start_page and args.end_page else "Full Document"
     print(f"[*] Running 2-way PDF benchmark on '{pdf_file.name}' ({pages_label})...")
 
-    print(" [1/2] Running Go/Standard Linear Extraction...")
+    print(" [1/2] Running pypdf / Standard Linear Extraction...")
     res_std = extract_standard_text(str(pdf_file), args.start_page, args.end_page)
 
     print(" [2/2] Running Fast PDF (PyMuPDF4LLM)...")

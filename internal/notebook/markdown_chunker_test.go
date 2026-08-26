@@ -87,6 +87,21 @@ Goroutines, channels, and sync primitives.
 	if chapters[0].StartPage != 1 || chapters[2].EndPage != 30 {
 		t.Errorf("unexpected page ranges: %+v", chapters)
 	}
+
+	// Regression test: 3 headings across 2 pages
+	chapters2 := ExtractSyllabusChaptersFromMarkdown(md, 2)
+	if len(chapters2) != 3 {
+		t.Fatalf("expected 3 chapters, got %d", len(chapters2))
+	}
+	if chapters2[0].StartPage != 1 || chapters2[0].EndPage != 1 {
+		t.Errorf("expected chapter 0 to be on page 1, got %d-%d", chapters2[0].StartPage, chapters2[0].EndPage)
+	}
+	if chapters2[1].StartPage != 2 || chapters2[1].EndPage != 2 {
+		t.Errorf("expected chapter 1 to be on page 2, got %d-%d", chapters2[1].StartPage, chapters2[1].EndPage)
+	}
+	if chapters2[2].StartPage != 2 || chapters2[2].EndPage != 2 {
+		t.Errorf("expected chapter 2 to be clamped to page 2, got %d-%d", chapters2[2].StartPage, chapters2[2].EndPage)
+	}
 }
 
 func TestBuildBreadcrumbText(t *testing.T) {
