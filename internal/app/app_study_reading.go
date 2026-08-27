@@ -1,74 +1,12 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
-
-	"github.com/google/uuid"
 )
-
-// ---------- Helpers for InitializeReadingSession ----------
-
-func (a *App) resolveReadingTaskIdentity(taskID, notebookID, topicID string, startPage, endPage int) (string, map[string]interface{}) {
-	repo := a.getRepo()
-	seedTaskID := taskID
-	existingTask, existingErr := repo.GetTaskByID(seedTaskID)
-
-	if existingErr == db.ErrTaskNotFound {
-		return a.createPendingReadingTask(seedTaskID, notebookID, topicID, startPage, endPage, "InitializeReadingSession task missing, creating pending reading task")
-	} else if existingErr != nil {
-		return "", map[string]interface{}{"error": existingErr.Error()}
-	}
-
-	if existingTask.Status != models.StudyTaskStatusPending && existingTask.Status != models.StudyTaskStatusActive {
-		if notebookID == "" {
-			notebookID = existingTask.NotebookID
-		}
-		if topicID == "" {
-			topicID = existingTask.TopicID
-		}
-		if notebookID == "" || topicID == "" {
-			return "", map[string]interface{}{"error": "terminal task cannot be reused and notebookID/topicID were not available", "code": 409}
-		}
-		newTaskID := uuid.NewString()
-		return a.createPendingReadingTask(newTaskID, notebookID, topicID, startPage, endPage, fmt.Sprintf("InitializeReadingSession task terminal, creating new queue row oldStatus=%s", existingTask.Status))
-	}
-
-	return taskID, nil
-}
-
-func (a *App) createPendingReadingTask(taskID, notebookID, topicID string, startPage, endPage int, logMsg string) (string, map[string]interface{}) {
-	repo := a.getRepo()
-	utils.Warnf("[READER_INIT] %s taskID=%s notebookID=%s topicID=%s", logMsg, taskID, notebookID, topicID)
-	if notebookID == "" || topicID == "" {
-		return "", map[string]interface{}{"error": "task not found and notebookID/topicID required to create it", "code": 400}
-	}
-	if startPage == 0 || endPage == 0 {
-		var err error
-		startPage, endPage, err = repo.ResolveAndValidateTopicBounds(topicID, startPage, endPage)
-		if err != nil {
-			return "", map[string]interface{}{"error": "failed to resolve bounds: " + err.Error()}
-		}
-	}
-	insertErr := repo.InsertStudyTask(models.StudyQueueTask{
-		ID:         taskID,
-		NotebookID: notebookID,
-		TopicID:    topicID,
-		TaskType:   models.StudyTaskTypeReading,
-		Status:     models.StudyTaskStatusPending,
-		Priority:   1,
-		StartPage:  startPage,
-		EndPage:    endPage,
-	})
-	if insertErr != nil {
-		return "", map[string]interface{}{"error": "failed to create reading task: " + insertErr.Error()}
-	}
-	return taskID, nil
-}
 
 func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 	repo := a.getRepo()
@@ -98,28 +36,17 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 	return nil
 }
 
-// InitializeReadingSession consolidates task activation, reading task loading,
-// and page bounds resolution into a single canonical backend call.
-// Accepts the full routing context so scheduler-suggested tasks (not yet in study_queue)
-// can be materialized as real queue rows on first open.
+// InitializeReadingSession activates and loads an active or pending reading task from the queue.
 func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, startPage, endPage int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
 	}
 	taskID = strings.TrimSpace(taskID)
-	notebookID = strings.TrimSpace(notebookID)
-	topicID = strings.TrimSpace(topicID)
 	if taskID == "" {
 		return map[string]interface{}{"error": "task ID is required", "code": 400}
 	}
-	utils.Warnf("[READER_INIT] InitializeReadingSession entry taskID=%s notebookID=%s topicID=%s startPage=%d endPage=%d", taskID, notebookID, topicID, startPage, endPage)
-
-	resolvedTaskID, errMap := a.resolveReadingTaskIdentity(taskID, notebookID, topicID, startPage, endPage)
-	if errMap != nil {
-		return errMap
-	}
-	taskID = resolvedTaskID
+	utils.Warnf("[READER_INIT] InitializeReadingSession entry taskID=%s", taskID)
 
 	if errMap := a.activateReadingSessionTask(taskID); errMap != nil {
 		return errMap

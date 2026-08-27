@@ -321,10 +321,10 @@ func (r *Repository) GetReadingTask(taskID string) (models.ReadingTask, error) {
 			COALESCE(sq.topic_id, ''),
 			COALESCE(sq.start_page, 0),
 			COALESCE(sq.end_page, 0),
-			COALESCE(rp.current_page, COALESCE(sq.start_page, 0)),
+			COALESCE(t.current_page_cursor, COALESCE(sq.start_page, 0)),
 			COALESCE(nb.file_hash, '')
 		FROM study_queue sq
-		LEFT JOIN reading_progress rp ON rp.task_id = sq.id
+		LEFT JOIN topics t ON t.id = sq.topic_id
 		LEFT JOIN notebooks nb ON nb.id = sq.notebook_id
 		WHERE sq.id = ? AND sq.task_type IN ('READING', 'REREAD')
 	`, taskID).Scan(
@@ -429,11 +429,14 @@ func (r *Repository) ResolveAndValidateTopicBounds(topicID string, startPage, en
 	return resolvedStart, resolvedEnd, nil
 }
 
-// GetReadingProgressPage retrieves the current page progress for a task.
+// GetReadingProgressPage retrieves the current page progress for a task from the topic cursor.
 func (r *Repository) GetReadingProgressPage(taskID string) (int, error) {
 	var currentPage int
 	err := r.db.QueryRow(`
-		SELECT COALESCE(current_page, 0) FROM reading_progress WHERE task_id = ?
+		SELECT COALESCE(t.current_page_cursor, sq.start_page, 0)
+		FROM study_queue sq
+		LEFT JOIN topics t ON t.id = sq.topic_id
+		WHERE sq.id = ?
 	`, taskID).Scan(&currentPage)
 	if err == sql.ErrNoRows {
 		return 0, nil

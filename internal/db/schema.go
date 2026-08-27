@@ -233,13 +233,6 @@ func InitSchema(tx *sql.Tx) error {
 			FOREIGN KEY (topic_id) REFERENCES topics(id)
 		)`,
 
-		`CREATE TABLE IF NOT EXISTS reading_progress (
-			task_id TEXT PRIMARY KEY,
-			current_page INTEGER DEFAULT 0,
-			last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (task_id) REFERENCES study_queue(id)
-		)`,
-
 		`CREATE TABLE IF NOT EXISTS review_task_cards (
 			task_id TEXT NOT NULL,
 			card_id TEXT NOT NULL,

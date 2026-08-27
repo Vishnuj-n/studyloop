@@ -25,12 +25,11 @@ func ResolvePageWindow(
 		return 0, 0, false, nil
 	}
 
-	startPage := topic.CurrentPageCursor
-	if startPage < 1 {
+	var startPage int
+	if topic.CurrentPageCursor <= 0 || topic.CurrentPageCursor < topic.StartPage {
 		startPage = max(1, topic.StartPage)
-	}
-	if topic.StartPage > 0 && startPage < topic.StartPage {
-		startPage = topic.StartPage
+	} else {
+		startPage = topic.CurrentPageCursor + 1
 	}
 
 	if startPage > topic.EndPage {

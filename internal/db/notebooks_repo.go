@@ -587,16 +587,6 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 		return fmt.Errorf("notebook id is required")
 	}
 	return r.withTx(func(tx *sql.Tx) error {
-		// Delete reading_progress for tasks associated with this notebook first
-		if _, err := tx.Exec(`
-			DELETE FROM reading_progress
-			WHERE task_id IN (
-				SELECT id FROM study_queue WHERE notebook_id = ?
-			)
-		`, notebookID); err != nil {
-			return err
-		}
-
 		// Delete quiz_attempts for tasks associated with this notebook
 		if _, err := tx.Exec(`
 			DELETE FROM quiz_attempts

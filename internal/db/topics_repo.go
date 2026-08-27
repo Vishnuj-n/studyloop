@@ -114,17 +114,14 @@ func (r *Repository) UpdateTopicPageBounds(topicID string, startPage, endPage in
 		shrunk := (previousStart > 0 && startPage > 0 && startPage > previousStart) ||
 			(previousEnd > 0 && endPage > 0 && endPage < previousEnd)
 
-		// Initialize cursor to startPage if uninitialized (0), otherwise clamp to new bounds
+		// Initialize cursor to 0 if uninitialized (0), otherwise clamp to new bounds
 		var newCursor int
 		if currentCursor == 0 {
-			newCursor = startPage
-			if newCursor < 0 {
-				newCursor = 0
-			}
+			newCursor = 0
 		} else {
 			// Clamp cursor to new bounds
 			if currentCursor < startPage {
-				newCursor = startPage
+				newCursor = 0
 			} else if currentCursor > endPage {
 				newCursor = endPage
 			} else {
@@ -206,17 +203,14 @@ func (r *Repository) UpdateTopicPageBoundsBatch(items []TopicPageBoundsBatchItem
 			shrunk := (previousStart > 0 && startPage > 0 && startPage > previousStart) ||
 				(previousEnd > 0 && endPage > 0 && endPage < previousEnd)
 
-			// Initialize cursor to startPage if uninitialized (0), otherwise clamp to new bounds
+			// Initialize cursor to 0 if uninitialized (0), otherwise clamp to new bounds
 			var newCursor int
 			if currentCursor == 0 {
-				newCursor = startPage
-				if newCursor < 0 {
-					newCursor = 0
-				}
+				newCursor = 0
 			} else {
 				// Clamp cursor to new bounds
 				if currentCursor < startPage {
-					newCursor = startPage
+					newCursor = 0
 				} else if currentCursor > endPage {
 					newCursor = endPage
 				} else {

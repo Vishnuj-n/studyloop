@@ -1431,3 +1431,192 @@ func TestCompleteReadingWithGeneratedQuizReservedStatusFlow(t *testing.T) {
 		t.Fatalf("expected quiz task status PENDING, got %s", quizTask.Status)
 	}
 }
+
+func TestMultiSessionChapterSlicingAndProgression(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	notebookID := "nb-multislice"
+	topicID1 := "topic-ch-1"
+	topicID2 := "topic-ch-2"
+
+	// Create Chapter 1 (pages 1-20) and Chapter 2 (pages 21-40)
+	if err := testRepo.EnsureTopic(topicID1, "Chapter 1"); err != nil {
+		t.Fatalf("EnsureTopic 1 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topicID1, 1, 20); err != nil {
+		t.Fatalf("UpdateTopicPageBounds 1 failed: %v", err)
+	}
+
+	if err := testRepo.EnsureTopic(topicID2, "Chapter 2"); err != nil {
+		t.Fatalf("EnsureTopic 2 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topicID2, 21, 40); err != nil {
+		t.Fatalf("UpdateTopicPageBounds 2 failed: %v", err)
+	}
+
+	if err := testRepo.CreateNotebook(notebookID, "Multi-Slice Test Book", "/tmp/multislice.pdf", "pdf", topicID1, "", 40, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if err := testRepo.LinkNotebookTopics(notebookID, []string{topicID1, topicID2}); err != nil {
+		t.Fatalf("LinkNotebookTopics failed: %v", err)
+	}
+	if err := testRepo.UpdateNotebookStatus(notebookID, "chunked"); err != nil {
+		t.Fatalf("UpdateNotebookStatus failed: %v", err)
+	}
+	if err := testRepo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
+		t.Fatalf("UpdateNotebookStudyStatus failed: %v", err)
+	}
+
+	// Insert chunks: 500 words per page for pages 1-40
+	for p := 1; p <= 40; p++ {
+		tID := topicID1
+		if p > 20 {
+			tID = topicID2
+		}
+		cID := fmt.Sprintf("chunk-p%d", p)
+		_, err := testRepo.db.Exec(`
+			INSERT INTO chunks (id, topic_id, chunk_text, page_num, token_count)
+			VALUES (?, ?, ?, ?, 500)
+		`, cID, tID, fmt.Sprintf("Text for page %d with many words", p), p)
+		if err != nil {
+			t.Fatalf("insert chunk failed: %v", err)
+		}
+		_, err = testRepo.db.Exec(`
+			INSERT INTO notebook_chunks (notebook_id, chunk_id)
+			VALUES (?, ?)
+		`, notebookID, cID)
+		if err != nil {
+			t.Fatalf("insert notebook_chunk failed: %v", err)
+		}
+	}
+
+	// Target session words = 2500 -> 5 pages per session
+	targetWords := 2500
+
+	// 1. Initial replenishment -> Slice 1 should be Pages 1-5 of Chapter 1
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 1 failed: %v", err)
+	}
+	pending1, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending1) == 0 {
+		t.Fatalf("GetAllPendingTasks slice 1 failed: %v", err)
+	}
+	task1 := pending1[0]
+	if task1.StartPage != 1 || task1.EndPage != 5 || task1.TopicID != topicID1 {
+		t.Fatalf("expected slice 1 (pages 1-5, topic %s), got range %d-%d topic %s", topicID1, task1.StartPage, task1.EndPage, task1.TopicID)
+	}
+
+	// Complete slice 1 reading
+	if err := testRepo.ActivateTask(task1.ID); err != nil {
+		t.Fatalf("activate task 1 failed: %v", err)
+	}
+	quizPayload := models.QuizTaskPayload{
+		Questions:    []models.QuizTaskQuestion{{ID: "q1", Prompt: "P?", Options: []string{"A", "B"}, CorrectAnswer: "A"}},
+		PassingScore: 70,
+	}
+	quizTaskID1, err := testRepo.CompleteReadingWithGeneratedQuiz(task1.ID, quizPayload)
+	if err != nil {
+		t.Fatalf("complete reading 1 failed: %v", err)
+	}
+
+	// Verify topic 1 cursor is now 5 and status is still reading
+	var cursor1 int
+	var status1 string
+	if err := testRepo.db.QueryRow(`SELECT current_page_cursor, status FROM topics WHERE id = ?`, topicID1).Scan(&cursor1, &status1); err != nil {
+		t.Fatalf("query topic 1 failed: %v", err)
+	}
+	if cursor1 != 5 {
+		t.Fatalf("expected topic 1 cursor=5, got %d", cursor1)
+	}
+	if status1 == "completed" {
+		t.Fatalf("topic 1 should NOT be completed after first slice (cursor=5, end=20)")
+	}
+
+	// Complete the quiz task for slice 1
+	if err := testRepo.ActivateTask(quizTaskID1); err != nil {
+		t.Fatalf("activate quiz 1 failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(quizTaskID1, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("complete quiz 1 failed: %v", err)
+	}
+
+	// 2. Next replenishment -> Slice 2 should be Pages 6-10 (NO SKIPPED PAGES!)
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 2 failed: %v", err)
+	}
+	pending2, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending2) == 0 {
+		t.Fatalf("GetAllPendingTasks slice 2 failed: %v", err)
+	}
+	task2 := pending2[0]
+	if task2.StartPage != 6 || task2.EndPage != 10 || task2.TopicID != topicID1 {
+		t.Fatalf("expected slice 2 (pages 6-10, topic %s), got range %d-%d topic %s", topicID1, task2.StartPage, task2.EndPage, task2.TopicID)
+	}
+
+	// Complete slice 2 reading
+	if err := testRepo.ActivateTask(task2.ID); err != nil {
+		t.Fatalf("activate task 2 failed: %v", err)
+	}
+	quizTaskID2, err := testRepo.CompleteReadingWithGeneratedQuiz(task2.ID, quizPayload)
+	if err != nil {
+		t.Fatalf("complete reading 2 failed: %v", err)
+	}
+	if err := testRepo.ActivateTask(quizTaskID2); err != nil {
+		t.Fatalf("activate quiz 2 failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(quizTaskID2, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("complete quiz 2 failed: %v", err)
+	}
+
+	// 3. Next replenishment -> Slice 3 should be Pages 11-15
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 3 failed: %v", err)
+	}
+	pending3, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending3) == 0 {
+		t.Fatalf("GetAllPendingTasks slice 3 failed: %v", err)
+	}
+	task3 := pending3[0]
+	if task3.StartPage != 11 || task3.EndPage != 15 || task3.TopicID != topicID1 {
+		t.Fatalf("expected slice 3 (pages 11-15), got range %d-%d", task3.StartPage, task3.EndPage)
+	}
+
+	// Complete slice 3 reading & quiz
+	_ = testRepo.ActivateTask(task3.ID)
+	quizTaskID3, _ := testRepo.CompleteReadingWithGeneratedQuiz(task3.ID, quizPayload)
+	_ = testRepo.ActivateTask(quizTaskID3)
+	_ = testRepo.CompleteTask(quizTaskID3, models.CompletionResult{Status: models.StudyTaskStatusCompleted})
+
+	// 4. Next replenishment -> Slice 4 should be Pages 16-20 (end of Chapter 1)
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 4 failed: %v", err)
+	}
+	pending4, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending4) == 0 {
+		t.Fatalf("GetAllPendingTasks slice 4 failed: %v", err)
+	}
+	task4 := pending4[0]
+	if task4.StartPage != 16 || task4.EndPage != 20 || task4.TopicID != topicID1 {
+		t.Fatalf("expected slice 4 (pages 16-20), got range %d-%d", task4.StartPage, task4.EndPage)
+	}
+
+	// Complete slice 4 reading
+	_ = testRepo.ActivateTask(task4.ID)
+	quizTaskID4, _ := testRepo.CompleteReadingWithGeneratedQuiz(task4.ID, quizPayload)
+	_ = testRepo.ActivateTask(quizTaskID4)
+	_ = testRepo.CompleteTask(quizTaskID4, models.CompletionResult{Status: models.StudyTaskStatusCompleted})
+	_, _ = testRepo.db.Exec(`UPDATE topics SET status = 'completed' WHERE id = ?`, topicID1)
+
+	// 5. Next replenishment -> Should seamlessly transition to Chapter 2 (Pages 21-25)
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook Chapter 2 failed: %v", err)
+	}
+	pending5, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending5) == 0 {
+		t.Fatalf("GetAllPendingTasks Chapter 2 failed: %v", err)
+	}
+	task5 := pending5[0]
+	if task5.StartPage != 21 || task5.EndPage != 25 || task5.TopicID != topicID2 {
+		t.Fatalf("expected Chapter 2 slice 1 (pages 21-25, topic %s), got range %d-%d topic %s", topicID2, task5.StartPage, task5.EndPage, task5.TopicID)
+	}
+}
