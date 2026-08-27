@@ -190,15 +190,16 @@ Intentionally removed:
 ### How
 
 **Sliding Window Parameters:**
-- **Chunk size**: 2500 words
-- **Overlap**: 200 words between chunks
+- **Embedding Chunk size**: 500 words (bounds: 350–650 words)
+- **Reading Session Window**: 2,500–3,000 words
+- **Overlap**: Sentence / paragraph boundary aware (no arbitrary mid-sentence cuts)
+- **Code & Markdown**: Tables and code blocks kept intact via markdown chunking
 
-**Pipeline:**
-
-1. PDF Upload → Extract text with page numbers
-2. Chapter Selection → User reviews/prunes extracted chapters (AI cleanup with graceful fallback)
-3. Sliding Window Chunking → Deterministic boundaries (no AI)
-4. **Insert READING tasks** → One task per chunk into `study_queue`
+Deterministic chunking pipeline:
+1. Ingest PDF / Markdown / TXT
+2. Split into ~500-word semantic chunks (preserving headings, tables, code)
+3. Sliding Window / Heading Chunking → Deterministic boundaries (no AI)
+4. **Insert READING tasks** → Sized for study sessions into `study_queue`
 
 **AI Cleanup Fallback (2026-07-11):**
 When user clicks "AI Clean Up" on notebook chapters, three-tier fallback on LLM failure:
