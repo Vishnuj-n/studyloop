@@ -475,8 +475,8 @@ async function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  if (file.size > 50 * 1024 * 1024) {
-    error.value = 'PDF upload failed: File size exceeds 50MB limit.';
+  if (file.size > 75 * 1024 * 1024) {
+    error.value = 'PDF upload failed: File size exceeds 75MB limit.';
     event.target.value = '';
     return;
   }

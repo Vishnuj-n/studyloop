@@ -23,7 +23,7 @@
         </div>
 
         <div class="form-group">
-          <label for="assign-file">Upload Local PDF File (Max 50MB)</label>
+          <label for="assign-file">Upload Local PDF File (Max 75MB)</label>
           <input
             id="assign-file"
             type="file"

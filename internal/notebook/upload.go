@@ -8,7 +8,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"ai-tutor/internal/embeddings"
 
@@ -56,7 +58,7 @@ func NewService(uploadDir string, opts ...Option) *Service {
 	s := &Service{
 		config: UploadConfig{
 			UploadDir:   uploadDir,
-			MaxFileSize: 50 * 1024 * 1024, // 50MB default
+			MaxFileSize: 75 * 1024 * 1024, // 75MB default
 		},
 		readFile: os.ReadFile,
 		openPDF:  pdfreader.Open,
@@ -518,16 +520,35 @@ func (s *Service) ExtractMetadata(filePath string, fileType string) (*FileMetada
 
 }
 
-func (s *Service) extractPDFRange(filePath string, doc *ExtractedDocument, startPage, endPage int) error {
-	file, reader, err := s.openPDF(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read pdf: %w", err)
+func optimalPDFWorkers(pageCount int) int {
+	if pageCount <= 1 {
+		return 1
 	}
-	defer func() {
-		_ = file.Close()
-	}()
+	// Scale with host CPU cores (2x cores for optimal work-stealing throughput),
+	// but never spawn more workers than there are pages to process.
+	maxWorkers := runtime.NumCPU() * 2
+	if maxWorkers < 2 {
+		maxWorkers = 2
+	}
+	if pageCount < maxWorkers {
+		return pageCount
+	}
+	return maxWorkers
+}
 
-	totalPages := reader.NumPage()
+func (s *Service) extractPDFRange(filePath string, doc *ExtractedDocument, startPage, endPage int) error {
+	data, err := s.readFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read pdf file: %w", err)
+	}
+
+	bytesReader := bytes.NewReader(data)
+	initReader, err := pdfreader.NewReader(bytesReader, int64(len(data)))
+	if err != nil {
+		return fmt.Errorf("failed to parse pdf: %w", err)
+	}
+
+	totalPages := initReader.NumPage()
 	doc.PageCount = totalPages
 
 	minP := 1
@@ -539,34 +560,82 @@ func (s *Service) extractPDFRange(filePath string, doc *ExtractedDocument, start
 		maxP = endPage
 	}
 
-	for pageIndex := minP; pageIndex <= maxP && pageIndex <= totalPages; pageIndex++ {
-		page := reader.Page(pageIndex)
-		if page.V.IsNull() {
-			continue
-		}
-		text, pageErr := page.GetPlainText(nil)
-		if pageErr != nil {
-			return fmt.Errorf("failed to read pdf page %d: %w", pageIndex, pageErr)
-		}
+	pageCount := maxP - minP + 1
+	if pageCount <= 0 {
+		return nil
+	}
 
-		normalized := embeddings.NormalizeWhitespace(text)
-		if normalized == "" {
-			continue
-		}
+	numWorkers := optimalPDFWorkers(pageCount)
 
-		doc.WordCount += len(strings.Fields(normalized))
-		doc.Sections = append(doc.Sections, ExtractedSection{
-			Heading: fmt.Sprintf("Page %d", pageIndex),
-			Text:    normalized,
-			PageNum: pageIndex,
-		})
+	type task struct {
+		idx     int
+		pageNum int
+	}
+
+	results := make([]ExtractedSection, pageCount)
+	tasks := make(chan task, pageCount)
+	for i := 0; i < pageCount; i++ {
+		tasks <- task{idx: i, pageNum: minP + i}
+	}
+	close(tasks)
+
+	var wg sync.WaitGroup
+	var errOnce sync.Once
+	var workerErr error
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rdr := bytes.NewReader(data)
+			r, err := pdfreader.NewReader(rdr, int64(len(data)))
+			if err != nil {
+				errOnce.Do(func() { workerErr = err })
+				return
+			}
+
+			for t := range tasks {
+				page := r.Page(t.pageNum)
+				if page.V.IsNull() {
+					continue
+				}
+				text, pageErr := page.GetPlainText(nil)
+				if pageErr != nil {
+					errOnce.Do(func() {
+						workerErr = fmt.Errorf("failed to read pdf page %d: %w", t.pageNum, pageErr)
+					})
+					return
+				}
+
+				normalized := embeddings.NormalizeWhitespace(text)
+				if normalized != "" {
+					results[t.idx] = ExtractedSection{
+						Heading: fmt.Sprintf("Page %d", t.pageNum),
+						Text:    normalized,
+						PageNum: t.pageNum,
+					}
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	if workerErr != nil {
+		return workerErr
+	}
+
+	for _, sec := range results {
+		if sec.Text != "" {
+			doc.WordCount += len(strings.Fields(sec.Text))
+			doc.Sections = append(doc.Sections, sec)
+		}
 	}
 
 	if len(doc.Sections) > 0 {
 		return nil
 	}
 
-	plainReader, plainErr := reader.GetPlainText()
+	plainReader, plainErr := initReader.GetPlainText()
 	if plainErr != nil {
 		return fmt.Errorf("pdf did not contain extractable text: %w", plainErr)
 	}

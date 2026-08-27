@@ -420,10 +420,10 @@ async function uploadFile(file, options = {}) {
     return
   }
 
-  // Validate file size (50MB max)
-  const maxSize = 50 * 1024 * 1024
+  // Validate file size (75MB max)
+  const maxSize = 75 * 1024 * 1024
   if (file.size > maxSize) {
-    uploadError.value = 'File too large. Maximum size is 50MB.'
+    uploadError.value = 'File too large. Maximum size is 75MB.'
     return
   }
 
