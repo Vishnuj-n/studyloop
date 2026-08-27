@@ -1,11 +1,8 @@
 <template>
   <div class="markdown-container">
     <!-- Earlier chapters (if studying chapter 2 or later) -->
-    <div
-      v-if="renderedBefore"
-      class="markdown-viewport before-viewport"
-      v-html="renderedBefore"
-    ></div>
+    <!-- eslint-disable-next-line vue/no-v-html -->
+    <div v-if="renderedBefore" class="markdown-viewport before-viewport" v-html="renderedBefore"></div>
 
     <!-- Start of Assigned Reading Banner -->
     <div class="markdown-boundary-tag top-boundary">
@@ -16,10 +13,8 @@
     </div>
 
     <!-- Assigned Reading Content -->
-    <div
-      class="markdown-viewport assigned-viewport"
-      v-html="renderedAssigned"
-    ></div>
+    <!-- eslint-disable-next-line vue/no-v-html -->
+    <div class="markdown-viewport assigned-viewport" v-html="renderedAssigned"></div>
 
     <!-- End of Assigned Reading Banner -->
     <div class="markdown-boundary-tag bottom-boundary">
@@ -38,11 +33,8 @@
     </div>
 
     <!-- Subsequent chapters continuing seamlessly below the banner -->
-    <div
-      v-if="renderedAfter"
-      class="markdown-viewport after-viewport"
-      v-html="renderedAfter"
-    ></div>
+    <!-- eslint-disable-next-line vue/no-v-html -->
+    <div v-if="renderedAfter" class="markdown-viewport after-viewport" v-html="renderedAfter"></div>
   </div>
 </template>
 

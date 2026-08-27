@@ -26,7 +26,9 @@ function loadPersistedState() {
 function savePersistedState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {}
+  } catch {
+    // Ignore storage write errors
+  }
 }
 
 const enabledMap = ref(loadPersistedState())
@@ -40,7 +42,9 @@ async function refreshExtensionsMetadata() {
       extensionsMetadata.value = exts
       metadataFetched = true
     }
-  } catch (_) {}
+  } catch (_) {
+    // Ignore metadata fetch errors
+  }
 }
 
 export function useExtensions() {

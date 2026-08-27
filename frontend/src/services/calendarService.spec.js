@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   getGoogleCalendarUrl,
   getOutlookCalendarUrl,
@@ -43,8 +43,8 @@ describe('calendarService', () => {
     const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => {})
     const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation(() => {})
 
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock-ics-url')
-    global.URL.revokeObjectURL = vi.fn()
+    window.URL.createObjectURL = vi.fn(() => 'blob:mock-ics-url')
+    window.URL.revokeObjectURL = vi.fn()
 
     const createElementOriginal = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tag) => {
@@ -60,7 +60,7 @@ describe('calendarService', () => {
     expect(clickSpy).toHaveBeenCalled()
     expect(appendSpy).toHaveBeenCalled()
     expect(removeSpy).toHaveBeenCalled()
-    expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-ics-url')
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-ics-url')
   })
 
   it('plays study chime without throwing when Web Audio API is available or unavailable', async () => {

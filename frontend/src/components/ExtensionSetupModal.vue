@@ -18,7 +18,7 @@
             }}: {{ extension?.name || 'Python Tool' }}
           </h3>
         </div>
-        <button class="close-modal-btn" @click="handleCancelOrClose" title="Close / Cancel Setup">✕</button>
+        <button class="close-modal-btn" title="Close / Cancel Setup" @click="handleCancelOrClose">✕</button>
       </div>
 
       <div class="modal-body">
