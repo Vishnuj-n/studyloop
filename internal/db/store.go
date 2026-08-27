@@ -269,8 +269,8 @@ func (r *Repository) QueryDueReviewCardsTimeline(endOfToday int64) ([]int, error
 
 	query := `
 		SELECT
-			COUNT(DISTINCT CASE WHEN fc.due_at <= ? THEN fc.id END),
-			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at < ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at >= ? AND fc.due_at <= ? THEN fc.id END),
 			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
 			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
 			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),

@@ -166,6 +166,9 @@ async function startSetup() {
           emitClose()
         }
       }, 1200)
+    } else if (res && res.canceled) {
+      logs.value = res?.logs || []
+      // Do not emit error when setup is canceled by user
     } else {
       status.value = 'error'
       logs.value = res?.logs || []

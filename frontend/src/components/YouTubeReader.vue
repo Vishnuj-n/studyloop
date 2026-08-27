@@ -13,6 +13,7 @@
         >
           ↗ Open in Browser
         </button>
+        <span v-if="browserError" class="browser-error-msg">⚠️ {{ browserError }}</span>
       </div>
       <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
     </div>
@@ -99,6 +100,7 @@ const props = defineProps({
 defineEmits(['complete'])
 
 const showTranscript = ref(true)
+const browserError = ref('')
 
 const startSeconds = computed(() => {
   if (props.videoStartSeconds > 0) return props.videoStartSeconds
@@ -155,9 +157,17 @@ const externalWatchUrl = computed(() => {
   return url
 })
 
-function openInExternalBrowser() {
+async function openInExternalBrowser() {
+  browserError.value = ''
   if (externalWatchUrl.value) {
-    openURLInBrowser(externalWatchUrl.value)
+    try {
+      const res = await openURLInBrowser(externalWatchUrl.value)
+      if (res && res.error) {
+        browserError.value = res.error
+      }
+    } catch (err) {
+      browserError.value = err instanceof Error ? err.message : String(err)
+    }
   }
 }
 </script>
@@ -185,6 +195,12 @@ function openInExternalBrowser() {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.browser-error-msg {
+  font-size: 12px;
+  color: var(--error, #ba1a1a);
+  font-weight: 500;
 }
 
 .open-browser-btn {

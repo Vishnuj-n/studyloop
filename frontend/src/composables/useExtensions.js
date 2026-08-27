@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
+import { listExtensions } from '../services/appApi'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 
@@ -29,20 +30,40 @@ function savePersistedState(state) {
 }
 
 const enabledMap = ref(loadPersistedState())
+const extensionsMetadata = ref([])
+let metadataFetched = false
+
+async function refreshExtensionsMetadata() {
+  try {
+    const exts = await listExtensions()
+    if (Array.isArray(exts)) {
+      extensionsMetadata.value = exts
+      metadataFetched = true
+    }
+  } catch (_) {}
+}
 
 export function useExtensions() {
   const clerkAuth = useClerkAuth()
   const isPro = computed(() => clerkAuth.isPro.value)
+
+  if (!metadataFetched) {
+    refreshExtensionsMetadata()
+  }
 
   function isEnabled(extensionId) {
     return Boolean(enabledMap.value[extensionId])
   }
 
   function isExtensionActive(extensionId) {
-    if (extensionId === 'audio_overview') {
-      return isEnabled(extensionId) && Boolean(isPro.value)
+    if (!isEnabled(extensionId)) {
+      return false
     }
-    return isEnabled(extensionId)
+    const ext = extensionsMetadata.value.find((e) => e.id === extensionId)
+    if (ext && (ext.tier || '').toLowerCase() === 'pro') {
+      return Boolean(isPro.value)
+    }
+    return true
   }
 
   function setExtensionEnabled(extensionId, enabled) {
@@ -59,9 +80,11 @@ export function useExtensions() {
 
   return {
     enabledMap,
+    extensionsMetadata,
     isPro,
     isEnabled,
     isExtensionActive,
+    refreshExtensionsMetadata,
     setExtensionEnabled,
     toggleExtension
   }

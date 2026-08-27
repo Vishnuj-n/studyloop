@@ -60,8 +60,14 @@ func setupRetrievalDB(chunks []VectorChunk) (*sql.DB, string, error) {
 		return nil, "", err
 	}
 
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
+	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
+		db.Close()
+		return nil, "", err
+	}
+	if _, err := db.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
+		db.Close()
+		return nil, "", err
+	}
 
 	schema := `
 	CREATE TABLE chunks (
@@ -74,13 +80,30 @@ func setupRetrievalDB(chunks []VectorChunk) (*sql.DB, string, error) {
 		return nil, "", err
 	}
 
-	tx, _ := db.Begin()
-	stmt, _ := tx.Prepare("INSERT INTO chunks (id, content) VALUES (?, ?)")
-	for _, c := range chunks {
-		_, _ = stmt.Exec(c.ID, c.Content)
+	tx, err := db.Begin()
+	if err != nil {
+		db.Close()
+		return nil, "", err
 	}
-	stmt.Close()
-	_ = tx.Commit()
+	stmt, err := tx.Prepare("INSERT INTO chunks (id, content) VALUES (?, ?)")
+	if err != nil {
+		_ = tx.Rollback()
+		db.Close()
+		return nil, "", err
+	}
+	defer stmt.Close()
+
+	for _, c := range chunks {
+		if _, err := stmt.Exec(c.ID, c.Content); err != nil {
+			_ = tx.Rollback()
+			db.Close()
+			return nil, "", err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		db.Close()
+		return nil, "", err
+	}
 
 	return db, tempDir, nil
 }
@@ -92,11 +115,18 @@ func benchmarkSQLLikeSearch(db *sql.DB, queryTerms []string, topK int) time.Dura
 		pattern := "%" + term + "%"
 		rows, err := db.Query("SELECT id FROM chunks WHERE content LIKE ? LIMIT ?", pattern, topK)
 		if err != nil {
-			continue
+			return time.Since(t0)
 		}
 		for rows.Next() {
 			var id string
-			_ = rows.Scan(&id)
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return time.Since(t0)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return time.Since(t0)
 		}
 		rows.Close()
 	}

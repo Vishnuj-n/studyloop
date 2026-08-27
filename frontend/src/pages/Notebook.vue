@@ -447,6 +447,10 @@ async function uploadFile(file, options = {}) {
       throw new Error(result.error)
     }
 
+    if (result?.id) {
+      ingestionNotebookID.value = result.id
+    }
+
     if (options.engine === 'fast_pdf') {
       showToast(`'${result?.file_name || file.name}' uploaded. Deep extraction running in background...`)
       await loadNotebooks()

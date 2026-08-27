@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -212,6 +213,15 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 
 	err := extension.SetupExtensionEnv(ctx, ext, logCallback)
 	if err != nil {
+		if errors.Is(err, extension.ErrSetupCanceled) || ctx.Err() == context.Canceled {
+			return map[string]interface{}{
+				"success":  false,
+				"canceled": true,
+				"error":    "setup canceled by user",
+				"logs":     logs,
+				"id":       id,
+			}
+		}
 		return map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),

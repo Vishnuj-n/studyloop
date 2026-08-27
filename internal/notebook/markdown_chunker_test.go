@@ -117,3 +117,35 @@ func TestBuildBreadcrumbText(t *testing.T) {
 		t.Errorf("expected heading to be preserved, got %q", res2)
 	}
 }
+
+func TestSplitMarkdownIntoChunks_SpacedTableSeparators(t *testing.T) {
+	spacedTableContent := `Overview of data structures in the program:
+
+| Data Type | Memory (Bytes) | Alignment |
+| --- | --- | --- |
+| bool | 1 | 1 |
+| int32 | 4 | 4 |
+| float64 | 8 | 8 |
+
+Summary follows after the table with detailed explanations.`
+
+	if !isMarkdownSection(spacedTableContent) {
+		t.Fatalf("expected isMarkdownSection to recognize spaced table separator '| --- | --- | --- |'")
+	}
+
+	chunks := SplitMarkdownIntoChunks(spacedTableContent, 30)
+	if len(chunks) == 0 {
+		t.Fatalf("expected chunks from spaced table markdown content, got none")
+	}
+
+	foundTable := false
+	for _, c := range chunks {
+		if strings.Contains(c, "| Data Type | Memory") && strings.Contains(c, "| float64 | 8 |") {
+			foundTable = true
+			break
+		}
+	}
+	if !foundTable {
+		t.Errorf("expected spaced table to be preserved intact in a chunk, chunks: %+v", chunks)
+	}
+}

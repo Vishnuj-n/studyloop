@@ -11,6 +11,7 @@ import sys
 import time
 import argparse
 from pathlib import Path
+import hashlib
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from typing import List, Dict, Any
 
@@ -190,6 +191,10 @@ def run_benchmark(pdf_path: str, start_page: int = 0, end_page: int = 0, runs: i
 
     results_table = []
     baseline_time = None
+    baseline_digest = None
+
+    def normalize_md(text: str) -> str:
+        return "\n".join(line.rstrip() for line in text.strip().splitlines())
 
     for idx, tc in enumerate(test_cases, 1):
         name = tc["name"]
@@ -207,6 +212,14 @@ def run_benchmark(pdf_path: str, start_page: int = 0, end_page: int = 0, runs: i
                 out = fn()
                 elapsed = time.perf_counter() - t0
                 times.append(elapsed)
+                norm_out = normalize_md(out)
+                digest = hashlib.sha256(norm_out.encode("utf-8")).hexdigest()
+
+                if baseline_digest is None and idx == 1 and r == 0:
+                    baseline_digest = digest
+                elif baseline_digest is not None and digest != baseline_digest:
+                    raise ValueError(f"output mismatch against baseline digest ({digest[:8]} != {baseline_digest[:8]})")
+
                 words = len(out.split())
                 text_len = len(out)
             except Exception as e:
@@ -267,6 +280,11 @@ def main():
     parser.add_argument("--runs", type=int, default=1, help="Number of benchmark runs per strategy")
     
     args = parser.parse_args()
+
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.end_page > 0 and args.start_page >= args.end_page:
+        parser.error(f"--start-page ({args.start_page}) must be less than --end-page ({args.end_page})")
     
     pdf_path = Path(args.pdf_path)
     if not pdf_path.exists():

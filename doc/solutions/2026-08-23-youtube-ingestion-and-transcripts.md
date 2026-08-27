@@ -8,7 +8,7 @@ Implemented YouTube video lecture ingestion into StudyLoop using **`yt-dlp`** in
 ## Changes Made
 
 ### 1. YouTube Free Extension (`extensions/youtube/`)
-- **[extensions/youtube/manifest.json](file:///c:/Users/vishn/PROJECT/ai-tutor/extensions/youtube/manifest.json)**:
+- **[extensions/youtube/manifest.json](../../extensions/youtube/manifest.json)**:
   - Extension manifest registering `id: "youtube"`, `tier: "free"`, `runtime: "python"`, and `entrypoint: "ingest.py"`.
   ```json
   {

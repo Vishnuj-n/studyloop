@@ -37,14 +37,40 @@ def extract_standard_text(pdf_path: str, start_page: int = 0, end_page: int = 0)
         import pypdf
         reader = pypdf.PdfReader(pdf_path)
         total = len(reader.pages)
+        if start_page > 0 and end_page > 0 and start_page > end_page:
+            return {
+                "engine": "pypdf / Standard Linear Text",
+                "elapsed_seconds": round(time.time() - start_time, 4),
+                "status": "error",
+                "error": f"start_page ({start_page}) cannot be greater than end_page ({end_page})",
+            }
+        if start_page > total:
+            return {
+                "engine": "pypdf / Standard Linear Text",
+                "elapsed_seconds": round(time.time() - start_time, 4),
+                "status": "error",
+                "error": f"start_page ({start_page}) exceeds total document pages ({total})",
+            }
         min_p = max(0, start_page - 1) if start_page > 0 else 0
         max_p = min(total, end_page) if end_page > 0 else total
         page_count = max_p - min_p
         for idx in range(min_p, max_p):
             page_text = reader.pages[idx].extract_text() or ""
             extracted_text += f"\n--- Page {idx + 1} ---\n" + page_text
-    except ImportError:
-        extracted_text = "[Standard text extractor: pypdf not found]"
+    except ImportError as e:
+        return {
+            "engine": "pypdf / Standard Linear Text",
+            "elapsed_seconds": round(time.time() - start_time, 4),
+            "status": "error",
+            "error": f"pypdf not found: {e}",
+        }
+    except Exception as e:
+        return {
+            "engine": "pypdf / Standard Linear Text",
+            "elapsed_seconds": round(time.time() - start_time, 4),
+            "status": "error",
+            "error": str(e),
+        }
 
     elapsed = time.time() - start_time
     clean_text = extracted_text.strip()
@@ -140,9 +166,19 @@ def build_markdown_report(results: list, file_name: str, pages_label: str) -> st
         md.append(f"### Engine: {res['engine']}")
         if res.get("status") == "success":
             snippet = res.get("raw_text", "")[:800].strip()
-            md.append("```markdown")
+            max_backticks = 2
+            cur = 0
+            for ch in snippet:
+                if ch == '`':
+                    cur += 1
+                    if cur > max_backticks:
+                        max_backticks = cur
+                else:
+                    cur = 0
+            fence = "`" * (max_backticks + 1)
+            md.append(f"{fence}markdown")
             md.append(snippet if snippet else "[Empty output]")
-            md.append("```\n")
+            md.append(f"{fence}\n")
         else:
             md.append(f"> ⚠️ **Error / Unavailable**: {res.get('error', 'Unknown')}\n")
 

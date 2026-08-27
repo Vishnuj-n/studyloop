@@ -108,7 +108,7 @@ It is not a chatbot, PDF viewer, or standalone flashcard app. It is a guided tut
 - Go 1.26+
 - Node.js 20+
 - Wails CLI
-- CGO-capable compiler toolchain
+- CGO-capable compiler toolchain (macOS/Linux) or pure Go build (Windows via `db/extension_nocgo.go`)
 - Local RAG assets in `asset/`:
 	- `tokenizer.json`
 	- `model_int8.onnx`
@@ -121,7 +121,7 @@ Run dependency checks and asset download:
 # macOS / Linux
 ./scripts/sync-deps.sh
 
-# Windows
+# Windows (pure Go, no CGO required)
 ./scripts/windows-sync-deps.ps1
 ```
 
@@ -148,9 +148,10 @@ wails build -tags sqlite_extension
 	- Ensure platform-specific `vec0` library exists in `asset/`
 - ONNX runtime load failure:
 	- Ensure platform-specific ONNX runtime library exists in `asset/`
-	- Rebuild with `CGO_ENABLED=1`
+	- Rebuild with `CGO_ENABLED=1` (macOS / Linux only; Windows uses pure Go `extension_nocgo.go`)
 - Build fails due to missing C compiler:
-	- Install MSVC Build Tools (Windows) or equivalent platform toolchain
+	- On macOS/Linux: Install Xcode Command Line Tools or build-essential
+	- On Windows: Windows builds do not require a C compiler or CGO; ensure build uses `db/extension_nocgo.go`
 
 ## Documentation
 
@@ -161,6 +162,8 @@ wails build -tags sqlite_extension
 - Source structure: [doc/PROJECT_STRUCTURE.md](doc/PROJECT_STRUCTURE.md)
 - API contracts: [doc/DATA_API.md](doc/DATA_API.md)
 - Module responsibilities: [doc/AGENT_MAP.md](doc/AGENT_MAP.md)
+- Retrieval pipeline & RAG: [doc/RAG.md](doc/RAG.md)
+
 ## Open-Source Credits & Acknowledgments
 
 - **yt-dlp**: Video lecture metadata and transcript extraction tooling is powered by the open-source [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.

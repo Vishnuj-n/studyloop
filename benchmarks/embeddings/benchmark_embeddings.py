@@ -2,7 +2,7 @@
 """
 Benchmarking Suite for Text Embeddings Generation.
 Compares sequential vs batched inference (Batch sizes: 1, 4, 8, 16, 32, 64, 128)
-measuring throughput (chunks/sec, tokens/sec) and peak latency.
+measuring throughput (chunks/sec, words/sec).
 """
 
 import sys
@@ -83,7 +83,7 @@ def run_embedding_benchmark(model_name: str = "all-MiniLM-L6-v2", chunk_count: i
         words_per_sec = total_words / elapsed if elapsed > 0 else 0
         speedup = baseline_time / elapsed if elapsed > 0 else 1.0
 
-        print(f" {elapsed:>6.3f}s | {chunks_per_sec:>6.1f} chunks/s | {speedup:>5.2f}x speedup")
+        print(f" {elapsed:>6.3f}s | {chunks_per_sec:>6.1f} chunks/s | {words_per_sec:>7.1f} words/s | {speedup:>5.2f}x speedup")
 
         results.append({
             "batch_size": bs,
@@ -95,16 +95,16 @@ def run_embedding_benchmark(model_name: str = "all-MiniLM-L6-v2", chunk_count: i
         })
 
     # Summary table
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 92)
     print("EMBEDDING BATCH RESULTS SUMMARY")
-    print("=" * 80)
-    print(f"{'Batch Size':<12} | {'Time (s)':<10} | {'Chunks/sec':<12} | {'Speedup':<10} | {'Dim':<6}")
-    print("-" * 80)
+    print("=" * 92)
+    print(f"{'Batch Size':<12} | {'Time (s)':<10} | {'Chunks/sec':<12} | {'Words/sec':<12} | {'Speedup':<10} | {'Dim':<6}")
+    print("-" * 92)
     best_time = min(r["time"] for r in results)
     for r in results:
         is_best = " 🏆" if r["time"] == best_time else ""
-        print(f"{r['batch_size']:<12} | {r['time']:>9.3f}s | {r['chunks_per_sec']:>11.1f} | {r['speedup']:>9} | {r['dim']:<6}{is_best}")
-    print("=" * 80)
+        print(f"{r['batch_size']:<12} | {r['time']:>9.3f}s | {r['chunks_per_sec']:>11.1f} | {r['words_per_sec']:>11.1f} | {r['speedup']:>9} | {r['dim']:<6}{is_best}")
+    print("=" * 92)
 
 
 def main():

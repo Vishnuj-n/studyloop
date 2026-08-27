@@ -8,14 +8,32 @@
  * Synthesizes a gentle, pleasant 2-tone chime using Web Audio API.
  * Zero external MP3/audio files required.
  */
-export function playStudyChime() {
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext
-    if (!AudioContextClass) return
+let retainedAudioCtx = null
 
-    const ctx = new AudioContextClass()
+export function initAudioContext() {
+  if (!retainedAudioCtx) {
+    const AudioContextClass = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
+    if (AudioContextClass) {
+      retainedAudioCtx = new AudioContextClass()
+    }
+  }
+  if (retainedAudioCtx && retainedAudioCtx.state === 'suspended') {
+    void retainedAudioCtx.resume()
+  }
+  return retainedAudioCtx
+}
+
+/**
+ * Synthesizes a gentle, pleasant 2-tone chime using Web Audio API.
+ * Zero external MP3/audio files required.
+ */
+export async function playStudyChime() {
+  try {
+    const ctx = initAudioContext()
+    if (!ctx) return
+
     if (ctx.state === 'suspended') {
-      ctx.resume()
+      await ctx.resume()
     }
 
     const now = ctx.currentTime
@@ -71,6 +89,21 @@ function getEventDates(startTime = '17:00', endTime = '19:00') {
 }
 
 /**
+ * Escapes text for RFC 5545 iCalendar TEXT values in strict order:
+ * 1. Backslashes
+ * 2. Commas
+ * 3. Semicolons
+ * 4. Line breaks
+ */
+export function escapeICSText(str = '') {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
+    .replace(/\r\n|\r|\n/g, '\\n')
+}
+
+/**
  * Builds the event description including optional custom study link.
  */
 function buildDescription(customUrl = '') {
@@ -101,33 +134,12 @@ export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00', cus
 }
 
 /**
- * Returns a direct URL to create an event on Outlook / Office 365 Web Calendar.
+ * Generates raw iCalendar (.ics) string with daily recurrence and alarms.
  */
-export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', customUrl = '') {
-  const { isoStart, isoEnd } = getEventDates(startTime, endTime)
-  const title = '📖 StudyLoop Daily Study Session'
-  const details = buildDescription(customUrl)
-
-  const params = new URLSearchParams({
-    path: '/calendar/action/compose',
-    rru: 'addevent',
-    subject: title,
-    startdt: isoStart,
-    enddt: isoEnd,
-    body: details,
-  })
-
-  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`
-}
-
-/**
- * Generates and triggers download of a standard RFC 5545 .ics file
- * with daily recurrence (RRULE:FREQ=DAILY) and 10-minute + 0-minute audio alarms.
- */
-export function downloadRoutineICS(startTime = '17:00', endTime = '19:00', customUrl = '') {
+export function generateRoutineICS(startTime = '17:00', endTime = '19:00', customUrl = '') {
   const { dtStart, dtEnd, y, m, d } = getEventDates(startTime, endTime)
   const title = '📖 StudyLoop Daily Study Session'
-  const details = buildDescription(customUrl).replace(/\n/g, '\\n')
+  const details = escapeICSText(buildDescription(customUrl))
 
   const icsLines = [
     'BEGIN:VCALENDAR',
@@ -158,7 +170,24 @@ export function downloadRoutineICS(startTime = '17:00', endTime = '19:00', custo
     'END:VCALENDAR',
   ]
 
-  const icsBlob = new Blob([icsLines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  return icsLines.join('\r\n')
+}
+
+/**
+ * Directs Outlook users to the recurring ICS export to preserve event details and daily recurrence.
+ */
+export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', customUrl = '') {
+  const icsContent = generateRoutineICS(startTime, endTime, customUrl)
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`
+}
+
+/**
+ * Generates and triggers download of a standard RFC 5545 .ics file
+ * with daily recurrence (RRULE:FREQ=DAILY) and 10-minute + 0-minute audio alarms.
+ */
+export function downloadRoutineICS(startTime = '17:00', endTime = '19:00', customUrl = '') {
+  const icsContent = generateRoutineICS(startTime, endTime, customUrl)
+  const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(icsBlob)
   const link = document.createElement('a')
   link.href = url

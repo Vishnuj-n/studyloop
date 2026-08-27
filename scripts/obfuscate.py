@@ -40,17 +40,21 @@ def ensure_pyarmor():
 
 def _process_single_extension(item: Path, output_dir: Path, has_pyarmor: bool, secret_key: str = ""):
     ext_id = item.name
+    dest_ext_dir = output_dir / ext_id
     manifest_file = item / "manifest.json"
     if manifest_file.exists():
         try:
             import json
             m_data = json.loads(manifest_file.read_text(encoding="utf-8"))
             if m_data.get("dev_only") is True:
+                if dest_ext_dir.exists():
+                    shutil.rmtree(dest_ext_dir, ignore_errors=True)
                 return f"  [SKIP] Skipping dev-only extension from release build: {ext_id}"
-        except Exception:
-            pass
+        except Exception as e:
+            if dest_ext_dir.exists():
+                shutil.rmtree(dest_ext_dir, ignore_errors=True)
+            return f"  [ERROR] Failed to parse manifest for {ext_id} ({e}); skipping extension to ensure security."
 
-    dest_ext_dir = output_dir / ext_id
     dest_ext_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy non-python files (manifest.json, requirements.txt, etc.)
