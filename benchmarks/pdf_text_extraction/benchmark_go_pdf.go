@@ -559,11 +559,11 @@ func main() {
 			fn:   func() (string, error) { return extractParallelSharedReader(targetPath, minP, maxP, cpuCount) },
 		},
 		{
-			name: fmt.Sprintf("4. Parallel Independent Handles (2 Workers)"),
+			name: "4. Parallel Independent Handles (2 Workers)",
 			fn:   func() (string, error) { return extractParallelIndependentHandles(targetPath, minP, maxP, 2) },
 		},
 		{
-			name: fmt.Sprintf("5. Parallel Independent Handles (4 Workers)"),
+			name: "5. Parallel Independent Handles (4 Workers)",
 			fn:   func() (string, error) { return extractParallelIndependentHandles(targetPath, minP, maxP, 4) },
 		},
 		{
@@ -571,7 +571,7 @@ func main() {
 			fn:   func() (string, error) { return extractParallelIndependentHandles(targetPath, minP, maxP, cpuCount) },
 		},
 		{
-			name: fmt.Sprintf("7. In-Memory Preload + Parallel Readers (4 Workers)"),
+			name: "7. In-Memory Preload + Parallel Readers (4 Workers)",
 			fn:   func() (string, error) { return extractParallelInMemory(targetPath, minP, maxP, 4) },
 		},
 		{
