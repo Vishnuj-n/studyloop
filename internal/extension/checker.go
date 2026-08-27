@@ -3,6 +3,7 @@ package extension
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,9 @@ import (
 	"strings"
 	"time"
 )
+
+// ErrSetupCanceled indicates extension setup was aborted via user cancellation.
+var ErrSetupCanceled = errors.New("setup canceled by user")
 
 // ReadinessStatus describes the environment and verification state of an extension.
 type ReadinessStatus struct {
@@ -90,7 +94,7 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 		return fmt.Errorf("cannot test nil extension")
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	testCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(testCtx, pythonPath, ext.EntrypointPath(), "--test")
@@ -143,10 +147,47 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	logLine(fmt.Sprintf("Using uv engine: %s", uvPath))
 	logLine(fmt.Sprintf("Configuring isolated environment in: %s", venvDir))
 
-	// 1. Create venv with uv (uv venv <venvDir> --system-site-packages)
+	// Validate that existing .venv was created with the selected Python interpreter
+	pyvenvCfg := filepath.Join(venvDir, "pyvenv.cfg")
+	if cfgData, err := os.ReadFile(pyvenvCfg); err == nil {
+		pyFindCmd := exec.CommandContext(ctx, uvPath, "python", "find")
+		hideConsoleWindow(pyFindCmd)
+		if out, err := pyFindCmd.Output(); err == nil {
+			selectedPy := strings.TrimSpace(string(out))
+			if selectedPy != "" {
+				selectedPyNorm := filepath.Clean(strings.ToLower(selectedPy))
+				selectedDirNorm := filepath.Clean(strings.ToLower(filepath.Dir(selectedPy)))
+
+				lines := strings.Split(string(cfgData), "\n")
+				var cfgHome, cfgExec string
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "home =") || strings.HasPrefix(line, "home=") {
+						cfgHome = filepath.Clean(strings.ToLower(strings.TrimSpace(strings.SplitN(line, "=", 2)[1])))
+					} else if strings.HasPrefix(line, "executable =") || strings.HasPrefix(line, "executable=") {
+						cfgExec = filepath.Clean(strings.ToLower(strings.TrimSpace(strings.SplitN(line, "=", 2)[1])))
+					}
+				}
+
+				mismatch := false
+				if cfgExec != "" && cfgExec != selectedPyNorm {
+					mismatch = true
+				} else if cfgHome != "" && cfgHome != selectedDirNorm {
+					mismatch = true
+				}
+
+				if mismatch {
+					logLine("Existing virtual environment interpreter mismatch. Recreating environment...")
+					_ = os.RemoveAll(venvDir)
+				}
+			}
+		}
+	}
+
+	// 1. Create venv with uv (uv venv <venvDir> --allow-existing --system-site-packages)
 	// uv automatically detects system Python and reuses already-installed global packages (e.g. yt-dlp, edge-tts)
 	logLine("Step 1/3: Initializing Python virtual environment...")
-	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--system-site-packages")
+	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--allow-existing", "--system-site-packages")
 	venvCmd.Dir = ext.Dir
 	hideConsoleWindow(venvCmd)
 
@@ -155,6 +196,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	venvCmd.Stderr = &venvErr
 
 	if err := venvCmd.Run(); err != nil {
+		if ctx.Err() == context.Canceled {
+			return ErrSetupCanceled
+		}
 		errMsg := strings.TrimSpace(venvErr.String())
 		if errMsg == "" {
 			errMsg = strings.TrimSpace(venvOut.String())
@@ -176,6 +220,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 		pipCmd.Stderr = &pipErr
 
 		if err := pipCmd.Run(); err != nil {
+			if ctx.Err() == context.Canceled {
+				return ErrSetupCanceled
+			}
 			errMsg := strings.TrimSpace(pipErr.String())
 			if errMsg == "" {
 				errMsg = strings.TrimSpace(pipOut.String())
@@ -191,6 +238,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	logLine("Step 3/3: Running extension verification self-test...")
 	pyPath := GetVenvPython(venvDir)
 	if err := RunSmokeTest(ctx, ext, pyPath); err != nil {
+		if ctx.Err() == context.Canceled {
+			return ErrSetupCanceled
+		}
 		return fmt.Errorf("extension self-test failed after installation: %w", err)
 	}
 

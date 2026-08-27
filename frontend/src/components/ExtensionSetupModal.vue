@@ -18,7 +18,7 @@
             }}: {{ extension?.name || 'Python Tool' }}
           </h3>
         </div>
-        <button v-if="status !== 'running'" class="close-modal-btn" @click="emitClose">✕</button>
+        <button class="close-modal-btn" title="Close / Cancel Setup" @click="handleCancelOrClose">✕</button>
       </div>
 
       <div class="modal-body">
@@ -31,6 +31,15 @@
               : errorMessage
           }}
         </p>
+
+        <!-- Download Size & Patience Notice Callout -->
+        <div v-if="extension?.setup_notice || extension?.download_size" class="setup-notice-banner">
+          <span class="notice-icon">⏳</span>
+          <div class="notice-text">
+            <strong>Package Size: {{ extension.download_size || '~1 GB' }}</strong>
+            <p>{{ extension.setup_notice || 'First-time setup downloads required models. Please keep the app open.' }}</p>
+          </div>
+        </div>
 
         <!-- Progress Steps -->
         <div class="setup-steps-list">
@@ -60,6 +69,13 @@
 
       <div class="modal-footer">
         <button
+          v-if="status === 'running'"
+          class="modal-close-btn"
+          @click="handleCancelOrClose"
+        >
+          Cancel
+        </button>
+        <button
           v-if="status === 'error'"
           class="modal-action-btn retry-btn"
           @click="startSetup"
@@ -80,7 +96,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { setupExtension } from '../services/appApi'
+import { setupExtension, cancelExtensionSetup } from '../services/appApi'
 
 const props = defineProps({
   isOpen: {
@@ -109,9 +125,20 @@ function getStepClass(stepNum) {
 }
 
 function handleOverlayClick() {
-  if (status.value !== 'running') {
-    emitClose()
+  handleCancelOrClose()
+}
+
+async function handleCancelOrClose() {
+  if (status.value === 'running') {
+    try {
+      await cancelExtensionSetup()
+    } catch (err) {
+      status.value = 'error'
+      errorMessage.value = err?.message || String(err) || 'Failed to cancel setup'
+      return
+    }
   }
+  emitClose()
 }
 
 function emitClose() {
@@ -139,6 +166,9 @@ async function startSetup() {
           emitClose()
         }
       }, 1200)
+    } else if (res && res.canceled) {
+      logs.value = res?.logs || []
+      // Do not emit error when setup is canceled by user
     } else {
       status.value = 'error'
       logs.value = res?.logs || []
@@ -273,6 +303,37 @@ watch(
   color: var(--muted-text);
   line-height: 1.5;
   margin: 0 0 16px 0;
+}
+
+.setup-notice-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--surface-container-high, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.12));
+  border-left: 3px solid var(--primary, #3b82f6);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.notice-icon {
+  font-size: 16px;
+  margin-top: 1px;
+}
+
+.notice-text strong {
+  display: block;
+  font-size: 12.5px;
+  color: var(--on-surface);
+  margin-bottom: 2px;
+}
+
+.notice-text p {
+  font-size: 12px;
+  color: var(--muted-text);
+  margin: 0;
+  line-height: 1.4;
 }
 
 .setup-steps-list {

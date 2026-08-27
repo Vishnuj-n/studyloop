@@ -97,15 +97,15 @@ func SplitIntoSentences(text string) []string {
 
 // BuildAudioOverviewPrompt creates a prompt for the conversational overview script.
 func BuildAudioOverviewPrompt(topicTitle string, contextContent string) string {
-	return fmt.Sprintf(`You are an engaging, insightful study host providing a spoken audio overview of this topic.
-Write a clear, concise 2 to 3 paragraph audio briefing that sounds natural, warm, and engaging when spoken aloud.
+	return fmt.Sprintf(`You are an engaging, insightful study host providing a comprehensive, in-depth spoken audio lesson on this topic.
+Write a rich, detailed audio lecture that sounds natural, warm, and engaging when spoken aloud.
 
 Rules:
 - Do NOT use markdown headers, bullet lists, asterisks, citations, or formatting symbols.
-- Write in plain, conversational English suitable for text-to-speech narration.
+- Write in plain, conversational English suitable for natural text-to-speech narration.
 - Use natural punctuation (. , ? !) to guide the speech rhythm and pauses.
-- Summarize key concepts, why they matter, and core takeaways.
-- Total length: between 120 and 220 words.
+- Provide thorough explanations: introduce the topic, dive deeply into core concepts and underlying mechanisms, provide intuitive real-world examples or analogies, and wrap up with key takeaways.
+- Total length: between 350 and 600 words (around 3 to 5 detailed conversational paragraphs).
 
 Topic: %s
 

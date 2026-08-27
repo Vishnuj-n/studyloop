@@ -54,6 +54,8 @@ type App struct {
 	indexQueue          *retrieval.VectorIndexQueue
 	audioOverviewMu     sync.Mutex
 	audioOverviewCancel context.CancelFunc
+	extSetupMu          sync.Mutex
+	extSetupCancel      context.CancelFunc
 }
 
 func NewApp() *App {

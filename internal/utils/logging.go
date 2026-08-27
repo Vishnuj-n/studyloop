@@ -216,4 +216,15 @@ func LogSchedulerDecision(topicID string, startPage, endPage int, tokenBudget, r
 		"tokenBudget", tokenBudget, "reason", reason)
 }
 
+// LogReadingEstimate logs word count and duration estimates for reading tasks.
+func LogReadingEstimate(taskID, topicID string, startPage, endPage, wordCount, estimateMinutes int, source string) {
+	if taskID == "" {
+		taskID = "unknown"
+	}
+	QueueLogger.Info("reading_estimate",
+		"task", taskID, "topic", topicID,
+		"pages", fmt.Sprintf("%d-%d", startPage, endPage),
+		"word_count", wordCount, "estimate_minutes", estimateMinutes, "source", source)
+}
+
 

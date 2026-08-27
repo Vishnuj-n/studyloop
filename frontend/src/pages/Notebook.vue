@@ -141,7 +141,7 @@ import {
   getAvailableTopics,
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
-  uploadNotebookFromPath as apiUploadNotebookFromPath,
+  uploadFastPDFNotebook as apiUploadFastPDFNotebook,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
@@ -154,10 +154,8 @@ import {
 } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import {
-  CanResolveFilePaths,
   EventsOff,
   EventsOn,
-  ResolveFilePaths,
 } from '../../wailsjs/runtime/runtime'
 
 import NotebookUpload from '../components/NotebookUpload.vue'
@@ -301,25 +299,23 @@ function handleIngestionProgress(payload) {
     return
   }
 
-  // Handle ingestion progress (upload/chunking phase)
+  // Handle ingestion / parsing progress
   if (!ingestionNotebookID.value && payload.notebook_id) {
     ingestionNotebookID.value = payload.notebook_id
   }
 
-  if (
-    ingestionNotebookID.value &&
-    payload.notebook_id &&
-    payload.notebook_id !== ingestionNotebookID.value
-  ) {
-    return
-  }
+  const isCurrentIngestion =
+    !ingestionNotebookID.value ||
+    !payload.notebook_id ||
+    payload.notebook_id === ingestionNotebookID.value
 
-  if (typeof payload.percent === 'number') {
-    uploadProgress.value = payload.percent
-  }
-
-  if (payload.message) {
-    ingestionStatusMessage.value = payload.message
+  if (isCurrentIngestion) {
+    if (typeof payload.percent === 'number') {
+      uploadProgress.value = payload.percent
+    }
+    if (payload.message) {
+      ingestionStatusMessage.value = payload.message
+    }
   }
 
   // Handle indexing progress (RAG indexing phase - background)
@@ -330,7 +326,7 @@ function handleIngestionProgress(payload) {
     }
   }
 
-  const terminalStates = new Set(['failed', 'chunked', 'indexed'])
+  const terminalStates = new Set(['failed', 'chunked', 'indexed', 'draft_ready'])
   if (typeof payload.status === 'string' && terminalStates.has(payload.status)) {
     void loadNotebooks()
   }
@@ -403,10 +399,12 @@ async function uploadYouTube(url) {
   }
 }
 
-async function uploadFile(file) {
+async function uploadFile(file, options = {}) {
   uploadError.value = ''
   successMessage.value = ''
-  ingestionStatusMessage.value = ''
+  ingestionStatusMessage.value = options.engine === 'fast_pdf'
+    ? 'Processing with Deep Structured Markdown parser...'
+    : ''
   ingestionNotebookID.value = ''
   draftError.value = ''
   uploadProgress.value = 10
@@ -422,19 +420,22 @@ async function uploadFile(file) {
     return
   }
 
-  // Validate file size (50MB max)
-  const maxSize = 50 * 1024 * 1024
+  // Validate file size (75MB max)
+  const maxSize = 75 * 1024 * 1024
   if (file.size > maxSize) {
-    uploadError.value = 'File too large. Maximum size is 50MB.'
+    uploadError.value = 'File too large. Maximum size is 75MB.'
     return
   }
 
   try {
-    const localPath = await resolveLocalFilePath(file)
     let result
-    if (localPath) {
-      uploadProgress.value = 40
-      result = await apiUploadNotebookFromPath(localPath)
+    if (options.engine === 'fast_pdf') {
+      uploadProgress.value = 5
+      ingestionStatusMessage.value = 'Starting Deep Structured Markdown extraction...'
+
+      const arrayBuffer = await file.arrayBuffer()
+      const bytes = new Uint8Array(arrayBuffer)
+      result = await apiUploadFastPDFNotebook(Array.from(bytes), file.name, isPro.value)
     } else {
       const arrayBuffer = await file.arrayBuffer()
       const bytes = new Uint8Array(arrayBuffer)
@@ -446,16 +447,23 @@ async function uploadFile(file) {
       throw new Error(result.error)
     }
 
-    if (result?.status === 'chunked') {
-      ingestionStatusMessage.value = 'Chunking complete'
-    } else {
-      ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
+    if (result?.id) {
+      ingestionNotebookID.value = result.id
     }
 
-    successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
-
-    if (result?.id) {
-      await openSyllabusDraft(result.id, result?.file_name || '')
+    if (options.engine === 'fast_pdf') {
+      showToast(`'${result?.file_name || file.name}' uploaded. Deep extraction running in background...`)
+      await loadNotebooks()
+    } else {
+      if (result?.status === 'chunked') {
+        ingestionStatusMessage.value = 'Chunking complete'
+      } else {
+        ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
+      }
+      successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
+      if (result?.id) {
+        await openSyllabusDraft(result.id, result?.file_name || '')
+      }
     }
 
     uploadProgress.value = 100
@@ -471,25 +479,6 @@ async function uploadFile(file) {
     uploadError.value = `Upload failed: ${error.message}`
     uploadProgress.value = 0
   }
-}
-
-async function resolveLocalFilePath(file) {
-  if (typeof file?.path === 'string' && file.path.trim() !== '') {
-    return file.path
-  }
-
-  try {
-    if (CanResolveFilePaths()) {
-      await Promise.resolve(ResolveFilePaths([file]))
-      if (typeof file?.path === 'string' && file.path.trim() !== '') {
-        return file.path
-      }
-    }
-  } catch (error) {
-    console.warn('Could not resolve local file path via Wails runtime:', error)
-  }
-
-  return ''
 }
 
 async function openSyllabusDraft(notebookID, notebookTitle = '') {

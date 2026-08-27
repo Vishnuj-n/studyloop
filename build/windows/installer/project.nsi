@@ -88,6 +88,16 @@ Section
 
     !insertmacro wails.files
 
+    # Package uv binary
+    SetOutPath "$INSTDIR\bin"
+    File "..\..\bin\uv.exe"
+
+    # Package default extensions
+    SetOutPath "$INSTDIR\extensions"
+    File /r /x ".git*" /x "__pycache__" /x ".venv*" "..\..\bin\extensions\*.*"
+
+    SetOutPath $INSTDIR
+
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
 

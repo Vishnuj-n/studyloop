@@ -93,6 +93,14 @@
               Open Simplifier ➔
             </button>
             <button
+              v-else-if="ext.id === 'youtube'"
+              class="action-btn primary-action"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/notebooks')"
+            >
+              Import in Notebooks ➔
+            </button>
+            <button
               v-else
               class="action-btn primary-action"
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
@@ -124,13 +132,20 @@
         >
           <div class="card-top">
             <div class="icon-box pro-icon">
+              <!-- PDF (Deep PDF) icon -->
+              <svg v-if="ext.id === 'fast_pdf' || ext.id.includes('pdf')" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+                <line x1="12" y1="12" x2="12" y2="18"></line>
+              </svg>
               <!-- Audio icon -->
-              <svg v-if="ext.id === 'audio_overview' || ext.category === 'audio'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg v-else-if="ext.id === 'audio_overview' || ext.category === 'audio'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
                 <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
               </svg>
               <!-- Video/YouTube icon -->
-              <svg v-else-if="ext.id === 'youtube_transcripts' || ext.category === 'ingestion'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg v-else-if="ext.id === 'youtube_transcripts' || ext.id === 'youtube' || ext.category === 'video'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7"></polygon>
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
               </svg>
@@ -164,7 +179,15 @@
 
           <div class="card-bottom">
             <button
-              v-if="isPro"
+              v-if="isPro && (ext.id === 'fast_pdf' || ext.id.includes('pdf'))"
+              class="action-btn pro-action"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/notebooks')"
+            >
+              Import in Notebooks ➔
+            </button>
+            <button
+              v-else-if="isPro"
               class="action-btn pro-action"
               :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
               @click="handleRun(ext)"
@@ -187,7 +210,7 @@
     <ExtensionSetupModal
       :is-open="setupModalOpen"
       :extension="currentSetupExt"
-      @close="setupModalOpen = false"
+      @close="closeSetupModal"
       @success="handleSetupSuccess"
     />
 
@@ -292,6 +315,11 @@ function triggerSetup(ext) {
   currentSetupExt.value = ext
   activeExtName.value = ext.name
   setupModalOpen.value = true
+}
+
+function closeSetupModal() {
+  setupModalOpen.value = false
+  currentSetupExt.value = null
 }
 
 function handleSetupSuccess(ext) {

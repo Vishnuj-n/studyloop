@@ -11,6 +11,7 @@ import {
   openRepoURL,
 } from './services/appApi'
 import { useToast } from './composables/useToast'
+import { playStudyChime } from './services/calendarService'
 
 const { toast, hideToast } = useToast()
 
@@ -67,14 +68,11 @@ function getNextEventTimeout(startTimeStr, endTimeStr) {
   }
 }
 
-// Fire notifications and banners based on event type
+// Fire audio chime and in-app banner based on event type
 async function fireEvent(type) {
+  playStudyChime()
+
   if (type === 'start') {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Study Time Started!', {
-        body: "It's study time! Let's work on today's learning queue.",
-      })
-    }
     banner.value = {
       show: true,
       type: 'start',
@@ -94,11 +92,6 @@ async function fireEvent(type) {
     }
 
     if (unfinishedCount > 0) {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Study Time is Up!', {
-          body: `You still have ${unfinishedCount} unfinished tasks today.`,
-        })
-      }
       banner.value = {
         show: true,
         type: 'end',
@@ -107,11 +100,6 @@ async function fireEvent(type) {
         unfinishedCount,
       }
     } else {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Study Time is Up!', {
-          body: 'Great job! You finished all your study tasks for today.',
-        })
-      }
       banner.value = {
         show: true,
         type: 'end',
@@ -141,11 +129,6 @@ async function syncScheduler() {
     }
 
     if (!settings.reminders_enabled) return
-
-    // Request notification permission if reminders are enabled
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
 
     const next = getNextEventTimeout(settings.study_start_time, settings.study_end_time)
     if (!next) return

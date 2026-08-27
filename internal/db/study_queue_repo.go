@@ -772,10 +772,15 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 	targetWords := settings.TargetSessionWords
 
 	rows, err := r.db.Query(`
-		SELECT id FROM notebooks
-		WHERE study_status = 'active'
-		  AND status = 'chunked'
-		  AND (? = '' OR profile_id = ? OR profile_id IS NULL OR profile_id = '')
+		SELECT n.id FROM notebooks n
+		WHERE n.study_status = 'active'
+		  AND n.status = 'chunked'
+		  AND (? = '' OR n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '')
+		  AND NOT EXISTS (
+			SELECT 1 FROM study_queue sq
+			WHERE sq.notebook_id = n.id
+			  AND sq.status IN ('PENDING', 'ACTIVE')
+		  )
 	`, activeProfileID, activeProfileID)
 	if err != nil {
 		return err

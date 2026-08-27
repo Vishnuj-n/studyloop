@@ -5,10 +5,17 @@
  */
 export const NOTEBOOK_IMPORTERS = [
   {
-    id: 'youtube_transcripts',
+    id: 'fast_pdf',
+    name: 'Deep Structured PDF',
+    icon: '⚡',
+    badge: 'Pro',
+    description: 'Deep high-speed Markdown extraction with tables, headers, and code blocks.',
+    fileType: 'pdf',
+  },
+  {
+    id: 'youtube',
     name: 'YouTube Lecture',
     icon: '🎥',
-    badge: 'Extension',
     description: 'Fetch video transcript & auto-generate structured chapter notes from a YouTube URL.',
     modalName: 'youtube',
   },

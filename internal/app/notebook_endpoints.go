@@ -80,6 +80,165 @@ func (a *App) UploadNotebookFromPath(filePath string) map[string]interface{} {
 	return a.finalizeNotebookUpload(uploadResult)
 }
 
+// UploadFastPDFNotebook handles file bytes upload using the fast_pdf Pro structured markdown parser.
+func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{"error": "notebook service not initialized"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("fast_pdf")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFile(fileData, fileName)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return a.finalizeFastPDFUpload(uploadResult, ext)
+}
+
+// UploadFastPDFNotebookFromPath handles local file upload using the fast_pdf Pro structured markdown parser.
+func (a *App) UploadFastPDFNotebookFromPath(filePath string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{"error": "notebook service not initialized"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("fast_pdf")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(filePath)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return a.finalizeFastPDFUpload(uploadResult, ext)
+}
+
+func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+
+	fileHash, hashErr := utils.FileSHA256(uploadResult.FilePath)
+	if hashErr != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"error": fmt.Sprintf("failed to compute file hash: %v", hashErr),
+		}
+	}
+
+	profileID := a.resolveExplicitActiveProfileID()
+	title := strings.TrimSpace(uploadResult.FileName)
+	if title == "" {
+		title = filepath.Base(uploadResult.FilePath)
+	}
+
+	// Register notebook immediately in SQLite
+	err := repo.CreateNotebook(uploadResult.ID, title, uploadResult.FilePath, uploadResult.FileType, "", fileHash, 0, profileID)
+	if err != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"error": err.Error(),
+		}
+	}
+	_ = repo.UpdateNotebookStatus(uploadResult.ID, "uploaded")
+
+	// Run deep extraction asynchronously in background — zero main thread blocking
+	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		doc, result, extErr := a.notebookService.IngestFastPDF(ctx, filePath, a.extRunner, extObj)
+		if extErr != nil {
+			utils.Warnf("[FAST_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Extraction failed: %v", extErr),
+			})
+			return
+		}
+
+		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
+			utils.Warnf("[FAST_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Failed to update page count: %v", err),
+			})
+			return
+		}
+
+		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		if len(chaptersDraft) == 0 {
+			chaptersDraft = []models.SyllabusChapterDraft{
+				{
+					Title:     fileName,
+					StartPage: 1,
+					EndPage:   doc.PageCount,
+				},
+			}
+		}
+
+		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
+			utils.Warnf("[FAST_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
+			})
+			return
+		}
+
+		emitIngestionProgress(a, ingestionProgressPayload{
+			NotebookID: nbID,
+			Status:     "draft_ready",
+			Message:    "Syllabus draft ready",
+		})
+	}(uploadResult.ID, uploadResult.FilePath, title, ext)
+
+	return map[string]interface{}{
+		"id":            uploadResult.ID,
+		"file_name":     title,
+		"file_type":     uploadResult.FileType,
+		"size":          uploadResult.Size,
+		"page_count":    0,
+		"word_count":    0,
+		"chunk_count":   0,
+		"indexed_count": 0,
+		"failed_count":  0,
+		"status":        "uploaded",
+	}
+}
+
 // UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
 func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]interface{} {
 	repo := a.getRepo()
@@ -556,11 +715,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup only topics provably created in this request; skip cleanup if existing-topic lookup failed.
 		if etErr == nil {
+			var toDelete []string
 			for _, item := range topicItems {
 				if _, existed := existingTopicIDs[item.TopicID]; !existed {
-					_ = repo.DeleteTopic(item.TopicID)
+					toDelete = append(toDelete, item.TopicID)
 				}
 			}
+			_ = repo.DeleteTopics(toDelete)
 		}
 		return map[string]interface{}{"error": "failed to persist topic bounds: " + err.Error()}
 	}
@@ -570,11 +731,11 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	}
 
 	// Track which topic IDs were newly created for cleanup
-	newlyCreatedTopicIDs := make(map[string]bool)
+	var newlyCreatedTopicIDs []string
 	if etErr == nil {
 		for _, item := range topicItems {
 			if _, existed := existingTopicIDs[item.TopicID]; !existed {
-				newlyCreatedTopicIDs[item.TopicID] = true
+				newlyCreatedTopicIDs = append(newlyCreatedTopicIDs, item.TopicID)
 			}
 		}
 	}
@@ -583,9 +744,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if len(groups) == 0 || len(allChunks) == 0 {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete only newly created topic rows to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "confirmed chapters produced no chunks"}
 	}
 
@@ -604,9 +763,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if err := repo.IngestNotebookContentByTopic(notebookID, groups); err != nil {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete only newly created topic rows to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		emitIngestionProgress(a, ingestionProgressPayload{
 			NotebookID: notebookID,
 			Status:     "failed",
@@ -623,9 +780,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if err := repo.LinkNotebookTopics(notebookID, topicIDs); err != nil {
 		_ = repo.UpdateNotebookStatus(notebookID, "failed")
 		// Cleanup: delete newly created topic rows (cascades to chunks, cards, etc.) to avoid orphaned records
-		for topicID := range newlyCreatedTopicIDs {
-			_ = repo.DeleteTopic(topicID)
-		}
+		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "failed to link notebook topics: " + err.Error()}
 	}
 
@@ -635,11 +790,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		for _, tid := range topicIDs {
 			newTopicIDsMap[tid] = true
 		}
+		var orphanedTopicIDs []string
 		for _, et := range existingTopics {
 			if !newTopicIDsMap[et.TopicID] {
-				_ = repo.DeleteTopic(et.TopicID)
+				orphanedTopicIDs = append(orphanedTopicIDs, et.TopicID)
 			}
 		}
+		_ = repo.DeleteTopics(orphanedTopicIDs)
 	}
 
 	status := "chunked"

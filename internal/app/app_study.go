@@ -353,12 +353,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
 		// Word-count based estimation (words / 200 WPM).
 		// Falls back to page-count if chunks have not been ingested yet.
-		totalWords := 0
-		if tokenMap, err := repo.GetTokensPerPageMap(task.TopicID, task.StartPage, task.EndPage); err == nil {
-			for _, w := range tokenMap {
-				totalWords += w
-			}
-		}
+		totalWords, _ := repo.GetTopicWordsInRange(task.TopicID, task.StartPage, task.EndPage)
 		pageCount := task.EndPage - task.StartPage + 1
 		estimationSource := "word_count"
 		if totalWords > 0 {
@@ -371,8 +366,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 			estimationSource = "no_chunks_yet"
 			estimateMinutes = int(math.Ceil(float64(pageCount) * scheduler.MinMinutesPerPage))
 		}
-		utils.Debugf("[READING_ESTIMATE] taskID=%s topicID=%s pages=%d-%d word_count=%d estimate_minutes=%d source=%s",
-			task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
+		utils.LogReadingEstimate(task.ID, task.TopicID, task.StartPage, task.EndPage, totalWords, estimateMinutes, estimationSource)
 	case task.StartPage > 0 && task.EndPage >= task.StartPage:
 		estimateMinutes = int(math.Ceil(float64(task.EndPage-task.StartPage+1) * scheduler.MinMinutesPerPage))
 	}
@@ -415,6 +409,11 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+// GetStreakState computes current and longest streaks and daily completed task count.
+func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
+	return a.getStreakState(timezoneOffsetMinutes)
+}
+
 func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
@@ -429,20 +428,21 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	currentStreak, longestStreak, activeDates := calculateStreak(times, timezoneOffsetMinutes)
 
 	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
-	todayStr := time.Now().In(loc).Format("2006-01-02")
-	todayCompleted := false
-	for _, d := range activeDates {
-		if d == todayStr {
-			todayCompleted = true
-			break
+	todayStr := time.Now().In(loc).Format(dateFormatYYYYMMDD)
+	completedToday := 0
+	for _, t := range times {
+		if t.In(loc).Format(dateFormatYYYYMMDD) == todayStr {
+			completedToday++
 		}
 	}
+	todayCompleted := completedToday > 0
 
 	return map[string]interface{}{
 		"current_streak":  currentStreak,
 		"longest_streak":  longestStreak,
 		"active_dates":    activeDates,
 		"today_completed": todayCompleted,
+		"completed_today": completedToday,
 	}
 }
 
@@ -519,30 +519,20 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
 	endOfToday := midnight.Add(24 * time.Hour).Unix()
 
-	timeline := make([]FlashcardDuePoint, 7)
-
-	// Day 0: Today (due_at in (0, endOfToday])
-	count, err := repo.QueryDueReviewCardsForRange(-1, endOfToday)
+	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+
+	timeline := make([]FlashcardDuePoint, 7)
 	timeline[0] = FlashcardDuePoint{
 		Date:      midnight.Format(dateFormatYYYYMMDD),
 		DayLabel:  "Today",
-		CardCount: count,
+		CardCount: counts[0],
 	}
 
-	// Days 1 to 6
 	dayNames := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	for i := 1; i < 7; i++ {
-		dayStart := endOfToday + int64(i-1)*24*3600
-		dayEnd := endOfToday + int64(i)*24*3600
-
-		count, err := repo.QueryDueReviewCardsForRange(dayStart, dayEnd)
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-
 		targetDay := midnight.Add(time.Duration(i*24) * time.Hour)
 		dayLabel := ""
 		if i == 1 {
@@ -554,7 +544,7 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 		timeline[i] = FlashcardDuePoint{
 			Date:      targetDay.Format(dateFormatYYYYMMDD),
 			DayLabel:  dayLabel,
-			CardCount: count,
+			CardCount: counts[i],
 		}
 	}
 

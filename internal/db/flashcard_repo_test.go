@@ -345,3 +345,57 @@ func TestSuspendFlashcardTxIdempotentAndTypeScan(t *testing.T) {
 	}
 }
 
+func TestQueryDueReviewCardsTimeline(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-timeline"
+	if err := testRepo.EnsureTopic(topicID, "Timeline Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+
+	baseEndOfToday := int64(100000)
+	err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
+		{ID: "card-t0", TopicID: topicID, Prompt: "Q0", Answer: "A0", DueAt: baseEndOfToday - 100, Suspended: false},
+		{ID: "card-t1", TopicID: topicID, Prompt: "Q1", Answer: "A1", DueAt: baseEndOfToday + 3600, Suspended: false},
+		{ID: "card-t2", TopicID: topicID, Prompt: "Q2", Answer: "A2", DueAt: baseEndOfToday + 86400 + 3600, Suspended: false},
+		{ID: "card-t3", TopicID: topicID, Prompt: "Q3", Answer: "A3", DueAt: baseEndOfToday + 4*86400 + 3600, Suspended: false},
+	}, map[string]models.FlashcardState{
+		"card-t0": {},
+		"card-t1": {},
+		"card-t2": {},
+		"card-t3": {},
+	})
+	if err != nil {
+		t.Fatalf("CreateFlashcards failed: %v", err)
+	}
+
+	counts, err := testRepo.QueryDueReviewCardsTimeline(baseEndOfToday)
+	if err != nil {
+		t.Fatalf("QueryDueReviewCardsTimeline failed: %v", err)
+	}
+	if len(counts) != 7 {
+		t.Fatalf("expected 7 counts, got %d", len(counts))
+	}
+	if counts[0] != 1 { // Day 0
+		t.Errorf("expected Day 0 count=1, got %d", counts[0])
+	}
+	if counts[1] != 1 { // Day 1
+		t.Errorf("expected Day 1 count=1, got %d", counts[1])
+	}
+	if counts[2] != 1 { // Day 2
+		t.Errorf("expected Day 2 count=1, got %d", counts[2])
+	}
+	if counts[3] != 0 { // Day 3
+		t.Errorf("expected Day 3 count=0, got %d", counts[3])
+	}
+	if counts[4] != 0 { // Day 4
+		t.Errorf("expected Day 4 count=0, got %d", counts[4])
+	}
+	if counts[5] != 1 { // Day 5
+		t.Errorf("expected Day 5 count=1, got %d", counts[5])
+	}
+	if counts[6] != 0 { // Day 6
+		t.Errorf("expected Day 6 count=0, got %d", counts[6])
+	}
+}
+

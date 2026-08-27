@@ -23,7 +23,7 @@
       v-if="pendingIngestionBook"
       variant="warning"
       icon="⚡"
-      title="New Assignment — Ingestion Needed"
+      :title="pendingIngestionBannerTitle"
       :subtitle="`${pendingIngestionBook.title} is ready for chapter extraction and ingestion.`"
       action-label="✨ Ingest Book"
       @action="goToIngestBook(pendingIngestionBook.id)"
@@ -257,6 +257,7 @@ const streakState = ref({
   longest_streak: 0,
   active_dates: [],
   today_completed: false,
+  completed_today: 0,
 })
 const streakError = ref('')
 
@@ -327,13 +328,17 @@ const hasSocraticRescueTask = computed(() => {
 // ponytail: pending ingestion notification state
 const pendingIngestionBook = ref(null)
 
+const pendingIngestionBannerTitle = computed(() => {
+  const isCloud = Boolean(userSettings.value?.classroom_code)
+  return isCloud ? 'New Assignment — Ingestion Needed' : 'New Book — Ingestion Needed'
+})
+
 function goToIngestBook(notebookId) {
   router.push({ path: '/notebooks', query: { ingest: notebookId } })
 }
 
 const completedSessionsToday = computed(() => {
-  const todayKey = `study_completed_${new Date().toISOString().slice(0, 10)}`
-  return Number(localStorage.getItem(todayKey)) || 0
+  return Number(streakState.value?.completed_today) || 0
 })
 
 // --- Lifecycle ---

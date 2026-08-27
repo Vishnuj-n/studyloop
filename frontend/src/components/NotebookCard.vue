@@ -22,7 +22,7 @@
     </div>
 
     <div v-if="needsIngestion" class="notebook-topic">
-      <span class="badge new-assignment-badge">⚡ New Assignment — Ingestion Needed</span>
+      <span class="badge new-assignment-badge">{{ ingestionBadgeLabel }}</span>
     </div>
     <div
       v-else-if="notebook.topic_id"
@@ -143,6 +143,12 @@ const needsIngestion = computed(() => {
       props.notebook.status === 'draft_ready' ||
       !props.notebook.status)
   )
+})
+
+const ingestionBadgeLabel = computed(() => {
+  return props.isCloudProfile
+    ? '⚡ New Assignment — Ingestion Needed'
+    : '⚡ Ingestion Needed'
 })
 
 const variantClass = computed(() =>
