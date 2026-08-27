@@ -18,7 +18,11 @@
 ## Development Stage Rules
 - **No Hardcoded Fallbacks (Fail Fast)**: Always use user-configured or database-persisted settings dynamically. Do not hardcode limits, credentials, model parameters, or configuration values. If a required setting, dependency, or configuration is missing or invalid, fail fast and return an explicit error ("if it breaks, let it break") rather than silently falling back to magic hardcoded defaults.
 - **No Backward Compatibility Required**: Active development. Do not add legacy database table adapters, column fallback checks, or migration repair loops. Keep schemas clean and lean.
-- **Code Integrity**: Windows builds use `extension_nocgo.go` (no CGO). `go test ./internal/...` must pass.
+- **Code Integrity & Fast Test Workflow**:
+  - Windows builds use `extension_nocgo.go` (no CGO).
+  - Use `go test -run=^$ ./internal/...` for instant compilation & type-checking without test execution.
+  - Use `go test -short ./internal/...` for rapid (<2s) whole-repo unit test verification during development.
+  - Full `go test ./internal/...` must pass before final commits and PR merges.
 
 ---
 

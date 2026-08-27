@@ -26,6 +26,9 @@ var testRepo *db.Repository
 
 func initTestDB(t *testing.T) {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	tempDB := filepath.Join(t.TempDir(), "studyloop-test.db")
 	repo, err := db.Init(tempDB, "")
 	if err != nil {
@@ -45,6 +48,9 @@ func initTestDB(t *testing.T) {
 
 func initCleanTestDB(t *testing.T) {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	tempDB := filepath.Join(t.TempDir(), "studyloop-test.db")
 	repo, err := db.Init(tempDB, "")
 	if err != nil {
