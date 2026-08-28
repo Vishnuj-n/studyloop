@@ -7,7 +7,7 @@ import "strings"
 var officialExtensionTiers = map[string]string{
 	"text_simplifier":  "free",
 	"audio_overview":   "pro",
-	"youtube":          "pro",
+	"youtube":          "free",
 	"deep_pdf":         "pro",
 	"reading_simplify": "free",
 }
