@@ -43,6 +43,7 @@
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
           :is-pro="isPro"
+          :extraction-progress="extractionProgressMap[notebook.id]"
           variant="active"
           @edit-syllabus="openSyllabusDraft"
           @upgrade-deep="handleUpgradeToDeepPDF"
@@ -83,6 +84,7 @@
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
           :is-pro="isPro"
+          :extraction-progress="extractionProgressMap[notebook.id]"
           variant="dormant"
           :active-limit-reached="activeNotebooks.length >= 4"
           @edit-syllabus="openSyllabusDraft"
@@ -300,9 +302,21 @@ function clearActionToastTimer() {
   }
 }
 
+const extractionProgressMap = ref({})
+
 function handleIngestionProgress(payload) {
   if (!payload) {
     return
+  }
+
+  // Live deep extraction progress on card
+  if (payload.notebook_id && payload.phase === 'extraction') {
+    extractionProgressMap.value[payload.notebook_id] = {
+      percent: typeof payload.percent === 'number' ? payload.percent : 0,
+      message: payload.message || '',
+      processed: payload.processed || 0,
+      total: payload.total || 0,
+    }
   }
 
   // Handle upload dropzone progress only for active new file uploads
@@ -443,7 +457,9 @@ async function handleUpgradeToDeepPDF(notebookID) {
       showActionToast.value = false
     }, 5000)
   } catch (error) {
-    uploadError.value = `Upgrade failed: ${error.message}`
+    const msg = error instanceof Error ? error.message : String(error)
+    uploadError.value = `Upgrade failed: ${msg}`
+    showToast(`⚠️ Upgrade failed: ${msg}`)
   }
 }
 

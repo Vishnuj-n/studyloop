@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"ai-tutor/internal/extension"
 )
@@ -71,9 +70,8 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 	}
 
 	if ctx == nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+		// ponytail: no artificial timeout ceiling
+		ctx = context.Background()
 	}
 
 	var res DeepPDFIngestResult

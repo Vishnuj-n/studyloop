@@ -63,10 +63,10 @@
         v-if="isProcessing"
         class="btn-processing"
         disabled
-        title="Deep extraction in progress..."
+        :title="progressLabel"
       >
         <span class="spinner-small"></span>
-        Deep Extracting...
+        {{ progressLabel }}
       </button>
       <button
         v-else-if="notebook.status === 'draft_ready'"
@@ -133,6 +133,7 @@ const props = defineProps({
   ragNotebookChapter: { type: Boolean, default: true },
   isCloudProfile: { type: Boolean, default: false },
   isPro: { type: Boolean, default: false },
+  extractionProgress: { type: Object, default: () => null },
   variant: {
     type: String,
     default: 'dormant',
@@ -172,6 +173,17 @@ const needsIngestion = computed(() => {
 })
 
 const isProcessing = computed(() => props.notebook.status === 'processing')
+
+const progressLabel = computed(() => {
+  const prog = props.extractionProgress
+  if (prog && typeof prog.percent === 'number' && prog.total > 0) {
+    return `Extracting ${prog.percent}% (${prog.processed}/${prog.total} pgs)`
+  }
+  if (prog && typeof prog.percent === 'number' && prog.percent > 0) {
+    return `Extracting ${prog.percent}%...`
+  }
+  return 'Deep Extracting...'
+})
 
 const canUpgradeDeep = computed(() => {
   return (

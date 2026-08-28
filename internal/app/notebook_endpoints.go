@@ -169,8 +169,8 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 
 	// Run deep extraction asynchronously in background — zero main thread blocking
 	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
+		ctx := context.Background()
 
 		doc, result, extErr := a.notebookService.IngestDeepPDF(ctx, filePath, a.extRunner, extObj)
 		if extErr != nil {
@@ -1117,11 +1117,15 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		Percent:    10,
 	})
 
+	prevStatus := nb.Status
+	prevStudyStatus := nb.StudyStatus
+
 	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
+		ctx := context.Background()
 
 		onProgress := func(processed, total, percent int, message string) {
+			utils.Infof("[DEEP_PDF] %s (%s): %s (%d%%)", fileName, nbID, message, percent)
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
 				Status:     "processing",
@@ -1136,10 +1140,15 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
 		if extErr != nil {
 			utils.Warnf("[DEEP_PDF] Upgrade failed for %s (%s): %v", fileName, nbID, extErr)
-			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			fallbackStatus := "failed"
+			if nb.ChunkCount > 0 {
+				fallbackStatus = prevStatus
+			}
+			_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
+			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
-				Status:     "failed",
+				Status:     fallbackStatus,
 				Message:    fmt.Sprintf("Deep PDF extraction failed: %v", extErr),
 			})
 			return
