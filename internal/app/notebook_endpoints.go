@@ -1196,10 +1196,11 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist upgraded syllabus draft for %s (%s): %v", fileName, nbID, err)
-			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
+			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
-				Status:     "failed",
+				Status:     prevStatus,
 				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
 			})
 			return

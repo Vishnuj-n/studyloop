@@ -218,11 +218,13 @@ function goToUpdatePage() {
   openRepoURL()
 }
 
+let cancelIngestionListener = null
+
 onMounted(() => {
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
-  EventsOn('ingestion-progress', handleGlobalIngestionProgress)
+  cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
 })
 
 onUnmounted(() => {
@@ -231,7 +233,7 @@ onUnmounted(() => {
     schedulerTimeout = null
   }
   window.removeEventListener('settings-updated', syncScheduler)
-  EventsOff('ingestion-progress')
+  if (cancelIngestionListener) cancelIngestionListener()
 })
 </script>
 

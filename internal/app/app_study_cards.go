@@ -540,12 +540,15 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
 
-	_, _ = a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+	if _, completeErr := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
 		TaskID:    taskID,
 		Event:     studypkg.EventCompleteFlashcards,
 		TopicID:   topicID,
 		CardCount: cardCount,
-	})
+	}); completeErr != nil {
+		utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_completion_failed taskID=%s reason=%v", taskID, completeErr)
+		return map[string]interface{}{"error": "failed to complete flashcard task: " + completeErr.Error()}
+	}
 	utils.Infof("[FLASHCARD_PIPELINE] retry_flashcard_generation_completed taskID=%s topicID=%s cardsScheduled=%d", taskID, topicID, cardCount)
 
 	return map[string]interface{}{

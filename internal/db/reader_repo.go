@@ -624,24 +624,34 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 	}
 
 	if bundle.NotebookID != "" {
-		if sec, err := fetchSections("WHERE c.topic_id = ?", topicID); err == nil && len(sec) > 0 {
+		sec, err := fetchSections("WHERE c.topic_id = ?", topicID)
+		if err != nil {
+			return bundle, err
+		}
+		if len(sec) > 0 {
 			bundle.Sections = sec
 		} else if bundle.TopicStartPage > 0 && bundle.TopicEndPage >= bundle.TopicStartPage {
 			// Fallback 1: Page range match if no sections match topic_id exactly
-			if sec, err := fetchSections("WHERE nc.page_num >= ? AND nc.page_num <= ?", bundle.TopicStartPage, bundle.TopicEndPage); err == nil && len(sec) > 0 {
+			if sec, err := fetchSections("WHERE nc.page_num >= ? AND nc.page_num <= ?", bundle.TopicStartPage, bundle.TopicEndPage); err != nil {
+				return bundle, err
+			} else if len(sec) > 0 {
 				bundle.Sections = sec
 			}
 		}
 		// Fallback 2: All chunks in notebook if still 0 sections
 		if len(bundle.Sections) == 0 {
-			if sec, err := fetchSections(""); err == nil {
+			if sec, err := fetchSections(""); err != nil {
+				return bundle, err
+			} else {
 				bundle.Sections = sec
 			}
 		}
 	} else {
-		if sec, err := fetchSections("WHERE c.topic_id = ?", topicID); err == nil {
-			bundle.Sections = sec
+		sec, err := fetchSections("WHERE c.topic_id = ?", topicID)
+		if err != nil {
+			return bundle, err
 		}
+		bundle.Sections = sec
 	}
 
 	// For text, markdown, and youtube files, load raw content directly from disk for instant rendering

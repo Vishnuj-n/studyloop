@@ -213,6 +213,8 @@ def main():
     parser.add_argument("--pages", type=int, default=30, help="Number of pages to parse and sweep")
     parser.add_argument("--batch-size", type=int, default=4, help="Inference batch size")
     args = parser.parse_args()
+    if args.batch_size <= 0:
+        parser.error(f"--batch-size must be a positive integer, got {args.batch_size}")
 
     benchmark_chunk_sweep(pdf_path=args.pdf, max_pages=args.pages, batch_size=args.batch_size)
 

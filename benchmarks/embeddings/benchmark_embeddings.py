@@ -32,11 +32,13 @@ def load_chunks_from_sqlite(db_path: str, limit: Optional[int] = None, task_pref
 
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    query = "SELECT chunk_text FROM chunks WHERE chunk_text IS NOT NULL AND trim(chunk_text) != ''"
+    query = "SELECT chunk_text FROM chunks WHERE chunk_text IS NOT NULL AND trim(chunk_text) != '' ORDER BY page_num ASC, id ASC"
+    params: tuple = ()
     if limit and limit > 0:
-        query += f" LIMIT {limit}"
-    
-    cur.execute(query)
+        query += " LIMIT ?"
+        params = (limit,)
+
+    cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
 

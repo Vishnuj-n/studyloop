@@ -625,7 +625,7 @@ func (r *Repository) GetReviewLogsSince(since int64) ([]models.FSRSReviewLog, er
 		SELECT id, topic_id, activity_type, reference_id, reviewed_at, rating, scheduled_days, state_before_json, state_after_json
 		FROM fsrs_review_log
 		WHERE reviewed_at > ?
-		ORDER BY reviewed_at ASC
+		ORDER BY reviewed_at ASC, id ASC
 	`, since)
 	if err != nil {
 		return nil, err
@@ -671,7 +671,7 @@ func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64) ([]models.SyncL
 		LEFT JOIN notebook_chunks nc ON nc.chunk_id = f.source_chunk_id
 		LEFT JOIN notebooks n ON n.id = nc.notebook_id
 		WHERE r.reviewed_at > ?
-		ORDER BY r.reviewed_at ASC
+		ORDER BY r.reviewed_at ASC, r.id ASC
 	`, since)
 	if err != nil {
 		return nil, err

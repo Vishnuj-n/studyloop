@@ -11,7 +11,7 @@ import (
 
 // scaledQuizQuestionCount returns the target question count for a quiz session.
 // ponytail: default to 8 questions per reading session
-func scaledQuizQuestionCount(wordCount int) int {
+func scaledQuizQuestionCount(_ int) int {
 	return 8
 }
 
