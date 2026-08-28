@@ -851,3 +851,138 @@ func (r *Repository) RevertTaskReservation(taskID string) error {
 
 	return tx.Commit()
 }
+
+// GetRereadAttemptCount returns the retry/reread count for a given topic.
+func (r *Repository) GetRereadAttemptCount(topicID string) (int, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return 0, fmt.Errorf("topic id is required")
+	}
+
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COALESCE(attempt_count, 0)
+		FROM reread_attempts
+		WHERE topic_id = ?
+	`, topicID).Scan(&count)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// IncrementRereadAttemptCountTx increments the retry/reread count for a topic within a transaction.
+func (r *Repository) IncrementRereadAttemptCountTx(tx *sql.Tx, topicID string) (int, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return 0, fmt.Errorf("topic id is required")
+	}
+
+	var count int
+	if err := tx.QueryRow(`
+		INSERT INTO reread_attempts (topic_id, attempt_count, last_attempt_at)
+		VALUES (?, 1, CURRENT_TIMESTAMP)
+		ON CONFLICT(topic_id) DO UPDATE
+		SET attempt_count = reread_attempts.attempt_count + 1,
+		    last_attempt_at = CURRENT_TIMESTAMP
+		RETURNING attempt_count
+	`, topicID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// ResetRereadAttemptCountTx resets the retry/reread count for a topic within a transaction.
+func (r *Repository) ResetRereadAttemptCountTx(tx *sql.Tx, topicID string) error {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return fmt.Errorf("topic id is required")
+	}
+
+	_, err := tx.Exec(`
+		INSERT INTO reread_attempts (topic_id, attempt_count, last_attempt_at)
+		VALUES (?, 0, CURRENT_TIMESTAMP)
+		ON CONFLICT(topic_id) DO UPDATE
+		SET attempt_count = 0,
+		    last_attempt_at = CURRENT_TIMESTAMP
+	`, topicID)
+	return err
+}
+
+type QuizAttemptWithPayload struct {
+	ID           string
+	Score        int
+	Passed       bool
+	AnswersJSON  string
+	CompletedAt  int64
+	QuizPayload  string
+	PassingScore int
+}
+
+func scanQuizAttemptsWithPayload(rows *sql.Rows) ([]QuizAttemptWithPayload, error) {
+	var attempts []QuizAttemptWithPayload
+	for rows.Next() {
+		var attempt QuizAttemptWithPayload
+		if err := rows.Scan(
+			&attempt.ID,
+			&attempt.Score,
+			&attempt.Passed,
+			&attempt.AnswersJSON,
+			&attempt.CompletedAt,
+			&attempt.QuizPayload,
+		); err != nil {
+			return nil, err
+		}
+
+		var payload models.QuizTaskPayload
+		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
+			attempt.PassingScore = payload.PassingScore
+		} else {
+			attempt.PassingScore = 70
+		}
+
+		attempts = append(attempts, attempt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attempts, nil
+}
+
+// readActiveProfileID fetches only the active_profile_id from user_settings.
+func (r *Repository) readActiveProfileID() (string, error) {
+	var activeProfileID sql.NullString
+	if err := r.db.QueryRow(`
+		SELECT COALESCE(active_profile_id, '') FROM user_settings WHERE id = 1
+	`).Scan(&activeProfileID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("reading user_settings: %w", err)
+	}
+	if activeProfileID.Valid {
+		return activeProfileID.String, nil
+	}
+	return "", nil
+}
+
+// assignTaskTitle sets task.Title based on task type and available topic/notebook titles.
+func assignTaskTitle(task *models.StudyQueueTask, topicTitle, notebookTitle string) {
+	if task.TaskType == models.StudyTaskTypeFlashcardReview {
+		task.Title = notebookTitle
+	} else if topicTitle != "" {
+		task.Title = topicTitle
+	} else if notebookTitle != "" {
+		task.Title = notebookTitle
+	} else {
+		task.Title = "Task"
+	}
+}
+
+func parseSQLiteTimestamp(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if t, err := time.ParseInLocation("2006-01-02 15:04:05", s, time.UTC); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
+}
