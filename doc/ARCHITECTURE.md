@@ -631,6 +631,19 @@ Student fails quiz twice on same topic → guided rescue flow:
 - `study_queue.task_type` accepts `SOCRATIC_REMEDIAL`
 - Re-quiz tasks include `"source": "socratic_rescue_requiz"` in payload for identification
 
+### Unified Queue Transition Router
+All study queue task transitions and completions are strictly routed through `StudyService.TransitionTask` in `internal/study/queue_transition.go` as the single switchboard:
+
+| Event | Source Task | Target / Result | Pipeline Actions |
+| :--- | :--- | :--- | :--- |
+| `COMPLETE_READING` | `READING` / `REREAD` | `QUIZ` (Pending) | Generates quiz questions and transitions task |
+| `SUBMIT_QUIZ` | `QUIZ` | `QuizResult` | Evaluates attempt, schedules reread/rescue/re-quiz/cards |
+| `COMPLETE_FLASHCARDS`| `FLASHCARD_GENERATE` | Terminal | Clears pending flashcard sync generation tasks |
+| `COMPLETE_FLASHCARD_REVIEW` | `FLASHCARD_REVIEW` | `COMPLETED` | Verifies zero remaining due cards and completes review session |
+| `COMPLETE_SOCRATIC_RESCUE` | `SOCRATIC_REMEDIAL` | `QUIZ` (Re-quiz) | Completes rescue session & inserts follow-up re-quiz |
+| `COMPLETE_MILESTONE_EXAM` | `MILESTONE_EXAM` | `COMPLETED` | Finalizes active milestone exam |
+| `FAIL_TASK` | Any | `FAILED` | Transactionally marks task status as failed |
+
 ### FLASHCARD_GENERATE Task
 
 Cloud sync operations use dedicated `FLASHCARD_GENERATE` task type:

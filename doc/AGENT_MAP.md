@@ -253,11 +253,13 @@ func SubmitAssessment(blockID string, answers []Answer) (*AssessmentResult, erro
 
 **API:**
 ```go
-func (s *StudyService) CompleteSocraticRescue(taskID string) error
+func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest) (TransitionResult, error)
+// Event: EventCompleteSocraticRescue ("COMPLETE_SOCRATIC_RESCUE")
 ```
 
 **Backend behavior:**
 - Validates task is SOCRATIC_REMEDIAL + ACTIVE
+- Routes through `TransitionTask(EventCompleteSocraticRescue)` switchboard
 - Marks task COMPLETED
 - Inserts fresh QUIZ task for same topic with `source: "socratic_rescue_requiz"` in payload
 - Transactional — both complete + insert happen atomically

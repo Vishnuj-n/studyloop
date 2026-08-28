@@ -15,26 +15,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// CompleteMilestoneExam completes an active MILESTONE_EXAM task.
+// CompleteMilestoneExam completes an active MILESTONE_EXAM task via Unified Transition Router.
 // ponytail: simplest way to complete milestone task with no flashcard generation.
 func (a *App) CompleteMilestoneExam(taskID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
+	if a.studyService == nil {
+		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return map[string]interface{}{"error": "task ID is required"}
-	}
-	task, err := repo.GetTaskByID(taskID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	if task.TaskType != models.StudyTaskTypeMilestoneExam {
-		return map[string]interface{}{"error": "task is not a MILESTONE_EXAM task"}
-	}
-	err = repo.CompleteTask(taskID, models.CompletionResult{
-		Status: models.StudyTaskStatusCompleted,
+	_, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID: taskID,
+		Event:  studypkg.EventCompleteMilestoneExam,
 	})
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
@@ -336,6 +325,7 @@ func (a *App) RecordCardReview(taskID, cardID string, rating int) map[string]int
 	return map[string]interface{}{"ok": true, "remaining": remaining}
 }
 
+// CompleteReviewSession finalizes an active review task and marks it completed via Unified Transition Router.
 func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -343,7 +333,11 @@ func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	if err := a.studyService.CompleteReviewSession(taskID); err != nil {
+	_, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID: taskID,
+		Event:  studypkg.EventCompleteFlashcardReview,
+	})
+	if err != nil {
 		return mapTaskError(err)
 	}
 	return map[string]interface{}{"ok": true}
@@ -386,16 +380,19 @@ func (a *App) ScoreShortAnswer(questionID, userAnswer string) map[string]interfa
 	return a.studyService.ScoreShortAnswer(questionID, userAnswer)
 }
 
-// CompleteSocraticRescue completes the socratic rescue session and inserts a re-quiz.
+// CompleteSocraticRescue completes the socratic rescue session and inserts a re-quiz via Unified Transition Router.
 func (a *App) CompleteSocraticRescue(taskID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	quizTaskID, err := a.studyService.CompleteSocraticRescue(taskID)
+	res, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID: taskID,
+		Event:  studypkg.EventCompleteSocraticRescue,
+	})
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"ok": true, "quiz_task_id": quizTaskID}
+	return map[string]interface{}{"ok": true, "quiz_task_id": res.NextTaskID}
 }
 
 // DevForceSocraticRescue forces a topic into the SOCRATIC_REMEDIAL queue task state.

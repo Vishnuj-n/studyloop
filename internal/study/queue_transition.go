@@ -2,21 +2,27 @@ package study
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 // TransitionEvent represents a deterministic queue transition trigger.
 type TransitionEvent string
 
 const (
-	EventCompleteReading    TransitionEvent = "COMPLETE_READING"
-	EventSubmitQuiz         TransitionEvent = "SUBMIT_QUIZ"
-	EventCompleteFlashcards TransitionEvent = "COMPLETE_FLASHCARDS"
-	EventFailTask           TransitionEvent = "FAIL_TASK"
+	EventCompleteReading          TransitionEvent = "COMPLETE_READING"
+	EventSubmitQuiz               TransitionEvent = "SUBMIT_QUIZ"
+	EventCompleteFlashcards        TransitionEvent = "COMPLETE_FLASHCARDS"
+	EventCompleteFlashcardReview  TransitionEvent = "COMPLETE_FLASHCARD_REVIEW"
+	EventCompleteSocraticRescue   TransitionEvent = "COMPLETE_SOCRATIC_RESCUE"
+	EventCompleteMilestoneExam    TransitionEvent = "COMPLETE_MILESTONE_EXAM"
+	EventFailTask                 TransitionEvent = "FAIL_TASK"
 )
 
 // TransitionRequest encapsulates parameters for a queue task transition.
@@ -89,6 +95,112 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			Success:        true,
 			TaskID:         req.TaskID,
 			CardsScheduled: req.CardCount,
+		}, nil
+
+	case EventCompleteFlashcardReview:
+		if err := s.repo.CompleteReviewSession(req.TaskID); err != nil {
+			return TransitionResult{}, err
+		}
+		return TransitionResult{
+			Success: true,
+			TaskID:  req.TaskID,
+		}, nil
+
+	case EventCompleteMilestoneExam:
+		task, err := s.repo.GetTaskByID(req.TaskID)
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to load milestone exam task: %w", err)
+		}
+		if task.TaskType != models.StudyTaskTypeMilestoneExam {
+			return TransitionResult{}, fmt.Errorf("task %s is not a MILESTONE_EXAM task", req.TaskID)
+		}
+		if err := s.repo.CompleteTask(req.TaskID, models.CompletionResult{
+			Status: models.StudyTaskStatusCompleted,
+		}); err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to complete milestone exam: %w", err)
+		}
+		return TransitionResult{
+			Success: true,
+			TaskID:  req.TaskID,
+		}, nil
+
+	case EventCompleteSocraticRescue:
+		task, err := s.repo.GetTaskByID(req.TaskID)
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to load socratic task: %w", err)
+		}
+		if task.TaskType != models.StudyTaskTypeSocraticRemedial {
+			return TransitionResult{}, fmt.Errorf("task %s is not SOCRATIC_REMEDIAL", req.TaskID)
+		}
+		if task.Status != models.StudyTaskStatusActive {
+			return TransitionResult{}, fmt.Errorf("task %s is not ACTIVE (status=%s)", req.TaskID, task.Status)
+		}
+
+		chunks, err := s.repo.GetChunksForTopicPageRange(task.TopicID, task.StartPage, task.EndPage)
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to load chunks for socratic task: %w", err)
+		}
+
+		chunkIDs := make([]string, 0, len(chunks))
+		chunkTextByID := make(map[string]string, len(chunks))
+		for _, chunk := range chunks {
+			chunkIDs = append(chunkIDs, chunk.ID)
+			chunkTextByID[chunk.ID] = chunk.Text
+		}
+
+		generatedQuiz, err := s.GenerateQuizSync(task.TopicID, chunkIDs, chunkTextByID)
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to generate quiz: %w", err)
+		}
+
+		tx, err := s.repo.Begin()
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		quizTaskID := uuid.NewString()
+		quizPayload, err := json.Marshal(map[string]interface{}{
+			"source":        "socratic_rescue_requiz",
+			"topic_id":      task.TopicID,
+			"questions":     generatedQuiz.Questions,
+			"passing_score": generatedQuiz.PassingScore,
+		})
+		if err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to marshal quiz payload: %w", err)
+		}
+
+		followUps := []models.StudyQueueTask{
+			{
+				ID:          quizTaskID,
+				NotebookID:  task.NotebookID,
+				TopicID:     task.TopicID,
+				TaskType:    models.StudyTaskTypeQuiz,
+				Status:      models.StudyTaskStatusPending,
+				Priority:    0,
+				PayloadJSON: string(quizPayload),
+				StartPage:   task.StartPage,
+				EndPage:     task.EndPage,
+			},
+		}
+
+		if err := s.repo.CompleteTaskTx(tx, req.TaskID, models.CompletionResult{
+			Status:    models.StudyTaskStatusCompleted,
+			FollowUps: followUps,
+		}); err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to complete socratic task: %w", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return TransitionResult{}, fmt.Errorf("failed to commit socratic rescue completion: %w", err)
+		}
+
+		utils.Warnf("[SOCRATIC_RESCUE] rescue_completed taskID=%s topicID=%s requizTaskID=%s", req.TaskID, task.TopicID, quizTaskID)
+		return TransitionResult{
+			Success:      true,
+			TaskID:       req.TaskID,
+			NextTaskID:   quizTaskID,
+			NextTaskType: string(models.StudyTaskTypeQuiz),
 		}, nil
 
 	case EventFailTask:

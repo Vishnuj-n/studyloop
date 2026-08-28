@@ -133,13 +133,7 @@ func (s *StudyService) RecordCardReview(taskID, cardID string, rating int) (int,
 	})
 }
 
-func (s *StudyService) CompleteReviewSession(taskID string) error {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return fmt.Errorf("task ID is required")
-	}
-	return s.repo.CompleteReviewSession(taskID)
-}
+
 
 // SuspendFlashcard marks a card as suspended, removing it from future reviews.
 // Returns the remaining pending card count in the current session.
