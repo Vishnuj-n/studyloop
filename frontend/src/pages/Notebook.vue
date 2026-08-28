@@ -25,6 +25,7 @@
       :upload-error="uploadError"
       :success-message="successMessage"
       @upload-file="uploadFile"
+      @upload-deep-structured="handleDeepStructuredUpload"
       @upload-youtube="uploadYouTube"
     />
 
@@ -141,7 +142,7 @@ import {
   getAvailableTopics,
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
-  uploadFastPDFNotebook as apiUploadFastPDFNotebook,
+  selectAndUploadDeepStructuredPDF,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
@@ -163,7 +164,7 @@ import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import { useDialog } from '../composables/useDialog'
 
-const { confirm: confirmDialog } = useDialog()
+const { confirm: confirmDialog, alert: alertDialog } = useDialog()
 const { isPro } = useClerkAuth()
 const route = useRoute()
 
@@ -328,6 +329,11 @@ function handleIngestionProgress(payload) {
 
   const terminalStates = new Set(['failed', 'chunked', 'indexed', 'draft_ready'])
   if (typeof payload.status === 'string' && terminalStates.has(payload.status)) {
+    if (payload.status === 'draft_ready') {
+      showToast('✨ Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
+    } else if (payload.status === 'failed') {
+      showToast(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
+    }
     void loadNotebooks()
   }
 }
@@ -399,12 +405,33 @@ async function uploadYouTube(url) {
   }
 }
 
-async function uploadFile(file, options = {}) {
+async function handleDeepStructuredUpload() {
   uploadError.value = ''
   successMessage.value = ''
-  ingestionStatusMessage.value = options.engine === 'fast_pdf'
-    ? 'Processing with Deep Structured Markdown parser...'
-    : ''
+  try {
+    const result = await selectAndUploadDeepStructuredPDF(isPro.value)
+    if (result?.canceled) {
+      return
+    }
+    if (result?.error) {
+      throw new Error(result.error)
+    }
+    await loadNotebooks()
+    await alertDialog({
+      title: '⚡ Deep Structure Analysis Started',
+      message: `Deep extraction is running in the background for '${result?.file_name || 'book'}'.\n\nFor large textbooks (100+ pages), this will take several minutes. You can safely continue studying other topics or close this dialog. You will receive an in-app notice as soon as your chapter syllabus is ready.`,
+      confirmText: 'Got it, continue',
+      type: 'info',
+    })
+  } catch (error) {
+    uploadError.value = `Deep extraction failed to start: ${error.message}`
+  }
+}
+
+async function uploadFile(file) {
+  uploadError.value = ''
+  successMessage.value = ''
+  ingestionStatusMessage.value = ''
   ingestionNotebookID.value = ''
   draftError.value = ''
   uploadProgress.value = 10
@@ -428,20 +455,10 @@ async function uploadFile(file, options = {}) {
   }
 
   try {
-    let result
-    if (options.engine === 'fast_pdf') {
-      uploadProgress.value = 5
-      ingestionStatusMessage.value = 'Starting Deep Structured Markdown extraction...'
-
-      const arrayBuffer = await file.arrayBuffer()
-      const bytes = new Uint8Array(arrayBuffer)
-      result = await apiUploadFastPDFNotebook(Array.from(bytes), file.name, isPro.value)
-    } else {
-      const arrayBuffer = await file.arrayBuffer()
-      const bytes = new Uint8Array(arrayBuffer)
-      uploadProgress.value = 50
-      result = await apiUploadNotebook(Array.from(bytes), file.name)
-    }
+    const arrayBuffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuffer)
+    uploadProgress.value = 50
+    const result = await apiUploadNotebook(Array.from(bytes), file.name)
 
     if (result?.error) {
       throw new Error(result.error)
@@ -451,19 +468,14 @@ async function uploadFile(file, options = {}) {
       ingestionNotebookID.value = result.id
     }
 
-    if (options.engine === 'fast_pdf') {
-      showToast(`'${result?.file_name || file.name}' uploaded. Deep extraction running in background...`)
-      await loadNotebooks()
+    if (result?.status === 'chunked') {
+      ingestionStatusMessage.value = 'Chunking complete'
     } else {
-      if (result?.status === 'chunked') {
-        ingestionStatusMessage.value = 'Chunking complete'
-      } else {
-        ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
-      }
-      successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
-      if (result?.id) {
-        await openSyllabusDraft(result.id, result?.file_name || '')
-      }
+      ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
+    }
+    successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
+    if (result?.id) {
+      await openSyllabusDraft(result.id, result?.file_name || '')
     }
 
     uploadProgress.value = 100

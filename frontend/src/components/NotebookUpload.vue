@@ -110,7 +110,7 @@ defineProps({
   successMessage: { type: String, default: '' },
 })
 
-const emit = defineEmits(['upload-file', 'upload-youtube'])
+const emit = defineEmits(['upload-file', 'upload-deep-structured', 'upload-youtube'])
 const { confirm } = useDialog()
 const { isExtensionActive } = useExtensions()
 
@@ -123,16 +123,8 @@ const activeImporters = computed(() => getAvailableImporters(isExtensionActive))
 
 function openImporter(importer) {
   localError.value = ''
-  if (importer.fileType === 'pdf') {
-    const tempInput = document.createElement('input')
-    tempInput.type = 'file'
-    tempInput.accept = '.pdf'
-    tempInput.onchange = (e) => {
-      if (e.target.files?.length) {
-        emit('upload-file', e.target.files[0], { engine: importer.id })
-      }
-    }
-    tempInput.click()
+  if (importer.id === 'deep_pdf') {
+    emit('upload-deep-structured')
     return
   }
   activeModal.value = importer.modalName

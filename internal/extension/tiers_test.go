@@ -46,11 +46,11 @@ func TestGetEffectiveTier(t *testing.T) {
 			expected: "free",
 		},
 		{
-			name: "official fast_pdf returns pro",
+			name: "official deep_pdf returns pro",
 			ext: &Extension{
 				Manifest: Manifest{
-					ID:   "fast_pdf",
-					Tier: "free", // Manifest claim ignored for official extension
+					ID:   "deep_pdf",
+					Tier: "free", // Even if local manifest says free, compiled tier takes precedence
 				},
 			},
 			expected: "pro",

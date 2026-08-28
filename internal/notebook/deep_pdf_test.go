@@ -7,17 +7,17 @@ import (
 	"testing"
 )
 
-func TestIngestFastPDF_MissingFile(t *testing.T) {
+func TestIngestDeepPDF_MissingFile(t *testing.T) {
 	service := NewService(t.TempDir())
-	_, _, err := service.IngestFastPDF(context.Background(), "/non/existent/file.pdf", nil, nil)
+	_, _, err := service.IngestDeepPDF(context.Background(), "/non/existent/file.pdf", nil, nil)
 	if err == nil {
 		t.Fatalf("expected error for non-existent file, got nil")
 	}
 }
 
-func TestIngestFastPDF_EmptyPath(t *testing.T) {
+func TestIngestDeepPDF_EmptyPath(t *testing.T) {
 	service := NewService(t.TempDir())
-	_, _, err := service.IngestFastPDF(context.Background(), "   ", nil, nil)
+	_, _, err := service.IngestDeepPDF(context.Background(), "   ", nil, nil)
 	if err == nil {
 		t.Fatalf("expected error for empty file path, got nil")
 	}

@@ -58,8 +58,9 @@ func (a *App) UploadNotebook(fileData []byte, fileName string) map[string]interf
 	return a.finalizeNotebookUpload(uploadResult)
 }
 
-// UploadFastPDFNotebook handles file bytes upload using the fast_pdf Pro structured markdown parser.
-func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool) map[string]interface{} {
+// SelectAndUploadDeepStructuredPDF opens a native OS file picker and initiates background deep structured PDF extraction.
+// This is zero-copy and instant on desktop without browser DOM file array serialization.
+func (a *App) SelectAndUploadDeepStructuredPDF(isPro bool) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -70,7 +71,7 @@ func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool
 
 	var ext *extension.Extension
 	if a.extManager != nil {
-		ext, _ = a.extManager.Get("fast_pdf")
+		ext, _ = a.extManager.Get("deep_pdf")
 		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
 			return map[string]interface{}{
 				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
@@ -79,15 +80,64 @@ func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool
 		}
 	}
 
-	uploadResult, err := a.notebookService.SaveUploadedFile(fileData, fileName)
+	selectedPath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select PDF for Deep Structured Analysis",
+		Filters: []wailsruntime.FileFilter{
+			{
+				DisplayName: "PDF Files (*.pdf)",
+				Pattern:     "*.pdf",
+			},
+		},
+	})
+	if err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to open file dialog: %v", err)}
+	}
+
+	selectedPath = strings.TrimSpace(selectedPath)
+	if selectedPath == "" {
+		// User canceled the file dialog
+		return map[string]interface{}{"canceled": true}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(selectedPath)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	return a.finalizeFastPDFUpload(uploadResult, ext)
+	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
 }
 
-func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
+// UploadDeepStructuredPDFFromPath imports a local PDF directly by path using the deep_pdf structured markdown parser.
+// This is the optimal zero-copy desktop flow that bypasses IPC array buffering.
+func (a *App) UploadDeepStructuredPDFFromPath(sourcePath string, isPro bool) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if a.notebookService == nil {
+		return map[string]interface{}{"error": "notebook service not initialized"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("deep_pdf")
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+			return map[string]interface{}{
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
+		}
+	}
+
+	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(sourcePath)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
+}
+
+func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -122,9 +172,9 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		doc, result, extErr := a.notebookService.IngestFastPDF(ctx, filePath, a.extRunner, extObj)
+		doc, result, extErr := a.notebookService.IngestDeepPDF(ctx, filePath, a.extRunner, extObj)
 		if extErr != nil {
-			utils.Warnf("[FAST_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
+			utils.Warnf("[DEEP_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
 			_ = repo.UpdateNotebookStatus(nbID, "failed")
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
@@ -135,7 +185,7 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 		}
 
 		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
-			utils.Warnf("[FAST_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
+			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, "failed")
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
@@ -157,7 +207,7 @@ func (a *App) finalizeFastPDFUpload(uploadResult *notebook.UploadResult, ext *ex
 		}
 
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
-			utils.Warnf("[FAST_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
+			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, "failed")
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,

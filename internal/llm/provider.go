@@ -278,8 +278,7 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		},
 	}
 
-	// Debug: write prompt to file for inspection when explicit env var is set
-	if os.Getenv("DEBUG_LLM_PROMPTS") != "" {
+	if os.Getenv("APP_ENV") == "dev" {
 		_ = os.MkdirAll("dev_data/logs", 0755)
 		debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
 			time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)

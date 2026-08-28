@@ -5,10 +5,11 @@ import "strings"
 // officialExtensionTiers defines the compiled authoritative tiers for official extensions.
 // This prevents users from circumventing Pro requirements by editing local manifest.json files.
 var officialExtensionTiers = map[string]string{
-	"text_simplifier": "free",
-	"audio_overview":  "pro",
-	"youtube":         "free",
-	"fast_pdf":        "pro",
+	"text_simplifier":  "free",
+	"audio_overview":   "pro",
+	"youtube":          "pro",
+	"deep_pdf":         "pro",
+	"reading_simplify": "free",
 }
 
 // GetEffectiveTier returns the authoritative tier for an extension.

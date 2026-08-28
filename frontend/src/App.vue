@@ -12,8 +12,9 @@ import {
 } from './services/appApi'
 import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
+import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
-const { toast, hideToast } = useToast()
+const { toast, hideToast, showNotice, showError } = useToast()
 
 const route = useRoute()
 
@@ -26,6 +27,21 @@ const banner = ref({
 })
 
 let schedulerTimeout = null
+
+function handleGlobalIngestionProgress(payload) {
+  if (!payload || typeof payload !== 'object') return
+  if (payload.status === 'draft_ready') {
+    showNotice(
+      '✨ Deep Structured extraction complete! Click the book card or dashboard banner to review your chapter syllabus.',
+      'Extraction Complete'
+    )
+  } else if (payload.status === 'failed') {
+    showError(
+      `Extraction failed: ${payload.message || 'Error parsing PDF'}`,
+      'Extraction Error'
+    )
+  }
+}
 
 // Helper to parse "HH:MM" into a Date object on a given base date
 function parseTime(timeStr, baseDate) {
@@ -206,6 +222,7 @@ onMounted(() => {
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
+  EventsOn('ingestion-progress', handleGlobalIngestionProgress)
 })
 
 onUnmounted(() => {
@@ -214,6 +231,7 @@ onUnmounted(() => {
     schedulerTimeout = null
   }
   window.removeEventListener('settings-updated', syncScheduler)
+  EventsOff('ingestion-progress')
 })
 </script>
 
