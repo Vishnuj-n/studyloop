@@ -207,19 +207,26 @@ func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
 
-	if resolveErr := repo.ResolveFlashcardGenerateTasksForTopic(task.TopicID); resolveErr != nil {
-		utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE tasks: %v", resolveErr)
-		return map[string]interface{}{"error": "failed to resolve FLASHCARD_GENERATE tasks: " + resolveErr.Error()}
+	transitionRes, transitionErr := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID:     taskID,
+		Event:      studypkg.EventCompleteFlashcards,
+		TopicID:    task.TopicID,
+		NotebookID: task.NotebookID,
+		CardCount:  cardCount,
+	})
+	if transitionErr != nil {
+		utils.Warnf("[FLASHCARD_PIPELINE] failed to execute flashcards transition: %v", transitionErr)
+		return map[string]interface{}{"error": "failed to complete transition: " + transitionErr.Error()}
 	}
 
 	checkAndInsertMilestoneExam(repo, task.NotebookID)
 
-	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_generation_completed taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", cardCount)
-	utils.Warnf("[DASHBOARD] dashboard_redirect_after_generation taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", cardCount)
+	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_generation_completed taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", transitionRes.CardsScheduled)
+	utils.Warnf("[DASHBOARD] dashboard_redirect_after_generation taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", transitionRes.CardsScheduled)
 
 	return map[string]interface{}{
 		"review_task_id":    "",
-		"cards_scheduled":   cardCount,
+		"cards_scheduled":   transitionRes.CardsScheduled,
 		"flashcards_gen_ok": true,
 	}
 }

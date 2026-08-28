@@ -91,6 +91,19 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if err := s.repo.ResolveFlashcardGenerateTasksForTopic(req.TopicID); err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete flashcards task: %w", err)
 		}
+
+		// ponytail: seed next reading task for active notebook inside unified transition
+		settings, err := s.repo.GetUserSettings()
+		targetWords := 1500
+		if err == nil && settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+		if req.NotebookID != "" {
+			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(req.NotebookID, targetWords); ensureErr != nil {
+				utils.Warnf("[QUEUE_TRANSITION] failed to seed next reading task for notebook %s: %v", req.NotebookID, ensureErr)
+			}
+		}
+
 		return TransitionResult{
 			Success:        true,
 			TaskID:         req.TaskID,

@@ -172,7 +172,20 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
 		ctx := context.Background()
 
-		doc, result, extErr := a.notebookService.IngestDeepPDF(ctx, filePath, a.extRunner, extObj)
+		onProgress := func(processed, total, percent int, message string) {
+			utils.Infof("[DEEP_PDF] %s (%s): %s (%d%%)", fileName, nbID, message, percent)
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "processing",
+				Message:    message,
+				Phase:      "extraction",
+				Processed:  processed,
+				Total:      total,
+				Percent:    percent,
+			})
+		}
+
+		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
 		if extErr != nil {
 			utils.Warnf("[DEEP_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
 			_ = repo.UpdateNotebookStatus(nbID, "failed")

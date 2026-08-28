@@ -23,10 +23,27 @@ export default defineConfig({
       }
     }
   ],
+  optimizeDeps: {
+    include: [
+      'highlight.js/lib/core',
+      'highlight.js/lib/languages/javascript',
+      'highlight.js/lib/languages/typescript',
+      'highlight.js/lib/languages/python',
+      'highlight.js/lib/languages/go',
+      'highlight.js/lib/languages/java',
+      'highlight.js/lib/languages/cpp',
+      'highlight.js/lib/languages/csharp',
+      'highlight.js/lib/languages/sql',
+      'highlight.js/lib/languages/bash',
+      'highlight.js/lib/languages/json',
+      'highlight.js/lib/languages/xml',
+      'highlight.js/lib/languages/css',
+    ],
+  },
   server: {
     watch: {
-      ignored: ['**/wailsjs/**']
-    }
+      ignored: ['**/wailsjs/**', '**/dev_data/**', '**/*.db*'],
+    },
   },
   build: {
     emptyOutDir: true
