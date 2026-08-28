@@ -282,7 +282,7 @@ const variantClass = computed(() =>
 .new-assignment-badge {
   background: color-mix(in srgb, #3b82f6 18%, var(--surface-container-low));
   color: #60a5fa;
-  border: 1px solid color-mix(in srgb, #3b82f6 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .topic-badge {
@@ -304,7 +304,7 @@ const variantClass = computed(() =>
   text-decoration: none;
   background: color-mix(in srgb, #6366f1 22%, var(--surface-container-low));
   color: #818cf8;
-  border: 1px solid color-mix(in srgb, #6366f1 45%, transparent);
+  border: 1px solid var(--outline-variant);
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
@@ -326,7 +326,7 @@ const variantClass = computed(() =>
 .btn-ingest {
   background: color-mix(in srgb, #3b82f6 20%, var(--surface-container-low));
   color: #60a5fa;
-  border: 1px solid color-mix(in srgb, #3b82f6 40%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -381,7 +381,7 @@ const variantClass = computed(() =>
 .btn-delete {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
@@ -401,7 +401,7 @@ const variantClass = computed(() =>
   border-color: var(--primary);
   box-shadow:
     0 0 0 1px var(--primary),
-    0 4px 12px rgba(0, 0, 0, 0.2);
+    0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .active-icon {
@@ -412,7 +412,7 @@ const variantClass = computed(() =>
 .btn-activate {
   background: color-mix(in srgb, var(--primary) 18%, var(--surface-container-low));
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -434,7 +434,7 @@ const variantClass = computed(() =>
 .btn-sleep {
   background: color-mix(in srgb, #f59e0b 14%, var(--surface-container-low));
   color: #fbbf24;
-  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -451,7 +451,7 @@ const variantClass = computed(() =>
 .btn-upgrade-deep {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.18));
   color: #c4b5fd;
-  border: 1px solid rgba(139, 92, 246, 0.4);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -472,7 +472,7 @@ const variantClass = computed(() =>
   gap: 8px;
   background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -483,7 +483,7 @@ const variantClass = computed(() =>
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 2px solid var(--outline-variant);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

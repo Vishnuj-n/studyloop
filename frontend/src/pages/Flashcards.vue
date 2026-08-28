@@ -649,7 +649,7 @@ async function loadQueueSession(taskID, notebookID = '') {
   gap: 8px;
   padding: 10px 14px;
   background: color-mix(in srgb, var(--primary) 8%, var(--surface-container-lowest));
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 10px;
   font-size: 13px;
   color: var(--on-surface);

@@ -116,7 +116,7 @@ function handleSubmit() {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -132,7 +132,7 @@ function handleSubmit() {
   border-radius: 16px;
   width: 100%;
   max-width: 520px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   animation: slideUp 0.15s ease;
 }
@@ -267,7 +267,7 @@ function handleSubmit() {
 .error-box {
   padding: 10px 14px;
   background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   border-radius: 8px;
   font-size: 13px;

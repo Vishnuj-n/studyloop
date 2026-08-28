@@ -904,7 +904,7 @@ async function updatePriority(notebookId, priority) {
   color: #fff;
   border-radius: 14px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--outline-variant);
 }
 
 .fallback-toast-inner {

@@ -1034,7 +1034,7 @@ label, legend {
 input:not([type='checkbox']):not([type='radio']),
 select {
   background: var(--surface-container-low);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent); /* Spec ghost border */
+  border: 1px solid var(--outline-variant); /* Spec ghost border */
   border-radius: 12px; /* xl: 12px/0.75rem */
   padding: 8px 12px; /* 8px grid friendly - slightly more compact */
   color: var(--on-surface);

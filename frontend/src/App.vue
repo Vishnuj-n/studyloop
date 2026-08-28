@@ -342,7 +342,7 @@ onUnmounted(() => {
 }
 
 .content-shell::-webkit-scrollbar-thumb:hover {
-  background: var(--outline-variant, rgba(0, 0, 0, 0.3));
+  background: var(--outline-variant, rgba(0, 0, 0, 0.12));
 }
 
 /* ── Global study reminder banner ── */
@@ -353,10 +353,10 @@ onUnmounted(() => {
   transform: translateX(-50%);
   z-index: 9999;
   background: var(--card-bg, rgba(30, 41, 59, 0.95));
-  border: 1px solid var(--accent, #4f46e5);
+  border: 1px solid var(--outline-variant);
   box-shadow:
-    0 10px 25px -5px rgba(0, 0, 0, 0.3),
-    0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    0 10px 25px -5px rgba(0, 0, 0, 0.12),
+    0 8px 10px -6px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(12px);
   border-radius: 12px;
   padding: 14px 20px;
@@ -435,7 +435,7 @@ onUnmounted(() => {
 .banner-btn.secondary {
   background: transparent;
   color: var(--text-muted, #94a3b8);
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--outline-variant);
 }
 
 .banner-btn.secondary:hover {
@@ -481,12 +481,12 @@ onUnmounted(() => {
 
 .update-modal {
   background: var(--surface-container-lowest, #0f172a);
-  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 30%, var(--outline-variant));
+  border: 1px solid var(--outline-variant);
   border-radius: 20px;
   padding: 32px;
   max-width: 440px;
   width: 100%;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -541,7 +541,7 @@ onUnmounted(() => {
   background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 10%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .version-badge {
@@ -555,13 +555,13 @@ onUnmounted(() => {
 .version-badge.current {
   background: rgba(239, 68, 68, 0.1);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .version-badge.latest {
   background: rgba(16, 185, 129, 0.1);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .version-arrow {
@@ -604,7 +604,7 @@ onUnmounted(() => {
 .modal-btn.secondary {
   background: transparent;
   color: var(--muted-text, #94a3b8);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .modal-btn.secondary:hover {
@@ -640,7 +640,7 @@ onUnmounted(() => {
   color: #fff;
   border-radius: 14px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--outline-variant);
   transition: transform 0.15s ease;
 }
 

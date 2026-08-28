@@ -71,7 +71,7 @@ defineEmits(['add', 'select', 'edit', 'delete'])
   background: var(--surface-container-lowest);
   border-radius: 16px;
   padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   box-shadow: 0 4px 20px color-mix(in srgb, var(--on-surface) 3%, transparent);
 }
 
@@ -135,7 +135,7 @@ defineEmits(['add', 'select', 'edit', 'delete'])
   font-weight: 700;
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 2px 8px;
   border-radius: 999px;
 }

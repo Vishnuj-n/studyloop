@@ -190,7 +190,7 @@ input[type='url'],
 input[type='password'],
 input[type='number'],
 select {
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
   color: var(--on-surface);
@@ -240,7 +240,7 @@ h2 {
   background: var(--surface-container-lowest);
   border-radius: 16px;
   padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   box-shadow: 0 4px 20px color-mix(in srgb, var(--on-surface) 3%, transparent);
 }
 
@@ -248,7 +248,7 @@ h2 {
   display: grid;
   gap: 16px;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
 }

@@ -88,7 +88,7 @@ defineEmits(['action'])
 /* --- Variant: info (escape hatch) --- */
 .banner--info {
   background: rgba(230, 126, 34, 0.1);
-  border: 1px solid rgba(230, 126, 34, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 .banner--info .banner-icon {
   background: #e67e22;
@@ -100,7 +100,7 @@ defineEmits(['action'])
 /* --- Variant: rescue (socratic rescue) --- */
 .banner--rescue {
   background: rgba(211, 84, 0, 0.1);
-  border: 1px solid rgba(211, 84, 0, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 .banner--rescue .banner-icon {
   background: #d35400;

@@ -414,7 +414,7 @@ function handleFileDrop(e) {
   margin-top: 12px;
   padding: 12px;
   background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   border-radius: 8px;
   font-size: 13.5px;
@@ -424,7 +424,7 @@ function handleFileDrop(e) {
   margin-top: 12px;
   padding: 12px;
   background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #10b981;
   border-radius: 8px;
   font-size: 13.5px;

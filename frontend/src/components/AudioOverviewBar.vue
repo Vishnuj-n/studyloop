@@ -353,7 +353,7 @@ watch(
   z-index: 99;
   background: var(--surface-container-lowest, #141617);
   border-top: 1px solid var(--outline-variant, rgba(235, 219, 178, 0.1));
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
   padding: 10px 18px;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--on-surface, #ebdbb2);
