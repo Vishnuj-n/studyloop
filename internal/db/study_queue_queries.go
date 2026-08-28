@@ -418,17 +418,6 @@ func validateReadingBounds(startPage, endPage int) error {
 	return nil
 }
 
-func (r *Repository) ResolveAndValidateTopicBounds(topicID string, startPage, endPage int) (int, int, error) {
-	resolvedStart, resolvedEnd, err := r.resolveReadingBounds(topicID, startPage, endPage)
-	if err != nil {
-		return 0, 0, err
-	}
-	if err := validateReadingBounds(resolvedStart, resolvedEnd); err != nil {
-		return 0, 0, err
-	}
-	return resolvedStart, resolvedEnd, nil
-}
-
 // GetReadingProgressPage retrieves the current page progress for a task from the topic cursor.
 func (r *Repository) GetReadingProgressPage(taskID string) (int, error) {
 	var currentPage int

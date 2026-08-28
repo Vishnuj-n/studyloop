@@ -863,9 +863,9 @@ func TestGetStreakState_CompletedToday(t *testing.T) {
 	app := newTestApp(t)
 
 	// Initially 0 completed today
-	initialState := app.GetStreakState(0)
+	initialState := app.getStreakState(0)
 	if initialState["error"] != nil {
-		t.Fatalf("GetStreakState failed: %v", initialState["error"])
+		t.Fatalf("getStreakState failed: %v", initialState["error"])
 	}
 	if count, ok := initialState["completed_today"].(int); !ok || count != 0 {
 		t.Fatalf("expected 0 completed_today initially, got %v", initialState["completed_today"])
@@ -890,9 +890,9 @@ func TestGetStreakState_CompletedToday(t *testing.T) {
 		t.Fatalf("CompleteTask failed: %v", err)
 	}
 
-	state := app.GetStreakState(0)
+	state := app.getStreakState(0)
 	if state["error"] != nil {
-		t.Fatalf("GetStreakState failed: %v", state["error"])
+		t.Fatalf("getStreakState failed: %v", state["error"])
 	}
 	if count, ok := state["completed_today"].(int); !ok || count != 1 {
 		t.Fatalf("expected 1 completed_today, got %v", state["completed_today"])

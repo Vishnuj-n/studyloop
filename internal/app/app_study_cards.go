@@ -1,11 +1,11 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
@@ -308,20 +308,11 @@ func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage in
 }
 
 func (a *App) GetReviewSession(taskID string, notebookID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
+	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-
-	if taskID == models.ReviewTaskDailyID {
-		resolvedTaskID, err := materializeSyntheticReviewSession(repo, notebookID)
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-		taskID = resolvedTaskID
 	}
 
 	session, err := a.studyService.GetReviewSession(taskID)
@@ -331,56 +322,12 @@ func (a *App) GetReviewSession(taskID string, notebookID string) map[string]inte
 	return map[string]interface{}{"session": session}
 }
 
-func materializeSyntheticReviewSession(repo *db.Repository, notebookID string) (string, error) {
-	requestedNotebookID := notebookID
-	utils.Warnf("[FLASHCARD_PIPELINE] GetReviewSession materializing synthetic task notebookID=%s", notebookID)
-	if notebookID == "" {
-		resolvedNotebookID, dueCount, err := repo.GetNextDueReviewNotebook(time.Now().Unix())
-		if err != nil {
-			return "", fmt.Errorf("Failed to resolve notebook for review materialization: %w", err)
-		}
-		notebookID = resolvedNotebookID
-		if notebookID != "" {
-			utils.Warnf("[FLASHCARD_PIPELINE] synthetic_review_notebook_selected notebookID=%s dueCards=%d source=review_materialization", notebookID, dueCount)
-		}
-	}
-	utils.Warnf("[FLASHCARD_PIPELINE] review_materialization_notebook_resolution taskID=%s requestedNotebookID=%s resolvedNotebookID=%s", models.ReviewTaskDailyID, requestedNotebookID, notebookID)
-
-	if notebookID == "" {
-		return "", fmt.Errorf("No due cards found for review materialization")
-	}
-
-	task, reused, err := repo.CreateReviewSession(notebookID)
-	if err != nil {
-		return "", fmt.Errorf("Failed to materialize review session: %w", err)
-	}
-	if task == nil {
-		return "", fmt.Errorf("No due cards found for review materialization")
-	}
-	if task.Status == models.StudyTaskStatusPending {
-		if activateErr := repo.ActivateTask(task.ID); activateErr != nil {
-			utils.Warnf("[FLASHCARD_PIPELINE] failed to auto-activate materialized review task taskID=%s: %v", task.ID, activateErr)
-			return "", fmt.Errorf("failed to auto-activate materialized review task taskID=%s: %w", task.ID, activateErr)
-		}
-	}
-	utils.Warnf("[FLASHCARD_PIPELINE] GetReviewSession materialized notebookID=%s taskID=%s reused=%t", notebookID, task.ID, reused)
-	return task.ID, nil
-}
-
 func (a *App) RecordCardReview(taskID, cardID string, rating int) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
+	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-	if taskID == models.ReviewTaskDailyID {
-		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-		taskID = resolvedTaskID
 	}
 	remaining, err := a.studyService.RecordCardReview(taskID, cardID, rating)
 	if err != nil {
@@ -390,19 +337,11 @@ func (a *App) RecordCardReview(taskID, cardID string, rating int) map[string]int
 }
 
 func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
+	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-	if taskID == models.ReviewTaskDailyID {
-		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-		taskID = resolvedTaskID
 	}
 	if err := a.studyService.CompleteReviewSession(taskID); err != nil {
 		return mapTaskError(err)
@@ -411,19 +350,11 @@ func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 }
 
 func (a *App) SuspendFlashcard(taskID, cardID string) map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
+	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
 	}
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-	if taskID == models.ReviewTaskDailyID {
-		resolvedTaskID, err := materializeSyntheticReviewSession(repo, "")
-		if err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-		taskID = resolvedTaskID
 	}
 	remaining, err := a.studyService.SuspendFlashcard(taskID, cardID)
 	if err != nil {
@@ -597,49 +528,20 @@ func (a *App) RetryFlashcardGeneration(taskID string) map[string]interface{} {
 
 	if err != nil {
 		utils.Warnf("[FLASHCARD_PIPELINE] retry_flashcard_generation_failed taskID=%s reason=%v", taskID, err)
-		if task.Status == models.StudyTaskStatusPending {
-			if activateErr := repo.ActivateTask(taskID); activateErr != nil {
-				utils.Warnf("[FLASHCARD_PIPELINE] failed to activate taskID=%s on retry failure: %v", taskID, activateErr)
-				return map[string]interface{}{"error": fmt.Sprintf("failed to generate flashcards: %v; failed to activate task: %v", err, activateErr)}
-			}
-		}
-		if completeErr := repo.CompleteTask(taskID, models.CompletionResult{
-			Status: models.StudyTaskStatusFailed,
-		}); completeErr != nil {
-			utils.Warnf("[FLASHCARD_PIPELINE] failed to mark taskID=%s as FAILED: %v", taskID, completeErr)
-			return map[string]interface{}{"error": fmt.Sprintf("failed to generate flashcards: %v; failed to mark task as FAILED: %v", err, completeErr)}
-		}
+		_, _ = a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+			TaskID:      taskID,
+			Event:       studypkg.EventFailTask,
+			ErrorReason: err.Error(),
+		})
 		return map[string]interface{}{"error": "failed to generate flashcards: " + err.Error()}
 	}
 
-	// On success, activate and complete this specific task
-	if task.Status == models.StudyTaskStatusPending {
-		if activateErr := repo.ActivateTask(taskID); activateErr != nil {
-			utils.Debugf("[FLASHCARD_PIPELINE] activate taskID=%s note=%v", taskID, activateErr)
-			return map[string]interface{}{"error": "failed to activate task: " + activateErr.Error()}
-		}
-	}
-	if completeErr := repo.CompleteTask(taskID, models.CompletionResult{
-		Status: models.StudyTaskStatusCompleted,
-	}); completeErr != nil {
-		utils.Warnf("[FLASHCARD_PIPELINE] failed to mark taskID=%s as COMPLETED: %v", taskID, completeErr)
-		return map[string]interface{}{"error": "failed to mark task as COMPLETED: " + completeErr.Error()}
-	}
-
-	// Also resolve any other pending FLASHCARD_GENERATE tasks for the topic
-	if topicID != "" {
-		if err := repo.ResolveFlashcardGenerateTasksForTopic(topicID); err != nil {
-			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve FLASHCARD_GENERATE tasks for topic %s: %v", topicID, err)
-			return map[string]interface{}{"error": "failed to resolve pending flashcard tasks: " + err.Error()}
-		}
-	}
-	if task.TopicID == "" {
-		if err := repo.ResolveFlashcardGenerateTasksForTopic(""); err != nil {
-			utils.Warnf("[FLASHCARD_PIPELINE] failed to resolve empty topic FLASHCARD_GENERATE tasks: %v", err)
-			return map[string]interface{}{"error": "failed to resolve empty topic pending tasks: " + err.Error()}
-		}
-	}
-
+	_, _ = a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID:    taskID,
+		Event:     studypkg.EventCompleteFlashcards,
+		TopicID:   topicID,
+		CardCount: cardCount,
+	})
 	utils.Infof("[FLASHCARD_PIPELINE] retry_flashcard_generation_completed taskID=%s topicID=%s cardsScheduled=%d", taskID, topicID, cardCount)
 
 	return map[string]interface{}{

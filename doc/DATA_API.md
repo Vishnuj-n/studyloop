@@ -223,13 +223,6 @@ const (
 
 ---
 
-## Dashboard Streak API
-
-### GetStreakState
-Returns current_streak, longest_streak, active_dates[] for calendar widget. Timezone-aware.
-
----
-
 ## Cloud Sync Payload
 
 ```json

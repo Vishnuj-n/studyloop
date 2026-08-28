@@ -333,7 +333,6 @@ func InsertReadingTasks(chunks []Chunk) error
 **API:**
 ```go
 func GetNextTask() (*Task, error)
-func GetStreakState(timezoneOffsetMinutes int) map[string]interface{}
 ```
 
 **Starvation Protection:**

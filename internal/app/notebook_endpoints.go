@@ -58,28 +58,6 @@ func (a *App) UploadNotebook(fileData []byte, fileName string) map[string]interf
 	return a.finalizeNotebookUpload(uploadResult)
 }
 
-// UploadNotebookFromPath stores a local file selected from desktop without bridge byte-array transfer.
-func (a *App) UploadNotebookFromPath(filePath string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{
-			"error": "notebook service not initialized",
-		}
-	}
-
-	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(filePath)
-	if err != nil {
-		return map[string]interface{}{
-			"error": err.Error(),
-		}
-	}
-
-	return a.finalizeNotebookUpload(uploadResult)
-}
-
 // UploadFastPDFNotebook handles file bytes upload using the fast_pdf Pro structured markdown parser.
 func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool) map[string]interface{} {
 	repo := a.getRepo()
@@ -102,35 +80,6 @@ func (a *App) UploadFastPDFNotebook(fileData []byte, fileName string, isPro bool
 	}
 
 	uploadResult, err := a.notebookService.SaveUploadedFile(fileData, fileName)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return a.finalizeFastPDFUpload(uploadResult, ext)
-}
-
-// UploadFastPDFNotebookFromPath handles local file upload using the fast_pdf Pro structured markdown parser.
-func (a *App) UploadFastPDFNotebookFromPath(filePath string, isPro bool) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{"error": "notebook service not initialized"}
-	}
-
-	var ext *extension.Extension
-	if a.extManager != nil {
-		ext, _ = a.extManager.Get("fast_pdf")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
-			return map[string]interface{}{
-				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
-				"requires_pro": true,
-			}
-		}
-	}
-
-	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(filePath)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}

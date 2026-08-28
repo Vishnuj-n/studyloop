@@ -590,4 +590,22 @@ func (r *Repository) MarkTopicCompletedTx(tx *sql.Tx, topicID string) error {
 	return nil
 }
 
-
+// IsTopicFullyReadTx returns true if the topic has a valid end_page and the current_page_cursor reaches or exceeds it.
+func (r *Repository) IsTopicFullyReadTx(tx *sql.Tx, topicID string) (bool, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return false, fmt.Errorf("topic id is required")
+	}
+	var endPage, cursor int
+	err := tx.QueryRow(`
+		SELECT COALESCE(end_page, 0), COALESCE(current_page_cursor, 0)
+		FROM topics WHERE id = ?
+	`, topicID).Scan(&endPage, &cursor)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return endPage > 0 && cursor >= endPage, nil
+}

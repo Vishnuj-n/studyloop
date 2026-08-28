@@ -260,24 +260,20 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 	app := newTestApp(t)
 	_, notebookID := setupReviewTestNotebook(t, "queue-review")
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
+	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
+	if err != nil {
+		t.Fatalf("CreateReviewSession failed: %v", err)
+	}
+
+	sessionResp := app.GetReviewSession(reviewTask.ID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
-		t.Fatalf("GetReviewSession materialization failed: %v", sessionResp["error"])
+		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}
 	session, ok := sessionResp["session"].(*models.ReviewSession)
 	if !ok {
 		t.Fatalf("expected review session pointer, got %#v", sessionResp["session"])
 	}
 	taskID := session.Task.ID
-
-	secondSessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
-	if _, hasErr := secondSessionResp["error"]; hasErr {
-		t.Fatalf("GetReviewSession materialization failed: %v", secondSessionResp["error"])
-	}
-	secondSession, ok := secondSessionResp["session"].(*models.ReviewSession)
-	if !ok || secondSession.Task.ID != taskID {
-		t.Fatalf("expected duplicate prevention to return same task, got %#v", secondSessionResp["session"])
-	}
 
 	if resp := app.ActivateTask(taskID); resp["error"] != nil {
 		t.Fatalf("ActivateTask failed: %#v", resp)
@@ -339,20 +335,18 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 }
 
 func TestGetReviewSessionNoDueCards(t *testing.T) {
-	app := newTestApp(t)
+	_ = newTestApp(t)
 
 	if err := testRepo.CreateNotebook("no-due-nb", "No Due Notebook", "/tmp/no-due.pdf", "pdf", "", "", 15, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "no-due-nb")
-	errVal, hasErr := sessionResp["error"]
-	if !hasErr {
-		t.Fatalf("expected error response when there are no due cards, got: %#v", sessionResp)
+	task, _, err := testRepo.CreateReviewSession("no-due-nb")
+	if err != nil {
+		t.Fatalf("unexpected error from CreateReviewSession: %v", err)
 	}
-	expectedErr := "No due cards found for review materialization"
-	if errVal != expectedErr {
-		t.Fatalf("expected error %q, got %q", expectedErr, errVal)
+	if task != nil {
+		t.Fatalf("expected nil task when there are no due cards, got: %#v", task)
 	}
 }
 
@@ -360,7 +354,12 @@ func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivati
 	app := newTestApp(t)
 	_, notebookID := setupReviewTestNotebook(t, "auto-act")
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
+	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
+	if err != nil {
+		t.Fatalf("CreateReviewSession failed: %v", err)
+	}
+
+	sessionResp := app.GetReviewSession(reviewTask.ID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}

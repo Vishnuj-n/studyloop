@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"strings"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
+	studypkg "ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 )
 
@@ -196,27 +198,22 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	}
 	utils.Warnf("[QUIZ] CompleteReading after GenerateQuizSync taskID=%s questionCount=%d", taskID, len(quizPayload.Questions))
 
-	// Complete reading task and generate follow-up quiz
-	// No page completion validation required - user decides when done
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading before CompleteReadingWithGeneratedQuiz taskID=%s", taskID)
-	quizTaskID, err := repo.CompleteReadingWithGeneratedQuiz(taskID, quizPayload)
+	// Complete reading task and generate follow-up quiz via Unified Transition Router
+	utils.Warnf("[COMPLETE_SESSION] CompleteReading before TransitionTask taskID=%s", taskID)
+	transitionRes, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID:      taskID,
+		Event:       studypkg.EventCompleteReading,
+		TopicID:     task.TopicID,
+		NotebookID:  task.NotebookID,
+		QuizPayload: &quizPayload,
+	})
 	if err != nil {
 		if revertErr := repo.RevertTaskReservation(taskID); revertErr != nil {
 			utils.Warnf("[QUIZ] failed to revert task reservation on finalization failure for task %s: %v", taskID, revertErr)
 		}
-		switch err {
-		case db.ErrTaskNotFound:
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading CompleteReadingWithGeneratedQuiz error: task not found taskID=%s", taskID)
-			return map[string]interface{}{"error": "ErrNotFound", "code": 404}
-		case db.ErrTaskNotActive:
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading CompleteReadingWithGeneratedQuiz error: task not active taskID=%s", taskID)
-			return map[string]interface{}{"error": "ErrTaskNotActive", "code": 409}
-		default:
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading CompleteReadingWithGeneratedQuiz error taskID=%s err=%v", taskID, err)
-			return map[string]interface{}{"error": err.Error()}
-		}
+		return map[string]interface{}{"error": err.Error()}
 	}
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading CompleteReadingWithGeneratedQuiz result taskID=%s quizTaskID=%s", taskID, quizTaskID)
-	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_generation_trigger check stage=reading_completed taskID=%s topicID=%s result=not_triggered reason=no_flashcard_hook_in_complete_reading", taskID, task.TopicID)
-	return map[string]interface{}{"ok": true, "quiz_task_id": quizTaskID}
+
+	utils.Warnf("[COMPLETE_SESSION] CompleteReading TransitionTask result taskID=%s quizTaskID=%s", taskID, transitionRes.NextTaskID)
+	return map[string]interface{}{"ok": true, "quiz_task_id": transitionRes.NextTaskID}
 }

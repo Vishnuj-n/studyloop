@@ -578,12 +578,11 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 				return models.QuizResult{}, fmt.Errorf("failed to reset reread attempts: %w", err)
 			}
 			// Only mark topic as completed if all pages in the topic have been read and completed
-			var endPage, cursor int
-			err := tx.QueryRow(`
-				SELECT COALESCE(end_page, 0), COALESCE(current_page_cursor, 0)
-				FROM topics WHERE id = ?
-			`, task.TopicID).Scan(&endPage, &cursor)
-			if err == nil && endPage > 0 && cursor >= endPage {
+			fullyRead, err := s.repo.IsTopicFullyReadTx(tx, task.TopicID)
+			if err != nil {
+				return models.QuizResult{}, fmt.Errorf("failed to check topic completion: %w", err)
+			}
+			if fullyRead {
 				if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
 					return models.QuizResult{}, fmt.Errorf("failed to mark topic completed: %w", err)
 				}
