@@ -208,7 +208,7 @@ func buildQuizContext(
 		if text == "" {
 			continue
 		}
-		chunkLine := fmt.Sprintf("- chunk_id: %s | text: %s\n", chunkID, text)
+		chunkLine := text + "\n"
 		chunkTokens, err := embeddings.CountTokens(chunkLine)
 		if err != nil {
 			return quizContextResult{}, fmt.Errorf("failed to count tokens for chunk %s: %w", chunkID, err)
@@ -220,7 +220,8 @@ func buildQuizContext(
 		}
 
 		totalWordCount += len(strings.Fields(text))
-		contextParts = append(contextParts, fmt.Sprintf("- chunk_id: %s | text: %s", chunkID, text))
+		// ponytail: raw text without chunk_id prefix saves prompt tokens
+		contextParts = append(contextParts, text)
 		currentTokens += chunkTokens
 	}
 
