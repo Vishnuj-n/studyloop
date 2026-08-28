@@ -36,12 +36,12 @@ internal/
     service.go        # Core study service + LLM routing
     flashcard.go      # Flashcard generation
     examiner.go       # Written assessment
-    quiz_sync.go      # Sync quiz generation + 2-strike rescue
+    quiz_sync.go      # Sync quiz generation + scoring
     reader_ai.go      # Reader AI interactions
     socratic.go       # Socratic tutor (in-app + retrieval)
-    socratic_rescue.go # SOCRATIC_REMEDIAL completion handler
     review_session.go # Review session + suspend
     sync.go           # Cloud sync + FLASHCARD_GENERATE tasks
+    queue_transition.go # Unified task transition switchboard
 
   notebook/           # Upload + ingestion (4 files)
     upload.go         # PDF upload
