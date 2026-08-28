@@ -1086,3 +1086,102 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		"pace_label":       paceLabel,
 	}
 }
+
+// UpgradeNotebookToDeepPDF re-extracts an existing PDF using the deep_pdf (PyMuPDF) engine.
+func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{} {
+	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
+	if errResp != nil {
+		return errResp
+	}
+
+	if !strings.EqualFold(nb.FileType, "pdf") {
+		return map[string]interface{}{"error": "only PDF documents can be upgraded with Deep PDF"}
+	}
+
+	var ext *extension.Extension
+	if a.extManager != nil {
+		ext, _ = a.extManager.Get("deep_pdf")
+	}
+
+	// Update status to processing and sleep/dormant to avoid outdated queue tasks while re-parsing
+	if err := repo.UpdateNotebookStatus(notebookID, "processing"); err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook status: %v", err)}
+	}
+	_ = repo.UpdateNotebookStudyStatus(notebookID, "dormant")
+
+	emitIngestionProgress(a, ingestionProgressPayload{
+		NotebookID: notebookID,
+		Status:     "processing",
+		Message:    "Starting Deep Structured extraction...",
+		Phase:      "extraction",
+		Percent:    10,
+	})
+
+	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		onProgress := func(processed, total, percent int, message string) {
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "processing",
+				Message:    message,
+				Phase:      "extraction",
+				Processed:  processed,
+				Total:      total,
+				Percent:    percent,
+			})
+		}
+
+		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
+		if extErr != nil {
+			utils.Warnf("[DEEP_PDF] Upgrade failed for %s (%s): %v", fileName, nbID, extErr)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Deep PDF extraction failed: %v", extErr),
+			})
+			return
+		}
+
+		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
+			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
+		}
+
+		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		if len(chaptersDraft) == 0 {
+			chaptersDraft = []models.SyllabusChapterDraft{
+				{
+					Title:     fileName,
+					StartPage: 1,
+					EndPage:   doc.PageCount,
+				},
+			}
+		}
+
+		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
+			utils.Warnf("[DEEP_PDF] Failed to persist upgraded syllabus draft for %s (%s): %v", fileName, nbID, err)
+			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			emitIngestionProgress(a, ingestionProgressPayload{
+				NotebookID: nbID,
+				Status:     "failed",
+				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
+			})
+			return
+		}
+
+		emitIngestionProgress(a, ingestionProgressPayload{
+			NotebookID: nbID,
+			Status:     "draft_ready",
+			Message:    "Deep PDF syllabus draft ready",
+		})
+	}(nb.ID, nb.FilePath, nb.Title, ext)
+
+	return map[string]interface{}{
+		"success":     true,
+		"notebook_id": nb.ID,
+		"status":      "processing",
+	}
+}
+

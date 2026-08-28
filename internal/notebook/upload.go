@@ -90,10 +90,11 @@ type ExtractedSection struct {
 
 // ExtractedDocument represents normalized notebook content ready for chunking.
 type ExtractedDocument struct {
-	Title     string
-	PageCount int
-	WordCount int
-	Sections  []ExtractedSection
+	Title      string
+	PageCount  int
+	WordCount  int
+	IsMarkdown bool
+	Sections   []ExtractedSection
 }
 
 // SaveUploadedFile saves an uploaded file and returns metadata
@@ -281,6 +282,7 @@ func (s *Service) ExtractDocumentRange(filePath string, fileType string, startPa
 		}
 
 	case "md":
+		doc.IsMarkdown = true
 		raw, err := s.readFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read markdown file: %w", err)

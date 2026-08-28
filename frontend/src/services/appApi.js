@@ -150,6 +150,10 @@ export async function uploadDeepStructuredPDFFromPath(sourcePath, isPro = false)
   return await appBridge().UploadDeepStructuredPDFFromPath(sourcePath, isPro)
 }
 
+export async function upgradeNotebookToDeepPDF(notebookID) {
+  return await appBridge().UpgradeNotebookToDeepPDF(notebookID)
+}
+
 export function uploadNotebook(fileBytes, fileName) {
   return appBridge().UploadNotebook(fileBytes, fileName)
 }

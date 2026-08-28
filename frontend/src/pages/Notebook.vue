@@ -42,8 +42,10 @@
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
+          :is-pro="isPro"
           variant="active"
           @edit-syllabus="openSyllabusDraft"
+          @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
           @delete="deleteNotebook"
@@ -80,9 +82,11 @@
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
+          :is-pro="isPro"
           variant="dormant"
           :active-limit-reached="activeNotebooks.length >= 4"
           @edit-syllabus="openSyllabusDraft"
+          @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
           @delete="deleteNotebook"
@@ -150,6 +154,7 @@ import {
   updateNotebookTitle as apiUpdateNotebookTitle,
   updateNotebookPriority as apiUpdateNotebookPriority,
   deleteNotebook as apiDeleteNotebook,
+  upgradeNotebookToDeepPDF as apiUpgradeNotebookToDeepPDF,
   updateNotebookStudyStatus,
   getUserSettings,
 } from '../services/appApi'
@@ -300,17 +305,8 @@ function handleIngestionProgress(payload) {
     return
   }
 
-  // Handle ingestion / parsing progress
-  if (!ingestionNotebookID.value && payload.notebook_id) {
-    ingestionNotebookID.value = payload.notebook_id
-  }
-
-  const isCurrentIngestion =
-    !ingestionNotebookID.value ||
-    !payload.notebook_id ||
-    payload.notebook_id === ingestionNotebookID.value
-
-  if (isCurrentIngestion) {
+  // Handle upload dropzone progress only for active new file uploads
+  if (ingestionNotebookID.value && payload.notebook_id === ingestionNotebookID.value) {
     if (typeof payload.percent === 'number') {
       uploadProgress.value = payload.percent
     }
@@ -425,6 +421,29 @@ async function handleDeepStructuredUpload() {
     })
   } catch (error) {
     uploadError.value = `Deep extraction failed to start: ${error.message}`
+  }
+}
+
+async function handleUpgradeToDeepPDF(notebookID) {
+  uploadError.value = ''
+  successMessage.value = ''
+  try {
+    const target = notebooks.value.find((n) => n.id === notebookID)
+    const bookTitle = target?.title || 'this textbook'
+
+    const result = await apiUpgradeNotebookToDeepPDF(notebookID)
+    if (result?.error) {
+      throw new Error(result.error)
+    }
+
+    await loadNotebooks()
+    actionToastMessage.value = `⚡ Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`
+    showActionToast.value = true
+    setTimeout(() => {
+      showActionToast.value = false
+    }, 5000)
+  } catch (error) {
+    uploadError.value = `Upgrade failed: ${error.message}`
   }
 }
 

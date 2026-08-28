@@ -154,10 +154,11 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 	}
 
 	doc := &ExtractedDocument{
-		Title:     filepath.Base(cleanPath),
-		PageCount: pageCount,
-		WordCount: wordCount,
-		Sections:  docSections,
+		Title:      filepath.Base(cleanPath),
+		PageCount:  pageCount,
+		WordCount:  wordCount,
+		IsMarkdown: true,
+		Sections:   docSections,
 	}
 
 	return doc, &res, nil
