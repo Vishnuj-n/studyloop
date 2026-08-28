@@ -5,7 +5,7 @@
  */
 export const NOTEBOOK_IMPORTERS = [
   {
-    id: 'fast_pdf',
+    id: 'deep_pdf',
     name: 'Deep Structured PDF',
     icon: '⚡',
     badge: 'Pro',

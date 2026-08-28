@@ -1006,7 +1006,7 @@ h3 {
 
 .panel {
   background: var(--surface-container-lowest);
-  border: 1px solid var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   border-radius: 14px;
   padding: 12px;
 }
@@ -1074,7 +1074,7 @@ h3 {
   aspect-ratio: 8.5 / 11;
   background: var(--surface-container-lowest, #ffffff);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--outline-variant);
   border-radius: 4px;
 }
 
@@ -1148,7 +1148,7 @@ h3 {
 
 select {
   width: 100%;
-  border: 1px solid var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   background: var(--surface-container-lowest);
   color: var(--on-surface);
   border-radius: 10px;
@@ -1183,13 +1183,13 @@ button:disabled {
 .audio-overview-btn.active {
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-low));
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .error {
   color: #b42318;
   background: color-mix(in srgb, #b42318 12%, var(--surface-container-lowest));
-  border: 1px solid color-mix(in srgb, #b42318 30%, var(--surface-container-low));
+  border: 1px solid var(--outline-variant);
   border-radius: 10px;
   padding: 10px;
   font-size: 13px;
@@ -1279,7 +1279,7 @@ button:disabled {
   padding: 10px 8px;
   border-radius: 20px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 22%, transparent);
+  border: 1px solid var(--outline-variant);
   z-index: 10;
   transition: opacity 0.25s ease;
 }

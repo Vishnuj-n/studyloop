@@ -32,8 +32,11 @@ func TestBuildMarathonFlashcardPromptWithBudget_IncludesChunks(t *testing.T) {
 	if !strings.Contains(prompt, "=== SOURCE CHUNKS ===") {
 		t.Errorf("prompt missing === SOURCE CHUNKS === header")
 	}
-	if !strings.Contains(prompt, "chunk_001") || !strings.Contains(prompt, "chunk_002") {
-		t.Errorf("prompt expected to contain chunk_001 and chunk_002, got:\n%s", prompt)
+	if !strings.Contains(prompt, "page_num: 15") || !strings.Contains(prompt, "page_num: 16") {
+		t.Errorf("prompt expected to contain page_num: 15 and page_num: 16, got:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "chunk_id:") {
+		t.Errorf("prompt should not contain chunk_id, got:\n%s", prompt)
 	}
 }
 
@@ -46,8 +49,8 @@ func TestBuildMarathonFlashcardPromptWithBudget_EmptyChunks(t *testing.T) {
 	if !strings.Contains(prompt, "=== SOURCE CHUNKS ===") {
 		t.Errorf("prompt missing === SOURCE CHUNKS === header")
 	}
-	// Verify that no chunk_id lines are rendered when context is empty
-	if strings.Contains(prompt, "- chunk_id:") {
-		t.Errorf("expected no chunk_id lines for empty context, got:\n%s", prompt)
+	// Verify that no chunk lines are rendered when context is empty
+	if strings.Contains(prompt, "- page_num:") || strings.Contains(prompt, "chunk_id:") {
+		t.Errorf("expected no chunk lines for empty context, got:\n%s", prompt)
 	}
 }

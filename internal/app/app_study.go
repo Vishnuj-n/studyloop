@@ -199,13 +199,9 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		return map[string]interface{}{"error": "scheduler not initialized"}
 	}
 	now := time.Now()
-
 	activeProfileID, err := repo.GetActiveProfileID()
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
-	}
-	if ensureErr := repo.EnsurePendingReadingTasksForActiveNotebooks(activeProfileID); ensureErr != nil {
-		utils.Warnf("[QUEUE] failed to ensure reading tasks for active notebooks: %v", ensureErr)
 	}
 
 	// Canonical queue recovery/materialization path for dashboard:
@@ -293,12 +289,17 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 		}
 		return models.ScheduledTask{}, false
 	}
+	task, _, err := repo.CreateReviewSession(bestNotebookID)
+	if err != nil || task == nil {
+		return models.ScheduledTask{}, false
+	}
+
 	reviewCardsForTask := materializedCards
 	if selectedDueCards < reviewCardsForTask {
 		reviewCardsForTask = selectedDueCards
 	}
 	return models.ScheduledTask{
-		ID:              models.ReviewTaskDailyID,
+		ID:              task.ID,
 		ActionType:      "flashcard_review",
 		Title:           fmt.Sprintf("Flashcard Review: %d cards", reviewCardsForTask),
 		EstimateMinutes: safeReviewBudget,
@@ -390,9 +391,6 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	if errMap != nil {
 		return errMap
 	}
-	if taskID == models.ReviewTaskDailyID {
-		return map[string]interface{}{"ok": true}
-	}
 	task, err := repo.GetTaskByID(taskID)
 	if err != nil {
 		return mapTaskError(err)
@@ -407,11 +405,6 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 		return mapTaskError(err)
 	}
 	return map[string]interface{}{"ok": true}
-}
-
-// GetStreakState computes current and longest streaks and daily completed task count.
-func (a *App) GetStreakState(timezoneOffsetMinutes int) map[string]interface{} {
-	return a.getStreakState(timezoneOffsetMinutes)
 }
 
 func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {

@@ -209,7 +209,7 @@ func (r *Repository) CompleteTask(taskID string, result models.CompletionResult)
 	return nil
 }
 
-// PersistReadingProgress persists page progress without validating completion.
+// PersistReadingProgress persists page progress directly to topics.current_page_cursor.
 // Used in trust-based completion model where user decides when reading is complete.
 func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool, error) {
 	task, err := r.GetReadingTask(taskID)
@@ -224,36 +224,21 @@ func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool,
 		finalPage = task.EndPage
 	}
 
-	err = r.withTx(func(tx *sql.Tx) error {
-		_, err = tx.Exec(`
-			INSERT INTO reading_progress (task_id, current_page, last_accessed_at)
-			VALUES (?, ?, CURRENT_TIMESTAMP)
-			ON CONFLICT(task_id) DO UPDATE
-			SET current_page = excluded.current_page,
-			    last_accessed_at = CURRENT_TIMESTAMP
-		`, task.TaskID, finalPage)
-		if err != nil {
-			return err
-		}
-
-		// Synchronize topics.current_page_cursor to keep both cursor systems aligned
-		if task.TopicID != "" {
-			_, err = tx.Exec(`
+	if task.TopicID != "" {
+		err = r.withTx(func(tx *sql.Tx) error {
+			_, err := tx.Exec(`
 				UPDATE topics
 				SET current_page_cursor = ?,
 				    updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND current_page_cursor < ?
 			`, finalPage, task.TopicID, finalPage)
-			if err != nil {
-				return err
-			}
+			return err
+		})
+		if err != nil {
+			return false, err
 		}
-		return nil
-	})
-
-	if err != nil {
-		return false, err
 	}
+
 	return reachedEnd, nil
 }
 
@@ -293,9 +278,9 @@ func (r *Repository) CompleteReadingWithGeneratedQuiz(taskID string, quizPayload
 			COALESCE(sq.start_page, 0),
 			COALESCE(sq.end_page, 0),
 			sq.status,
-			COALESCE(rp.current_page, COALESCE(sq.start_page, 0))
+			COALESCE(t.current_page_cursor, COALESCE(sq.start_page, 0))
 		FROM study_queue sq
-		LEFT JOIN reading_progress rp ON rp.task_id = sq.id
+		LEFT JOIN topics t ON t.id = sq.topic_id
 		WHERE sq.id = ? AND sq.task_type IN ('READING', 'REREAD')
 	`, taskID).Scan(
 		&seed.ID,
@@ -318,7 +303,7 @@ func (r *Repository) CompleteReadingWithGeneratedQuiz(taskID string, quizPayload
 
 	quizTaskID := uuid.NewString()
 	err = r.withTx(func(tx *sql.Tx) error {
-		// Synchronize topics.current_page_cursor to keep both cursor systems aligned.
+		// Update topics.current_page_cursor to task end_page upon completion.
 		// Completion is authoritative for the assigned reading window, so cursor must
 		// advance to at least end_page to prevent scheduler rematerializing the same window.
 		if seed.TopicID != "" {
@@ -612,21 +597,24 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		}
 
 		var topicID, topicTitle, notebookTitle string
-		var topicStartPage, topicEndPage int
+		var topicStartPage, topicEndPage, topicCursorPage int
 		err = tx.QueryRow(`
 			SELECT
 				t.id,
 				COALESCE(t.title, ''),
 				COALESCE(n.title, ''),
 				COALESCE(NULLIF(t.start_page, 0), 1),
-				COALESCE(NULLIF(t.end_page, 0), 1)
+				COALESCE(NULLIF(t.end_page, 0), 1),
+				COALESCE(t.current_page_cursor, 0)
 			FROM topics t
 			JOIN notebook_topics nt ON t.id = nt.topic_id
 			JOIN notebooks n ON n.id = nt.notebook_id
-			WHERE nt.notebook_id = ? AND COALESCE(t.status, 'unseen') != 'completed'
+			WHERE nt.notebook_id = ?
+			  AND COALESCE(t.status, 'unseen') != 'completed'
+			  AND (COALESCE(t.end_page, 0) = 0 OR COALESCE(t.current_page_cursor, 0) < COALESCE(t.end_page, 0))
 			ORDER BY t.start_page ASC, t.id ASC
 			LIMIT 1
-		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &topicStartPage, &topicEndPage)
+		`, notebookID).Scan(&topicID, &topicTitle, &notebookTitle, &topicStartPage, &topicEndPage, &topicCursorPage)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil // No uncompleted topics found
 		}
@@ -636,11 +624,12 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 
 		// Calculate soft-capped page window based on targetSessionWords
 		topicCursor := models.ReadingTopicCursor{
-			ID:         topicID,
-			Title:      topicTitle,
-			StartPage:  topicStartPage,
-			EndPage:    topicEndPage,
-			NotebookID: notebookID,
+			ID:                topicID,
+			Title:             topicTitle,
+			StartPage:         topicStartPage,
+			EndPage:           topicEndPage,
+			CurrentPageCursor: topicCursorPage,
+			NotebookID:        notebookID,
 		}
 
 		var queryErr error
@@ -861,4 +850,139 @@ func (r *Repository) RevertTaskReservation(taskID string) error {
 	}
 
 	return tx.Commit()
+}
+
+// GetRereadAttemptCount returns the retry/reread count for a given topic.
+func (r *Repository) GetRereadAttemptCount(topicID string) (int, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return 0, fmt.Errorf("topic id is required")
+	}
+
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COALESCE(attempt_count, 0)
+		FROM reread_attempts
+		WHERE topic_id = ?
+	`, topicID).Scan(&count)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// IncrementRereadAttemptCountTx increments the retry/reread count for a topic within a transaction.
+func (r *Repository) IncrementRereadAttemptCountTx(tx *sql.Tx, topicID string) (int, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return 0, fmt.Errorf("topic id is required")
+	}
+
+	var count int
+	if err := tx.QueryRow(`
+		INSERT INTO reread_attempts (topic_id, attempt_count, last_attempt_at)
+		VALUES (?, 1, CURRENT_TIMESTAMP)
+		ON CONFLICT(topic_id) DO UPDATE
+		SET attempt_count = reread_attempts.attempt_count + 1,
+		    last_attempt_at = CURRENT_TIMESTAMP
+		RETURNING attempt_count
+	`, topicID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// ResetRereadAttemptCountTx resets the retry/reread count for a topic within a transaction.
+func (r *Repository) ResetRereadAttemptCountTx(tx *sql.Tx, topicID string) error {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return fmt.Errorf("topic id is required")
+	}
+
+	_, err := tx.Exec(`
+		INSERT INTO reread_attempts (topic_id, attempt_count, last_attempt_at)
+		VALUES (?, 0, CURRENT_TIMESTAMP)
+		ON CONFLICT(topic_id) DO UPDATE
+		SET attempt_count = 0,
+		    last_attempt_at = CURRENT_TIMESTAMP
+	`, topicID)
+	return err
+}
+
+type QuizAttemptWithPayload struct {
+	ID           string
+	Score        int
+	Passed       bool
+	AnswersJSON  string
+	CompletedAt  int64
+	QuizPayload  string
+	PassingScore int
+}
+
+func scanQuizAttemptsWithPayload(rows *sql.Rows) ([]QuizAttemptWithPayload, error) {
+	var attempts []QuizAttemptWithPayload
+	for rows.Next() {
+		var attempt QuizAttemptWithPayload
+		if err := rows.Scan(
+			&attempt.ID,
+			&attempt.Score,
+			&attempt.Passed,
+			&attempt.AnswersJSON,
+			&attempt.CompletedAt,
+			&attempt.QuizPayload,
+		); err != nil {
+			return nil, err
+		}
+
+		var payload models.QuizTaskPayload
+		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
+			attempt.PassingScore = payload.PassingScore
+		} else {
+			attempt.PassingScore = 70
+		}
+
+		attempts = append(attempts, attempt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attempts, nil
+}
+
+// readActiveProfileID fetches only the active_profile_id from user_settings.
+func (r *Repository) readActiveProfileID() (string, error) {
+	var activeProfileID sql.NullString
+	if err := r.db.QueryRow(`
+		SELECT COALESCE(active_profile_id, '') FROM user_settings WHERE id = 1
+	`).Scan(&activeProfileID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("reading user_settings: %w", err)
+	}
+	if activeProfileID.Valid {
+		return activeProfileID.String, nil
+	}
+	return "", nil
+}
+
+// assignTaskTitle sets task.Title based on task type and available topic/notebook titles.
+func assignTaskTitle(task *models.StudyQueueTask, topicTitle, notebookTitle string) {
+	if task.TaskType == models.StudyTaskTypeFlashcardReview {
+		task.Title = notebookTitle
+	} else if topicTitle != "" {
+		task.Title = topicTitle
+	} else if notebookTitle != "" {
+		task.Title = notebookTitle
+	} else {
+		task.Title = "Task"
+	}
+}
+
+func parseSQLiteTimestamp(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if t, err := time.ParseInLocation("2006-01-02 15:04:05", s, time.UTC); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, s)
 }

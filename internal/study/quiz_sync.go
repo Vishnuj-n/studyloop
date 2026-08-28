@@ -208,7 +208,7 @@ func buildQuizContext(
 		if text == "" {
 			continue
 		}
-		chunkLine := fmt.Sprintf("- chunk_id: %s | text: %s\n", chunkID, text)
+		chunkLine := text + "\n"
 		chunkTokens, err := embeddings.CountTokens(chunkLine)
 		if err != nil {
 			return quizContextResult{}, fmt.Errorf("failed to count tokens for chunk %s: %w", chunkID, err)
@@ -220,7 +220,8 @@ func buildQuizContext(
 		}
 
 		totalWordCount += len(strings.Fields(text))
-		contextParts = append(contextParts, fmt.Sprintf("- chunk_id: %s | text: %s", chunkID, text))
+		// ponytail: raw text without chunk_id prefix saves prompt tokens
+		contextParts = append(contextParts, text)
 		currentTokens += chunkTokens
 	}
 
@@ -577,8 +578,15 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 			if err := s.repo.ResetRereadAttemptCountTx(tx, task.TopicID); err != nil {
 				return models.QuizResult{}, fmt.Errorf("failed to reset reread attempts: %w", err)
 			}
-			if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
-				return models.QuizResult{}, fmt.Errorf("failed to mark topic completed: %w", err)
+			// Only mark topic as completed if all pages in the topic have been read and completed
+			fullyRead, err := s.repo.IsTopicFullyReadTx(tx, task.TopicID)
+			if err != nil {
+				return models.QuizResult{}, fmt.Errorf("failed to check topic completion: %w", err)
+			}
+			if fullyRead {
+				if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
+					return models.QuizResult{}, fmt.Errorf("failed to mark topic completed: %w", err)
+				}
 			}
 		}
 	} else if task.TopicID != "" {
@@ -663,6 +671,14 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		if isRescueRequiz {
 			utils.LogQuizResult(task.ID, scoreRes.score, false, "")
 			utils.Warnf("[QUIZ] quiz_failed_requiz_failed notebookID=%s topicID=%s — external help marked", task.NotebookID, task.TopicID)
+			settings, sErr := s.repo.GetUserSettings()
+			targetWords := 1500
+			if sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+				targetWords = settings.TargetSessionWords
+			}
+			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords); ensureErr != nil {
+				utils.Warnf("[QUIZ] failed to seed next reading task after failed requiz notebookID=%s: %v", task.NotebookID, ensureErr)
+			}
 		} else if socraticTaskID != "" {
 			utils.LogQuizResult(task.ID, scoreRes.score, false, "")
 			utils.Warnf("[QUIZ] quiz_failed_socratic_rescue_created notebookID=%s topicID=%s socraticTaskID=%s", task.NotebookID, task.TopicID, socraticTaskID)

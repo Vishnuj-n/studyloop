@@ -331,7 +331,7 @@ onMounted(() => {
   border-radius: 999px;
   background: var(--surface-container-high);
   color: var(--on-surface-variant);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .form-grid {
@@ -344,7 +344,7 @@ onMounted(() => {
   background: var(--surface-container-lowest);
   border-radius: 16px;
   padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 h2 {
@@ -463,7 +463,7 @@ h2 {
 
 .danger-btn {
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   padding: 10px 18px;
   border-radius: 10px;
@@ -551,7 +551,7 @@ h2 {
 
 .dev-toggle-btn.active {
   background: #f59e0b;
-  color: #000;
+  color: #2d3338;
   font-weight: 700;
 }
 
@@ -579,7 +579,7 @@ h2 {
 
 .danger-btn-sm {
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   padding: 5px 12px;
   border-radius: 8px;
@@ -712,7 +712,7 @@ label {
 
 input[type='text'],
 input[type='password'] {
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 10px;
   background: var(--surface-container-low);
   color: var(--on-surface);
@@ -745,7 +745,7 @@ input:focus {
 
 .login-error-message {
   background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--outline-variant);
   color: #f87171;
   padding: 0.75rem 1rem;
   border-radius: 8px;

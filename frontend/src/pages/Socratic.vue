@@ -925,7 +925,7 @@ h1 {
 .spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--outline-variant);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -1265,7 +1265,7 @@ h1 {
   align-items: center;
   gap: 16px;
   background: linear-gradient(135deg, rgba(211, 84, 0, 0.1) 0%, rgba(230, 126, 34, 0.15) 100%);
-  border: 1px solid rgba(211, 84, 0, 0.25);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 12px 16px;
   margin-bottom: 4px;
@@ -1329,7 +1329,7 @@ h1 {
 .copy-prompt-btn {
   align-self: flex-start;
   background: transparent;
-  border: 1px solid var(--primary);
+  border: 1px solid var(--outline-variant);
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 11px;

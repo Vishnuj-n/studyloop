@@ -340,7 +340,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 		}
 
 		// Estimate tokens for this chunk with formatting
-		chunkLine := fmt.Sprintf("- chunk_id: %s | page_num: %d | text: %s\n", chunk.ChunkID, chunk.PageNum, text)
+		chunkLine := fmt.Sprintf("- page_num: %d | text: %s\n", chunk.PageNum, text)
 		chunkTokens, err := embeddings.CountTokens(chunkLine)
 		if err != nil {
 			// Fallback to word count if tokenization fails
@@ -361,7 +361,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	// Add chunks to prompt
 	for _, chunk := range includedChunks {
 		text := strings.TrimSpace(chunk.Text)
-		fmt.Fprintf(&b, "- chunk_id: %s | page_num: %d | text: %s\n", chunk.ChunkID, chunk.PageNum, text)
+		fmt.Fprintf(&b, "- page_num: %d | text: %s\n", chunk.PageNum, text)
 	}
 
 	if truncatedCount > 0 {

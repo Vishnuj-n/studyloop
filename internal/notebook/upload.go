@@ -33,9 +33,9 @@ type Service struct {
 }
 
 const (
-	DefaultChunkTargetWords = 150
-	chunkLowerBoundWords    = 100
-	chunkUpperBoundWords    = 200
+	DefaultChunkTargetWords = 500
+	chunkLowerBoundWords    = 350
+	chunkUpperBoundWords    = 650
 )
 
 // Option customizes Service dependencies for testing and advanced setups.
@@ -90,10 +90,11 @@ type ExtractedSection struct {
 
 // ExtractedDocument represents normalized notebook content ready for chunking.
 type ExtractedDocument struct {
-	Title     string
-	PageCount int
-	WordCount int
-	Sections  []ExtractedSection
+	Title      string
+	PageCount  int
+	WordCount  int
+	IsMarkdown bool
+	Sections   []ExtractedSection
 }
 
 // SaveUploadedFile saves an uploaded file and returns metadata
@@ -281,6 +282,7 @@ func (s *Service) ExtractDocumentRange(filePath string, fileType string, startPa
 		}
 
 	case "md":
+		doc.IsMarkdown = true
 		raw, err := s.readFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read markdown file: %w", err)
@@ -700,7 +702,14 @@ func SplitPageIntoChunks(text string, targetWords int) []string {
 			break
 		}
 
-		lower := start + chunkLowerBoundWords
+		lowerBound := chunkLowerBoundWords
+		upperBound := chunkUpperBoundWords
+		if targetWords > 0 {
+			lowerBound = int(float64(targetWords) * 0.7)
+			upperBound = int(float64(targetWords) * 1.3)
+		}
+
+		lower := start + lowerBound
 		if lower <= start {
 			lower = start + 1
 		}
@@ -708,7 +717,7 @@ func SplitPageIntoChunks(text string, targetWords int) []string {
 			lower = len(spans)
 		}
 
-		upper := start + chunkUpperBoundWords
+		upper := start + upperBound
 		if upper > len(spans) {
 			upper = len(spans)
 		}

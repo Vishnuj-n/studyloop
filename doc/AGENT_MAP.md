@@ -235,7 +235,7 @@ func SubmitAssessment(blockID string, answers []Answer) (*AssessmentResult, erro
 
 ## SocraticRescue Module
 
-**File:** `frontend/src/pages/SocraticRescue.vue` + `internal/study/socratic_rescue.go`
+**File:** `frontend/src/pages/SocraticRescue.vue` + `internal/study/queue_transition.go`
 
 **Responsibility:** 2-strike rescue for repeated quiz failures (Rescue Layer)
 
@@ -253,11 +253,13 @@ func SubmitAssessment(blockID string, answers []Answer) (*AssessmentResult, erro
 
 **API:**
 ```go
-func (s *StudyService) CompleteSocraticRescue(taskID string) error
+func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest) (TransitionResult, error)
+// Event: EventCompleteSocraticRescue ("COMPLETE_SOCRATIC_RESCUE")
 ```
 
 **Backend behavior:**
 - Validates task is SOCRATIC_REMEDIAL + ACTIVE
+- Routes through `TransitionTask(EventCompleteSocraticRescue)` switchboard
 - Marks task COMPLETED
 - Inserts fresh QUIZ task for same topic with `source: "socratic_rescue_requiz"` in payload
 - Transactional — both complete + insert happen atomically
@@ -333,7 +335,6 @@ func InsertReadingTasks(chunks []Chunk) error
 **API:**
 ```go
 func GetNextTask() (*Task, error)
-func GetStreakState(timezoneOffsetMinutes int) map[string]interface{}
 ```
 
 **Starvation Protection:**
@@ -464,12 +465,12 @@ internal/
     service.go       # Core study service
     flashcard.go     # Flashcard review session
     examiner.go      # Written assessment session
-    quiz_sync.go     # Synchronous quiz generation + 2-strike rescue logic
+    quiz_sync.go     # Synchronous quiz generation + scoring
     reader_ai.go     # Reader AI interactions
     socratic.go       # Socratic tutor session
-    socratic_rescue.go # SOCRATIC_REMEDIAL completion handler (re-quiz insertion)
     review_session.go # Review session management
     sync.go           # Cloud sync + FLASHCARD_GENERATE task management
+    queue_transition.go # Unified task transition switchboard
   scheduler/         # Scheduling algorithms
     fsrs.go          # FSRS spaced repetition algorithm
     service.go       # Scheduler service wrapper

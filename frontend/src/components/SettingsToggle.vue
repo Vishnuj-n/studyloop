@@ -47,7 +47,7 @@ defineEmits(['update:modelValue'])
   width: 20px;
   height: 20px;
   background-color: var(--surface-container-low);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 6px;
   flex-shrink: 0;
   position: relative;

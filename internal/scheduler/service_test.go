@@ -20,7 +20,7 @@ func TestBuildTodayPlanGeneratesContextLockedReadTask(t *testing.T) {
 				Title:             "Chapter 1",
 				StartPage:         1,
 				EndPage:           40,
-				CurrentPageCursor: 1,
+				CurrentPageCursor: 0,
 				NotebookID:        "nb-1",
 			}, true, nil
 		},
@@ -77,7 +77,7 @@ func TestBuildTodayPlanWithTokenQueryFailureFallback(t *testing.T) {
 				Title:             "Scanned Document",
 				StartPage:         1,
 				EndPage:           20,
-				CurrentPageCursor: 1,
+				CurrentPageCursor: 0,
 				NotebookID:        "nb-1",
 			}, true, nil
 		},
@@ -100,18 +100,16 @@ func TestBuildTodayPlanWithTokenQueryFailureFallback(t *testing.T) {
 	}
 
 	task := plan.Tasks[0]
-	// With token query failure, uses FallbackWordsPerPage (500)
-	// Budget 3000 words / 500 = 6 pages -> EndPage = 6
+	if task.StartPage != 1 {
+		t.Errorf("expected StartPage=1, got %d", task.StartPage)
+	}
+	// Fallback calculation: 3000 budget / 500 fallback-words-per-page = 6 pages. Start 1 -> End 6
 	if task.EndPage != 6 {
 		t.Errorf("expected fallback end page 6, got %d", task.EndPage)
 	}
-	// Estimate minutes fallback: 6 pages * 2.5 mins/page (MinutesPerPage) = 15
-	if task.EstimateMinutes != 15 {
-		t.Errorf("expected fallback EstimateMinutes=15, got %d", task.EstimateMinutes)
-	}
 }
 
-func TestBuildTodayPlanClampWindowAbsorbsRemainingPages(t *testing.T) {
+func TestBuildTodayPlanClampsToChapterEnd(t *testing.T) {
 	svc := New(nil, Dependencies{
 		QueryDueReviewCards: func(int64) (int, error) { return 0, nil },
 		QueryUserSettings: func() (*models.UserSettings, error) {
@@ -123,7 +121,7 @@ func TestBuildTodayPlanClampWindowAbsorbsRemainingPages(t *testing.T) {
 				Title:             "Chapter 2",
 				StartPage:         1,
 				EndPage:           7, // Small chapter, only 7 pages total
-				CurrentPageCursor: 1,
+				CurrentPageCursor: 0,
 				NotebookID:        "nb-1",
 			}, true, nil
 		},

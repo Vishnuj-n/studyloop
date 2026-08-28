@@ -7,13 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"ai-tutor/internal/extension"
 )
 
-// FastPDFIngestResult holds the output from extensions/fast_pdf/ingest.py (PyMuPDF4LLM).
-type FastPDFIngestResult struct {
+// DeepPDFIngestResult holds the output from extensions/deep_pdf/ingest.py (PyMuPDF4LLM).
+type DeepPDFIngestResult struct {
 	Title     string `json:"title"`
 	PageCount int    `json:"page_count"`
 	Markdown  string `json:"markdown"`
@@ -21,8 +20,8 @@ type FastPDFIngestResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// FastPDFProgress represents a progress event from the fast_pdf Python worker.
-type FastPDFProgress struct {
+// DeepPDFProgress represents a progress event from the deep_pdf Python worker.
+type DeepPDFProgress struct {
 	Type      string `json:"type"`
 	Processed int    `json:"processed"`
 	Total     int    `json:"total"`
@@ -31,13 +30,13 @@ type FastPDFProgress struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// IngestFastPDF runs the fast_pdf Pro extension to rapidly convert a PDF into structured Markdown.
-func (s *Service) IngestFastPDF(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension) (*ExtractedDocument, *FastPDFIngestResult, error) {
-	return s.IngestFastPDFWithProgress(ctx, filePath, runner, ext, nil)
+// IngestDeepPDF runs the deep_pdf Pro extension to rapidly convert a PDF into structured Markdown.
+func (s *Service) IngestDeepPDF(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension) (*ExtractedDocument, *DeepPDFIngestResult, error) {
+	return s.IngestDeepPDFWithProgress(ctx, filePath, runner, ext, nil)
 }
 
-// IngestFastPDFWithProgress runs the fast_pdf Pro extension with live progress callbacks.
-func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension, onProgress func(processed, total, percent int, message string)) (*ExtractedDocument, *FastPDFIngestResult, error) {
+// IngestDeepPDFWithProgress runs the deep_pdf Pro extension with live progress callbacks.
+func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string, runner *extension.Runner, ext *extension.Extension, onProgress func(processed, total, percent int, message string)) (*ExtractedDocument, *DeepPDFIngestResult, error) {
 	cleanPath := strings.TrimSpace(filePath)
 	if cleanPath == "" {
 		return nil, nil, fmt.Errorf("pdf file path cannot be empty")
@@ -51,13 +50,13 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 		extDir := extension.ResolveExtensionsDir("")
 		ext = &extension.Extension{
 			Manifest: extension.Manifest{
-				ID:         "fast_pdf",
+				ID:         "deep_pdf",
 				Name:       "Deep Structured PDF Parser",
 				Runtime:    "python",
 				Entrypoint: "ingest.py",
 				Tier:       "pro",
 			},
-			Dir: filepath.Join(extDir, "fast_pdf"),
+			Dir: filepath.Join(extDir, "deep_pdf"),
 		}
 	}
 
@@ -67,16 +66,15 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 
 	pythonPath, err := extension.FindExtensionPython(ext)
 	if err != nil {
-		return nil, nil, fmt.Errorf("python runtime is required for fast_pdf ingestion: %w", err)
+		return nil, nil, fmt.Errorf("python runtime is required for deep_pdf ingestion: %w", err)
 	}
 
 	if ctx == nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+		// ponytail: no artificial timeout ceiling
+		ctx = context.Background()
 	}
 
-	var res FastPDFIngestResult
+	var res DeepPDFIngestResult
 	var lastErr string
 
 	onLine := func(line string) error {
@@ -85,7 +83,7 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 			return nil
 		}
 
-		var prog FastPDFProgress
+		var prog DeepPDFProgress
 		if pErr := json.Unmarshal([]byte(line), &prog); pErr == nil {
 			if prog.Type == "progress" {
 				if onProgress != nil {
@@ -98,7 +96,7 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 			}
 		}
 
-		var r FastPDFIngestResult
+		var r DeepPDFIngestResult
 		if rErr := json.Unmarshal([]byte(line), &r); rErr == nil && (r.Markdown != "" || r.Error != "") {
 			res = r
 			if r.Error != "" {
@@ -113,7 +111,7 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 		if lastErr != "" {
 			return nil, nil, fmt.Errorf("%s", lastErr)
 		}
-		return nil, nil, fmt.Errorf("fast_pdf extension execution failed: %w", err)
+		return nil, nil, fmt.Errorf("deep_pdf extension execution failed: %w", err)
 	}
 
 	if res.Error != "" {
@@ -121,7 +119,7 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 	}
 
 	if strings.TrimSpace(res.Markdown) == "" {
-		return nil, nil, fmt.Errorf("fast_pdf extracted no readable content")
+		return nil, nil, fmt.Errorf("deep_pdf extracted no readable content")
 	}
 
 	sections := splitMarkdownByHeadings(res.Markdown)
@@ -154,10 +152,11 @@ func (s *Service) IngestFastPDFWithProgress(ctx context.Context, filePath string
 	}
 
 	doc := &ExtractedDocument{
-		Title:     filepath.Base(cleanPath),
-		PageCount: pageCount,
-		WordCount: wordCount,
-		Sections:  docSections,
+		Title:      filepath.Base(cleanPath),
+		PageCount:  pageCount,
+		WordCount:  wordCount,
+		IsMarkdown: true,
+		Sections:   docSections,
 	}
 
 	return doc, &res, nil

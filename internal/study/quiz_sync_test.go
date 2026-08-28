@@ -79,8 +79,8 @@ func TestBuildQuizContext(t *testing.T) {
 		t.Errorf("expected 0 truncated, got %d", res.truncatedCount)
 	}
 
-	// Budget that fits c1 but not c2 (e.g. availableBudget = 25)
-	resSmall, err := buildQuizContext([]string{"c1", "c2"}, chunkText, 25)
+	// Budget that fits c1 but not c2 (e.g. availableBudget = 15)
+	resSmall, err := buildQuizContext([]string{"c1", "c2"}, chunkText, 15)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

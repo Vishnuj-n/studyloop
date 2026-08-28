@@ -9,20 +9,10 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-// scaledQuizQuestionCount dynamically scales quiz question count to content volume
-// (1 question per ~400 words, clamped between 3 and 10 questions).
-func scaledQuizQuestionCount(wordCount int) int {
-	if wordCount <= 0 {
-		return 3
-	}
-	count := wordCount / 400
-	if count < 3 {
-		return 3
-	}
-	if count > 10 {
-		return 10
-	}
-	return count
+// scaledQuizQuestionCount returns the target question count for a quiz session.
+// ponytail: default to 8 questions per reading session
+func scaledQuizQuestionCount(_ int) int {
+	return 8
 }
 
 // buildPageBoundedContext fetches structured chunk context for a notebook page range
@@ -79,7 +69,7 @@ func calculatePromptTokenCount(chunks []models.ChunkWithContext) int {
 		if text == "" {
 			continue
 		}
-		fmt.Fprintf(&contentBuilder, "- chunk_id: %s | page_num: %d | text: %s\n", chunk.ChunkID, chunk.PageNum, text)
+		fmt.Fprintf(&contentBuilder, "- page_num: %d | text: %s\n", chunk.PageNum, text)
 	}
 
 	if len(chunks) > maxContextChunks {

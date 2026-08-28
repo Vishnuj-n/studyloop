@@ -260,24 +260,20 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 	app := newTestApp(t)
 	_, notebookID := setupReviewTestNotebook(t, "queue-review")
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
+	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
+	if err != nil {
+		t.Fatalf("CreateReviewSession failed: %v", err)
+	}
+
+	sessionResp := app.GetReviewSession(reviewTask.ID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
-		t.Fatalf("GetReviewSession materialization failed: %v", sessionResp["error"])
+		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}
 	session, ok := sessionResp["session"].(*models.ReviewSession)
 	if !ok {
 		t.Fatalf("expected review session pointer, got %#v", sessionResp["session"])
 	}
 	taskID := session.Task.ID
-
-	secondSessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
-	if _, hasErr := secondSessionResp["error"]; hasErr {
-		t.Fatalf("GetReviewSession materialization failed: %v", secondSessionResp["error"])
-	}
-	secondSession, ok := secondSessionResp["session"].(*models.ReviewSession)
-	if !ok || secondSession.Task.ID != taskID {
-		t.Fatalf("expected duplicate prevention to return same task, got %#v", secondSessionResp["session"])
-	}
 
 	if resp := app.ActivateTask(taskID); resp["error"] != nil {
 		t.Fatalf("ActivateTask failed: %#v", resp)
@@ -339,20 +335,18 @@ func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing
 }
 
 func TestGetReviewSessionNoDueCards(t *testing.T) {
-	app := newTestApp(t)
+	_ = newTestApp(t)
 
 	if err := testRepo.CreateNotebook("no-due-nb", "No Due Notebook", "/tmp/no-due.pdf", "pdf", "", "", 15, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, "no-due-nb")
-	errVal, hasErr := sessionResp["error"]
-	if !hasErr {
-		t.Fatalf("expected error response when there are no due cards, got: %#v", sessionResp)
+	task, _, err := testRepo.CreateReviewSession("no-due-nb")
+	if err != nil {
+		t.Fatalf("unexpected error from CreateReviewSession: %v", err)
 	}
-	expectedErr := "No due cards found for review materialization"
-	if errVal != expectedErr {
-		t.Fatalf("expected error %q, got %q", expectedErr, errVal)
+	if task != nil {
+		t.Fatalf("expected nil task when there are no due cards, got: %#v", task)
 	}
 }
 
@@ -360,7 +354,12 @@ func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivati
 	app := newTestApp(t)
 	_, notebookID := setupReviewTestNotebook(t, "auto-act")
 
-	sessionResp := app.GetReviewSession(models.ReviewTaskDailyID, notebookID)
+	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
+	if err != nil {
+		t.Fatalf("CreateReviewSession failed: %v", err)
+	}
+
+	sessionResp := app.GetReviewSession(reviewTask.ID, notebookID)
 	if _, hasErr := sessionResp["error"]; hasErr {
 		t.Fatalf("GetReviewSession failed: %v", sessionResp["error"])
 	}
@@ -772,12 +771,82 @@ func TestRequizFailMarksExternalHelp(t *testing.T) {
 	}
 
 	var required bool
-	err := testRepo.QueryRowForTest("SELECT external_help_required FROM topics WHERE id = 'topic-requiz-fail'").Scan(&required)
+	var topicStatus string
+	err := testRepo.QueryRowForTest("SELECT external_help_required, status FROM topics WHERE id = 'topic-requiz-fail'").Scan(&required, &topicStatus)
 	if err != nil {
 		t.Fatalf("failed to query topic: %v", err)
 	}
 	if !required {
 		t.Fatalf("expected external_help_required to be true, got false")
+	}
+	if topicStatus != "completed" {
+		t.Fatalf("expected topic status to be completed, got %q", topicStatus)
+	}
+}
+
+func TestRequizFailSeedsNextReadingTask(t *testing.T) {
+	app := newTestApp(t)
+	if err := testRepo.EnsureTopic("topic-requiz-ch1", "Chapter 1"); err != nil {
+		t.Fatalf("failed to ensure topic 1: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds("topic-requiz-ch1", 1, 10); err != nil {
+		t.Fatalf("failed to update bounds for topic 1: %v", err)
+	}
+	if err := testRepo.EnsureTopic("topic-requiz-ch2", "Chapter 2"); err != nil {
+		t.Fatalf("failed to ensure topic 2: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds("topic-requiz-ch2", 11, 20); err != nil {
+		t.Fatalf("failed to update bounds for topic 2: %v", err)
+	}
+	if err := testRepo.CreateNotebook("nb-requiz-seq", "Sequence NB", "/tmp/nb-requiz-seq.pdf", "pdf", "topic-requiz-ch1", "", 20, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if _, err := testRepo.ExecForTest(`INSERT INTO notebook_topics (notebook_id, topic_id) VALUES ('nb-requiz-seq', 'topic-requiz-ch1'), ('nb-requiz-seq', 'topic-requiz-ch2')`); err != nil {
+		t.Fatalf("link notebook_topics failed: %v", err)
+	}
+
+	payloadBytes, _ := json.Marshal(map[string]interface{}{
+		"source":   "socratic_rescue_requiz",
+		"topic_id": "topic-requiz-ch1",
+		"questions": []models.QuizTaskQuestion{
+			{ID: "q1", Prompt: "P1", Options: []string{"A", "B"}, CorrectAnswer: "A"},
+		},
+		"passing_score": 70,
+	})
+	task := models.StudyQueueTask{
+		ID:          "task-requiz-seq-ch1",
+		NotebookID:  "nb-requiz-seq",
+		TopicID:     "topic-requiz-ch1",
+		TaskType:    models.StudyTaskTypeQuiz,
+		Status:      models.StudyTaskStatusActive,
+		PayloadJSON: string(payloadBytes),
+		StartPage:   1,
+		EndPage:     10,
+	}
+	if err := testRepo.InsertStudyTask(task); err != nil {
+		t.Fatalf("failed to insert requiz task: %v", err)
+	}
+
+	resp := app.SubmitQuizAttempt("task-requiz-seq-ch1", []models.QuizAnswer{
+		{QuestionID: "q1", Selected: "B"},
+	})
+	if _, hasErr := resp["error"]; hasErr {
+		t.Fatalf("expected submit success, got error: %v", resp["error"])
+	}
+
+	nextTasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("failed to query pending tasks: %v", err)
+	}
+	foundNextReading := false
+	for _, pt := range nextTasks {
+		if pt.NotebookID == "nb-requiz-seq" && pt.TopicID == "topic-requiz-ch2" && pt.TaskType == models.StudyTaskTypeReading {
+			foundNextReading = true
+			break
+		}
+	}
+	if !foundNextReading {
+		t.Fatalf("expected pending reading task for topic-requiz-ch2 after requiz failure, got pending tasks: %#v", nextTasks)
 	}
 }
 

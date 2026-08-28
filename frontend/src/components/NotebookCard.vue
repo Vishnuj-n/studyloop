@@ -29,15 +29,15 @@
       class="notebook-topic"
       style="display: flex; align-items: center; gap: 8px"
     >
-      <span class="badge">{{ topicTitle }}</span>
+      <span class="badge topic-badge">{{ topicTitle }}</span>
       <RouterLink
         v-if="ragEnabled && ragNotebookChapter"
         :to="`/tutor?topic_id=${notebook.topic_id}&notebook_id=${notebook.id}`"
         class="tutor-link-btn"
         title="Ask Tutor (RAG)"
-        style="text-decoration: none; font-size: 13px"
       >
-        ◎ Ask Tutor
+        <span class="tutor-icon">✨</span>
+        <span>Ask Tutor</span>
       </RouterLink>
     </div>
 
@@ -60,12 +60,37 @@
 
     <div class="notebook-actions">
       <button
-        v-if="needsIngestion"
+        v-if="isProcessing"
+        class="btn-processing"
+        disabled
+        :title="progressLabel"
+      >
+        <span class="spinner-small"></span>
+        {{ progressLabel }}
+      </button>
+      <button
+        v-else-if="notebook.status === 'draft_ready'"
         class="btn-ingest"
-        title="Extract PDF bookmarks and run AI cleanup"
+        title="Review structured chapter syllabus"
+        @click="$emit('edit-syllabus', notebook.id, notebook.title)"
+      >
+        ✨ Review Chapters
+      </button>
+      <button
+        v-else-if="needsIngestion"
+        class="btn-ingest"
+        title="Extract bookmarks and run AI cleanup"
         @click="$emit('edit-syllabus', notebook.id, notebook.title)"
       >
         ✨ Ingest Book
+      </button>
+      <button
+        v-else-if="variant === 'active' && canUpgradeDeep"
+        class="btn-upgrade-deep"
+        title="Re-extract with deep structured analysis for rich tables, code blocks, and headings"
+        @click="$emit('upgrade-deep', notebook.id)"
+      >
+        ⚡ Deep Extract
       </button>
       <button
         v-else-if="variant === 'active'"
@@ -107,6 +132,8 @@ const props = defineProps({
   ragEnabled: { type: Boolean, default: false },
   ragNotebookChapter: { type: Boolean, default: true },
   isCloudProfile: { type: Boolean, default: false },
+  isPro: { type: Boolean, default: false },
+  extractionProgress: { type: Object, default: () => null },
   variant: {
     type: String,
     default: 'dormant',
@@ -115,7 +142,7 @@ const props = defineProps({
   activeLimitReached: { type: Boolean, default: false },
 })
 
-defineEmits(['edit-syllabus', 'update-priority', 'change-status', 'delete'])
+defineEmits(['edit-syllabus', 'update-priority', 'change-status', 'delete', 'upgrade-deep'])
 
 const FILE_ICONS = { pdf: '📕', txt: '📄', md: '📝' }
 
@@ -142,6 +169,28 @@ const needsIngestion = computed(() => {
     (props.notebook.status === 'uploaded' ||
       props.notebook.status === 'draft_ready' ||
       !props.notebook.status)
+  )
+})
+
+const isProcessing = computed(() => props.notebook.status === 'processing')
+
+const progressLabel = computed(() => {
+  const prog = props.extractionProgress
+  if (prog && typeof prog.percent === 'number' && prog.total > 0) {
+    return `Extracting ${prog.percent}% (${prog.processed}/${prog.total} pgs)`
+  }
+  if (prog && typeof prog.percent === 'number' && prog.percent > 0) {
+    return `Extracting ${prog.percent}%...`
+  }
+  return 'Deep Extracting...'
+})
+
+const canUpgradeDeep = computed(() => {
+  return (
+    props.isPro &&
+    props.notebook.file_type === 'pdf' &&
+    !needsIngestion.value &&
+    !isProcessing.value
   )
 })
 
@@ -221,7 +270,7 @@ const variantClass = computed(() =>
   background: var(--surface-container-low);
   color: var(--primary);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
 }
@@ -233,13 +282,51 @@ const variantClass = computed(() =>
 .new-assignment-badge {
   background: color-mix(in srgb, #3b82f6 18%, var(--surface-container-low));
   color: #60a5fa;
-  border: 1px solid color-mix(in srgb, #3b82f6 30%, transparent);
+  border: 1px solid var(--outline-variant);
+}
+
+.topic-badge {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tutor-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  background: color-mix(in srgb, #6366f1 22%, var(--surface-container-low));
+  color: #818cf8;
+  border: 1px solid var(--outline-variant);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tutor-link-btn:hover {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.tutor-icon {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .btn-ingest {
   background: color-mix(in srgb, #3b82f6 20%, var(--surface-container-low));
   color: #60a5fa;
-  border: 1px solid color-mix(in srgb, #3b82f6 40%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -294,7 +381,7 @@ const variantClass = computed(() =>
 .btn-delete {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
@@ -314,7 +401,7 @@ const variantClass = computed(() =>
   border-color: var(--primary);
   box-shadow:
     0 0 0 1px var(--primary),
-    0 4px 12px rgba(0, 0, 0, 0.2);
+    0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .active-icon {
@@ -325,7 +412,7 @@ const variantClass = computed(() =>
 .btn-activate {
   background: color-mix(in srgb, var(--primary) 18%, var(--surface-container-low));
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -347,7 +434,7 @@ const variantClass = computed(() =>
 .btn-sleep {
   background: color-mix(in srgb, #f59e0b 14%, var(--surface-container-low));
   color: #fbbf24;
-  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
   font-weight: 600;
@@ -359,5 +446,52 @@ const variantClass = computed(() =>
   background: color-mix(in srgb, #f59e0b 26%, var(--surface-container-low));
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.btn-upgrade-deep {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.18));
+  color: #c4b5fd;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upgrade-deep:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.32), rgba(59, 130, 246, 0.32));
+  border-color: rgba(139, 92, 246, 0.65);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-processing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
+  color: var(--primary);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: wait;
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--outline-variant);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

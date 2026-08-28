@@ -803,7 +803,7 @@ async function handleContinue() {
 /* Flashcard success message styles */
 .result-panel__flashcard-success {
   background: color-mix(in srgb, #16a34a 8%, var(--surface-container-low));
-  border: 1px solid color-mix(in srgb, #16a34a 20%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 16px 20px;
   margin: 8px 0;
@@ -957,7 +957,7 @@ async function handleContinue() {
   display: flex;
   gap: 12px;
   background: rgba(230, 126, 34, 0.1);
-  border: 1px solid rgba(230, 126, 34, 0.2);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 8px;
@@ -996,7 +996,7 @@ async function handleContinue() {
 
 .result-panel__external-help-notice {
   background: rgba(192, 41, 43, 0.1);
-  border: 1px solid rgba(192, 41, 43, 0.2);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 8px;

@@ -25,17 +25,16 @@ UI sends `block_id` with request. Backend validates block exists. Retrieval quer
 
 ## 4. Content Structure
 
-**Sliding Window Chunking (Free Tier Baseline):**
-- Chunk: ~2500 words with 200-word overlap
-- Storage: `chunks` table linked to topics
-- Retrieval: top-k chunks via sqlite-vec within `block_id` scope
-
-**Removed:** parent-child hierarchy, semantic boundaries, LLM-drafted sections, heading/parent expansion.
-**Added:** sliding window, uniform chunk storage, simpler retrieval.
+**Sliding Window & Markdown-Aware Chunking:**
+- **RAG Embedding Chunk Target**: ~500 words (bounds: [350, 650] words)
+- **Reading Task Session Window**: ~2,500 – 3,000 words (`TargetSessionWords`)
+- **Storage**: `chunks` table linked to topics
+- **Retrieval**: top-k chunks via sqlite-vec within `topic_id` / `block_id` scope
+- **Production Model**: Nomic Embed Text v1.5 (INT8 ONNX quantized, 768-d)
 
 ### 4.1 Pro Extension Ingestion (Deep Structured PDF & Markdown)
 - **Engine**: PyMuPDF4LLM (`fast_pdf` extension) converts documents to structured Markdown.
-- **Markdown-Aware Chunking**: Uses `SplitMarkdownIntoChunks` to align splits with `#` / `##` headings while preserving tables (`|---|`) and code fences (` ``` `) as unbroken semantic units.
+- **Markdown-Aware Chunking**: Uses `SplitMarkdownIntoChunks` (500-word target) to align splits with `#` / `##` headings while preserving tables (`|---|`) and code fences (` ``` `) as unbroken semantic units.
 - **Heading Context**: Chunk text retains heading metadata for higher retrieval precision.
 
 ## 5. Retrieval Pipeline

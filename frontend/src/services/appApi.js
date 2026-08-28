@@ -142,20 +142,20 @@ export function uploadYouTubeNotebook(videoURL, isPro = false) {
   return appBridge().UploadYouTubeNotebook(videoURL, isPro)
 }
 
-export async function uploadFastPDFNotebook(fileBytes, fileName, isPro = false) {
-  return await appBridge().UploadFastPDFNotebook(fileBytes, fileName, isPro)
+export async function selectAndUploadDeepStructuredPDF(isPro = false) {
+  return await appBridge().SelectAndUploadDeepStructuredPDF(isPro)
 }
 
-export async function uploadFastPDFNotebookFromPath(filePath, isPro = false) {
-  return await appBridge().UploadFastPDFNotebookFromPath(filePath, isPro)
+export async function uploadDeepStructuredPDFFromPath(sourcePath, isPro = false) {
+  return await appBridge().UploadDeepStructuredPDFFromPath(sourcePath, isPro)
+}
+
+export async function upgradeNotebookToDeepPDF(notebookID) {
+  return await appBridge().UpgradeNotebookToDeepPDF(notebookID)
 }
 
 export function uploadNotebook(fileBytes, fileName) {
   return appBridge().UploadNotebook(fileBytes, fileName)
-}
-
-export function uploadNotebookFromPath(filePath) {
-  return appBridge().UploadNotebookFromPath(filePath)
 }
 
 export function draftNotebookSyllabus(notebookID, regenerate = false) {
@@ -349,14 +349,6 @@ export function cancelExtensionSetup() {
 
 export function runExtension(id, input = '', isPro = false) {
   return appBridge().RunExtension(id, input, !!isPro)
-}
-
-export function installExtensionZip(zipPath) {
-  return appBridge().InstallExtensionZip(zipPath)
-}
-
-export function uninstallExtension(id) {
-  return appBridge().UninstallExtension(id)
 }
 
 export function simplifyReadingContent(content) {

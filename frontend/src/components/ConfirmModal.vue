@@ -185,12 +185,12 @@ onUnmounted(() => {
   width: 100%;
   max-width: 420px;
   background: var(--surface-container-lowest, #18181b);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--outline-variant);
   border-radius: 16px;
   padding: 24px;
   box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.4),
-    0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    0 20px 25px -5px rgba(0, 0, 0, 0.12),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -217,19 +217,19 @@ onUnmounted(() => {
 .dialog-icon-wrapper.danger {
   background: rgba(239, 68, 68, 0.2);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid var(--outline-variant);
 }
 
 .dialog-icon-wrapper.warning {
   background: rgba(245, 158, 11, 0.2);
   color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border: 1px solid var(--outline-variant);
 }
 
 .dialog-icon-wrapper.info {
   background: rgba(59, 130, 246, 0.2);
   color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  border: 1px solid var(--outline-variant);
 }
 
 .dialog-titles {
@@ -269,7 +269,7 @@ onUnmounted(() => {
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
   transition: all 0.15s ease;
 }
 
@@ -280,7 +280,7 @@ onUnmounted(() => {
 .cancel-btn {
   background: transparent;
   color: var(--muted-text, #a1a1aa);
-  border-color: var(--border-color, rgba(255, 255, 255, 0.12));
+  border-color: var(--outline-variant);
 }
 
 .cancel-btn:hover {

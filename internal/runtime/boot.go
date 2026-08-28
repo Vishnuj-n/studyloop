@@ -65,6 +65,11 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 	res.Repo = repo
 	utils.Infof("Database initialized at %s (extension pre-load phase)", dbPath)
 
+	// Clean up any interrupted extractions from a crash or sudden app close
+	if resetErr := res.Repo.ResetInterruptedNotebookStatuses(); resetErr != nil {
+		utils.Warnf("failed to reset interrupted notebook statuses: %v", resetErr)
+	}
+
 	// Check if RAG is enabled in database
 	ragEnabled, err := res.Repo.GetRAGEnabled()
 	if err != nil {

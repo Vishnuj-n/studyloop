@@ -25,6 +25,7 @@
       :upload-error="uploadError"
       :success-message="successMessage"
       @upload-file="uploadFile"
+      @upload-deep-structured="handleDeepStructuredUpload"
       @upload-youtube="uploadYouTube"
     />
 
@@ -41,8 +42,11 @@
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
+          :is-pro="isPro"
+          :extraction-progress="extractionProgressMap[notebook.id]"
           variant="active"
           @edit-syllabus="openSyllabusDraft"
+          @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
           @delete="deleteNotebook"
@@ -79,9 +83,12 @@
           :rag-enabled="ragEnabled"
           :rag-notebook-chapter="ragNotebookChapter"
           :is-cloud-profile="isCloudProfile"
+          :is-pro="isPro"
+          :extraction-progress="extractionProgressMap[notebook.id]"
           variant="dormant"
           :active-limit-reached="activeNotebooks.length >= 4"
           @edit-syllabus="openSyllabusDraft"
+          @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
           @delete="deleteNotebook"
@@ -141,7 +148,7 @@ import {
   getAvailableTopics,
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
-  uploadFastPDFNotebook as apiUploadFastPDFNotebook,
+  selectAndUploadDeepStructuredPDF,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
@@ -149,6 +156,7 @@ import {
   updateNotebookTitle as apiUpdateNotebookTitle,
   updateNotebookPriority as apiUpdateNotebookPriority,
   deleteNotebook as apiDeleteNotebook,
+  upgradeNotebookToDeepPDF as apiUpgradeNotebookToDeepPDF,
   updateNotebookStudyStatus,
   getUserSettings,
 } from '../services/appApi'
@@ -163,7 +171,7 @@ import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import { useDialog } from '../composables/useDialog'
 
-const { confirm: confirmDialog } = useDialog()
+const { confirm: confirmDialog, alert: alertDialog } = useDialog()
 const { isPro } = useClerkAuth()
 const route = useRoute()
 
@@ -294,22 +302,25 @@ function clearActionToastTimer() {
   }
 }
 
+const extractionProgressMap = ref({})
+
 function handleIngestionProgress(payload) {
   if (!payload) {
     return
   }
 
-  // Handle ingestion / parsing progress
-  if (!ingestionNotebookID.value && payload.notebook_id) {
-    ingestionNotebookID.value = payload.notebook_id
+  // Live deep extraction progress on card
+  if (payload.notebook_id && payload.phase === 'extraction') {
+    extractionProgressMap.value[payload.notebook_id] = {
+      percent: typeof payload.percent === 'number' ? payload.percent : 0,
+      message: payload.message || '',
+      processed: payload.processed || 0,
+      total: payload.total || 0,
+    }
   }
 
-  const isCurrentIngestion =
-    !ingestionNotebookID.value ||
-    !payload.notebook_id ||
-    payload.notebook_id === ingestionNotebookID.value
-
-  if (isCurrentIngestion) {
+  // Handle upload dropzone progress only for active new file uploads
+  if (ingestionNotebookID.value && payload.notebook_id === ingestionNotebookID.value) {
     if (typeof payload.percent === 'number') {
       uploadProgress.value = payload.percent
     }
@@ -328,6 +339,15 @@ function handleIngestionProgress(payload) {
 
   const terminalStates = new Set(['failed', 'chunked', 'indexed', 'draft_ready'])
   if (typeof payload.status === 'string' && terminalStates.has(payload.status)) {
+    if (payload.status === 'draft_ready') {
+      showToast('✨ Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
+    } else if (payload.status === 'failed') {
+      showToast(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
+    }
+    // Clear stale progress so the spinner doesn't linger on the card
+    if (payload.notebook_id) {
+      delete extractionProgressMap.value[payload.notebook_id]
+    }
     void loadNotebooks()
   }
 }
@@ -399,12 +419,58 @@ async function uploadYouTube(url) {
   }
 }
 
-async function uploadFile(file, options = {}) {
+async function handleDeepStructuredUpload() {
   uploadError.value = ''
   successMessage.value = ''
-  ingestionStatusMessage.value = options.engine === 'fast_pdf'
-    ? 'Processing with Deep Structured Markdown parser...'
-    : ''
+  try {
+    const result = await selectAndUploadDeepStructuredPDF(isPro.value)
+    if (result?.canceled) {
+      return
+    }
+    if (result?.error) {
+      throw new Error(result.error)
+    }
+    await loadNotebooks()
+    await alertDialog({
+      title: '⚡ Deep Structure Analysis Started',
+      message: `Deep extraction is running in the background for '${result?.file_name || 'book'}'.\n\nFor large textbooks (100+ pages), this will take several minutes. You can safely continue studying other topics or close this dialog. You will receive an in-app notice as soon as your chapter syllabus is ready.`,
+      confirmText: 'Got it, continue',
+      type: 'info',
+    })
+  } catch (error) {
+    uploadError.value = `Deep extraction failed to start: ${error.message}`
+  }
+}
+
+async function handleUpgradeToDeepPDF(notebookID) {
+  uploadError.value = ''
+  successMessage.value = ''
+  try {
+    const target = notebooks.value.find((n) => n.id === notebookID)
+    const bookTitle = target?.title || 'this textbook'
+
+    const result = await apiUpgradeNotebookToDeepPDF(notebookID)
+    if (result?.error) {
+      throw new Error(result.error)
+    }
+
+    await loadNotebooks()
+    actionToastMessage.value = `⚡ Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`
+    showActionToast.value = true
+    setTimeout(() => {
+      showActionToast.value = false
+    }, 5000)
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    uploadError.value = `Upgrade failed: ${msg}`
+    showToast(`⚠️ Upgrade failed: ${msg}`)
+  }
+}
+
+async function uploadFile(file) {
+  uploadError.value = ''
+  successMessage.value = ''
+  ingestionStatusMessage.value = ''
   ingestionNotebookID.value = ''
   draftError.value = ''
   uploadProgress.value = 10
@@ -428,20 +494,10 @@ async function uploadFile(file, options = {}) {
   }
 
   try {
-    let result
-    if (options.engine === 'fast_pdf') {
-      uploadProgress.value = 5
-      ingestionStatusMessage.value = 'Starting Deep Structured Markdown extraction...'
-
-      const arrayBuffer = await file.arrayBuffer()
-      const bytes = new Uint8Array(arrayBuffer)
-      result = await apiUploadFastPDFNotebook(Array.from(bytes), file.name, isPro.value)
-    } else {
-      const arrayBuffer = await file.arrayBuffer()
-      const bytes = new Uint8Array(arrayBuffer)
-      uploadProgress.value = 50
-      result = await apiUploadNotebook(Array.from(bytes), file.name)
-    }
+    const arrayBuffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuffer)
+    uploadProgress.value = 50
+    const result = await apiUploadNotebook(Array.from(bytes), file.name)
 
     if (result?.error) {
       throw new Error(result.error)
@@ -451,19 +507,14 @@ async function uploadFile(file, options = {}) {
       ingestionNotebookID.value = result.id
     }
 
-    if (options.engine === 'fast_pdf') {
-      showToast(`'${result?.file_name || file.name}' uploaded. Deep extraction running in background...`)
-      await loadNotebooks()
+    if (result?.status === 'chunked') {
+      ingestionStatusMessage.value = 'Chunking complete'
     } else {
-      if (result?.status === 'chunked') {
-        ingestionStatusMessage.value = 'Chunking complete'
-      } else {
-        ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
-      }
-      successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
-      if (result?.id) {
-        await openSyllabusDraft(result.id, result?.file_name || '')
-      }
+      ingestionStatusMessage.value = 'Uploaded. Drafting syllabus for review...'
+    }
+    successMessage.value = `Upload successful${result?.file_name ? `: ${result.file_name}` : ''}`
+    if (result?.id) {
+      await openSyllabusDraft(result.id, result?.file_name || '')
     }
 
     uploadProgress.value = 100
@@ -853,7 +904,7 @@ async function updatePriority(notebookId, priority) {
   color: #fff;
   border-radius: 14px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--outline-variant);
 }
 
 .fallback-toast-inner {

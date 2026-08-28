@@ -301,7 +301,7 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   padding: 14px 18px;
   border-radius: 12px;
@@ -336,7 +336,7 @@ onMounted(async () => {
 .spinner {
   width: 42px;
   height: 42px;
-  border: 4px solid var(--surface-container-highest);
+  border: 4px solid var(--outline-variant);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

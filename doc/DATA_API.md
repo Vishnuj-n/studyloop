@@ -151,7 +151,7 @@ Returns joined text of all sections in a topic (used by SocraticRescue).
 ## SocraticRescue API
 
 ### CompleteSocraticRescue
-Completes rescue session, inserts fresh QUIZ task with `"source": "socratic_rescue_requiz"`. Queue unblocks.
+Completes rescue session via `TransitionTask(EventCompleteSocraticRescue)`, inserts fresh QUIZ task with `"source": "socratic_rescue_requiz"`. Queue unblocks.
 
 ### DevForceSocraticRescue
 Dev-only: forces topic into SOCRATIC_REMEDIAL state. Requires `APP_ENV=dev`.
@@ -220,13 +220,6 @@ const (
 
 ### Generation Status (Quiz Tasks)
 `GENERATING` → `READY` or `FAILED`
-
----
-
-## Dashboard Streak API
-
-### GetStreakState
-Returns current_streak, longest_streak, active_dates[] for calendar widget. Timezone-aware.
 
 ---
 

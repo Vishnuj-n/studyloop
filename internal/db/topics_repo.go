@@ -114,17 +114,14 @@ func (r *Repository) UpdateTopicPageBounds(topicID string, startPage, endPage in
 		shrunk := (previousStart > 0 && startPage > 0 && startPage > previousStart) ||
 			(previousEnd > 0 && endPage > 0 && endPage < previousEnd)
 
-		// Initialize cursor to startPage if uninitialized (0), otherwise clamp to new bounds
+		// Initialize cursor to 0 if uninitialized (0), otherwise clamp to new bounds
 		var newCursor int
 		if currentCursor == 0 {
-			newCursor = startPage
-			if newCursor < 0 {
-				newCursor = 0
-			}
+			newCursor = 0
 		} else {
 			// Clamp cursor to new bounds
 			if currentCursor < startPage {
-				newCursor = startPage
+				newCursor = 0
 			} else if currentCursor > endPage {
 				newCursor = endPage
 			} else {
@@ -206,17 +203,14 @@ func (r *Repository) UpdateTopicPageBoundsBatch(items []TopicPageBoundsBatchItem
 			shrunk := (previousStart > 0 && startPage > 0 && startPage > previousStart) ||
 				(previousEnd > 0 && endPage > 0 && endPage < previousEnd)
 
-			// Initialize cursor to startPage if uninitialized (0), otherwise clamp to new bounds
+			// Initialize cursor to 0 if uninitialized (0), otherwise clamp to new bounds
 			var newCursor int
 			if currentCursor == 0 {
-				newCursor = startPage
-				if newCursor < 0 {
-					newCursor = 0
-				}
+				newCursor = 0
 			} else {
 				// Clamp cursor to new bounds
 				if currentCursor < startPage {
-					newCursor = startPage
+					newCursor = 0
 				} else if currentCursor > endPage {
 					newCursor = endPage
 				} else {
@@ -556,7 +550,7 @@ func (r *Repository) MarkTopicExternalHelpRequiredTx(tx *sql.Tx, topicID string)
 	}
 	res, err := tx.Exec(`
 		UPDATE topics
-		SET external_help_required = 1, updated_at = CURRENT_TIMESTAMP
+		SET external_help_required = 1, status = 'completed', updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, topicID)
 	if err != nil {
@@ -596,4 +590,22 @@ func (r *Repository) MarkTopicCompletedTx(tx *sql.Tx, topicID string) error {
 	return nil
 }
 
-
+// IsTopicFullyReadTx returns true if the topic has a valid end_page and the current_page_cursor reaches or exceeds it.
+func (r *Repository) IsTopicFullyReadTx(tx *sql.Tx, topicID string) (bool, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return false, fmt.Errorf("topic id is required")
+	}
+	var endPage, cursor int
+	err := tx.QueryRow(`
+		SELECT COALESCE(end_page, 0), COALESCE(current_page_cursor, 0)
+		FROM topics WHERE id = ?
+	`, topicID).Scan(&endPage, &cursor)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return endPage > 0 && cursor >= endPage, nil
+}

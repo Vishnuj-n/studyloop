@@ -7,7 +7,7 @@ const STORAGE_KEY = 'studyloop_extensions_enabled'
 // Official extensions are enabled by default out-of-the-box
 const DEFAULT_ENABLED_EXTENSIONS = {
   text_simplifier: true,
-  fast_pdf: true,
+  deep_pdf: true,
   youtube: true,
   audio_overview: true,
 }

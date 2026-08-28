@@ -190,15 +190,16 @@ Intentionally removed:
 ### How
 
 **Sliding Window Parameters:**
-- **Chunk size**: 2500 words
-- **Overlap**: 200 words between chunks
+- **Embedding Chunk size**: 500 words (bounds: 350–650 words)
+- **Reading Session Window**: 2,500–3,000 words
+- **Overlap**: Sentence / paragraph boundary aware (no arbitrary mid-sentence cuts)
+- **Code & Markdown**: Tables and code blocks kept intact via markdown chunking
 
-**Pipeline:**
-
-1. PDF Upload → Extract text with page numbers
-2. Chapter Selection → User reviews/prunes extracted chapters (AI cleanup with graceful fallback)
-3. Sliding Window Chunking → Deterministic boundaries (no AI)
-4. **Insert READING tasks** → One task per chunk into `study_queue`
+Deterministic chunking pipeline:
+1. Ingest PDF / Markdown / TXT
+2. Split into ~500-word semantic chunks (preserving headings, tables, code)
+3. Sliding Window / Heading Chunking → Deterministic boundaries (no AI)
+4. **Insert READING tasks** → Sized for study sessions into `study_queue`
 
 **AI Cleanup Fallback (2026-07-11):**
 When user clicks "AI Clean Up" on notebook chapters, three-tier fallback on LLM failure:
@@ -629,6 +630,19 @@ Student fails quiz twice on same topic → guided rescue flow:
 - `topics.external_help_required` boolean column tracks topics needing external review
 - `study_queue.task_type` accepts `SOCRATIC_REMEDIAL`
 - Re-quiz tasks include `"source": "socratic_rescue_requiz"` in payload for identification
+
+### Unified Queue Transition Router
+All study queue task transitions and completions are strictly routed through `StudyService.TransitionTask` in `internal/study/queue_transition.go` as the single switchboard:
+
+| Event | Source Task | Target / Result | Pipeline Actions |
+| :--- | :--- | :--- | :--- |
+| `COMPLETE_READING` | `READING` / `REREAD` | `QUIZ` (Pending) | Generates quiz questions and transitions task |
+| `SUBMIT_QUIZ` | `QUIZ` | `QuizResult` | Evaluates attempt, schedules reread/rescue/re-quiz/cards |
+| `COMPLETE_FLASHCARDS`| `FLASHCARD_GENERATE` | Terminal | Clears pending flashcard sync generation tasks |
+| `COMPLETE_FLASHCARD_REVIEW` | `FLASHCARD_REVIEW` | `COMPLETED` | Verifies zero remaining due cards and completes review session |
+| `COMPLETE_SOCRATIC_RESCUE` | `SOCRATIC_REMEDIAL` | `QUIZ` (Re-quiz) | Completes rescue session & inserts follow-up re-quiz |
+| `COMPLETE_MILESTONE_EXAM` | `MILESTONE_EXAM` | `COMPLETED` | Finalizes active milestone exam |
+| `FAIL_TASK` | Any | `FAILED` | Transactionally marks task status as failed |
 
 ### FLASHCARD_GENERATE Task
 

@@ -114,6 +114,21 @@ func (r *Repository) UpdateNotebookStatus(notebookID string, status string) erro
 	return nil
 }
 
+// ResetInterruptedNotebookStatuses resets any notebooks stuck in 'processing' or 'analyzing'
+// back to their prior stable state upon app restart (e.g. if the user abruptly closed the app).
+func (r *Repository) ResetInterruptedNotebookStatuses() error {
+	// If it already had chunks, it returns to 'chunked'; otherwise back to 'uploaded'
+	_, err := r.db.Exec(`
+		UPDATE notebooks
+		SET status = CASE 
+			WHEN chunk_count > 0 THEN 'chunked'
+			ELSE 'uploaded'
+		END
+		WHERE status IN ('processing', 'analyzing')
+	`)
+	return err
+}
+
 // UpdateNotebookIndexingStatus updates the notebook semantic indexing status.
 func (r *Repository) UpdateNotebookIndexingStatus(notebookID string, status string) error {
 	result, err := r.db.Exec(`
@@ -587,16 +602,6 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 		return fmt.Errorf("notebook id is required")
 	}
 	return r.withTx(func(tx *sql.Tx) error {
-		// Delete reading_progress for tasks associated with this notebook first
-		if _, err := tx.Exec(`
-			DELETE FROM reading_progress
-			WHERE task_id IN (
-				SELECT id FROM study_queue WHERE notebook_id = ?
-			)
-		`, notebookID); err != nil {
-			return err
-		}
-
 		// Delete quiz_attempts for tasks associated with this notebook
 		if _, err := tx.Exec(`
 			DELETE FROM quiz_attempts

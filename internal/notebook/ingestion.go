@@ -2,21 +2,13 @@ package notebook
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
 )
 
-var tableSeparatorRegex = regexp.MustCompile(`(?m)^\s*\|(?:\s*:?-+:?\s*\|)+\s*$`)
 
-func isMarkdownSection(text string) bool {
-	if strings.Contains(text, "\n#") || strings.HasPrefix(text, "#") || strings.Contains(text, "```") || strings.Contains(text, "|---") || strings.Contains(text, "-|-") {
-		return true
-	}
-	return tableSeparatorRegex.MatchString(text)
-}
 
 // BuildTopicGroupsFromChapters builds topic groups and chunks from document chapters.
 func BuildTopicGroupsFromChapters(notebookID string, doc *ExtractedDocument, topicIDs []string, chapters []models.SyllabusChapterDraft) ([]db.NotebookTopicIngestionGroup, []models.Chunk) {
@@ -49,7 +41,7 @@ func BuildTopicGroupsFromChapters(notebookID string, doc *ExtractedDocument, top
 		builder.order++
 
 		var chunkTexts []string
-		if isMarkdownSection(sectionText) {
+		if doc.IsMarkdown {
 			chunkTexts = SplitMarkdownIntoChunks(sectionText, DefaultChunkTargetWords)
 		} else {
 			chunkTexts = SplitPageIntoChunks(sectionText, DefaultChunkTargetWords)

@@ -110,7 +110,7 @@ defineProps({
   successMessage: { type: String, default: '' },
 })
 
-const emit = defineEmits(['upload-file', 'upload-youtube'])
+const emit = defineEmits(['upload-file', 'upload-deep-structured', 'upload-youtube'])
 const { confirm } = useDialog()
 const { isExtensionActive } = useExtensions()
 
@@ -123,16 +123,8 @@ const activeImporters = computed(() => getAvailableImporters(isExtensionActive))
 
 function openImporter(importer) {
   localError.value = ''
-  if (importer.fileType === 'pdf') {
-    const tempInput = document.createElement('input')
-    tempInput.type = 'file'
-    tempInput.accept = '.pdf'
-    tempInput.onchange = (e) => {
-      if (e.target.files?.length) {
-        emit('upload-file', e.target.files[0], { engine: importer.id })
-      }
-    }
-    tempInput.click()
+  if (importer.id === 'deep_pdf') {
+    emit('upload-deep-structured')
     return
   }
   activeModal.value = importer.modalName
@@ -422,7 +414,7 @@ function handleFileDrop(e) {
   margin-top: 12px;
   padding: 12px;
   background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   border-radius: 8px;
   font-size: 13.5px;
@@ -432,7 +424,7 @@ function handleFileDrop(e) {
   margin-top: 12px;
   padding: 12px;
   background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #10b981;
   border-radius: 8px;
   font-size: 13.5px;

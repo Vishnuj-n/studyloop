@@ -10,7 +10,7 @@ Generated from + must stay synchronized with `internal/db/schema.go`. Every `CRE
 
 | Layer         | Tables                                                                                  |
 | ------------- | --------------------------------------------------------------------------------------- |
-| Queue         | `study_queue`, `reading_progress`, `review_task_cards`                                  |
+| Queue         | `study_queue`, `review_task_cards`                                                      |
 | Content       | `notebooks`, `topics`, `chunks`, `notebook_topics`, `notebook_chunks`, `topic_progress` |
 | Assessment    | `quiz_attempts`, `reread_attempts`, `written_questions`, `written_user_answers`         |
 | Retention     | `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`                                    |
@@ -49,18 +49,6 @@ Central task table.
 CREATE INDEX idx_study_queue_status_priority_created ON study_queue(status, priority, created_at);
 CREATE INDEX idx_study_queue_notebook_status ON study_queue(notebook_id, status);
 ```
-
-### `reading_progress`
-
-Per-task reading cursor.
-
-| Field | Type | Description |
-|---|---|---|
-| `task_id` | TEXT PRIMARY KEY | FK → `study_queue(id)` |
-| `current_page` | INTEGER DEFAULT 0 | Last visited page |
-| `last_accessed_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
-
-**Foreign keys:** `task_id` → `study_queue(id)`.
 
 ### `review_task_cards`
 
@@ -435,7 +423,6 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 |---|---|---|---|
 | `study_queue` | `notebook_id` | `notebooks(id)` | None |
 | `study_queue` | `topic_id` | `topics(id)` | None |
-| `reading_progress` | `task_id` | `study_queue(id)` | None |
 | `review_task_cards` | `task_id` | `study_queue(id)` | ON DELETE CASCADE |
 | `review_task_cards` | `card_id` | `fsrs_cards(id)` | ON DELETE CASCADE |
 | `chunks` | `topic_id` | `topics(id)` | None |
@@ -490,4 +477,4 @@ These mappings documentation-only: code + live schema already use current table 
 5. Socratic rescue uses `external_help_required` flag on `topics` to prevent infinite rescue cycles.
 6. Long-term retention handled by `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`.
 7. Cloud sync failures insert `FLASHCARD_GENERATE` tasks at highest queue priority.
-8. Session-specific review mappings live in `review_task_cards`, per-task reading cursors live in `reading_progress`.
+8. Session-specific review mappings live in `review_task_cards`, canonical reading position lives in `topics.current_page_cursor`.

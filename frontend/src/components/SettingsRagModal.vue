@@ -61,7 +61,7 @@ defineEmits(['dismiss', 'start', 'finish'])
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +78,7 @@ defineEmits(['dismiss', 'start', 'finish'])
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
 }
 
 .modal-card h2 {
@@ -93,8 +93,8 @@ defineEmits(['dismiss', 'start', 'finish'])
 }
 
 .rag-setup-box {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 16px;
   margin: 20px 0;

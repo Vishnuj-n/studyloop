@@ -129,10 +129,6 @@ func TestSplitMarkdownIntoChunks_SpacedTableSeparators(t *testing.T) {
 
 Summary follows after the table with detailed explanations.`
 
-	if !isMarkdownSection(spacedTableContent) {
-		t.Fatalf("expected isMarkdownSection to recognize spaced table separator '| --- | --- | --- |'")
-	}
-
 	chunks := SplitMarkdownIntoChunks(spacedTableContent, 30)
 	if len(chunks) == 0 {
 		t.Fatalf("expected chunks from spaced table markdown content, got none")

@@ -133,7 +133,7 @@
           <div class="card-top">
             <div class="icon-box pro-icon">
               <!-- PDF (Deep PDF) icon -->
-              <svg v-if="ext.id === 'fast_pdf' || ext.id.includes('pdf')" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg v-if="ext.id === 'deep_pdf' || ext.id.includes('pdf')" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
                 <line x1="9" y1="15" x2="15" y2="15"></line>
@@ -179,7 +179,7 @@
 
           <div class="card-bottom">
             <button
-              v-if="isPro && (ext.id === 'fast_pdf' || ext.id.includes('pdf'))"
+              v-if="isPro && (ext.id === 'deep_pdf' || ext.id.includes('pdf'))"
               class="action-btn pro-action"
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/notebooks')"
@@ -833,98 +833,4 @@ input:checked + .slider:before {
   background: var(--surface-container);
 }
 
-/* Setup Modal Specific Styles */
-.setup-card {
-  max-width: 580px;
-}
-
-.setup-header-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.setup-icon-spinner {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-}
-
-.loading-spin-circle {
-  width: 18px;
-  height: 18px;
-  border: 2.5px solid var(--surface-container);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.setup-icon-success {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #2e7d32;
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: bold;
-}
-
-.setup-icon-error {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #c62828;
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  font-weight: bold;
-}
-
-.setup-desc {
-  font-size: 13.5px;
-  color: var(--muted-text);
-  line-height: 1.5;
-  margin: 0 0 16px 0;
-}
-
-.setup-logs-box {
-  background: var(--surface-container-low);
-  border-radius: 12px;
-  padding: 14px 16px;
-  font-family: 'SFMono-Regular', Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  max-height: 200px;
-  overflow-y: auto;
-  color: var(--on-surface);
-}
-
-.setup-log-line {
-  margin-bottom: 4px;
-}
-
-.log-pending {
-  color: var(--primary);
-  font-style: italic;
-}
-
-.modal-action-btn.retry-btn {
-  padding: 8px 18px;
-  border-radius: 10px;
-  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
-  color: var(--on-primary);
-  border: none;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  margin-right: 8px;
-}
 </style>

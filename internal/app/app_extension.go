@@ -238,41 +238,6 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 	}
 }
 
-// InstallExtensionZip installs a packaged extension from a local zip file.
-func (a *App) InstallExtensionZip(zipPath string) map[string]interface{} {
-	if a.extManager == nil {
-		return map[string]interface{}{"error": "extension system not initialized"}
-	}
-
-	ext, err := a.extManager.InstallZip(zipPath)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return map[string]interface{}{
-		"success": true,
-		"id":      ext.ID(),
-		"name":    ext.Name(),
-		"tier":    ext.Manifest.Tier,
-	}
-}
-
-// UninstallExtension removes an extension from the system.
-func (a *App) UninstallExtension(id string) map[string]interface{} {
-	if a.extManager == nil {
-		return map[string]interface{}{"error": "extension system not initialized"}
-	}
-
-	if err := a.extManager.Uninstall(id); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return map[string]interface{}{
-		"success": true,
-		"id":      id,
-	}
-}
-
 // SimplifyReadingContent takes dense text content and simplifies it using the LLM
 // while preserving all core technical concepts, formulas, and definitions.
 func (a *App) SimplifyReadingContent(content string) map[string]interface{} {
