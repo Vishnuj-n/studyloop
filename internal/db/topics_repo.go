@@ -550,7 +550,7 @@ func (r *Repository) MarkTopicExternalHelpRequiredTx(tx *sql.Tx, topicID string)
 	}
 	res, err := tx.Exec(`
 		UPDATE topics
-		SET external_help_required = 1, updated_at = CURRENT_TIMESTAMP
+		SET external_help_required = 1, status = 'completed', updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`, topicID)
 	if err != nil {

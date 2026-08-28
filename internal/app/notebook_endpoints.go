@@ -451,24 +451,18 @@ func (a *App) getNotebookAndRepo(notebookID string) (*db.Repository, *models.Not
 	return repo, nb, nil
 }
 
-func persistSyllabusDraft(repo *db.Repository, notebookID string, pageCount int, chapters []models.SyllabusChapterDraft, fallbackUsed bool) map[string]interface{} {
+func persistSyllabusDraft(repo *db.Repository, notebookID string, pageCount int, chapters []models.SyllabusChapterDraft, fallbackUsed bool) error {
 	draftJSON, err := json.Marshal(models.SyllabusDraft{PageCount: pageCount, Chapters: chapters, FallbackUsed: fallbackUsed})
 	if err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to marshal draft: %v", err)}
+		return fmt.Errorf("failed to marshal draft: %w", err)
 	}
 	if err := repo.UpdateNotebookSyllabusDraft(notebookID, string(draftJSON)); err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to persist syllabus draft: %v", err)}
+		return fmt.Errorf("failed to persist syllabus draft: %w", err)
 	}
 	if err := repo.UpdateNotebookStatus(notebookID, "draft_ready"); err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to update status to draft_ready: %v", err)}
+		return fmt.Errorf("failed to update status to draft_ready: %w", err)
 	}
-	return map[string]interface{}{
-		"notebook_id":   notebookID,
-		"page_count":    pageCount,
-		"chapters":      chapters,
-		"status":        "draft_ready",
-		"fallback_used": fallbackUsed,
-	}
+	return nil
 }
 
 // DraftNotebookSyllabus creates editable chapter ranges for HITL verification.
@@ -535,7 +529,16 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 			chapters = []models.SyllabusChapterDraft{{Title: title, StartPage: 1, EndPage: doc.PageCount}}
 		}
 
-		return persistSyllabusDraft(repo, notebookID, doc.PageCount, chapters, fallbackUsed)
+		if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, chapters, fallbackUsed); err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		return map[string]interface{}{
+			"notebook_id":   notebookID,
+			"page_count":    doc.PageCount,
+			"chapters":      chapters,
+			"status":        "draft_ready",
+			"fallback_used": fallbackUsed,
+		}
 	}
 
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
@@ -552,7 +555,16 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
-	return persistSyllabusDraft(repo, notebookID, doc.PageCount, result.Chapters, result.FallbackUsed)
+	if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, result.Chapters, result.FallbackUsed); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"notebook_id":   notebookID,
+		"page_count":    doc.PageCount,
+		"chapters":      result.Chapters,
+		"status":        "draft_ready",
+		"fallback_used": result.FallbackUsed,
+	}
 }
 
 // AICleanupNotebookSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.

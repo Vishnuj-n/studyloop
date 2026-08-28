@@ -85,7 +85,7 @@
         ✨ Ingest Book
       </button>
       <button
-        v-else-if="canUpgradeDeep"
+        v-else-if="variant === 'active' && canUpgradeDeep"
         class="btn-upgrade-deep"
         title="Re-extract with deep structured analysis for rich tables, code blocks, and headings"
         @click="$emit('upgrade-deep', notebook.id)"

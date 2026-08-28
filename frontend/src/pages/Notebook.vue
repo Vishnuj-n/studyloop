@@ -344,6 +344,10 @@ function handleIngestionProgress(payload) {
     } else if (payload.status === 'failed') {
       showToast(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
     }
+    // Clear stale progress so the spinner doesn't linger on the card
+    if (payload.notebook_id) {
+      delete extractionProgressMap.value[payload.notebook_id]
+    }
     void loadNotebooks()
   }
 }
