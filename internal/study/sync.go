@@ -249,6 +249,11 @@ func syncAnalyticsFallback(repo *db.Repository) error {
 		researchToken = DefaultResearchAnalyticsAnonKey
 	}
 
+	if researchURL == "" || researchToken == "" {
+		// Analytics endpoint/credentials not configured; skip upload cleanly
+		return nil
+	}
+
 	jsonBytes, err := json.Marshal(events)
 	if err != nil {
 		return fmt.Errorf("failed to marshal fallback analytics: %w", err)
