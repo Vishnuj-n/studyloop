@@ -30,9 +30,10 @@
   - Read-only binaries live in `%PROGRAMFILES64%\Studyloop\bin\uv.exe`.
   - User-writable virtual environments live in `%APPDATA%\Studyloop\extensions\<id>\.venv\` (or `./dev_data/extensions/` in dev mode).
 
-### B. PyArmor Obfuscation in Build Pipeline
-- `scripts/obfuscate.py` automatically scans `extensions/`, obfuscates Python scripts with **PyArmor** into `build/bin/extensions/`, and preserves manifests and requirements.
-- `scripts/build.py` automatically checks for `build/bin/uv.exe` (downloading it via `scripts/install_uv.py` if missing), obfuscates extensions, and executes `wails build -nsis`.
+### B. Portable Bytecode Compilation in Build Pipeline
+- `scripts/obfuscate.py` automatically scans `extensions/`, injects the build-time authorization secret (`__STUDYLOOP_SECRET__`), stages Python scripts into `build/bin/extensions/`, and compiles portable bytecode (`.pyc`) with fallback/optional PyArmor support.
+- Standard Python / `.pyc` distribution ensures zero native DLL conflicts (like `pyarmor_runtime.pyd`) across different user Python installations (Python 3.10 through 3.14+).
+- `scripts/build.py` automatically checks for `build/bin/uv.exe` (downloading it via `scripts/install_uv.py` if missing), stages extensions, and executes `wails build -nsis`.
 
 ### C. Reusable Verification Popup Modal
 - Created `frontend/src/components/ExtensionSetupModal.vue` as a shared component.
@@ -49,7 +50,7 @@
 | Component | File Path | Description |
 |---|---|---|
 | **Build Automation** | `scripts/install_uv.py` | Cross-platform multi-architecture `uv` binary downloader. |
-| **Build Automation** | `scripts/obfuscate.py` | PyArmor extension obfuscator with fallback bytecode compilation. |
+| **Build Automation** | `scripts/obfuscate.py` | Extension staging, secret injector, and portable bytecode compiler. |
 | **Build Automation** | `scripts/build.py` | Orchestrates `install_uv`, `obfuscate`, and `wails build -nsis`. |
 | **Go Extension Engine** | `internal/extension/uv.go` | Locates `uv.exe` and resolves user-writable `.venv` paths. |
 | **Go Extension Engine** | `internal/extension/checker.go` | `CheckReadiness`, `SetupExtensionEnv`, and smoke test runner. |
@@ -66,7 +67,8 @@
 
 1. **Go Unit & Integration Tests**:
    - `go test ./...` passed with exit code 0.
-2. **PyArmor Obfuscation Test**:
-   - `python scripts/obfuscate.py` successfully obfuscated `youtube` and `audio_overview` extensions into `build/bin/extensions/` with PyArmor runtime.
+2. **Extension Staging & Bytecode Compilation**:
+   - `python scripts/obfuscate.py` successfully staged `youtube`, `audio_overview`, and `deep_pdf` extensions into `build/bin/extensions/` with compiled `.pyc` and secret injection.
 3. **Frontend Production Build**:
    - `npm --prefix frontend run build` built all Vue components and assets into `dist/` with exit code 0.
+
