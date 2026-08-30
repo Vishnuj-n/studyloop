@@ -75,7 +75,7 @@
                 type="checkbox"
                 :checked="isExtensionEnabled(ext.id)"
                 :disabled="isSettingUp(ext.id)"
-                @change="handleToggle(ext)"
+                @click.prevent="handleToggle(ext)"
               />
               <span class="slider"></span>
             </label>
@@ -169,7 +169,7 @@
                 type="checkbox"
                 :checked="isPro && isExtensionEnabled(ext.id)"
                 :disabled="isSettingUp(ext.id)"
-                @change="handleProToggle(ext)"
+                @click.prevent="handleProToggle(ext)"
               />
               <span class="slider"></span>
             </label>

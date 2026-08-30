@@ -4,12 +4,12 @@ import { listExtensions } from '../services/appApi'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 
-// Official extensions are enabled by default out-of-the-box
+// Built-in lightweight extensions are enabled by default; external/python tools require explicit setup & opt-in
 const DEFAULT_ENABLED_EXTENSIONS = {
   text_simplifier: true,
-  deep_pdf: true,
-  youtube: true,
-  audio_overview: true,
+  deep_pdf: false,
+  youtube: false,
+  audio_overview: false,
 }
 
 function loadPersistedState() {

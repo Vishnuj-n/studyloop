@@ -79,7 +79,7 @@
       <button
         v-else-if="needsIngestion"
         class="btn-ingest"
-        title="Extract bookmarks and run AI cleanup"
+        :title="isCloudProfile ? 'Extract bookmarks and run AI cleanup for cloud assignment' : 'Extract bookmarks and run AI cleanup'"
         @click="$emit('edit-syllabus', notebook.id, notebook.title)"
       >
         ✨ Ingest Book
@@ -100,7 +100,7 @@
         Sleep
       </button>
       <button
-        v-else-if="variant === 'dormant'"
+        v-else-if="variant === 'dormant' && !needsIngestion"
         class="btn-activate"
         :disabled="activeLimitReached"
         @click="$emit('change-status', notebook.id, 'active')"

@@ -168,7 +168,38 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 	_ = repo.UpdateNotebookStatus(uploadResult.ID, "uploaded")
 
 	// Run deep extraction asynchronously in background — zero main thread blocking
-	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
+	a.runDeepPDFExtraction(uploadResult.ID, uploadResult.FilePath, title, ext, "uploaded", "dormant")
+
+	return map[string]interface{}{
+		"id":            uploadResult.ID,
+		"file_name":     title,
+		"file_type":     uploadResult.FileType,
+		"size":          uploadResult.Size,
+		"page_count":    0,
+		"word_count":    0,
+		"chunk_count":   0,
+		"indexed_count": 0,
+		"failed_count":  0,
+		"status":        "processing",
+	}
+}
+
+func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *extension.Extension, prevStatus, prevStudyStatus string) {
+	repo := a.getRepo()
+	if repo == nil {
+		return
+	}
+
+	_ = repo.UpdateNotebookStatus(nbID, "processing")
+	emitIngestionProgress(a, ingestionProgressPayload{
+		NotebookID: nbID,
+		Status:     "processing",
+		Message:    "Starting Deep Structured extraction...",
+		Phase:      "extraction",
+		Percent:    10,
+	})
+
+	go func() {
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
 		ctx := context.Background()
 
@@ -188,10 +219,15 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
 		if extErr != nil {
 			utils.Warnf("[DEEP_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
-			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			fallbackStatus := "failed"
+			if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
+				fallbackStatus = prevStatus
+			}
+			_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
+			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
-				Status:     "failed",
+				Status:     fallbackStatus,
 				Message:    fmt.Sprintf("Extraction failed: %v", extErr),
 			})
 			return
@@ -199,13 +235,6 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 
 		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
-			_ = repo.UpdateNotebookStatus(nbID, "failed")
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     "failed",
-				Message:    fmt.Sprintf("Failed to update page count: %v", err),
-			})
-			return
 		}
 
 		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
@@ -221,10 +250,11 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
-			_ = repo.UpdateNotebookStatus(nbID, "failed")
+			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
+			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
-				Status:     "failed",
+				Status:     prevStatus,
 				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
 			})
 			return
@@ -235,20 +265,7 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 			Status:     "draft_ready",
 			Message:    "Syllabus draft ready",
 		})
-	}(uploadResult.ID, uploadResult.FilePath, title, ext)
-
-	return map[string]interface{}{
-		"id":            uploadResult.ID,
-		"file_name":     title,
-		"file_type":     uploadResult.FileType,
-		"size":          uploadResult.Size,
-		"page_count":    0,
-		"word_count":    0,
-		"chunk_count":   0,
-		"indexed_count": 0,
-		"failed_count":  0,
-		"status":        "uploaded",
-	}
+	}()
 }
 
 // UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
@@ -1114,7 +1131,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 
 // UpgradeNotebookToDeepPDF re-extracts an existing PDF using the deep_pdf (PyMuPDF) engine.
 func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{} {
-	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
+	_, nb, errResp := a.getNotebookAndRepo(notebookID)
 	if errResp != nil {
 		return errResp
 	}
@@ -1128,90 +1145,8 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		ext, _ = a.extManager.Get("deep_pdf")
 	}
 
-	// Update status to processing and sleep/dormant to avoid outdated queue tasks while re-parsing
-	if err := repo.UpdateNotebookStatus(notebookID, "processing"); err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook status: %v", err)}
-	}
-	_ = repo.UpdateNotebookStudyStatus(notebookID, "dormant")
-
-	emitIngestionProgress(a, ingestionProgressPayload{
-		NotebookID: notebookID,
-		Status:     "processing",
-		Message:    "Starting Deep Structured extraction...",
-		Phase:      "extraction",
-		Percent:    10,
-	})
-
-	prevStatus := nb.Status
-	prevStudyStatus := nb.StudyStatus
-
-	go func(nbID, filePath, fileName string, extObj *extension.Extension) {
-		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
-		ctx := context.Background()
-
-		onProgress := func(processed, total, percent int, message string) {
-			utils.Infof("[DEEP_PDF] %s (%s): %s (%d%%)", fileName, nbID, message, percent)
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     "processing",
-				Message:    message,
-				Phase:      "extraction",
-				Processed:  processed,
-				Total:      total,
-				Percent:    percent,
-			})
-		}
-
-		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
-		if extErr != nil {
-			utils.Warnf("[DEEP_PDF] Upgrade failed for %s (%s): %v", fileName, nbID, extErr)
-			fallbackStatus := "failed"
-			if nb.ChunkCount > 0 {
-				fallbackStatus = prevStatus
-			}
-			_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
-			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     fallbackStatus,
-				Message:    fmt.Sprintf("Deep PDF extraction failed: %v", extErr),
-			})
-			return
-		}
-
-		if err := repo.UpdateNotebookPageCount(nbID, doc.PageCount); err != nil {
-			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
-		}
-
-		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
-		if len(chaptersDraft) == 0 {
-			chaptersDraft = []models.SyllabusChapterDraft{
-				{
-					Title:     fileName,
-					StartPage: 1,
-					EndPage:   doc.PageCount,
-				},
-			}
-		}
-
-		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
-			utils.Warnf("[DEEP_PDF] Failed to persist upgraded syllabus draft for %s (%s): %v", fileName, nbID, err)
-			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
-			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     prevStatus,
-				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
-			})
-			return
-		}
-
-		emitIngestionProgress(a, ingestionProgressPayload{
-			NotebookID: nbID,
-			Status:     "draft_ready",
-			Message:    "Deep PDF syllabus draft ready",
-		})
-	}(nb.ID, nb.FilePath, nb.Title, ext)
+	// Delegate to unified extraction worker
+	a.runDeepPDFExtraction(nb.ID, nb.FilePath, nb.Title, ext, nb.Status, nb.StudyStatus)
 
 	return map[string]interface{}{
 		"success":     true,

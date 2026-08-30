@@ -138,6 +138,7 @@ import {
   getOutlookCalendarUrl,
   downloadRoutineICS,
 } from '../services/calendarService'
+import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   settings: { type: Object, required: true },
@@ -160,13 +161,21 @@ function applyDurationPreset(preset) {
   emit('apply-duration-preset', preset)
 }
 
+function openExternalLink(url) {
+  try {
+    openURLInBrowser(url)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
 function openGoogle() {
   const url = getGoogleCalendarUrl(
     props.settings?.study_start_time,
     props.settings?.study_end_time,
     customStudyUrl.value
   )
-  window.open(url, '_blank')
+  openExternalLink(url)
 }
 
 function openOutlook() {
@@ -175,7 +184,7 @@ function openOutlook() {
     props.settings?.study_end_time,
     customStudyUrl.value
   )
-  window.open(url, '_blank')
+  openExternalLink(url)
 }
 
 function downloadICS() {
