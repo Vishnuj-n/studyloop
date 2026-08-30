@@ -239,27 +239,26 @@ func buildQuizContext(
 
 func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []string) string {
 	return strings.Join([]string{
-		"You are an expert academic tutor and quiz generator creating a quiz for spaced repetition study.",
+		"You are an expert academic tutor and quiz generator creating an immediate comprehension check quiz.",
 		"Return STRICT JSON only.",
 		fmt.Sprintf("Notebook: \"%s\"", notebookTitle),
 		fmt.Sprintf("Generate exactly %d multiple-choice questions grounded strictly and exclusively in the provided text chunks.", targetCount),
 		"",
 		"=== GROUNDING & NO-HALLUCINATION RULES ===",
-		"1. EVERY question must be answerable purely from the explicit facts and concepts present in the provided Chunks.",
+		"1. EVERY question must be answerable purely from the explicit concepts and explanations present in the provided Chunks.",
 		"2. NEVER ask meta-questions about the book, author, preface, target audience, difficulty level, prerequisites, table of contents, or overall structure (e.g. 'Which chapter covers X?', 'What is the lowest barrier to entry according to the author?', 'What does chapter N introduce?').",
-		"3. Focus solely on testing the subject matter concept, theory, technique, or formula described in the text.",
+		"3. Focus solely on testing the subject matter concept, mechanism, theory, technique, or reasoning described in the text.",
 		"",
-		"=== ADAPTIVE CONTENT RULES ===",
-		"Before generating questions, classify the text using the notebook title and provided content:",
-		"",
-		"- FACTUAL: Test specific facts, dates, names, formulas, definitions, and concrete data.",
-		"- CONCEPTUAL: Test core ideas, frameworks, reasoning, comparisons, principles, and cause-effect relationships.",
-		"- TECHNICAL: Prioritize definitions, terminology, algorithms, architectures, APIs, workflows, constraints, trade-offs, and practical application. Avoid theme- or opinion-based questions unless they describe a technical concept.",
+		"=== COMPREHENSION CHECK GUIDELINES (NO ROTE FACTS) ===",
+		"1. Focus strictly on CAUSE-AND-EFFECT, MECHANISMS, and 'WHY/HOW' outcomes rather than raw facts.",
+		"2. DO NOT test raw facts, dates, names, trivia, or direct keyword matching/definitions (e.g. avoid 'What is the definition of X?', 'Who created Y?', 'In what year...').",
+		"3. Every question should assess whether the reader understands how the concept works in practice (e.g., 'What happens when...?', 'Why does X lead to Y?', 'What is the consequence if...?').",
+		"4. Distractors (incorrect options) must represent plausible conceptual misunderstandings or inverted causal relationships, not obviously absurd answers.",
 		"",
 		"=== QUESTION RULES ===",
 		"Each question must have exactly 4 options.",
 		"correct_answer must match one option exactly.",
-		"AVOID yes/no questions. PREFER 'why', 'how', 'what is', 'explain' questions.",
+		"AVOID yes/no questions. PREFER 'why', 'how', 'what happens if', and 'what causes' questions.",
 		"",
 		"JSON schema: {\"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",
 		"Chunks:",
@@ -323,15 +322,10 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	maxOutputTokens := limits.MaxOutputTokens
 	utils.Warnf("[QUIZ_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
 
-	// Estimate token limits and budget
-	if maxInputTokens <= 0 {
-		return models.QuizTaskPayload{}, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
-	}
-	const baseOverheadTokens = 300
-	const safetyMarginTokens = 500
-	availableBudget := maxInputTokens - baseOverheadTokens - safetyMarginTokens
-	if availableBudget <= 0 {
-		return models.QuizTaskPayload{}, fmt.Errorf("insufficient token budget: maxInputTokens (%d) is too small for prompt overhead", maxInputTokens)
+	templatePrompt := buildQuizPrompt(notebookTitle, scaledQuizQuestionCount(0), nil)
+	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, templatePrompt)
+	if err != nil {
+		return models.QuizTaskPayload{}, fmt.Errorf("insufficient token budget: %w", err)
 	}
 
 	ctxRes, err := buildQuizContext(normalizedChunkIDs, chunkTextByID, availableBudget)

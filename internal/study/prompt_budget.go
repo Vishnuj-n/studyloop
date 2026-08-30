@@ -149,3 +149,55 @@ func BudgetChunksToLimit(chunks []models.ChunkWithContext, tokenBudget int) ([]m
 
 	return result, nil
 }
+
+// BudgetConversationHistory selects the most recent conversation messages that fit within the given token budget.
+// It iterates backwards from the newest message to the oldest message.
+func BudgetConversationHistory(history []map[string]string, tokenBudget int) ([]map[string]string, error) {
+	if len(history) == 0 || tokenBudget <= 0 {
+		return nil, nil
+	}
+
+	currentTokens := 0
+	var selected []map[string]string
+
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		role := "Student"
+		if msg["role"] == "assistant" {
+			role = "Tutor"
+		}
+		msgText := fmt.Sprintf("%s: %s\n", role, msg["content"])
+		msgTokens, err := embeddings.CountTokens(msgText)
+		if err != nil {
+			return nil, fmt.Errorf("error counting message tokens: %w", err)
+		}
+
+		if currentTokens+msgTokens > tokenBudget {
+			break
+		}
+
+		selected = append([]map[string]string{msg}, selected...)
+		currentTokens += msgTokens
+	}
+
+	return selected, nil
+}
+
+// BudgetTextSample truncates a sample text string to fit strictly within the specified token budget.
+func BudgetTextSample(sample string, tokenBudget int) (string, error) {
+	if sample == "" || tokenBudget <= 0 {
+		return "", nil
+	}
+
+	sampleTokens, err := embeddings.CountTokens(sample)
+	if err != nil {
+		return "", fmt.Errorf("failed to count sample tokens: %w", err)
+	}
+
+	if sampleTokens <= tokenBudget {
+		return sample, nil
+	}
+
+	return embeddings.TruncateToTokens(sample, tokenBudget)
+}
+
