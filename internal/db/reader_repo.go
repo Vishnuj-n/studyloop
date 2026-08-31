@@ -692,6 +692,12 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 					if ch.Text != "" {
 						bundle.RawContent = ch.Text
 					}
+
+					// ponytail: check if offline cached video exists in uploads/videos/<notebook_id>.mp4
+					videoPath := filepath.Join(filepath.Dir(filePath.String), "videos", fmt.Sprintf("%s.mp4", bundle.NotebookID))
+					if _, err := os.Stat(videoPath); err == nil {
+						bundle.CachedVideoURL = fmt.Sprintf("/notebooks/videos/%s.mp4", bundle.NotebookID)
+					}
 				}
 			}
 		}

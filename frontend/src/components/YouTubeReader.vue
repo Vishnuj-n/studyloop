@@ -1,9 +1,30 @@
 <template>
   <div class="youtube-player-container">
-    <div v-if="startSeconds > 0 || endSeconds > 0 || videoId" class="video-timecode-banner">
+    <div v-if="startSeconds > 0 || endSeconds > 0 || videoId || cachedVideoUrl" class="video-timecode-banner">
       <div class="timecode-info">
         <span v-if="startSeconds > 0 || endSeconds > 0" class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
         <span v-if="durationText" class="duration-badge">Duration: {{ durationText }}</span>
+
+        <!-- Source Mode Switcher (Local Offline vs Online YouTube) -->
+        <div v-if="cachedVideoUrl" class="source-toggle-group">
+          <button
+            type="button"
+            class="source-toggle-btn"
+            :class="{ active: sourceMode === 'local' }"
+            @click="sourceMode = 'local'"
+          >
+            💾 Offline Video
+          </button>
+          <button
+            type="button"
+            class="source-toggle-btn"
+            :class="{ active: sourceMode === 'youtube' }"
+            @click="sourceMode = 'youtube'"
+          >
+            🌐 YouTube Stream
+          </button>
+        </div>
+
         <button
           v-if="externalWatchUrl"
           type="button"
@@ -15,11 +36,30 @@
         </button>
         <span v-if="browserError" class="browser-error-msg">⚠️ {{ browserError }}</span>
       </div>
-      <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
+      <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">
+        This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.
+        <span v-if="sourceMode === 'local'" class="offline-active-hint">(Playing high-speed offline copy from disk)</span>
+      </p>
     </div>
 
     <div class="video-wrapper">
+      <!-- Local Video Player when offline/cached mode -->
+      <video
+        v-if="sourceMode === 'local' && cachedVideoUrl"
+        ref="videoRef"
+        :src="cachedVideoUrl"
+        class="video-element"
+        controls
+        autoplay
+        playsinline
+        @loadedmetadata="onVideoMetadata"
+        @canplay="onVideoMetadata"
+        @timeupdate="onTimeUpdate"
+      ></video>
+
+      <!-- Remote YouTube Iframe -->
       <iframe
+        v-else
         :src="embedUrl"
         class="youtube-iframe"
         frameborder="0"
@@ -50,12 +90,16 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import MarkdownReader from './MarkdownReader.vue'
 import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   embedUrl: {
+    type: String,
+    default: '',
+  },
+  cachedVideoUrl: {
     type: String,
     default: '',
   },
@@ -101,6 +145,19 @@ defineEmits(['complete'])
 
 const showTranscript = ref(true)
 const browserError = ref('')
+const videoRef = ref(null)
+// Default to local if cached video is available
+const sourceMode = ref(props.cachedVideoUrl ? 'local' : 'youtube')
+
+watch(
+  () => props.cachedVideoUrl,
+  (newVal) => {
+    if (newVal && !sourceMode.value) {
+      sourceMode.value = 'local'
+    }
+  },
+  { immediate: true }
+)
 
 const startSeconds = computed(() => {
   if (props.videoStartSeconds > 0) return props.videoStartSeconds
@@ -122,6 +179,47 @@ const endSeconds = computed(() => {
   }
 })
 
+let userInteractedPastEnd = false
+
+function onVideoMetadata() {
+  if (videoRef.value) {
+    userInteractedPastEnd = false
+    if (startSeconds.value > 0 && Math.abs(videoRef.value.currentTime - startSeconds.value) > 1) {
+      videoRef.value.currentTime = startSeconds.value
+    }
+  }
+}
+
+// ponytail: Auto-pause when chapter ends; user can press play again if they wish to continue
+function onTimeUpdate() {
+  if (!videoRef.value) return
+  const current = videoRef.value.currentTime
+
+  if (endSeconds.value > 0 && current >= endSeconds.value) {
+    if (!videoRef.value.paused && !userInteractedPastEnd) {
+      videoRef.value.pause()
+      userInteractedPastEnd = true
+    }
+  } else if (current < endSeconds.value) {
+    userInteractedPastEnd = false
+  }
+}
+
+watch(
+  [() => startSeconds.value, () => sourceMode.value],
+  async () => {
+    userInteractedPastEnd = false
+    await nextTick()
+    if (sourceMode.value === 'local' && videoRef.value) {
+      if (startSeconds.value > 0) {
+        videoRef.value.currentTime = startSeconds.value
+      } else {
+        videoRef.value.currentTime = 0
+      }
+    }
+  }
+)
+
 function formatTime(totalSeconds) {
   if (!totalSeconds || isNaN(totalSeconds) || totalSeconds < 0) return '0:00'
   const hrs = Math.floor(totalSeconds / 3600)
@@ -142,6 +240,7 @@ const durationText = computed(() => {
   if (mins > 0) return `${mins} min`
   return `${secs}s`
 })
+
 const videoId = computed(() => {
   if (!props.embedUrl) return ''
   const match = props.embedUrl.match(/\/embed\/([^/?#]+)/)
@@ -256,6 +355,44 @@ async function openInExternalBrowser() {
   line-height: 1.4;
 }
 
+.source-toggle-group {
+  display: inline-flex;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.source-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--on-surface-variant);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.source-toggle-btn.active {
+  background: var(--primary);
+  color: var(--on-primary, #ffffff);
+}
+
+.source-toggle-btn:not(.active):hover {
+  color: var(--on-surface);
+  background: var(--surface-container-highest);
+}
+
+.offline-active-hint {
+  color: var(--primary);
+  font-weight: 600;
+  margin-left: 6px;
+}
+
 .video-wrapper {
   position: relative;
   width: 100%;
@@ -266,6 +403,7 @@ async function openInExternalBrowser() {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
+.video-element,
 .youtube-iframe {
   position: absolute;
   top: 0;
@@ -273,6 +411,7 @@ async function openInExternalBrowser() {
   width: 100%;
   height: 100%;
   border: none;
+  object-fit: contain;
 }
 
 .transcript-drawer {
