@@ -405,8 +405,8 @@ onUnmounted(() => {
 .settings-workspace {
   display: flex;
   margin: -16px -20px;
-  height: calc(100vh - 32px);
-  max-height: calc(100vh - 32px);
+  height: calc(100% + 32px);
+  min-height: calc(100vh);
   overflow: hidden;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);

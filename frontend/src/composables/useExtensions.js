@@ -20,6 +20,12 @@ export const DEFAULT_EXTENSION_CONFIG = {
   text_simplifier: {
     level: 'eli15',
   },
+  youtube: {
+    cookies_browser: 'none',
+    cookies_file: '',
+    auto_download: false,
+    download_quality: '720p',
+  },
 }
 
 function loadPersistedState() {

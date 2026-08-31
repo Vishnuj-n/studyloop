@@ -51,7 +51,7 @@ func createMockYouTubeExt(t *testing.T, outputJSON string, exitCode int) (*exten
 
 func TestIngestYouTubeVideo_EmptyURL(t *testing.T) {
 	svc := NewService(t.TempDir())
-	doc, res, err := svc.IngestYouTubeVideo(context.Background(), "", nil, nil)
+	doc, res, err := svc.IngestYouTubeVideo(context.Background(), "", nil, nil, "", "")
 	if err == nil {
 		t.Fatalf("expected error for empty video URL, got nil")
 	}
@@ -97,7 +97,7 @@ func TestIngestYouTubeVideo_Success(t *testing.T) {
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
-	doc, res, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc12345", runner, ext)
+	doc, res, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc12345", runner, ext, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestIngestYouTubeVideo_ExtensionErrorPayload(t *testing.T) {
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
-	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext)
+	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext, "", "")
 	if err == nil || err.Error() != "Transcript is disabled for this video" {
 		t.Fatalf("expected extension error payload propagated, got: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestIngestYouTubeVideo_MalformedJSON(t *testing.T) {
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
-	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext)
+	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext, "", "")
 	if err == nil {
 		t.Fatalf("expected error for malformed json, got nil")
 	}
@@ -165,7 +165,7 @@ func TestIngestYouTubeVideo_EmptyChapters(t *testing.T) {
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
-	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext)
+	_, _, err := svc.IngestYouTubeVideo(context.Background(), "https://youtube.com/watch?v=abc", runner, ext, "", "")
 	if err == nil {
 		t.Fatalf("expected error for empty chapters, got nil")
 	}

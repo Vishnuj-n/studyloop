@@ -300,10 +300,32 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 		}
 	}
 
+	var cookiesBrowser, cookiesFile, downloadQuality string
+	var autoDownload bool
+	if extJSON, err := repo.GetExtensionConfig(); err == nil && extJSON != "" && extJSON != "{}" {
+		var extCfg map[string]map[string]interface{}
+		if err := json.Unmarshal([]byte(extJSON), &extCfg); err == nil {
+			if ytCfg, ok := extCfg["youtube"]; ok {
+				if cb, ok := ytCfg["cookies_browser"].(string); ok {
+					cookiesBrowser = cb
+				}
+				if cf, ok := ytCfg["cookies_file"].(string); ok {
+					cookiesFile = cf
+				}
+				if ad, ok := ytCfg["auto_download"].(bool); ok {
+					autoDownload = ad
+				}
+				if dq, ok := ytCfg["download_quality"].(string); ok {
+					downloadQuality = dq
+				}
+			}
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	doc, result, err := a.notebookService.IngestYouTubeVideo(ctx, cleanURL, a.extRunner, ext)
+	doc, result, err := a.notebookService.IngestYouTubeVideo(ctx, cleanURL, a.extRunner, ext, cookiesBrowser, cookiesFile)
 	if err != nil {
 		return map[string]interface{}{
 			"error": fmt.Sprintf("Failed to ingest YouTube video: %v", err),
@@ -360,6 +382,25 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 		return map[string]interface{}{
 			"error": fmt.Sprintf("failed to save syllabus draft: %v", err),
 		}
+	}
+
+	// Trigger non-blocking background video download if enabled
+	if autoDownload {
+		videoDir := filepath.Join(a.notebookUploadDir, "videos")
+		videoFilePath := filepath.Join(videoDir, fmt.Sprintf("%s.mp4", notebookID))
+		if downloadQuality == "" {
+			downloadQuality = "720p"
+		}
+		go func(vURL, outPath, qual, cBrowser, cFile string) {
+			dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			defer dlCancel()
+			utils.Infof("[YOUTUBE_CACHE] Starting background video download for %s (%s)...", notebookID, vURL)
+			if err := a.notebookService.DownloadYouTubeVideo(dlCtx, vURL, outPath, qual, a.extRunner, ext, cBrowser, cFile); err != nil {
+				utils.Warnf("[YOUTUBE_CACHE] Background video download failed for %s: %v", notebookID, err)
+			} else {
+				utils.Infof("[YOUTUBE_CACHE] Video successfully cached at %s", outPath)
+			}
+		}(cleanURL, videoFilePath, downloadQuality, cookiesBrowser, cookiesFile)
 	}
 
 	return map[string]interface{}{

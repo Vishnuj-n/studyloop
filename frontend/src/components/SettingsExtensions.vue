@@ -58,6 +58,73 @@
         <p class="hint">Rewrites dense textbooks to match your target comprehension level.</p>
       </div>
     </article>
+
+    <!-- YouTube & Video Ingestion -->
+    <article class="panel form-grid">
+      <h2>YouTube Ingestion &amp; Video Playback</h2>
+      
+      <div class="form-group">
+        <label for="youtube-cookies-browser">Cookie Authentication Source</label>
+        <select
+          id="youtube-cookies-browser"
+          v-model="youtubeCookiesBrowser"
+          class="setting-select"
+          :disabled="disabled"
+        >
+          <option value="none">None (Default - Safe Client Rotation)</option>
+          <option value="chrome">Google Chrome</option>
+          <option value="edge">Microsoft Edge</option>
+          <option value="firefox">Mozilla Firefox</option>
+          <option value="brave">Brave Browser</option>
+          <option value="custom">Custom cookies.txt File Path</option>
+        </select>
+        <p v-if="youtubeCookiesBrowser !== 'none' && youtubeCookiesBrowser !== 'custom'" class="hint warning-hint">
+          ⚠️ <strong>Note:</strong> Make sure your browser is closed before importing videos so yt-dlp can safely read cookies without file-locking errors. If locked, StudyLoop automatically falls back to safe client rotation.
+        </p>
+        <p v-else-if="youtubeCookiesBrowser === 'none'" class="hint">
+          Uses anti-bot client rotation without requiring browser session logins.
+        </p>
+      </div>
+
+      <div v-if="youtubeCookiesBrowser === 'custom'" class="form-group">
+        <label for="youtube-cookies-file">Custom Cookies File Path</label>
+        <input
+          id="youtube-cookies-file"
+          v-model="youtubeCookiesFile"
+          type="text"
+          class="setting-input"
+          placeholder="C:\path\to\youtube_cookies.txt"
+          :disabled="disabled"
+        />
+        <p class="hint">Absolute path to an exported Netscape-format cookies.txt file.</p>
+      </div>
+
+      <div class="form-group checkbox-group">
+        <label class="checkbox-label">
+          <input
+            v-model="youtubeAutoDownload"
+            type="checkbox"
+            :disabled="disabled"
+          />
+          <span>Auto-download video for offline study</span>
+        </label>
+        <p class="hint">Streams immediately on import, then caches a local copy in the background for zero-buffering offline playback.</p>
+      </div>
+
+      <div v-if="youtubeAutoDownload" class="form-group">
+        <label for="youtube-quality">Video Download Quality</label>
+        <select
+          id="youtube-quality"
+          v-model="youtubeQuality"
+          class="setting-select"
+          :disabled="disabled"
+        >
+          <option value="720p">720p (Recommended - Fast download &amp; compact size)</option>
+          <option value="1080p">1080p (Full HD)</option>
+          <option value="480p">480p (Low bandwidth)</option>
+        </select>
+      </div>
+    </article>
   </div>
 </template>
 
@@ -87,6 +154,26 @@ const audioSpeed = computed({
 const simplifierLevel = computed({
   get: () => extensionConfig.value?.text_simplifier?.level || 'eli15',
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
+})
+
+const youtubeCookiesBrowser = computed({
+  get: () => extensionConfig.value?.youtube?.cookies_browser || 'none',
+  set: (val) => setExtensionSetting('youtube', 'cookies_browser', val),
+})
+
+const youtubeCookiesFile = computed({
+  get: () => extensionConfig.value?.youtube?.cookies_file || '',
+  set: (val) => setExtensionSetting('youtube', 'cookies_file', val),
+})
+
+const youtubeAutoDownload = computed({
+  get: () => Boolean(extensionConfig.value?.youtube?.auto_download),
+  set: (val) => setExtensionSetting('youtube', 'auto_download', Boolean(val)),
+})
+
+const youtubeQuality = computed({
+  get: () => extensionConfig.value?.youtube?.download_quality || '720p',
+  set: (val) => setExtensionSetting('youtube', 'download_quality', val),
 })
 </script>
 
@@ -122,6 +209,28 @@ h2 {
   flex-direction: column;
 }
 
+.checkbox-group {
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface);
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
 label {
   font-weight: 600;
   font-size: 14px;
@@ -129,7 +238,8 @@ label {
   margin-bottom: 6px;
 }
 
-select {
+select,
+.setting-input {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
@@ -142,7 +252,8 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-select:focus {
+select:focus,
+.setting-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
@@ -153,6 +264,15 @@ select:focus {
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
+}
+
+.warning-hint {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  margin-top: 8px;
 }
 </style>
 
