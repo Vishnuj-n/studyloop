@@ -19,15 +19,6 @@ export const DEFAULT_EXTENSION_CONFIG = {
   },
   text_simplifier: {
     level: 'eli15',
-    preserveJargon: true,
-  },
-  youtube: {
-    language: 'en',
-    splitChapters: true,
-  },
-  deep_pdf: {
-    tableFormat: 'markdown',
-    extractMath: true,
   },
 }
 

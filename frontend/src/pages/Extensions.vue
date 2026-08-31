@@ -110,7 +110,7 @@
             </button>
 
             <button
-              v-if="['text_simplifier', 'youtube', 'audio_overview'].includes(ext.id)"
+              v-if="ext.id === 'text_simplifier'"
               class="config-icon-btn"
               title="Configure in Settings"
               :disabled="!isExtensionEnabled(ext.id)"
@@ -213,7 +213,7 @@
             </button>
 
             <button
-              v-if="isPro && ['text_simplifier', 'youtube', 'audio_overview'].includes(ext.id)"
+              v-if="isPro && ext.id === 'audio_overview'"
               class="config-icon-btn"
               title="Configure in Settings"
               :disabled="!isExtensionEnabled(ext.id)"

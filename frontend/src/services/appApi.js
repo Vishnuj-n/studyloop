@@ -351,8 +351,8 @@ export function runExtension(id, input = '', isPro = false) {
   return appBridge().RunExtension(id, input, !!isPro)
 }
 
-export function simplifyReadingContent(content) {
-  return appBridge().SimplifyReadingContent(content)
+export function simplifyReadingContent(content, level = '') {
+  return appBridge().SimplifyReadingContent(content, level)
 }
 
 export function startBrowserAuth(mode = 'sign-in') {

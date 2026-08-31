@@ -58,73 +58,6 @@
         <p class="hint">Rewrites dense textbooks to match your target comprehension level.</p>
       </div>
     </article>
-
-    <!-- YouTube Ingestion -->
-    <article class="panel form-grid">
-      <h2>YouTube Ingestion</h2>
-      <div class="form-group">
-        <label for="yt-lang">Preferred Subtitle Language</label>
-        <select
-          id="yt-lang"
-          v-model="ytLanguage"
-          class="setting-select"
-          :disabled="disabled"
-        >
-          <option value="en">English (en)</option>
-          <option value="es">Spanish (es)</option>
-          <option value="fr">French (fr)</option>
-          <option value="de">German (de)</option>
-          <option value="auto">Auto / First Available Track</option>
-        </select>
-        <p class="hint">Priority language when extracting video transcripts.</p>
-      </div>
-
-      <div class="form-group">
-        <label for="yt-split">Chapter Segmentation</label>
-        <select
-          id="yt-split"
-          v-model="ytSplitChapters"
-          class="setting-select"
-          :disabled="disabled"
-        >
-          <option :value="true">Auto-split video chapters into notebook sections</option>
-          <option :value="false">Single unified reading document</option>
-        </select>
-        <p class="hint">Determines how YouTube video timestamps divide notebook content.</p>
-      </div>
-    </article>
-
-    <!-- Deep Structured PDF Parser -->
-    <article class="panel form-grid">
-      <h2>Deep Structured PDF Parser</h2>
-      <div class="form-group">
-        <label for="pdf-table-format">Table Formatting Style</label>
-        <select
-          id="pdf-table-format"
-          v-model="pdfTableFormat"
-          class="setting-select"
-          :disabled="disabled"
-        >
-          <option value="markdown">Markdown Grid Tables</option>
-          <option value="list">Hierarchical Structured Lists</option>
-        </select>
-        <p class="hint">Output structure for tables detected in PDF documents.</p>
-      </div>
-
-      <div class="form-group">
-        <label for="pdf-math">Formula &amp; Equation Extraction</label>
-        <select
-          id="pdf-math"
-          v-model="pdfExtractMath"
-          class="setting-select"
-          :disabled="disabled"
-        >
-          <option :value="true">Enabled (Extract as KaTeX LaTeX math)</option>
-          <option :value="false">Disabled (Plain raw text)</option>
-        </select>
-        <p class="hint">Preserves formulas for math and STEM textbook readings.</p>
-      </div>
-    </article>
   </div>
 </template>
 
@@ -154,28 +87,6 @@ const audioSpeed = computed({
 const simplifierLevel = computed({
   get: () => extensionConfig.value?.text_simplifier?.level || 'eli15',
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
-})
-
-// YouTube
-const ytLanguage = computed({
-  get: () => extensionConfig.value?.youtube?.language || 'en',
-  set: (val) => setExtensionSetting('youtube', 'language', val),
-})
-
-const ytSplitChapters = computed({
-  get: () => extensionConfig.value?.youtube?.splitChapters ?? true,
-  set: (val) => setExtensionSetting('youtube', 'splitChapters', val === true || val === 'true'),
-})
-
-// Deep PDF
-const pdfTableFormat = computed({
-  get: () => extensionConfig.value?.deep_pdf?.tableFormat || 'markdown',
-  set: (val) => setExtensionSetting('deep_pdf', 'tableFormat', val),
-})
-
-const pdfExtractMath = computed({
-  get: () => extensionConfig.value?.deep_pdf?.extractMath ?? true,
-  set: (val) => setExtensionSetting('deep_pdf', 'extractMath', val === true || val === 'true'),
 })
 </script>
 
