@@ -198,8 +198,7 @@ label {
   margin-bottom: 6px;
 }
 
-select,
-.setting-input {
+select {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
@@ -212,8 +211,7 @@ select,
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-select:focus,
-.setting-input:focus {
+select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;

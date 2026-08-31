@@ -261,7 +261,7 @@ function handleEnterKey(event) {
   text-decoration: none;
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 6px;
   padding: 2px 8px;
   transition: all 0.15s ease;

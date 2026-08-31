@@ -463,7 +463,8 @@ onUnmounted(() => {
   gap: 2px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
+  border-color: transparent;
   background: transparent;
   cursor: pointer;
   text-align: left;
