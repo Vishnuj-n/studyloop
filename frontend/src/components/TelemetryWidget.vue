@@ -4,11 +4,11 @@
     <div
       class="telemetry-pill session-pill"
       :class="{ 'pill-target-met': completedSessions >= targetSessions && targetSessions > 0 }"
-      title="Daily session completion progress"
+      title="Daily reading session completion progress"
     >
       <span class="pill-icon">🎯</span>
       <span class="pill-text">
-        <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Sessions Today
+        <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Reading Sessions Today
       </span>
     </div>
 
@@ -40,7 +40,7 @@
     >
       <span class="pill-icon">🎯</span>
       <span class="pill-text">
-        <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Sessions Today
+        <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Reading Sessions Today
       </span>
     </div>
   </div>
