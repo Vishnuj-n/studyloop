@@ -135,3 +135,45 @@ func (s *Service) DownloadYouTubeVideo(ctx context.Context, videoURL string, out
 	return nil
 }
 
+// GetYouTubeSegmentTimestamps reads the saved youtube JSON metadata and returns start/end second bounds for each 1-based segment.
+func (s *Service) GetYouTubeSegmentTimestamps(filePath string) ([]struct {
+	SegmentIndex int    `json:"segment_index"`
+	StartSeconds int    `json:"start_seconds"`
+	EndSeconds   int    `json:"end_seconds"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+}, error) {
+	raw, err := s.readFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var res YouTubeIngestResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, err
+	}
+	segments := make([]struct {
+		SegmentIndex int    `json:"segment_index"`
+		StartSeconds int    `json:"start_seconds"`
+		EndSeconds   int    `json:"end_seconds"`
+		StartTime    string `json:"start_time"`
+		EndTime      string `json:"end_time"`
+	}, len(res.Chapters))
+
+	for i, ch := range res.Chapters {
+		segments[i] = struct {
+			SegmentIndex int    `json:"segment_index"`
+			StartSeconds int    `json:"start_seconds"`
+			EndSeconds   int    `json:"end_seconds"`
+			StartTime    string `json:"start_time"`
+			EndTime      string `json:"end_time"`
+		}{
+			SegmentIndex: i + 1,
+			StartSeconds: ch.StartSeconds,
+			EndSeconds:   ch.EndSeconds,
+			StartTime:    fmt.Sprintf("%02d:%02d", ch.StartSeconds/60, ch.StartSeconds%60),
+			EndTime:      fmt.Sprintf("%02d:%02d", ch.EndSeconds/60, ch.EndSeconds%60),
+		}
+	}
+	return segments, nil
+}
+

@@ -104,6 +104,7 @@
       :notebook-priority="draftNotebookPriority"
       :page-count="draftPageCount"
       :chapters="draftChapters"
+      :segments="draftSegments"
       :is-confirming="isConfirmingDraft"
       :is-cleaning="isAICleaning"
       :error="draftError"
@@ -197,6 +198,7 @@ const originalDraftPriority = ref(5)
 
 const draftPageCount = ref(1)
 const draftChapters = ref([])
+const draftSegments = ref([])
 const originalDraftChapters = ref([])
 const draftError = ref('')
 const isConfirmingDraft = ref(false)
@@ -551,6 +553,7 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
     }
 
     const chapters = Array.isArray(draft?.chapters) ? draft.chapters : []
+    draftSegments.value = Array.isArray(draft?.segments) ? draft.segments : []
     draftPageCount.value = Number(draft?.page_count) > 0 ? Number(draft.page_count) : 1
     draftChapters.value =
       chapters.length > 0
@@ -624,6 +627,9 @@ async function aiCleanupChapters() {
     }
 
     const chapters = Array.isArray(result?.chapters) ? result.chapters : []
+    if (Array.isArray(result?.segments)) {
+      draftSegments.value = result.segments
+    }
     draftPageCount.value =
       Number(result?.page_count) > 0 ? Number(result.page_count) : draftPageCount.value
     draftChapters.value =

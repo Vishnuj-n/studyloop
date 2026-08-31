@@ -35,6 +35,7 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `getAvailableTopics` | `GetAvailableTopics` | 2 | Active |
 | `getCloudConfig` | `GetCloudConfig` | 1 | Active |
 | `getDashboardOverview` | `GetDashboardOverview` | 1 | Active |
+| `getExtensionConfig` | `GetExtensionConfig` | 1 | Active |
 | `getFlashcardDueTimeline` | `GetFlashcardDueTimeline` | 1 | Active |
 | `getLLMProviderPreset` | `GetLLMProviderPreset` | 2 | Active |
 | `getLLMSettings` | `GetLLMSettings` | 1 | Active |
@@ -56,10 +57,11 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `loginStudent` | `LoginStudent` | 1 | Active |
 | `logoutStudent` | `LogoutStudent` | 1 | Active |
 | `openRepoURL` | `OpenRepoURL` | 2 | Active |
-| `openURLInBrowser` | `OpenURLInBrowser` | 1 | Active |
+| `openURLInBrowser` | `OpenURLInBrowser` | 4 | Active |
 | `recordCardReview` | `RecordCardReview` | 1 | Active |
 | `retryFlashcardGeneration` | `RetryFlashcardGeneration` | 2 | Active |
 | `runExtension` | `RunExtension` | 1 | Active |
+| `saveExtensionConfig` | `SaveExtensionConfig` | 1 | Active |
 | `saveLLMAPIKey` | `SaveLLMAPIKey` | 2 | Active |
 | `scoreShortAnswer` | `ScoreShortAnswer` | 1 | Active |
 | `selectAndUploadDeepStructuredPDF` | `SelectAndUploadDeepStructuredPDF` | 1 | Active |
@@ -119,6 +121,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `GetCloudConfig` | Yes |
 | `GetCtx` | Yes |
 | `GetDashboardOverview` | Yes |
+| `GetExtensionConfig` | Yes |
 | `GetFlashcardDueTimeline` | Yes |
 | `GetLLMProviderPreset` | Yes |
 | `GetLLMSettings` | Yes |
@@ -146,6 +149,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `RecordCardReview` | Yes |
 | `RetryFlashcardGeneration` | Yes |
 | `RunExtension` | Yes |
+| `SaveExtensionConfig` | Yes |
 | `SaveLLMAPIKey` | Yes |
 | `ScoreShortAnswer` | Yes |
 | `SelectAndUploadDeepStructuredPDF` | Yes |
@@ -180,6 +184,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `CheckReadiness` | `internal\extension\checker.go:32` | None | `function` |
 | `CreateReviewSession` | `internal\db\review_session_repo.go:172` | `Repository` | `method` |
 | `DeleteAPIKey` | `internal\llm\keyring.go:37` | None | `function` |
+| `DownloadYouTubeVideo` | `internal\notebook\youtube.go:106` | `Service` | `method` |
 | `DraftSyllabusChapters` | `internal\notebook\syllabus.go:33` | `Service` | `method` |
 | `ExtractFullPDFCPUBookmarkNodes` | `internal\notebook\pdfcpu.go:73` | None | `function` |
 | `ExtractSyllabusChaptersFromMarkdown` | `internal\notebook\markdown_chunker.go:196` | None | `function` |
@@ -189,8 +194,8 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `IngestYouTubeVideo` | `internal\notebook\youtube.go:32` | `Service` | `method` |
 | `InstallZip` | `internal\extension\installer.go:45` | `Manager` | `method` |
 | `MakeAllFlashcardsDueNow` | `internal\db\flashcard_repo.go:503` | `Repository` | `method` |
-| `MarkLLMKeyStored` | `internal\db\store.go:571` | `Repository` | `method` |
-| `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:199` | None | `function` |
+| `MarkLLMKeyStored` | `internal\db\store.go:598` | `Repository` | `method` |
+| `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:235` | None | `function` |
 | `ParsePDFCPUBookmarkDraftFromJSON` | `internal\notebook\pdfcpu.go:85` | None | `function` |
 | `RunSmokeTest` | `internal\extension\checker.go:92` | None | `function` |
 | `SaveAPIKey` | `internal\llm\keyring.go:21` | None | `function` |
@@ -201,10 +206,10 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `Uninstall` | `internal\extension\installer.go:15` | `Manager` | `method` |
 | `activateReadingSessionTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `aggregateQueueTasks` | `internal\app\app_study.go:52` | None | `function` |
-| `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:126` | None | `function` |
+| `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:145` | None | `function` |
 | `bookmarkNodesToDraft` | `internal\notebook\pdfcpu.go:43` | None | `function` |
 | `buildInputValues` | `internal\embeddings\onnx.go:274` | `OnnxEmbedder` | `method` |
-| `buildPageSample` | `internal\notebook\syllabus.go:281` | None | `function` |
+| `buildPageSample` | `internal\notebook\syllabus.go:317` | None | `function` |
 | `buildReviewTaskForPlan` | `internal\app\app_study.go:281` | None | `function` |
 | `buildSocraticRemedialPrompt` | `internal\app\app_study_cards.go:94` | None | `function` |
 | `buildTokenArrays` | `internal\embeddings\onnx.go:223` | None | `function` |
@@ -212,12 +217,12 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `calculateFlashcardBudgets` | `internal\app\app_study.go:39` | None | `function` |
 | `calculateStreak` | `internal\app\app_study.go:86` | None | `function` |
 | `chapterIndexForPage` | `internal\notebook\ingestion.go:83` | None | `function` |
-| `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:234` | None | `function` |
+| `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:253` | None | `function` |
 | `computeCurrentStreak` | `internal\app\app_study.go:142` | None | `function` |
 | `computeLongestStreak` | `internal\app\app_study.go:112` | None | `function` |
 | `destroyValues` | `internal\embeddings\onnx.go:576` | None | `function` |
 | `embedInternal` | `internal\embeddings\onnx.go:180` | `OnnxEmbedder` | `method` |
-| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:930` | None | `function` |
+| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:999` | None | `function` |
 | `envHasLLMAPIKey` | `internal\app\app_settings.go:311` | None | `function` |
 | `extractEmbedding` | `internal\embeddings\onnx.go:322` | None | `function` |
 | `extractIONames` | `internal\embeddings\onnx.go:536` | None | `function` |
@@ -226,7 +231,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `finalizeNotebookUpload` | `internal/app/app.go` | `App` | `AppHelper` |
 | `findPDFCPUExecutable` | `internal\notebook\pdfcpu.go:229` | None | `function` |
 | `firstInt` | `internal\notebook\pdfcpu.go:291` | None | `function` |
-| `firstN` | `internal\notebook\syllabus.go:316` | None | `function` |
+| `firstN` | `internal\notebook\syllabus.go:352` | None | `function` |
 | `firstString` | `internal\notebook\pdfcpu.go:276` | None | `function` |
 | `getAppVersion` | `internal\app\app_update.go:17` | None | `function` |
 | `getNotebookAndRepo` | `internal/app/app.go` | `App` | `AppHelper` |
@@ -234,7 +239,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `inferMaxSeqLen` | `internal\embeddings\onnx.go:564` | None | `function` |
 | `isTableRow` | `internal\notebook\markdown_chunker.go:191` | None | `function` |
 | `mapTaskError` | `internal\app\app_study.go:165` | None | `function` |
-| `maxPage` | `internal\notebook\syllabus.go:308` | None | `function` |
+| `maxPage` | `internal\notebook\syllabus.go:344` | None | `function` |
 | `meanPool2D` | `internal\embeddings\onnx.go:451` | None | `function` |
 | `meanPool2DFloat64` | `internal\embeddings\onnx.go:495` | None | `function` |
 | `meanPool3D` | `internal\embeddings\onnx.go:429` | None | `function` |
@@ -243,8 +248,8 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `normalizeLLMTierForApp` | `internal\app\app_settings.go:301` | None | `function` |
 | `parseBookmarkNode` | `internal\notebook\pdfcpu.go:33` | None | `function` |
 | `parseMarkdownBlocks` | `internal\notebook\markdown_chunker.go:97` | None | `function` |
-| `parseSyllabusDraft` | `internal\notebook\syllabus.go:180` | None | `function` |
-| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:454` | None | `function` |
+| `parseSyllabusDraft` | `internal\notebook\syllabus.go:216` | None | `function` |
+| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:511` | None | `function` |
 | `pickInputSource` | `internal\embeddings\onnx.go:544` | None | `function` |
 | `poolFloat32Tensor` | `internal\embeddings\onnx.go:350` | None | `function` |
 | `poolFloat64Tensor` | `internal\embeddings\onnx.go:387` | None | `function` |
@@ -253,12 +258,12 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `reloadLLMProviders` | `internal/app/app.go` | `App` | `AppHelper` |
 | `requireRepo` | `internal\app\app_study.go:183` | None | `function` |
 | `resolveExplicitActiveProfileID` | `internal/app/app.go` | `App` | `AppHelper` |
-| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:557` | None | `function` |
+| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:579` | None | `function` |
 | `resolveRuntimeLibraryPath` | `internal\embeddings\onnx.go:584` | None | `function` |
+| `runDeepPDFExtraction` | `internal/app/app.go` | `App` | `AppHelper` |
 | `runPDFCPUBookmarksExport` | `internal\notebook\pdfcpu.go:127` | None | `function` |
 | `sameLLMSettingsForUI` | `internal\app\app_settings.go:325` | None | `function` |
 | `tensorFromInputData` | `internal\embeddings\onnx.go:299` | None | `function` |
-| `truncateToCharBoundary` | `internal\notebook\syllabus.go:324` | None | `function` |
 | `validatePDFCPUInputFilePath` | `internal\notebook\pdfcpu.go:189` | None | `function` |
 | `walkBookmarkNode` | `internal\notebook\pdfcpu.go:54` | None | `function` |
 

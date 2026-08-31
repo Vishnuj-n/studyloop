@@ -532,7 +532,12 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return errResp
 	}
 
-	notebookID = strings.TrimSpace(notebookID)
+	var segments interface{}
+	if strings.EqualFold(strings.TrimSpace(nb.FileType), "youtube") {
+		if segList, err := a.notebookService.GetYouTubeSegmentTimestamps(nb.FilePath); err == nil {
+			segments = segList
+		}
+	}
 
 	// Try to load persisted draft if not regenerating
 	if !regenerate {
@@ -543,13 +548,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		if draftJSON != "" {
 			var persistedDraft models.SyllabusDraft
 			if err := json.Unmarshal([]byte(draftJSON), &persistedDraft); err == nil {
-				return map[string]interface{}{
+				resp := map[string]interface{}{
 					"notebook_id":   notebookID,
 					"page_count":    persistedDraft.PageCount,
 					"chapters":      persistedDraft.Chapters,
 					"status":        "draft_ready",
 					"fallback_used": persistedDraft.FallbackUsed,
 				}
+				if segments != nil {
+					resp["segments"] = segments
+				}
+				return resp
 			}
 		}
 	}
@@ -589,13 +598,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, chapters, fallbackUsed); err != nil {
 			return map[string]interface{}{"error": err.Error()}
 		}
-		return map[string]interface{}{
+		resp := map[string]interface{}{
 			"notebook_id":   notebookID,
 			"page_count":    doc.PageCount,
 			"chapters":      chapters,
 			"status":        "draft_ready",
 			"fallback_used": fallbackUsed,
 		}
+		if segments != nil {
+			resp["segments"] = segments
+		}
+		return resp
 	}
 
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
@@ -615,13 +628,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, result.Chapters, result.FallbackUsed); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{
+	resp := map[string]interface{}{
 		"notebook_id":   notebookID,
 		"page_count":    doc.PageCount,
 		"chapters":      result.Chapters,
 		"status":        "draft_ready",
 		"fallback_used": result.FallbackUsed,
 	}
+	if segments != nil {
+		resp["segments"] = segments
+	}
+	return resp
 }
 
 // AICleanupNotebookSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.
