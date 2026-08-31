@@ -354,6 +354,7 @@ export function useReaderBase(taskID) {
 
       topicTitle.value = cleanTopicTitle(result?.topic_title || selectedTopicTitle.value) || 'Reader'
       notebookUrl.value = result?.notebook_url || ''
+      cachedVideoUrl.value = result?.cached_video_url || ''
       fileType.value = (result?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(result?.page_count) || 1)
       topicStartPage.value = Number(result?.topic_start_page) || 0

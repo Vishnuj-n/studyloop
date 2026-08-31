@@ -55,7 +55,15 @@
         @loadedmetadata="onVideoMetadata"
         @canplay="onVideoMetadata"
         @timeupdate="onTimeUpdate"
-      ></video>
+      >
+        <track
+          v-if="captionTrackUrl"
+          kind="subtitles"
+          srclang="en"
+          label="English"
+          :src="captionTrackUrl"
+        />
+      </video>
 
       <!-- Remote YouTube Iframe -->
       <iframe
@@ -230,6 +238,34 @@ function formatTime(totalSeconds) {
   }
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
+
+// ponytail: Slice transcript into clean, bite-sized subtitle cues (1-2 lines at a time)
+const captionTrackUrl = computed(() => {
+  if (!props.transcriptContent) return ''
+  const start = startSeconds.value || 0
+  const end = endSeconds.value > start ? endSeconds.value : start + 600
+  const text = props.transcriptContent.replace(/<[^>]+>/g, '').replace(/[#*`_[\]]/g, '').trim()
+  if (!text) return ''
+
+  const words = text.split(/\s+/)
+  const chunkSize = 7 // 7 words per line looks neat and compact
+  const totalChunks = Math.ceil(words.length / chunkSize)
+  if (totalChunks === 0) return ''
+
+  const chunkDuration = (end - start) / totalChunks
+  let vtt = 'WEBVTT\n\n'
+
+  for (let i = 0; i < totalChunks; i++) {
+    const s1 = start + i * chunkDuration
+    const s2 = Math.min(end, s1 + chunkDuration)
+    const t1 = (formatTime(s1).length <= 4 ? '00:0' : '00:') + formatTime(s1) + '.000'
+    const t2 = (formatTime(s2).length <= 4 ? '00:0' : '00:') + formatTime(s2) + '.000'
+    const line = words.slice(i * chunkSize, (i + 1) * chunkSize).join(' ')
+    vtt += `${t1} --> ${t2}\n${line}\n\n`
+  }
+
+  return URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+})
 
 const durationText = computed(() => {
   if (!endSeconds.value || endSeconds.value <= startSeconds.value) return ''
@@ -412,6 +448,15 @@ async function openInExternalBrowser() {
   height: 100%;
   border: none;
   object-fit: contain;
+}
+
+.video-element::cue {
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.4;
+  font-family: inherit;
+  border-radius: 4px;
 }
 
 .transcript-drawer {
