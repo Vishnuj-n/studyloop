@@ -117,6 +117,20 @@
           </div>
         </div>
 
+        <!-- Extensions & Tools Category -->
+        <div v-show="activeCategory === 'extensions'" class="category-pane">
+          <header class="pane-header">
+            <h2>Extensions &amp; Tools</h2>
+            <p class="pane-subtitle">
+              Configure local AI tools, podcast voice personas, and simplifier comprehension levels.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsExtensions :disabled="loading || saving" />
+          </div>
+        </div>
+
         <!-- System & Account Category -->
         <div v-show="activeCategory === 'system'" class="category-pane">
           <header class="pane-header">
@@ -195,6 +209,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { getAppEnv, getCloudConfig, triggerCloudSync } from '../services/appApi'
 
 import { useSettings } from '../composables/useSettings'
@@ -206,6 +221,7 @@ import { useAuth } from '../composables/useAuth'
 import SettingsStudyBudget from '../components/SettingsStudyBudget.vue'
 import SettingsQuizRescue from '../components/SettingsQuizRescue.vue'
 import SettingsAIProvider from '../components/SettingsAIProvider.vue'
+import SettingsExtensions from '../components/SettingsExtensions.vue'
 import SettingsTheme from '../components/SettingsTheme.vue'
 import SettingsUpdate from '../components/SettingsUpdate.vue'
 import SettingsAccount from '../components/SettingsAccount.vue'
@@ -214,10 +230,13 @@ import SettingsTextbooksPanel from '../components/SettingsTextbooksPanel.vue'
 import SettingsProfileModal from '../components/SettingsProfileModal.vue'
 import SettingsRagModal from '../components/SettingsRagModal.vue'
 
+const route = useRoute()
+
 const categories = [
   { id: 'study', label: 'Study & Routine', desc: 'Budgets, schedules, quiz rules' },
   { id: 'ai', label: 'AI & Retrieval', desc: 'LLM models, API keys, RAG' },
   { id: 'profiles', label: 'Profiles & Notebooks', desc: 'Exam goals and book mapping' },
+  { id: 'extensions', label: 'Extensions & Tools', desc: 'Podcast voice, simplifier, AI tools' },
   { id: 'system', label: 'System & Account', desc: 'Themes, cloud sync, updates' },
 ]
 
@@ -359,6 +378,12 @@ watch(
 )
 
 onMounted(async () => {
+  if (route.query.category && categories.some((c) => c.id === route.query.category)) {
+    activeCategory.value = route.query.category
+  } else if (route.query.tab && categories.some((c) => c.id === route.query.tab)) {
+    activeCategory.value = route.query.tab
+  }
+
   const [envRes, cfgRes] = await Promise.all([
     getAppEnv().catch(() => null),
     getCloudConfig().catch(() => null),

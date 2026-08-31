@@ -252,3 +252,20 @@ func (a *App) SimplifyReadingContent(content string) map[string]interface{} {
 		"simplified": simplified,
 	}
 }
+
+// GetExtensionConfig retrieves the persisted JSON extension configuration.
+func (a *App) GetExtensionConfig() (string, error) {
+	if a.repo == nil {
+		return "{}", errors.New("repository not initialized")
+	}
+	return a.repo.GetExtensionConfig()
+}
+
+// SaveExtensionConfig persists the serialized JSON extension configuration to SQLite.
+func (a *App) SaveExtensionConfig(configJSON string) error {
+	if a.repo == nil {
+		return errors.New("repository not initialized")
+	}
+	return a.repo.SaveExtensionConfig(configJSON)
+}
+

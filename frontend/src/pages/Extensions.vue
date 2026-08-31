@@ -108,6 +108,16 @@
             >
               {{ getActionButtonLabel(ext.id) }}
             </button>
+
+            <button
+              v-if="['text_simplifier', 'youtube', 'audio_overview'].includes(ext.id)"
+              class="config-icon-btn"
+              title="Configure in Settings"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/settings?category=extensions')"
+            >
+              ⚙️
+            </button>
           </div>
         </div>
       </div>
@@ -200,6 +210,16 @@
               @click="handleUpgrade"
             >
               Unlock with Pro
+            </button>
+
+            <button
+              v-if="isPro && ['text_simplifier', 'youtube', 'audio_overview'].includes(ext.id)"
+              class="config-icon-btn"
+              title="Configure in Settings"
+              :disabled="!isExtensionEnabled(ext.id)"
+              @click="router.push('/settings?category=extensions')"
+            >
+              ⚙️
             </button>
           </div>
         </div>
@@ -709,6 +729,32 @@ input:checked + .slider:before {
 }
 
 .action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.config-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.config-icon-btn:hover:not(:disabled) {
+  background: var(--surface-container);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.config-icon-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

@@ -83,6 +83,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { startTopicAudioOverview, stopTopicAudioOverview } from '../services/appApi'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
+import { useExtensions } from '../composables/useExtensions'
 
 const props = defineProps({
   topicId: {
@@ -101,6 +102,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+const { getExtensionSetting } = useExtensions()
+
 const chunks = ref([])
 const currentIndex = ref(0)
 const isPlaying = ref(false)
@@ -108,8 +111,8 @@ const isLoading = ref(true)
 const isFinished = ref(false)
 const totalChunks = ref(0)
 const errorMessage = ref('')
-const selectedVoice = ref('en-US-ChristopherNeural')
-const playbackRate = ref(1.0)
+const selectedVoice = ref(getExtensionSetting('audio_overview', 'voice', 'en-US-ChristopherNeural'))
+const playbackRate = ref(Number(getExtensionSetting('audio_overview', 'speed', 1.0)))
 const activeGenerationId = ref('')
 
 let audio = null

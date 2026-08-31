@@ -363,3 +363,12 @@ export function openURLInBrowser(url) {
   return appBridge().OpenURLInBrowser(url)
 }
 
+export function getExtensionConfig() {
+  return appBridge().GetExtensionConfig()
+}
+
+export function saveExtensionConfig(configJSON) {
+  return appBridge().SaveExtensionConfig(configJSON)
+}
+
+

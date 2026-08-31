@@ -129,6 +129,7 @@ func InitSchema(tx *sql.Tx) error {
 			quiz_question_count INTEGER NOT NULL DEFAULT 8,
 			quiz_passing_score INTEGER NOT NULL DEFAULT 70,
 			tutor_style TEXT NOT NULL DEFAULT 'socratic',
+			extension_settings TEXT DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (active_profile_id) REFERENCES study_profiles(id) ON DELETE SET NULL
 		)`,
@@ -403,6 +404,7 @@ var alterStatements = []struct {
 	{"user_settings", "quiz_question_count", "ALTER TABLE user_settings ADD COLUMN quiz_question_count INTEGER NOT NULL DEFAULT 8"},
 	{"user_settings", "quiz_passing_score", "ALTER TABLE user_settings ADD COLUMN quiz_passing_score INTEGER NOT NULL DEFAULT 70"},
 	{"user_settings", "tutor_style", "ALTER TABLE user_settings ADD COLUMN tutor_style TEXT NOT NULL DEFAULT 'socratic'"},
+	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 	{"study_profiles", "classroom_code", "ALTER TABLE study_profiles ADD COLUMN classroom_code TEXT DEFAULT ''"},
 	{"study_profiles", "student_username", "ALTER TABLE study_profiles ADD COLUMN student_username TEXT DEFAULT ''"},
 	{"study_profiles", "cloud_api_token", "ALTER TABLE study_profiles ADD COLUMN cloud_api_token TEXT DEFAULT ''"},

@@ -934,3 +934,29 @@ func (r *Repository) GetRemedialStrategy() (string, error) {
 	return strategy, nil
 }
 
+// GetExtensionConfig retrieves the serialized JSON configuration for extensions from user_settings.
+func (r *Repository) GetExtensionConfig() (string, error) {
+	var config string
+	err := r.db.QueryRow(`SELECT COALESCE(extension_settings, '{}') FROM user_settings WHERE id = 1`).Scan(&config)
+	if err == sql.ErrNoRows {
+		return "{}", nil
+	}
+	if err != nil {
+		return "{}", err
+	}
+	if strings.TrimSpace(config) == "" {
+		return "{}", nil
+	}
+	return config, nil
+}
+
+// SaveExtensionConfig persists the serialized JSON configuration for extensions to user_settings.
+func (r *Repository) SaveExtensionConfig(configJSON string) error {
+	trimmed := strings.TrimSpace(configJSON)
+	if trimmed == "" {
+		trimmed = "{}"
+	}
+	_, err := r.db.Exec(`UPDATE user_settings SET extension_settings = ? WHERE id = 1`, trimmed)
+	return err
+}
+
