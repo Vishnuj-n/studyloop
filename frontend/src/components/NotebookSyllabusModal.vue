@@ -7,8 +7,11 @@
       </div>
 
       <p class="modal-warning">
-        Use absolute PDF page numbers. Page labels shown inside the PDF viewer may differ from file
-        page numbers.
+        {{
+          fileType === 'youtube'
+            ? 'Verify video chapter segments. Segments map to video timestamps.'
+            : 'Use absolute PDF page numbers. Page labels shown inside the PDF viewer may differ from file page numbers.'
+        }}
       </p>
 
       <div class="modal-title-edit">
@@ -45,8 +48,8 @@
           <thead>
             <tr>
               <th>Title</th>
-              <th>Start Page</th>
-              <th>End Page</th>
+              <th>{{ fileType === 'youtube' ? 'Start Segment' : 'Start Page' }}</th>
+              <th>{{ fileType === 'youtube' ? 'End Segment' : 'End Page' }}</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -131,6 +134,7 @@ import { ref, watch } from 'vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
+  fileType: { type: String, default: 'pdf' },
   notebookTitle: { type: String, default: '' },
   notebookPriority: { type: Number, default: 5 },
   pageCount: { type: Number, default: 1 },

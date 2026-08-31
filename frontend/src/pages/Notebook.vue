@@ -99,6 +99,7 @@
     <!-- Syllabus Modal -->
     <NotebookSyllabusModal
       :show="showSyllabusModal"
+      :file-type="draftNotebookFileType"
       :notebook-title="draftNotebookTitle"
       :notebook-priority="draftNotebookPriority"
       :page-count="draftPageCount"
@@ -189,6 +190,7 @@ const indexingStatusMessage = ref('')
 const showSyllabusModal = ref(false)
 const draftNotebookID = ref('')
 const draftNotebookTitle = ref('')
+const draftNotebookFileType = ref('pdf')
 const draftNotebookPriority = ref(5)
 const originalDraftTitle = ref('')
 const originalDraftPriority = ref(5)
@@ -559,12 +561,17 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
           }))
         : [{ title: 'General', start_page: 1, end_page: draftPageCount.value }]
 
-    // Load notebook to get current priority
+    // Load notebook to get current priority and file type
     const notebook = notebooks.value.find((nb) => nb.id === notebookID)
     if (notebook) {
+      if (notebook.file_type) {
+        draftNotebookFileType.value = notebook.file_type
+      }
       if (notebook.priority) {
         draftNotebookPriority.value = notebook.priority
       }
+    } else {
+      draftNotebookFileType.value = 'pdf'
     }
 
     showSyllabusModal.value = true

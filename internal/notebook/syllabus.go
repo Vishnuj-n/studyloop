@@ -65,7 +65,24 @@ func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *Extracte
 		}
 
 		var prompt string
-		if len(rawBookmarkJSON) > 0 || len(bookmarkLikeDraft) > 0 {
+		if strings.EqualFold(strings.TrimSpace(fileType), "youtube") {
+			prompt = fmt.Sprintf(`You are structuring a study syllabus from a video transcript.
+
+Video: %s
+Total segments: %d
+
+Segment text sample with segment numbers (1-based):
+%s
+
+Task: Merge short, fragmented, or introductory video segments into cohesive, comprehensive study topics.
+Rules:
+- Output strict JSON only: {"chapters":[{"title":"...","start_page":1,"end_page":4}]}
+- "start_page" and "end_page" are 1-based segment indices (1 to %d).
+- Group related micro-segments into substantive study chapters (each chapter representing a major concept or question).
+- Omit or merge trivial segments (like intros, sponsor callouts, and outros) into adjacent study topics.
+- Ensure sequential, contiguous segment ranges without gaps or overlaps.`,
+				bookName, doc.PageCount, sample, doc.PageCount)
+		} else if len(rawBookmarkJSON) > 0 || len(bookmarkLikeDraft) > 0 {
 			var bookmarkContext string
 			if len(rawBookmarkJSON) > 0 {
 				fullNodes := ExtractFullPDFCPUBookmarkNodes(rawBookmarkJSON)
