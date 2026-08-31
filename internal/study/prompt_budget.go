@@ -9,11 +9,6 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-// scaledQuizQuestionCount returns the target question count for a quiz session.
-// ponytail: default to 8 questions per reading session
-func scaledQuizQuestionCount(_ int) int {
-	return 8
-}
 
 // buildPageBoundedContext fetches structured chunk context for a notebook page range
 // and returns (chunks, tokenCount, error).

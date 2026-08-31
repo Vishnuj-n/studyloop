@@ -339,15 +339,3 @@ func firstN(text string, n int) string {
 	return text[:n]
 }
 
-// truncateToCharBoundary truncates text to maxChars, preferring a newline boundary.
-func truncateToCharBoundary(text string, maxChars int) string {
-	if len(text) <= maxChars {
-		return text
-	}
-	truncated := text[:maxChars]
-	// Prefer breaking at a newline for cleaner context.
-	if idx := strings.LastIndex(truncated, "\n"); idx > maxChars/2 {
-		return truncated[:idx]
-	}
-	return truncated
-}
