@@ -7,11 +7,11 @@
           Current Version: <strong>v{{ currentVersion }}</strong>
         </p>
         <p v-if="updateChecked && !updateAvailable" class="status-text success">
-          ✓ Your application is up to date!
+          Your application is up to date.
         </p>
         <p v-if="updateChecked && updateAvailable" class="status-text warning">
-          ⚠️ A new version (<strong>v{{ latestVersion }}</strong
-          >) is available!
+          A new version (<strong>v{{ latestVersion }}</strong
+          >) is available.
         </p>
         <p v-if="error" class="status-text error">Error checking updates: {{ error }}</p>
       </div>

@@ -33,7 +33,7 @@
         Target word count per reading session (3,000 words ≈ 15 minutes of standard reading).
       </p>
       <p v-if="hasTokenWarning" class="warning-hint">
-        ⚠️ {{ settings.target_session_words }} words (~{{ Math.round(settings.target_session_words * 1.3) }} tokens) may exceed your Max Input Tokens limit ({{ maxInputTokens }} tokens). Content may be truncated during quizzes.
+        Warning: {{ settings.target_session_words }} words (~{{ Math.round(settings.target_session_words * 1.3) }} tokens) may exceed your Max Input Tokens limit ({{ maxInputTokens }} tokens). Content may be truncated during quizzes.
       </p>
     </div>
 
@@ -51,7 +51,7 @@
     <div class="calendar-sync-card">
       <div class="calendar-header">
         <div>
-          <h3>📅 Calendar Routine Sync</h3>
+          <h3>Calendar Routine Sync</h3>
           <p class="hint">
             Export your daily study routine to your calendar. Your phone and laptop will remind you every day with alarms even when StudyLoop is closed.
           </p>
@@ -62,7 +62,7 @@
           title="Play sample in-app chime"
           @click="playStudyChime"
         >
-          🔔 Test In-App Chime
+          Test In-App Chime
         </button>
       </div>
 
@@ -86,21 +86,21 @@
           class="calendar-btn google-btn"
           @click="openGoogle"
         >
-          📅 Add to Google Calendar
+          Add to Google Calendar
         </button>
         <button
           type="button"
           class="calendar-btn outlook-btn"
           @click="openOutlook"
         >
-          📧 Add to Outlook Web
+          Add to Outlook Web
         </button>
         <button
           type="button"
           class="calendar-btn ics-btn"
           @click="downloadICS"
         >
-          🍎 Download .ics (Apple / Windows)
+          Download .ics (Apple / Windows)
         </button>
       </div>
     </div>

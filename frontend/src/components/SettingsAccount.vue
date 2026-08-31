@@ -9,7 +9,7 @@
 
     <!-- Authentication Error Alert -->
     <div v-if="clerkAuth.authError.value" class="login-error-message animate-fade-in">
-      ⚠️ {{ clerkAuth.authError.value }}
+      {{ clerkAuth.authError.value }}
     </div>
 
     <!-- Signed In with Clerk -->
@@ -26,7 +26,7 @@
         <div class="plan-row">
           <span><strong>Current Plan:</strong></span>
           <span v-if="clerkAuth.isPro.value" class="plan-pill pro">
-            ★ PRO PLAN
+            PRO PLAN
           </span>
           <span v-else class="plan-pill free">
             FREE PLAN
