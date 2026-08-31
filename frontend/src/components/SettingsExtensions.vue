@@ -62,42 +62,6 @@
     <!-- YouTube & Video Ingestion -->
     <article class="panel form-grid">
       <h2>YouTube Ingestion &amp; Video Playback</h2>
-      
-      <div class="form-group">
-        <label for="youtube-cookies-browser">Cookie Authentication Source</label>
-        <select
-          id="youtube-cookies-browser"
-          v-model="youtubeCookiesBrowser"
-          class="setting-select"
-          :disabled="disabled"
-        >
-          <option value="none">None (Default - Safe Client Rotation)</option>
-          <option value="chrome">Google Chrome</option>
-          <option value="edge">Microsoft Edge</option>
-          <option value="firefox">Mozilla Firefox</option>
-          <option value="brave">Brave Browser</option>
-          <option value="custom">Custom cookies.txt File Path</option>
-        </select>
-        <p v-if="youtubeCookiesBrowser !== 'none' && youtubeCookiesBrowser !== 'custom'" class="hint warning-hint">
-          ⚠️ <strong>Note:</strong> Make sure your browser is closed before importing videos so yt-dlp can safely read cookies without file-locking errors. If locked, StudyLoop automatically falls back to safe client rotation.
-        </p>
-        <p v-else-if="youtubeCookiesBrowser === 'none'" class="hint">
-          Uses anti-bot client rotation without requiring browser session logins.
-        </p>
-      </div>
-
-      <div v-if="youtubeCookiesBrowser === 'custom'" class="form-group">
-        <label for="youtube-cookies-file">Custom Cookies File Path</label>
-        <input
-          id="youtube-cookies-file"
-          v-model="youtubeCookiesFile"
-          type="text"
-          class="setting-input"
-          placeholder="C:\path\to\youtube_cookies.txt"
-          :disabled="disabled"
-        />
-        <p class="hint">Absolute path to an exported Netscape-format cookies.txt file.</p>
-      </div>
 
       <div class="form-group checkbox-group">
         <label class="checkbox-label">
@@ -156,24 +120,20 @@ const simplifierLevel = computed({
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
 })
 
-const youtubeCookiesBrowser = computed({
-  get: () => extensionConfig.value?.youtube?.cookies_browser || 'none',
-  set: (val) => setExtensionSetting('youtube', 'cookies_browser', val),
-})
-
-const youtubeCookiesFile = computed({
-  get: () => extensionConfig.value?.youtube?.cookies_file || '',
-  set: (val) => setExtensionSetting('youtube', 'cookies_file', val),
-})
-
 const youtubeAutoDownload = computed({
   get: () => Boolean(extensionConfig.value?.youtube?.auto_download),
-  set: (val) => setExtensionSetting('youtube', 'auto_download', Boolean(val)),
+  set: (val) => {
+    console.log('[SettingsExtensions] Setting youtube.auto_download:', val)
+    setExtensionSetting('youtube', 'auto_download', Boolean(val))
+  },
 })
 
 const youtubeQuality = computed({
   get: () => extensionConfig.value?.youtube?.download_quality || '720p',
-  set: (val) => setExtensionSetting('youtube', 'download_quality', val),
+  set: (val) => {
+    console.log('[SettingsExtensions] Setting youtube.download_quality:', val)
+    setExtensionSetting('youtube', 'download_quality', val)
+  },
 })
 </script>
 
@@ -264,15 +224,6 @@ select:focus,
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
-}
-
-.warning-hint {
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.1);
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(217, 119, 6, 0.25);
-  margin-top: 8px;
 }
 </style>
 

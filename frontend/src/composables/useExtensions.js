@@ -21,8 +21,6 @@ export const DEFAULT_EXTENSION_CONFIG = {
     level: 'eli15',
   },
   youtube: {
-    cookies_browser: 'none',
-    cookies_file: '',
     auto_download: false,
     download_quality: '720p',
   },
@@ -135,10 +133,13 @@ export function useExtensions() {
       extensionConfig.value[extensionId] = {}
     }
     extensionConfig.value[extensionId][key] = value
+    console.log(`[useExtensions] Updating config for [${extensionId}.${key}] =>`, value)
     try {
-      await saveExtensionConfig(JSON.stringify(extensionConfig.value))
+      const payload = JSON.stringify(extensionConfig.value)
+      await saveExtensionConfig(payload)
+      console.log(`[useExtensions] Successfully persisted extension config:`, extensionConfig.value)
     } catch (err) {
-      console.error('Failed to save extension setting:', err)
+      console.error(`[useExtensions] Failed to save extension setting [${extensionId}.${key}]:`, err)
     }
   }
 

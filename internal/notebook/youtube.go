@@ -29,7 +29,7 @@ type YouTubeIngestResult struct {
 }
 
 // IngestYouTubeVideo runs the youtube extension and feeds directly into standard ExtractedDocument.
-func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runner *extension.Runner, ext *extension.Extension, cookiesBrowser string, cookiesFile string) (*ExtractedDocument, *YouTubeIngestResult, error) {
+func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runner *extension.Runner, ext *extension.Extension) (*ExtractedDocument, *YouTubeIngestResult, error) {
 	cleanURL := strings.TrimSpace(videoURL)
 	if cleanURL == "" {
 		return nil, nil, fmt.Errorf("video URL or ID cannot be empty")
@@ -60,15 +60,7 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 		defer cancel()
 	}
 
-	args := []string{cleanURL}
-	if cookiesBrowser != "" && cookiesBrowser != "none" {
-		args = append(args, "--cookies-browser", cookiesBrowser)
-	}
-	if cookiesFile != "" {
-		args = append(args, "--cookies-file", cookiesFile)
-	}
-
-	outputBytes, err := runner.Run(ctx, ext, pythonPath, append([]string{entrypoint}, args...)...)
+	outputBytes, err := runner.Run(ctx, ext, pythonPath, entrypoint, cleanURL)
 	if err != nil && len(outputBytes) == 0 {
 		return nil, nil, fmt.Errorf("youtube extension failed: %w", err)
 	}
@@ -111,7 +103,7 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 }
 
 // DownloadYouTubeVideo runs yt-dlp to download a video file asynchronously in the background.
-func (s *Service) DownloadYouTubeVideo(ctx context.Context, videoURL string, outputPath string, quality string, runner *extension.Runner, ext *extension.Extension, cookiesBrowser string, cookiesFile string) error {
+func (s *Service) DownloadYouTubeVideo(ctx context.Context, videoURL string, outputPath string, quality string, runner *extension.Runner, ext *extension.Extension) error {
 	cleanURL := strings.TrimSpace(videoURL)
 	if cleanURL == "" {
 		return fmt.Errorf("video URL cannot be empty")
@@ -136,15 +128,7 @@ func (s *Service) DownloadYouTubeVideo(ctx context.Context, videoURL string, out
 		return fmt.Errorf("python is required for youtube download: %w", err)
 	}
 
-	args := []string{cleanURL, "--download-video", outputPath, "--quality", quality}
-	if cookiesBrowser != "" && cookiesBrowser != "none" {
-		args = append(args, "--cookies-browser", cookiesBrowser)
-	}
-	if cookiesFile != "" {
-		args = append(args, "--cookies-file", cookiesFile)
-	}
-
-	outputBytes, err := runner.Run(ctx, ext, pythonPath, append([]string{entrypoint}, args...)...)
+	outputBytes, err := runner.Run(ctx, ext, pythonPath, entrypoint, cleanURL, "--download-video", outputPath, "--quality", quality)
 	if err != nil {
 		return fmt.Errorf("video download failed: %w (output: %s)", err, string(outputBytes))
 	}
