@@ -103,31 +103,21 @@ export function escapeICSText(str = '') {
     .replace(/\r\n|\r|\n/g, '\\n')
 }
 
-/**
- * Builds the event description including optional custom study link.
- */
-function buildDescription(customUrl = '') {
-  let desc = 'Time for your daily StudyLoop study session! Clear your flashcard queue and complete reading tasks.'
-  if (customUrl && customUrl.trim()) {
-    desc += `\n\nStudy Portal: ${customUrl.trim()}`
-  }
-  return desc
-}
+const DEFAULT_STUDY_DESCRIPTION = 'Time for your daily StudyLoop study session! Clear your flashcard queue and complete reading tasks.'
 
 /**
  * Returns a direct URL to create a recurring daily event on Google Calendar.
  */
-export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00', customUrl = '') {
+export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00') {
   const { dtStart, dtEnd } = getEventDates(startTime, endTime)
   const title = '📖 StudyLoop Daily Study Session'
-  const details = buildDescription(customUrl)
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: title,
     dates: `${dtStart}/${dtEnd}`,
     recur: 'RRULE:FREQ=DAILY',
-    details: details,
+    details: DEFAULT_STUDY_DESCRIPTION,
   })
 
   return `https://calendar.google.com/calendar/render?${params.toString()}`
@@ -136,10 +126,10 @@ export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00', cus
 /**
  * Generates raw iCalendar (.ics) string with daily recurrence and alarms.
  */
-export function generateRoutineICS(startTime = '17:00', endTime = '19:00', customUrl = '') {
+export function generateRoutineICS(startTime = '17:00', endTime = '19:00') {
   const { dtStart, dtEnd, y, m, d } = getEventDates(startTime, endTime)
   const title = '📖 StudyLoop Daily Study Session'
-  const details = escapeICSText(buildDescription(customUrl))
+  const details = escapeICSText(DEFAULT_STUDY_DESCRIPTION)
 
   const icsLines = [
     'BEGIN:VCALENDAR',
@@ -176,16 +166,15 @@ export function generateRoutineICS(startTime = '17:00', endTime = '19:00', custo
 /**
  * Returns a direct URL to compose an event on Outlook Web / Live.
  */
-export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', customUrl = '') {
+export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00') {
   const { isoStart, isoEnd } = getEventDates(startTime, endTime)
   const title = '📖 StudyLoop Daily Study Session'
-  const details = buildDescription(customUrl)
 
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
     rru: 'addevent',
     subject: title,
-    body: details,
+    body: DEFAULT_STUDY_DESCRIPTION,
     startdt: isoStart,
     enddt: isoEnd,
   })
@@ -197,8 +186,8 @@ export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', cu
  * Generates and triggers download of a standard RFC 5545 .ics file
  * with daily recurrence (RRULE:FREQ=DAILY) and 10-minute + 0-minute audio alarms.
  */
-export function downloadRoutineICS(startTime = '17:00', endTime = '19:00', customUrl = '') {
-  const icsContent = generateRoutineICS(startTime, endTime, customUrl)
+export function downloadRoutineICS(startTime = '17:00', endTime = '19:00') {
+  const icsContent = generateRoutineICS(startTime, endTime)
   const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(icsBlob)
   const link = document.createElement('a')
