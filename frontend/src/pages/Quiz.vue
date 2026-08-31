@@ -230,6 +230,16 @@
           {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
         </button>
 
+        <!-- Written Assessment optional routing on pass -->
+        <button
+          v-if="result.passed"
+          class="ghost-btn examiner-btn"
+          :disabled="generatingFlashcards"
+          @click="handleGoToExaminer"
+        >
+          Written Assessment
+        </button>
+
         <button
           class="primary-btn continue-btn"
           :disabled="generatingFlashcards"
@@ -622,6 +632,51 @@ async function handleContinue() {
     query.highlight = result.value.reread_task_id
   }
   router.push({ path: '/dashboard', query })
+}
+
+async function handleGoToExaminer() {
+  // If quiz passed with flashcards pending, generate flashcards first to maintain state machine integrity
+  if (result.value?.passed && result.value?.flashcards_pending) {
+    generatingFlashcards.value = true
+    error.value = ''
+    result.value.flashcards_generation_error = false
+    result.value.flashcards_generation_message = ''
+    try {
+      const genResult = await generateFlashcardsForQuizTask(result.value.task_id)
+      if (genResult?.error) {
+        console.warn('[FLASHCARD_PIPELINE] Flashcard generation failed:', genResult.error)
+        result.value.flashcards_generation_error = true
+        result.value.flashcards_generation_message = genResult.error
+        result.value.flashcards_pending = false
+        return
+      } else {
+        result.value.flashcards_generated = genResult?.cards_scheduled || 0
+        result.value.flashcards_pending = false
+      }
+    } catch (err) {
+      console.warn('[FLASHCARD_PIPELINE] Flashcard generation error:', err)
+      result.value.flashcards_generation_error = true
+      result.value.flashcards_generation_message = err?.message || 'Flashcard generation failed.'
+      result.value.flashcards_pending = false
+      return
+    } finally {
+      generatingFlashcards.value = false
+    }
+  }
+
+  const nbID = taskMeta.value?.notebook_id || selectedNotebookID.value || ''
+  const startP = taskMeta.value?.start_page || startPage.value || 1
+  const endP = taskMeta.value?.end_page || endPage.value || startP
+
+  router.push({
+    path: '/examiner',
+    query: {
+      notebookID: nbID,
+      startPage: String(startP),
+      endPage: String(endP),
+      autoGenerate: 'true',
+    },
+  })
 }
 </script>
 
@@ -1017,15 +1072,42 @@ async function handleContinue() {
   color: var(--on-surface);
 }
 
-.retry-btn {
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  border: 1px solid var(--outline-variant);
-  margin-right: 12px;
+.result-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }
 
-.retry-btn:hover {
-  background: var(--outline-variant);
+.examiner-btn {
+  padding: 11px 20px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-low);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.examiner-btn:hover:not(:disabled) {
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.08));
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.examiner-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .retry-generation-btn {

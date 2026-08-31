@@ -64,6 +64,14 @@
         <!-- Error state -->
         <article v-if="error" class="state-panel state-panel--error">
           <p class="state-text">{{ error }}</p>
+          <button
+            v-if="canGenerate"
+            class="primary-btn retry-generation-btn"
+            :disabled="loading"
+            @click="generate"
+          >
+            Retry Generation
+          </button>
         </article>
       </div>
 
@@ -85,9 +93,26 @@
             v-model="userAnswer"
             class="ghost-textarea"
             rows="7"
-            placeholder="Write your answer here…"
+            placeholder="Write or dictate your answer here…"
             :disabled="scoring"
           />
+        </div>
+
+        <!-- STT Tip -->
+        <div class="stt-tip">
+          <span class="stt-tip__icon">💡</span>
+          <span class="stt-tip__text">
+            Prefer speaking? Use OS dictation (<kbd class="kbd-badge">Win + H</kbd>) or offline tools like
+            <a
+              href="https://github.com/cjpais/Handy"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="stt-tip__link"
+            >
+              Handy
+            </a>
+            to dictate your explanation directly into the answer field.
+          </span>
         </div>
 
         <!-- Actions row -->
@@ -108,6 +133,13 @@
         <!-- Inline error during submission -->
         <article v-if="error" class="state-panel state-panel--error">
           <p class="state-text">{{ error }}</p>
+          <button
+            class="primary-btn retry-generation-btn"
+            :disabled="scoring || !userAnswer.trim()"
+            @click="submitAnswer"
+          >
+            Retry Scoring
+          </button>
         </article>
       </div>
 
@@ -123,7 +155,10 @@
         <p class="result-panel__feedback">{{ result.feedback }}</p>
 
         <div class="form-footer">
-          <button id="wa-new-btn" class="primary-btn" @click="reset">New Question</button>
+          <button id="wa-dashboard-btn" class="primary-btn" @click="goToDashboard">
+            Back to Dashboard
+          </button>
+          <button id="wa-new-btn" class="ghost-btn" @click="reset">New Question</button>
         </div>
       </article>
     </section>
@@ -132,8 +167,12 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getNotebooks, generateComprehensiveExam, scoreShortAnswer } from '../services/appApi.js'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 const notebooks = ref([])
 const selectedNotebookID = ref('')
@@ -180,10 +219,30 @@ onMounted(async () => {
   try {
     const res = await getNotebooks()
     notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
+
+    // Read optional query parameters from router (e.g. from Quiz completion)
+    const { notebookID, startPage: queryStart, endPage: queryEnd, autoGenerate } = route.query
+    if (notebookID) {
+      selectedNotebookID.value = String(notebookID)
+    }
+    if (queryStart && Number(queryStart) > 0) {
+      startPage.value = Number(queryStart)
+    }
+    if (queryEnd && Number(queryEnd) >= startPage.value) {
+      endPage.value = Number(queryEnd)
+    }
+
+    if (autoGenerate === 'true' && selectedNotebookID.value) {
+      await generate()
+    }
   } catch {
     error.value = 'Failed to load notebooks.'
   }
 })
+
+function goToDashboard() {
+  router.push('/dashboard')
+}
 
 async function generate() {
   error.value = ''
@@ -388,6 +447,11 @@ function reset() {
   color: var(--muted-text);
 }
 
+.retry-generation-btn {
+  margin-top: 12px;
+  min-width: 120px;
+}
+
 /* ── Exam area ────────────────────────────────── */
 .exam-area {
   display: grid;
@@ -422,6 +486,45 @@ function reset() {
   border-radius: 999px;
   padding: 4px 12px;
   width: fit-content;
+}
+
+/* STT Tip banner */
+.stt-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-container-low);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted-text);
+}
+
+.stt-tip__icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.stt-tip__text {
+  line-height: 1.5;
+}
+
+.stt-tip__link {
+  color: var(--primary);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.kbd-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--on-surface);
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
 }
 
 /* Answer field */
