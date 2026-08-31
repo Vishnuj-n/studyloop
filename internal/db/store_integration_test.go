@@ -1197,5 +1197,42 @@ func TestInitOnLegacyDatabaseAddsMissingColumns(t *testing.T) {
 	}
 }
 
+func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
+	initDBForTest(t, false, 0)
 
+	settings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if settings.QuizQuestionCount != 8 {
+		t.Fatalf("expected default QuizQuestionCount 8, got %d", settings.QuizQuestionCount)
+	}
+	if settings.QuizPassingScore != 70 {
+		t.Fatalf("expected default QuizPassingScore 70, got %d", settings.QuizPassingScore)
+	}
+	if settings.TutorStyle != "socratic" {
+		t.Fatalf("expected default TutorStyle 'socratic', got %q", settings.TutorStyle)
+	}
 
+	settings.QuizQuestionCount = 5
+	settings.QuizPassingScore = 80
+	settings.TutorStyle = "direct"
+
+	if err := testRepo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+
+	updated, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings after update failed: %v", err)
+	}
+	if updated.QuizQuestionCount != 5 {
+		t.Fatalf("expected updated QuizQuestionCount 5, got %d", updated.QuizQuestionCount)
+	}
+	if updated.QuizPassingScore != 80 {
+		t.Fatalf("expected updated QuizPassingScore 80, got %d", updated.QuizPassingScore)
+	}
+	if updated.TutorStyle != "direct" {
+		t.Fatalf("expected updated TutorStyle 'direct', got %q", updated.TutorStyle)
+	}
+}

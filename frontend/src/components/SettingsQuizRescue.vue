@@ -49,6 +49,65 @@
       </div>
     </div>
 
+    <div class="form-group">
+      <label>AI Tutor Style</label>
+      <p class="hint" style="margin-bottom: 8px">
+        Choose how the AI tutor interacts with you during concept rescue sessions.
+      </p>
+      <div class="strategy-options">
+        <label
+          class="strategy-option"
+          :class="{ active: (settings.tutor_style || 'socratic') === 'socratic' }"
+        >
+          <input
+            v-model="settings.tutor_style"
+            type="radio"
+            value="socratic"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">Socratic Guide</span>
+            <span class="option-desc">Asks leading questions to help you discover the answers yourself</span>
+          </div>
+        </label>
+
+        <label
+          class="strategy-option"
+          :class="{ active: settings.tutor_style === 'direct' }"
+        >
+          <input
+            v-model="settings.tutor_style"
+            type="radio"
+            value="direct"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">Direct &amp; Concise</span>
+            <span class="option-desc">Direct explanations pointing out exactly where you went wrong</span>
+          </div>
+        </label>
+
+        <label
+          class="strategy-option"
+          :class="{ active: settings.tutor_style === 'detailed' }"
+        >
+          <input
+            v-model="settings.tutor_style"
+            type="radio"
+            value="detailed"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">Step-by-Step</span>
+            <span class="option-desc">Deep walkthroughs with intuitive analogies and clear examples</span>
+          </div>
+        </label>
+      </div>
+    </div>
+
     <SettingsToggle
       :model-value="settings.rag_enabled"
       :disabled="disabled"
@@ -176,6 +235,41 @@ h2 {
   font-size: 1rem;
   font-weight: 600;
   color: var(--on-surface);
+}
+
+input[type='number'],
+select {
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+input[type='number']:focus,
+select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
+  outline: none;
+}
+
+.settings-row-pair {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.field-half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .option-desc {

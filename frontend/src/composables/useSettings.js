@@ -23,6 +23,9 @@ export function useSettings(errorRef, successRef) {
     classroom_code: '',
     analytics_enabled: false,
     target_session_words: 3000,
+    quiz_question_count: 8,
+    quiz_passing_score: 70,
+    tutor_style: 'socratic',
   })
 
   const studyDuration = ref('')
@@ -94,6 +97,16 @@ export function useSettings(errorRef, successRef) {
             'Target session words must be between 1000 and 20000 and a multiple of 500.'
           return
         }
+        const quizCount = s.quiz_question_count
+        if (typeof quizCount === 'number' && (quizCount < 3 || quizCount > 15)) {
+          errorRef.value = 'Quiz question count must be between 3 and 15.'
+          return
+        }
+        const passScore = s.quiz_passing_score
+        if (typeof passScore === 'number' && (passScore < 50 || passScore > 100)) {
+          errorRef.value = 'Quiz passing score must be between 50% and 100%.'
+          return
+        }
         const start = s.study_start_time
         const end = s.study_end_time
         if (!start || !end || start >= end) {
@@ -123,6 +136,9 @@ export function useSettings(errorRef, successRef) {
       return false
     }
     if (!res.default_remedial_strategy) res.default_remedial_strategy = 'FAST'
+    if (!res.quiz_question_count) res.quiz_question_count = 8
+    if (!res.quiz_passing_score) res.quiz_passing_score = 70
+    if (!res.tutor_style) res.tutor_style = 'socratic'
     settings.value = res
     computeDuration()
     return true

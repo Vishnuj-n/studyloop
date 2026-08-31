@@ -349,10 +349,10 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000)
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(reminders_enabled, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'light-classic'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic')
 		FROM user_settings
 		WHERE id = 1
-	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.RemindersEnabled, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords)
+	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.RemindersEnabled, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle)
 	if err == sql.ErrNoRows {
 		s = models.UserSettings{
 			MaxFlashcardsPerSession: 30,
@@ -368,6 +368,9 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			AnalyticsEnabled:        false,
 			AnonymousUserID:         "",
 			TargetSessionWords:      3000,
+			QuizQuestionCount:       8,
+			QuizPassingScore:        70,
+			TutorStyle:              "socratic",
 		}
 	} else if err != nil {
 		return nil, err
@@ -381,6 +384,15 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		if _, updateErr := r.db.Exec(`UPDATE user_settings SET target_session_words = ? WHERE id = 1`, s.TargetSessionWords); updateErr != nil {
 			utils.Warnf("failed to persist default target_session_words: %v", updateErr)
 		}
+	}
+	if s.QuizQuestionCount <= 0 {
+		s.QuizQuestionCount = 8
+	}
+	if s.QuizPassingScore <= 0 {
+		s.QuizPassingScore = 70
+	}
+	if s.TutorStyle == "" {
+		s.TutorStyle = "socratic"
 	}
 
 	// Auto-generate anonymous_user_id if not set yet
@@ -442,9 +454,21 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	if targetWords <= 0 {
 		targetWords = 3000
 	}
+	quizCount := s.QuizQuestionCount
+	if quizCount <= 0 {
+		quizCount = 8
+	}
+	passingScore := s.QuizPassingScore
+	if passingScore <= 0 {
+		passingScore = 70
+	}
+	tutorStyle := s.TutorStyle
+	if tutorStyle == "" {
+		tutorStyle = "socratic"
+	}
 	_, err := r.db.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, quiz_question_count, quiz_passing_score, tutor_style)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			max_flashcards_per_session = excluded.max_flashcards_per_session,
 			study_start_time = excluded.study_start_time,
@@ -465,8 +489,11 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			analytics_enabled = excluded.analytics_enabled,
 			anonymous_user_id = CASE WHEN excluded.anonymous_user_id != '' THEN excluded.anonymous_user_id ELSE user_settings.anonymous_user_id END,
 			target_session_words = excluded.target_session_words,
+			quiz_question_count = excluded.quiz_question_count,
+			quiz_passing_score = excluded.quiz_passing_score,
+			tutor_style = excluded.tutor_style,
 			updated_at = CURRENT_TIMESTAMP
-	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, s.RemindersEnabled, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords)
+	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, s.RemindersEnabled, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, quizCount, passingScore, tutorStyle)
 	return err
 }
 

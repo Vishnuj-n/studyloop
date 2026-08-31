@@ -540,6 +540,9 @@ type UserSettings struct {
 	StudentUsername         string `json:"student_username"`
 	LastSyncedAt            int64  `json:"last_synced_at"`
 	TargetSessionWords      int    `json:"target_session_words"`
+	QuizQuestionCount       int    `json:"quiz_question_count"`
+	QuizPassingScore        int    `json:"quiz_passing_score"`
+	TutorStyle              string `json:"tutor_style"`
 	AnalyticsEnabled        bool   `json:"analytics_enabled"`
 	AnonymousUserID         string `json:"anonymous_user_id"`
 }

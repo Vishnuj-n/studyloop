@@ -17,6 +17,39 @@
       <p class="hint">Caps the number of FSRS reviews active in any single study session.</p>
     </div>
 
+    <div class="settings-row-pair">
+      <div class="form-group field-half">
+        <label for="quiz-question-count">Questions per Quiz</label>
+        <input
+          id="quiz-question-count"
+          v-model.number="settings.quiz_question_count"
+          type="number"
+          min="3"
+          max="15"
+          step="1"
+          :disabled="disabled"
+          required
+        />
+        <p class="hint">Target number of questions generated per quiz attempt (3–15, default 8).</p>
+      </div>
+
+      <div class="form-group field-half">
+        <label for="quiz-passing-score">Passing Score (%)</label>
+        <select
+          id="quiz-passing-score"
+          v-model.number="settings.quiz_passing_score"
+          :disabled="disabled"
+          class="setting-select"
+        >
+          <option :value="60">60% (Lenient)</option>
+          <option :value="70">70% (Standard)</option>
+          <option :value="80">80% (Strict)</option>
+          <option :value="90">90% (Mastery)</option>
+        </select>
+        <p class="hint">Minimum score required to master a topic without remedial review.</p>
+      </div>
+    </div>
+
     <div class="form-group">
       <label for="target-session-words">Target Reading Session Words</label>
       <input
@@ -204,7 +237,8 @@ label {
 }
 
 input[type='number'],
-input[type='url'] {
+input[type='url'],
+select {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
@@ -215,13 +249,28 @@ input[type='url'] {
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 input[type='number']:focus,
-input[type='url']:focus {
+input[type='url']:focus,
+select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
+}
+
+.settings-row-pair {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.field-half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .hint {

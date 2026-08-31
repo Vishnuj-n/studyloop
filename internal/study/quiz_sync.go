@@ -322,7 +322,19 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	maxOutputTokens := limits.MaxOutputTokens
 	utils.Warnf("[QUIZ_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
 
-	templatePrompt := buildQuizPrompt(notebookTitle, scaledQuizQuestionCount(0), nil)
+	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
+	userQuizCount := 8
+	userPassingScore := 70
+	if userSettings, err := s.repo.GetUserSettings(); err == nil && userSettings != nil {
+		if userSettings.QuizQuestionCount > 0 {
+			userQuizCount = userSettings.QuizQuestionCount
+		}
+		if userSettings.QuizPassingScore > 0 {
+			userPassingScore = userSettings.QuizPassingScore
+		}
+	}
+
+	templatePrompt := buildQuizPrompt(notebookTitle, userQuizCount, nil)
 	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, templatePrompt)
 	if err != nil {
 		return models.QuizTaskPayload{}, fmt.Errorf("insufficient token budget: %w", err)
@@ -338,7 +350,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 			len(normalizedChunkIDs), len(ctxRes.contextParts), ctxRes.truncatedCount, ctxRes.currentTokens, availableBudget)
 	}
 
-	targetCount := scaledQuizQuestionCount(ctxRes.totalWordCount)
+	targetCount := userQuizCount
 
 	prompt := buildQuizPrompt(notebookTitle, targetCount, ctxRes.contextParts)
 
@@ -356,7 +368,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		return models.QuizTaskPayload{}, fmt.Errorf("no valid questions generated")
 	}
 
-	return models.QuizTaskPayload{Questions: questions, PassingScore: 70}, nil
+	return models.QuizTaskPayload{Questions: questions, PassingScore: userPassingScore}, nil
 }
 
 func (s *StudyService) triggerSocraticRescueHandoffTx(
