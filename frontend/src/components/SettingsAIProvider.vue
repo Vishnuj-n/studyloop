@@ -63,6 +63,11 @@
             : 'No fast-tier key stored yet.'
         }}
       </p>
+      <p class="hint">
+        Get free key:
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq (Recommended Fast) ↗</a> ·
+        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+      </p>
     </div>
 
     <div class="form-group">
@@ -141,6 +146,11 @@
               ? 'A heavy-tier key is stored.'
               : 'No heavy-tier key stored yet.'
           }}
+        </p>
+        <p class="hint">
+          Get free key:
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio (Recommended Heavy) ↗</a> ·
+          <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
         </p>
       </div>
       <div class="form-group">
@@ -224,6 +234,16 @@ select:focus {
   line-height: 1.4;
 }
 
+.hint a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hint a:hover {
+  text-decoration: underline;
+}
+
 .warning-hint {
   margin: 6px 0 0;
   font-size: 12px;
@@ -253,12 +273,11 @@ h2 {
 }
 
 .llm-advanced {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  background: var(--surface-container-low);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 8px;
+  border-top: 1px solid var(--outline-variant);
 }
 
 .button-row {
