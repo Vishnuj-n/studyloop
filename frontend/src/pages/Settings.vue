@@ -23,7 +23,7 @@
 
       <div class="rail-footer">
         <button
-          v-if="cloudConfigured"
+          v-if="isCloudAccount"
           type="button"
           class="rail-sync-btn"
           :disabled="syncing"
@@ -303,6 +303,14 @@ const {
 const activeProfileName = computed(() => {
   const p = profiles.value.find((pr) => pr.id === settings.value.active_profile_id)
   return p ? p.name : ''
+})
+
+const isCloudAccount = computed(() => {
+  return cloudConfigured.value && !!(
+    settings.value?.classroom_code ||
+    settings.value?.cloud_api_token ||
+    settings.value?.cloud_student_id
+  )
 })
 
 async function loadAllData() {
