@@ -27,8 +27,12 @@
         id="settings-llm-base-url"
         v-model="llmSettings.fast.base_url"
         type="url"
-        :disabled="disabled"
+        :placeholder="llmSettings.fast.provider === 'custom' ? 'e.g. http://localhost:11434/v1' : 'Managed by provider preset'"
+        :disabled="disabled || llmSettings.fast.provider !== 'custom'"
       />
+      <p v-if="llmSettings.fast.provider !== 'custom'" class="hint">
+        Automatically configured for {{ llmSettings.fast.provider }}. Switch Provider to "Custom" to set a custom endpoint.
+      </p>
     </div>
 
     <div class="form-group">
@@ -105,8 +109,12 @@
           id="settings-heavy-base-url"
           v-model="llmSettings.heavy.base_url"
           type="url"
-          :disabled="disabled"
+          :placeholder="llmSettings.heavy.provider === 'custom' ? 'e.g. http://localhost:11434/v1' : 'Managed by provider preset'"
+          :disabled="disabled || llmSettings.heavy.provider !== 'custom'"
         />
+        <p v-if="llmSettings.heavy.provider !== 'custom'" class="hint">
+          Automatically configured for {{ llmSettings.heavy.provider }}. Switch Provider to "Custom" to set a custom endpoint.
+        </p>
       </div>
       <div class="form-group">
         <label for="settings-heavy-model">Heavy Model</label>
