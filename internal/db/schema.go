@@ -164,6 +164,7 @@ func InitSchema(tx *sql.Tx) error {
 			uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			profile_id TEXT,
 			study_status TEXT DEFAULT 'dormant',
+			extraction_engine TEXT DEFAULT 'standard',
 			FOREIGN KEY (topic_id) REFERENCES topics(id),
 			FOREIGN KEY (profile_id) REFERENCES study_profiles(id) ON DELETE SET NULL
 		)`,
@@ -395,6 +396,7 @@ var alterStatements = []struct {
 	{"user_settings", "student_username", "ALTER TABLE user_settings ADD COLUMN student_username TEXT DEFAULT ''"},
 	{"user_settings", "last_synced_at", "ALTER TABLE user_settings ADD COLUMN last_synced_at INTEGER DEFAULT 0"},
 	{"notebooks", "file_hash", "ALTER TABLE notebooks ADD COLUMN file_hash TEXT DEFAULT ''"},
+	{"notebooks", "extraction_engine", "ALTER TABLE notebooks ADD COLUMN extraction_engine TEXT DEFAULT 'standard'"},
 	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
 	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
 	{"user_settings", "target_session_words", "ALTER TABLE user_settings ADD COLUMN target_session_words INTEGER NOT NULL DEFAULT 3000"},

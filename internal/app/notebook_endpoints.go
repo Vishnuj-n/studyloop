@@ -248,6 +248,10 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 			}
 		}
 
+		if err := repo.UpdateNotebookExtractionEngine(nbID, "deep_structured"); err != nil {
+			utils.Warnf("[DEEP_PDF] Failed to update extraction engine for %s (%s): %v", fileName, nbID, err)
+		}
+
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
@@ -1143,6 +1147,11 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 	var ext *extension.Extension
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("deep_pdf")
+	}
+
+	repo := a.getRepo()
+	if repo != nil {
+		_ = repo.UpdateNotebookStudyStatus(nb.ID, "dormant")
 	}
 
 	// Delegate to unified extraction worker

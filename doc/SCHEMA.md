@@ -90,6 +90,7 @@ Top-level container for uploaded study material.
 | `exam_deadline` | TEXT | Exam date string for deadline tracking |
 | `profile_id` | TEXT | Owning study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
 | `study_status` | TEXT DEFAULT 'dormant' | Lifecycle state (`dormant`, `active`, `completed`) |
+| `extraction_engine` | TEXT DEFAULT 'standard' | Extraction pipeline used (`standard`, `deep_structured`) |
 | `uploaded_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Upload time |
 
 **Foreign keys:** `topic_id` → `topics(id)`, `profile_id` → `study_profiles(id)` ON DELETE SET NULL.
