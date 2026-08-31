@@ -17,6 +17,7 @@
         <p class="meta">{{ notebook.file_type.toUpperCase() }}</p>
         <p v-if="notebook.page_count > 0" class="meta">{{ notebook.page_count }} pages</p>
         <p class="meta">{{ notebook.chunk_count }} chunks</p>
+        <p v-if="isDeepExtracted" class="meta deep-badge">⚡ Deep Extracted</p>
         <p v-if="variant === 'dormant'" class="meta">Status: {{ formattedStatus }}</p>
       </div>
     </div>
@@ -79,34 +80,44 @@
       <button
         v-else-if="needsIngestion"
         class="btn-ingest"
-        title="Extract bookmarks and run AI cleanup"
+        :title="isCloudProfile ? 'Extract bookmarks and run AI cleanup for cloud assignment' : 'Extract bookmarks and run AI cleanup'"
         @click="$emit('edit-syllabus', notebook.id, notebook.title)"
       >
         ✨ Ingest Book
       </button>
-      <button
-        v-else-if="variant === 'active' && canUpgradeDeep"
-        class="btn-upgrade-deep"
-        title="Re-extract with deep structured analysis for rich tables, code blocks, and headings"
-        @click="$emit('upgrade-deep', notebook.id)"
-      >
-        ⚡ Deep Extract
-      </button>
-      <button
-        v-else-if="variant === 'active'"
-        class="btn-sleep"
-        @click="$emit('change-status', notebook.id, 'dormant')"
-      >
-        Sleep
-      </button>
-      <button
-        v-else-if="variant === 'dormant'"
-        class="btn-activate"
-        :disabled="activeLimitReached"
-        @click="$emit('change-status', notebook.id, 'active')"
-      >
-        Activate
-      </button>
+      <template v-else-if="variant === 'active'">
+        <button
+          v-if="canUpgradeDeep"
+          class="btn-upgrade-deep"
+          title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
+          @click="$emit('upgrade-deep', notebook.id)"
+        >
+          ⚡ Upgrade Deep
+        </button>
+        <button
+          class="btn-sleep"
+          @click="$emit('change-status', notebook.id, 'dormant')"
+        >
+          Sleep
+        </button>
+      </template>
+      <template v-else-if="variant === 'dormant'">
+        <button
+          v-if="canUpgradeDeep"
+          class="btn-upgrade-deep"
+          title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
+          @click="$emit('upgrade-deep', notebook.id)"
+        >
+          ⚡ Upgrade Deep
+        </button>
+        <button
+          class="btn-activate"
+          :disabled="activeLimitReached"
+          @click="$emit('change-status', notebook.id, 'active')"
+        >
+          Activate
+        </button>
+      </template>
       <button
         class="btn-delete"
         :disabled="isCloudProfile"
@@ -185,10 +196,15 @@ const progressLabel = computed(() => {
   return 'Deep Extracting...'
 })
 
+const isDeepExtracted = computed(() => {
+  return props.notebook.file_type === 'pdf' && props.notebook.extraction_engine === 'deep_structured'
+})
+
 const canUpgradeDeep = computed(() => {
   return (
     props.isPro &&
     props.notebook.file_type === 'pdf' &&
+    !isDeepExtracted.value &&
     !needsIngestion.value &&
     !isProcessing.value
   )
@@ -259,6 +275,11 @@ const variantClass = computed(() =>
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--muted-text);
+}
+
+.deep-badge {
+  color: #a78bfa;
+  font-weight: 600;
 }
 
 .notebook-topic {

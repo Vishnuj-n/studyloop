@@ -106,17 +106,36 @@ Rules:
 			if maxInputTokens <= 0 {
 				return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
 			}
-			const baseOverheadTokens = 500
-			const safetyMarginTokens = 500
-			availableBudget := maxInputTokens - baseOverheadTokens - safetyMarginTokens
+
+			emptyTemplate := fmt.Sprintf(`You are extracting a study syllabus from a document.
+
+Document: %s
+File type: %s
+Total pages: %d
+
+Text sample with absolute page markers (first 30 sections):
+
+
+Task: Return a flat list of study-ready chapters with accurate page ranges.
+Rules:
+- Output strict JSON only: {"chapters":[{"title":"...","start_page":1,"end_page":10}]}
+- Use absolute page numbers. Preserve order. No gaps. No overlaps.
+- Prefer main chapters.`,
+				bookName, strings.ToLower(fileType), doc.PageCount)
+
+			templateTokens, err := embeddings.CountTokens(emptyTemplate)
+			if err != nil {
+				templateTokens = 300
+			}
+			availableBudget := maxInputTokens - templateTokens - 100
 			if availableBudget <= 0 {
-				return nil, fmt.Errorf("insufficient token budget: maxInputTokens (%d) is too small for prompt overhead", maxInputTokens)
+				return nil, fmt.Errorf("insufficient token budget: maxInputTokens (%d) is too small for syllabus prompt", maxInputTokens)
 			}
 
-			sampleChars := len(sample)
-			maxChars := availableBudget * 4
-			if sampleChars > maxChars && maxChars > 0 {
-				sample = truncateToCharBoundary(sample, maxChars)
+			if sampleTokens, err := embeddings.CountTokens(sample); err == nil && sampleTokens > availableBudget {
+				if truncated, err := embeddings.TruncateToTokens(sample, availableBudget); err == nil && len(truncated) > 0 {
+					sample = truncated
+				}
 			}
 
 			prompt = fmt.Sprintf(`You are extracting a study syllabus from a document.
@@ -320,15 +339,3 @@ func firstN(text string, n int) string {
 	return text[:n]
 }
 
-// truncateToCharBoundary truncates text to maxChars, preferring a newline boundary.
-func truncateToCharBoundary(text string, maxChars int) string {
-	if len(text) <= maxChars {
-		return text
-	}
-	truncated := text[:maxChars]
-	// Prefer breaking at a newline for cleaner context.
-	if idx := strings.LastIndex(truncated, "\n"); idx > maxChars/2 {
-		return truncated[:idx]
-	}
-	return truncated
-}

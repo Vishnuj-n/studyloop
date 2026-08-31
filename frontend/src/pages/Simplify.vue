@@ -67,10 +67,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { simplifyReadingContent, getTopicSectionsContent } from '../services/appApi'
+import { useExtensions } from '../composables/useExtensions'
 import MarkdownReader from '../components/MarkdownReader.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { getExtensionSetting } = useExtensions()
 
 const topicId = computed(() => (route.query.topicId || route.query.topic_id || '').trim())
 const notebookId = computed(() => (route.query.notebookId || route.query.notebook_id || '').trim())
@@ -122,7 +124,8 @@ async function generateSimplification() {
   errorMessage.value = ''
 
   try {
-    const res = await simplifyReadingContent(rawContent.value)
+    const level = getExtensionSetting('text_simplifier', 'level', 'eli15')
+    const res = await simplifyReadingContent(rawContent.value, level)
     if (res?.error) {
       errorMessage.value = res.error
     } else if (res?.simplified) {

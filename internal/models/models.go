@@ -209,6 +209,7 @@ type Notebook struct {
 	ExamDeadline         *string `json:"exam_deadline,omitempty"`
 	ProfileID            string  `json:"profile_id,omitempty"`
 	StudyStatus          string  `json:"study_status,omitempty"`
+	ExtractionEngine     string  `json:"extraction_engine,omitempty"`
 	FileHash             string  `json:"file_hash"`
 	ExternalHelpRequired bool    `json:"external_help_required"`
 	StartPage            int     `json:"start_page,omitempty"`
@@ -540,6 +541,9 @@ type UserSettings struct {
 	StudentUsername         string `json:"student_username"`
 	LastSyncedAt            int64  `json:"last_synced_at"`
 	TargetSessionWords      int    `json:"target_session_words"`
+	QuizQuestionCount       int    `json:"quiz_question_count"`
+	QuizPassingScore        int    `json:"quiz_passing_score"`
+	TutorStyle              string `json:"tutor_style"`
 	AnalyticsEnabled        bool   `json:"analytics_enabled"`
 	AnonymousUserID         string `json:"anonymous_user_id"`
 }

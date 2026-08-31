@@ -244,35 +244,9 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		historyBudget = 0
 	}
 
-	var truncatedHistory []map[string]string
-	historyUsedTokens := 0
-	for i := len(conversationHistory) - 1; i >= 0; i-- {
-		msg := conversationHistory[i]
-		role := "Student"
-		if msg["role"] == "assistant" {
-			role = "Tutor"
-		}
-		msgText := fmt.Sprintf("%s: %s\n", role, msg["content"])
-		msgTokens, err := embeddings.CountTokens(msgText)
-		if err != nil {
-			return nil, fmt.Errorf("error counting message tokens: %w", err)
-		}
-		if historyUsedTokens+msgTokens <= historyBudget {
-			truncatedHistory = append([]map[string]string{msg}, truncatedHistory...)
-			historyUsedTokens += msgTokens
-		} else {
-			remaining := historyBudget - historyUsedTokens
-			if remaining > 8 {
-				if truncatedContent, err := embeddings.TruncateToTokens(msg["content"], remaining); err == nil && strings.TrimSpace(truncatedContent) != "" {
-					truncatedMsg := map[string]string{
-						"role":    msg["role"],
-						"content": truncatedContent,
-					}
-					truncatedHistory = append([]map[string]string{truncatedMsg}, truncatedHistory...)
-				}
-			}
-			break
-		}
+	truncatedHistory, err := BudgetConversationHistory(conversationHistory, historyBudget)
+	if err != nil {
+		return nil, fmt.Errorf("error budgeting conversation history: %w", err)
 	}
 
 	historyBlock := ""

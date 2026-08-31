@@ -17,16 +17,15 @@ describe('calendarService', () => {
     expect(url).toContain('https%3A%2F%2Fmy-school.edu%2Fstudy')
   })
 
-  it('generates a valid Outlook recurring ICS data URL with event details', () => {
+  it('generates a valid Outlook Web calendar URL with event details', () => {
     const url = getOutlookCalendarUrl('18:30', '20:00', 'https://custom-notes.com')
-    expect(url).toContain('data:text/calendar;charset=utf-8,')
-    const decoded = decodeURIComponent(url.replace('data:text/calendar;charset=utf-8,', ''))
-    expect(decoded).toContain('BEGIN:VCALENDAR')
-    expect(decoded).toContain('RRULE:FREQ=DAILY')
-    expect(decoded).toContain('183000')
-    expect(decoded).toContain('200000')
-    expect(decoded).toContain('StudyLoop')
-    expect(decoded).toContain('https://custom-notes.com')
+    expect(url).toContain('https://outlook.live.com/calendar/0/deeplink/compose')
+    expect(url).toContain('path=%2Fcalendar%2Faction%2Fcompose')
+    expect(url).toContain('rru=addevent')
+    expect(url).toContain('subject=%F0%9F%93%96+StudyLoop+Daily+Study+Session')
+    expect(url).toContain('startdt=')
+    expect(url).toContain('enddt=')
+    expect(url).toContain('https%3A%2F%2Fcustom-notes.com')
   })
 
   it('escapes RFC 5545 TEXT characters in strict order (backslashes, commas, semicolons, line breaks)', () => {

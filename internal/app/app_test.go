@@ -900,5 +900,33 @@ func TestGetStreakState_CompletedToday(t *testing.T) {
 	if todayCompleted, ok := state["today_completed"].(bool); !ok || !todayCompleted {
 		t.Fatalf("expected today_completed to be true, got %v", state["today_completed"])
 	}
+
+	// Insert and complete a non-reading task (QUIZ) - should not increment reading completion count
+	taskID2 := "streak-test-task-2"
+	task2 := models.StudyQueueTask{
+		ID:         taskID2,
+		NotebookID: "os-notebook",
+		TaskType:   models.StudyTaskTypeQuiz,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+	}
+	if err := testRepo.InsertStudyTask(task2); err != nil {
+		t.Fatalf("InsertStudyTask 2 failed: %v", err)
+	}
+	if err := testRepo.ActivateTask(taskID2); err != nil {
+		t.Fatalf("ActivateTask 2 failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(taskID2, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("CompleteTask 2 failed: %v", err)
+	}
+
+	state2 := app.getStreakState(0)
+	if state2["error"] != nil {
+		t.Fatalf("getStreakState failed: %v", state2["error"])
+	}
+	// Reading sessions completed today should remain 1
+	if count, ok := state2["completed_today"].(int); !ok || count != 1 {
+		t.Fatalf("expected 1 completed_today (reading tasks only), got %v", state2["completed_today"])
+	}
 }
 

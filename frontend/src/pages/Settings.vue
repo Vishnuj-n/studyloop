@@ -1,120 +1,177 @@
 <template>
-  <section class="page">
-    <p class="eyebrow">Settings & Profiles</p>
-    <h1>Workspace Configuration</h1>
-
-    <div class="tabs">
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'settings' }"
-        @click="activeTab = 'settings'"
-      >
-        General Settings
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'profiles' }"
-        @click="activeTab = 'profiles'"
-      >
-        Study Profiles
-      </button>
-    </div>
-
-    <!-- General Settings Tab -->
-    <div v-if="activeTab === 'settings'" class="tab-content">
-      <div class="settings-panels">
-        <SettingsStudyBudget
-          :settings="settings"
-          :study-duration="studyDuration"
-          :max-input-tokens="llmSettings.fast?.max_input_tokens || 4000"
-          :disabled="loading || saving"
-          @apply-duration-preset="applyDurationPreset"
-        />
-
-        <SettingsQuizRescue
-          :settings="settings"
-          :disabled="loading || saving"
-          @rag-toggle="onRagToggle"
-        />
-
-        <SettingsAIProvider
-          :llm-settings="llmSettings"
-          :llm-fast-key="llmFastKey"
-          :llm-heavy-key="llmHeavyKey"
-          :target-session-words="settings.target_session_words || 3000"
-          :disabled="loading || savingLLM"
-          @apply-preset="applyProviderPreset"
-          @remove-keys="removeLLMKeys"
-          @update:llm-fast-key="llmFastKey = $event"
-          @update:llm-heavy-key="llmHeavyKey = $event"
-        />
-
-        <SettingsTheme :settings="settings" :disabled="loading || saving" />
-
-        <SettingsUpdate />
-
-        <SettingsAccount
-          :settings="settings"
-          :is-dev="isDev"
-          :disabled="loading || saving"
-          :active-profile-name="activeProfileName"
-          :is-sign-up-mode="isSignUpMode"
-          :login-username="loginUsername"
-          :login-password="loginPassword"
-          :signup-username="signupUsername"
-          :signup-password="signupPassword"
-          :signup-classroom-code="signupClassroomCode"
-          :login-error="loginError"
-          :logging-in="loggingIn"
-          @login="handleLogin"
-          @signup="handleSignUp"
-          @logout="handleLogout"
-          @toggle-mode="toggleAuthMode"
-          @update:login-username="loginUsername = $event"
-          @update:login-password="loginPassword = $event"
-          @update:signup-username="signupUsername = $event"
-          @update:signup-password="signupPassword = $event"
-          @update:signup-classroom-code="signupClassroomCode = $event"
-        />
+  <section class="settings-workspace">
+    <!-- Solid Left Category Sidebar Rail -->
+    <aside class="settings-category-rail" aria-label="Settings Categories">
+      <div class="rail-header">
+        <p class="eyebrow">Settings</p>
+        <h1 class="rail-title">Configuration</h1>
       </div>
 
-      <div class="global-actions">
-        <div class="button-row">
-          <button
-            v-if="cloudConfigured"
-            type="button"
-            class="sync-btn"
-            :disabled="syncing"
-            @click="runManualSync"
-          >
-            {{ syncing ? 'Syncing...' : 'Sync with Cloud Now' }}
-          </button>
-        </div>
+      <nav class="rail-nav">
+        <button
+          v-for="cat in categories"
+          :key="cat.id"
+          type="button"
+          class="rail-item"
+          :class="{ active: activeCategory === cat.id }"
+          @click="activeCategory = cat.id"
+        >
+          <span class="rail-item-title">{{ cat.label }}</span>
+          <span class="rail-item-desc">{{ cat.desc }}</span>
+        </button>
+      </nav>
+
+      <div class="rail-footer">
+        <button
+          v-if="isCloudAccount"
+          type="button"
+          class="rail-sync-btn"
+          :disabled="syncing"
+          @click="runManualSync"
+        >
+          {{ syncing ? 'Syncing...' : 'Sync Cloud' }}
+        </button>
         <p v-if="error" class="error-text">{{ error }}</p>
         <p v-if="success" class="success-text">{{ success }}</p>
       </div>
-    </div>
+    </aside>
 
-    <!-- Study Profiles Tab -->
-    <div v-else-if="activeTab === 'profiles'" class="tab-content">
-      <div class="profiles-layout">
-        <SettingsProfilesPanel
-          :profiles="profiles"
-          :active-profile-id="settings.active_profile_id"
-          :format-unix-date="formatUnixDate"
-          @add="showAddModal = true"
-          @select="setActiveProfile"
-          @edit="openEditModal"
-          @delete="handleDeleteProfile"
-        />
+    <!-- Main Content Viewport -->
+    <main class="settings-content-viewport">
+      <div class="settings-content-scroll">
+        <!-- Study & Routine Category -->
+        <div v-show="activeCategory === 'study'" class="category-pane">
+          <header class="pane-header">
+            <h2>Study &amp; Routine</h2>
+            <p class="pane-subtitle">
+              Configure daily reading volume, review limits, study schedules, and remediation paths.
+            </p>
+          </header>
 
-        <SettingsTextbooksPanel
-          :notebooks="notebooks"
-          :profiles="profiles"
-          @assign="handleAssignProfile"
-        />
+          <div class="pane-body">
+            <SettingsStudyBudget
+              :settings="settings"
+              :study-duration="studyDuration"
+              :max-input-tokens="llmSettings.fast?.max_input_tokens || 4000"
+              :disabled="loading || saving"
+              @apply-duration-preset="applyDurationPreset"
+            />
+
+            <SettingsQuizRescue
+              :settings="settings"
+              :disabled="loading || saving"
+              @rag-toggle="onRagToggle"
+            />
+          </div>
+        </div>
+
+        <!-- AI & Retrieval Category -->
+        <div v-show="activeCategory === 'ai'" class="category-pane">
+          <header class="pane-header">
+            <h2>AI &amp; Retrieval</h2>
+            <p class="pane-subtitle">
+              Manage fast and heavy LLM endpoints, credentials, and local vector retrieval.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsAIProvider
+              :llm-settings="llmSettings"
+              :llm-fast-key="llmFastKey"
+              :llm-heavy-key="llmHeavyKey"
+              :target-session-words="settings.target_session_words || 3000"
+              :disabled="loading || savingLLM"
+              @apply-preset="applyProviderPreset"
+              @remove-keys="removeLLMKeys"
+              @update:llm-fast-key="llmFastKey = $event"
+              @update:llm-heavy-key="llmHeavyKey = $event"
+            />
+          </div>
+        </div>
+
+        <!-- Profiles & Notebooks Category -->
+        <div v-show="activeCategory === 'profiles'" class="category-pane">
+          <header class="pane-header">
+            <h2>Study Profiles &amp; Notebooks</h2>
+            <p class="pane-subtitle">
+              Switch exam targets, manage study profiles, and assign notebooks to specific profiles.
+            </p>
+          </header>
+
+          <div class="pane-body profiles-layout">
+            <SettingsProfilesPanel
+              :profiles="profiles"
+              :active-profile-id="settings.active_profile_id"
+              :format-unix-date="formatUnixDate"
+              @add="showAddModal = true"
+              @select="setActiveProfile"
+              @edit="openEditModal"
+              @delete="handleDeleteProfile"
+            />
+
+            <SettingsTextbooksPanel
+              :notebooks="notebooks"
+              :profiles="profiles"
+              @assign="handleAssignProfile"
+            />
+          </div>
+        </div>
+
+        <!-- Extensions & Tools Category -->
+        <div v-show="activeCategory === 'extensions'" class="category-pane">
+          <header class="pane-header">
+            <h2>Extensions &amp; Tools</h2>
+            <p class="pane-subtitle">
+              Configure local AI tools, podcast voice personas, and simplifier comprehension levels.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsExtensions :disabled="loading || saving" />
+          </div>
+        </div>
+
+        <!-- System & Account Category -->
+        <div v-show="activeCategory === 'system'" class="category-pane">
+          <header class="pane-header">
+            <h2>System &amp; Account</h2>
+            <p class="pane-subtitle">
+              Manage desktop appearance, authentication, subscription tier, and software updates.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsTheme :settings="settings" :disabled="loading || saving" />
+
+            <SettingsAccount
+              :settings="settings"
+              :is-dev="isDev"
+              :disabled="loading || saving"
+              :active-profile-name="activeProfileName"
+              :is-sign-up-mode="isSignUpMode"
+              :login-username="loginUsername"
+              :login-password="loginPassword"
+              :signup-username="signupUsername"
+              :signup-password="signupPassword"
+              :signup-classroom-code="signupClassroomCode"
+              :login-error="loginError"
+              :logging-in="loggingIn"
+              @login="handleLogin"
+              @signup="handleSignUp"
+              @logout="handleLogout"
+              @toggle-mode="toggleAuthMode"
+              @update:login-username="loginUsername = $event"
+              @update:login-password="loginPassword = $event"
+              @update:signup-username="signupUsername = $event"
+              @update:signup-password="signupPassword = $event"
+              @update:signup-classroom-code="signupClassroomCode = $event"
+            />
+
+            <SettingsUpdate />
+          </div>
+        </div>
       </div>
-    </div>
+    </main>
 
     <!-- Add Profile Modal -->
     <SettingsProfileModal
@@ -152,6 +209,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { getAppEnv, getCloudConfig, triggerCloudSync } from '../services/appApi'
 
 import { useSettings } from '../composables/useSettings'
@@ -163,6 +221,7 @@ import { useAuth } from '../composables/useAuth'
 import SettingsStudyBudget from '../components/SettingsStudyBudget.vue'
 import SettingsQuizRescue from '../components/SettingsQuizRescue.vue'
 import SettingsAIProvider from '../components/SettingsAIProvider.vue'
+import SettingsExtensions from '../components/SettingsExtensions.vue'
 import SettingsTheme from '../components/SettingsTheme.vue'
 import SettingsUpdate from '../components/SettingsUpdate.vue'
 import SettingsAccount from '../components/SettingsAccount.vue'
@@ -171,7 +230,17 @@ import SettingsTextbooksPanel from '../components/SettingsTextbooksPanel.vue'
 import SettingsProfileModal from '../components/SettingsProfileModal.vue'
 import SettingsRagModal from '../components/SettingsRagModal.vue'
 
-const activeTab = ref('settings')
+const route = useRoute()
+
+const categories = [
+  { id: 'study', label: 'Study & Routine', desc: 'Budgets, schedules, quiz rules' },
+  { id: 'ai', label: 'AI & Retrieval', desc: 'LLM models, API keys, RAG' },
+  { id: 'profiles', label: 'Profiles & Notebooks', desc: 'Exam goals and book mapping' },
+  { id: 'extensions', label: 'Extensions & Tools', desc: 'Podcast voice, simplifier, AI tools' },
+  { id: 'system', label: 'System & Account', desc: 'Themes, cloud sync, updates' },
+]
+
+const activeCategory = ref('study')
 const isDev = ref(false)
 const cloudConfigured = ref(false)
 const syncing = ref(false)
@@ -255,6 +324,15 @@ const activeProfileName = computed(() => {
   return p ? p.name : ''
 })
 
+const isCloudAccount = computed(() => {
+  return cloudConfigured.value && !!(
+    settings.value?.classroom_code ||
+    settings.value?.cloud_api_token ||
+    settings.value?.cloud_student_id ||
+    settings.value?.cloud_session_token
+  )
+})
+
 async function loadAllData() {
   loading.value = true
   error.value = ''
@@ -301,6 +379,12 @@ watch(
 )
 
 onMounted(async () => {
+  if (route.query.category && categories.some((c) => c.id === route.query.category)) {
+    activeCategory.value = route.query.category
+  } else if (route.query.tab && categories.some((c) => c.id === route.query.tab)) {
+    activeCategory.value = route.query.tab
+  }
+
   const [envRes, cfgRes] = await Promise.all([
     getAppEnv().catch(() => null),
     getCloudConfig().catch(() => null),
@@ -318,86 +402,169 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page {
-  display: grid;
-  gap: 20px;
-  max-width: 1000px;
-  margin: 0 auto;
+.settings-workspace {
+  display: flex;
+  margin: -16px -20px;
+  min-height: calc(100vh - 20px);
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);
+  background: var(--background);
 }
 
-h1 {
+/* Solid Left Category Sidebar Rail */
+.settings-category-rail {
+  width: 260px;
+  min-width: 260px;
+  background: var(--surface-container-low);
+  border-right: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.06));
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  gap: 20px;
+}
+
+.rail-header {
+  padding: 0 8px 12px;
+  border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.05));
+}
+
+.eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--muted-text);
+  margin: 0 0 4px;
+}
+
+.rail-title {
   margin: 0;
-  font-size: 36px;
+  font-size: 22px;
   font-family: 'Manrope', sans-serif;
   letter-spacing: -0.02em;
 }
 
-.tabs {
+.rail-nav {
   display: flex;
-  gap: 8px;
-  background: var(--surface-container-low);
-  padding: 6px;
-  border-radius: 12px;
-  width: fit-content;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
 }
 
-.tab-btn {
-  background: none;
-  border: none;
-  color: var(--muted-text);
-  font-size: 14px;
-  font-weight: 700;
-  padding: 8px 16px;
-  cursor: pointer;
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
   border-radius: 8px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
 }
 
-.tab-btn:hover {
+.rail-item:hover {
+  background: var(--surface-container);
+}
+
+.rail-item.active {
+  background: var(--surface-container-highest);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.rail-item-title {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--on-surface);
 }
 
-.tab-btn.active {
+.rail-item.active .rail-item-title {
   color: var(--primary);
-  background: var(--surface-container-lowest);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--on-surface) 6%, transparent);
 }
 
-.settings-panels {
+.rail-item-desc {
+  font-size: 11px;
+  color: var(--muted-text);
+  line-height: 1.3;
+}
+
+.rail-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.05));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rail-sync-btn {
+  width: 100%;
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface-container);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rail-sync-btn:hover:not(:disabled) {
+  background: var(--surface-container-highest);
+}
+
+.rail-sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Main Content Area */
+.settings-content-viewport {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 40px 48px;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-content-scroll {
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-.button-row {
-  display: flex;
-  gap: 12px;
-}
-
-.global-actions {
-  padding: 8px 0;
-  margin-top: 8px;
+.category-pane {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
 }
 
-.sync-btn {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 24px;
-  color: var(--primary);
-  font-weight: 700;
-  background: var(--surface-container-highest);
-  cursor: pointer;
-  transition: all 0.2s ease;
+.pane-header {
+  border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.06));
+  padding-bottom: 12px;
 }
 
-.sync-btn:hover {
-  background: var(--surface-container-low);
+.pane-header h2 {
+  font-size: 22px;
+  font-family: 'Manrope', sans-serif;
+  margin: 0 0 4px;
+}
+
+.pane-subtitle {
+  font-size: 13px;
+  color: var(--muted-text);
+  margin: 0;
+}
+
+.pane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .profiles-layout {
@@ -408,9 +575,32 @@ h1 {
 
 .error-text {
   color: #ef4444;
+  font-size: 12px;
+  margin: 0;
 }
 
 .success-text {
   color: #10b981;
+  font-size: 12px;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .settings-workspace {
+    flex-direction: column;
+    margin: 0;
+  }
+  .settings-category-rail {
+    width: 100%;
+    min-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.06));
+  }
+  .profiles-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-content-viewport {
+    padding: 20px 0;
+  }
 }
 </style>

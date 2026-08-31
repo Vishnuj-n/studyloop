@@ -93,7 +93,7 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 			if sampleText == "" {
 				sampleText = "StudyLoop is an intelligent study queue platform designed to help students master complex subjects through active recall, spaced repetition, and clear conceptual explanations."
 			}
-			res := a.SimplifyReadingContent(sampleText)
+			res := a.SimplifyReadingContent(sampleText, "")
 			if errStr, ok := res["error"].(string); ok && errStr != "" {
 				return map[string]interface{}{"error": errStr, "id": id}
 			}
@@ -240,11 +240,12 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 
 // SimplifyReadingContent takes dense text content and simplifies it using the LLM
 // while preserving all core technical concepts, formulas, and definitions.
-func (a *App) SimplifyReadingContent(content string) map[string]interface{} {
+func (a *App) SimplifyReadingContent(content string, level string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not available"}
 	}
-	simplified, err := a.studyService.SimplifyReadingContent(context.Background(), content)
+
+	simplified, err := a.studyService.SimplifyReadingContent(context.Background(), content, level)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
@@ -252,3 +253,20 @@ func (a *App) SimplifyReadingContent(content string) map[string]interface{} {
 		"simplified": simplified,
 	}
 }
+
+// GetExtensionConfig retrieves the persisted JSON extension configuration.
+func (a *App) GetExtensionConfig() (string, error) {
+	if a.repo == nil {
+		return "{}", errors.New("repository not initialized")
+	}
+	return a.repo.GetExtensionConfig()
+}
+
+// SaveExtensionConfig persists the serialized JSON extension configuration to SQLite.
+func (a *App) SaveExtensionConfig(configJSON string) error {
+	if a.repo == nil {
+		return errors.New("repository not initialized")
+	}
+	return a.repo.SaveExtensionConfig(configJSON)
+}
+

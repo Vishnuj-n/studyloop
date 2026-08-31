@@ -116,7 +116,26 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 		materialName = notebookTitle
 	}
 
-	promptText := fmt.Sprintf("I'm studying the following text from %s for preparation. I've failed to understand it twice. Please act as a Socratic tutor — don't give me summaries or answers. Instead, ask me leading questions that guide me to discover the key concepts myself. Start with the most fundamental question.\n\n", materialName)
+	tutorStyle := "socratic"
+	userSettings, err := repo.GetUserSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user settings for task %s: %w", task.ID, err)
+	}
+	if userSettings != nil && userSettings.TutorStyle != "" {
+		tutorStyle = userSettings.TutorStyle
+	}
+
+	var directive string
+	switch tutorStyle {
+	case "direct":
+		directive = "Please act as a direct, concise AI tutor. Explain key concepts directly and clearly, point out why the failed questions occurred, and help me quickly understand without unnecessary fluff. Keep explanations focused and direct."
+	case "detailed":
+		directive = "Please act as a comprehensive step-by-step AI tutor. Provide detailed conceptual walkthroughs, real-world analogies, and illustrative examples to thoroughly explain the core concepts and clear up misunderstandings."
+	default: // "socratic"
+		directive = "Please act as a Socratic tutor — don't give me summaries or answers directly. Instead, ask me leading questions that guide me to discover the key concepts myself. Start with the most fundamental question."
+	}
+
+	promptText := fmt.Sprintf("I'm studying the following text from %s for preparation. I've encountered difficulty understanding it. %s\n\n", materialName, directive)
 
 	promptText = appendFailedQuestionsSection(promptText, task)
 

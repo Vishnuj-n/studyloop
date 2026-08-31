@@ -156,3 +156,42 @@ func TestProfileAndSettingsLifecycle(t *testing.T) {
 		t.Errorf("expected profile_id to be empty after profile deletion, got %q", nb1.ProfileID)
 	}
 }
+
+func TestExtensionConfig(t *testing.T) {
+	tempDB := "test_extension_config.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() {
+		_ = repo.Close()
+	}()
+
+	// 1. Initial default state
+	cfg, err := repo.GetExtensionConfig()
+	if err != nil {
+		t.Fatalf("GetExtensionConfig failed: %v", err)
+	}
+	if cfg != "{}" {
+		t.Errorf("expected default '{}', got %q", cfg)
+	}
+
+	// 2. Save custom JSON config
+	testJSON := `{"audio_overview":{"voice":"en-US-JennyNeural","speed":1.25},"text_simplifier":{"level":"eli10"}}`
+	if err := repo.SaveExtensionConfig(testJSON); err != nil {
+		t.Fatalf("SaveExtensionConfig failed: %v", err)
+	}
+
+	// 3. Read back saved config
+	readCfg, err := repo.GetExtensionConfig()
+	if err != nil {
+		t.Fatalf("GetExtensionConfig after save failed: %v", err)
+	}
+	if readCfg != testJSON {
+		t.Errorf("expected %q, got %q", testJSON, readCfg)
+	}
+}
+

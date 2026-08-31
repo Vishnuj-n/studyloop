@@ -17,6 +17,39 @@
       <p class="hint">Caps the number of FSRS reviews active in any single study session.</p>
     </div>
 
+    <div class="settings-row-pair">
+      <div class="form-group field-half">
+        <label for="quiz-question-count">Questions per Quiz</label>
+        <input
+          id="quiz-question-count"
+          v-model.number="settings.quiz_question_count"
+          type="number"
+          min="3"
+          max="15"
+          step="1"
+          :disabled="disabled"
+          required
+        />
+        <p class="hint">Target number of questions generated per quiz attempt (3–15, default 8).</p>
+      </div>
+
+      <div class="form-group field-half">
+        <label for="quiz-passing-score">Passing Score (%)</label>
+        <select
+          id="quiz-passing-score"
+          v-model.number="settings.quiz_passing_score"
+          :disabled="disabled"
+          class="setting-select"
+        >
+          <option :value="60">60% (Lenient)</option>
+          <option :value="70">70% (Standard)</option>
+          <option :value="80">80% (Strict)</option>
+          <option :value="90">90% (Mastery)</option>
+        </select>
+        <p class="hint">Minimum score required to master a topic without remedial review.</p>
+      </div>
+    </div>
+
     <div class="form-group">
       <label for="target-session-words">Target Reading Session Words</label>
       <input
@@ -33,7 +66,7 @@
         Target word count per reading session (3,000 words ≈ 15 minutes of standard reading).
       </p>
       <p v-if="hasTokenWarning" class="warning-hint">
-        ⚠️ {{ settings.target_session_words }} words (~{{ Math.round(settings.target_session_words * 1.3) }} tokens) may exceed your Max Input Tokens limit ({{ maxInputTokens }} tokens). Content may be truncated during quizzes.
+        Warning: {{ settings.target_session_words }} words (~{{ Math.round(settings.target_session_words * 1.3) }} tokens) may exceed your Max Input Tokens limit ({{ maxInputTokens }} tokens). Content may be truncated during quizzes.
       </p>
     </div>
 
@@ -51,7 +84,7 @@
     <div class="calendar-sync-card">
       <div class="calendar-header">
         <div>
-          <h3>📅 Calendar Routine Sync</h3>
+          <h3>Calendar Routine Sync</h3>
           <p class="hint">
             Export your daily study routine to your calendar. Your phone and laptop will remind you every day with alarms even when StudyLoop is closed.
           </p>
@@ -62,7 +95,7 @@
           title="Play sample in-app chime"
           @click="playStudyChime"
         >
-          🔔 Test In-App Chime
+          Test In-App Chime
         </button>
       </div>
 
@@ -86,21 +119,21 @@
           class="calendar-btn google-btn"
           @click="openGoogle"
         >
-          📅 Add to Google Calendar
+          Add to Google Calendar
         </button>
         <button
           type="button"
           class="calendar-btn outlook-btn"
           @click="openOutlook"
         >
-          📧 Add to Outlook Web
+          Add to Outlook Web
         </button>
         <button
           type="button"
           class="calendar-btn ics-btn"
           @click="downloadICS"
         >
-          🍎 Download .ics (Apple / Windows)
+          Download .ics (Apple / Windows)
         </button>
       </div>
     </div>
@@ -138,6 +171,7 @@ import {
   getOutlookCalendarUrl,
   downloadRoutineICS,
 } from '../services/calendarService'
+import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   settings: { type: Object, required: true },
@@ -160,13 +194,21 @@ function applyDurationPreset(preset) {
   emit('apply-duration-preset', preset)
 }
 
+async function openExternalLink(url) {
+  try {
+    await openURLInBrowser(url)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
 function openGoogle() {
   const url = getGoogleCalendarUrl(
     props.settings?.study_start_time,
     props.settings?.study_end_time,
     customStudyUrl.value
   )
-  window.open(url, '_blank')
+  openExternalLink(url)
 }
 
 function openOutlook() {
@@ -175,7 +217,7 @@ function openOutlook() {
     props.settings?.study_end_time,
     customStudyUrl.value
   )
-  window.open(url, '_blank')
+  openExternalLink(url)
 }
 
 function downloadICS() {
@@ -195,7 +237,8 @@ label {
 }
 
 input[type='number'],
-input[type='url'] {
+input[type='url'],
+select {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
@@ -206,13 +249,28 @@ input[type='url'] {
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 input[type='number']:focus,
-input[type='url']:focus {
+input[type='url']:focus,
+select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
+}
+
+.settings-row-pair {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.field-half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .hint {

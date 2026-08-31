@@ -352,6 +352,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 		COALESCE(indexing_status, 'PENDING'), page_count, chunk_count, COALESCE(priority, 5), 
 		exam_deadline, uploaded_at, COALESCE(profile_id, ''), COALESCE(study_status, 'dormant'),
 		COALESCE(file_hash, ''),
+		COALESCE(extraction_engine, 'standard'),
 		COALESCE((
 			SELECT MAX(COALESCE(t.external_help_required, 0))
 			FROM topics t
@@ -401,7 +402,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 		if err := rows.Scan(
 			&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 			&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-			&nb.FileHash, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
+			&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
 		); err != nil {
 			return nil, err
 		}
@@ -422,6 +423,7 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 			COALESCE(indexing_status, 'PENDING'), page_count, chunk_count, COALESCE(priority, 5), 
 			exam_deadline, uploaded_at, COALESCE(profile_id, ''), COALESCE(study_status, 'dormant'),
 			COALESCE(file_hash, ''),
+			COALESCE(extraction_engine, 'standard'),
 			COALESCE((
 				SELECT MAX(COALESCE(t.external_help_required, 0))
 				FROM topics t
@@ -435,7 +437,7 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 	`, notebookID).Scan(
 		&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 		&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-		&nb.FileHash, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
+		&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
 	)
 
 	if err == sql.ErrNoRows {
@@ -445,6 +447,16 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 		return nil, err
 	}
 	return &nb, nil
+}
+
+// UpdateNotebookExtractionEngine updates the extraction engine field for a notebook.
+func (r *Repository) UpdateNotebookExtractionEngine(notebookID, engine string) error {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return fmt.Errorf("notebook id is required")
+	}
+	_, err := r.db.Exec(`UPDATE notebooks SET extraction_engine = ? WHERE id = ?`, engine, notebookID)
+	return err
 }
 
 // LinkChunksToNotebook associates chunks with a notebook

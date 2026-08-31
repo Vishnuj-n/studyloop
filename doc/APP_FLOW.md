@@ -185,7 +185,7 @@ Aggregate exam from past quiz attempts for a notebook. Triggered every 10 comple
 
 ## 6a. Examiner Mode
 
-Optional written assessments. Triggered after mastery (e.g., quiz > 80%). Lowest queue priority (tier 0). Reviews/reading not blocked. User-triggered, not hidden.
+Optional written assessments with custom page ranges. User-triggered on-demand via the Written Assessment screen (`frontend/src/pages/WrittenAssessment.vue`), not automatically inserted into the queue. Lowest queue priority (tier 0) when queued. Reviews and reading are not blocked.
 
 ---
 

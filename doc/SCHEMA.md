@@ -90,6 +90,7 @@ Top-level container for uploaded study material.
 | `exam_deadline` | TEXT | Exam date string for deadline tracking |
 | `profile_id` | TEXT | Owning study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
 | `study_status` | TEXT DEFAULT 'dormant' | Lifecycle state (`dormant`, `active`, `completed`) |
+| `extraction_engine` | TEXT DEFAULT 'standard' | Extraction pipeline used (`standard`, `deep_structured`) |
 | `uploaded_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Upload time |
 
 **Foreign keys:** `topic_id` → `topics(id)`, `profile_id` → `study_profiles(id)` ON DELETE SET NULL.
@@ -365,6 +366,9 @@ Singleton table for global preferences.
 | `classroom_code` | TEXT DEFAULT '' | Classroom code for teacher-student association in cloud sync |
 | `last_synced_at` | INTEGER DEFAULT 0 | Timestamp of last successful cloud sync |
 | `target_session_words` | INTEGER NOT NULL DEFAULT 3000 | Target word count per reading session |
+| `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
+| `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
+| `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 
 **Foreign keys:** `active_profile_id` → `study_profiles(id)` ON DELETE SET NULL.

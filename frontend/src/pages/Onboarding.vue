@@ -243,6 +243,11 @@
             type="password"
             placeholder="Paste key to save in OS credential manager"
           />
+          <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
+            Get free key:
+            <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq (Recommended Fast) ↗</a> ·
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+          </p>
         </div>
 
         <label class="checkbox-container inline-check">
@@ -292,6 +297,11 @@
               type="password"
               placeholder="Paste key to save in OS credential manager"
             />
+            <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
+              Get free key:
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio (Recommended Heavy) ↗</a> ·
+              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+            </p>
           </div>
         </div>
 
@@ -1514,6 +1524,16 @@ select:focus {
   font-size: 0.75rem;
   line-height: 1.3;
   font-weight: 500;
+}
+
+.hint a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hint a:hover {
+  text-decoration: underline;
 }
 
 .test-status-msg.success {

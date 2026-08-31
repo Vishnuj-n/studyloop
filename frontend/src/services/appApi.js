@@ -351,8 +351,8 @@ export function runExtension(id, input = '', isPro = false) {
   return appBridge().RunExtension(id, input, !!isPro)
 }
 
-export function simplifyReadingContent(content) {
-  return appBridge().SimplifyReadingContent(content)
+export function simplifyReadingContent(content, level = '') {
+  return appBridge().SimplifyReadingContent(content, level)
 }
 
 export function startBrowserAuth(mode = 'sign-in') {
@@ -362,4 +362,13 @@ export function startBrowserAuth(mode = 'sign-in') {
 export function openURLInBrowser(url) {
   return appBridge().OpenURLInBrowser(url)
 }
+
+export function getExtensionConfig() {
+  return appBridge().GetExtensionConfig()
+}
+
+export function saveExtensionConfig(configJSON) {
+  return appBridge().SaveExtensionConfig(configJSON)
+}
+
 

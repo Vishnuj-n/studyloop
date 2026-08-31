@@ -174,11 +174,23 @@ export function generateRoutineICS(startTime = '17:00', endTime = '19:00', custo
 }
 
 /**
- * Directs Outlook users to the recurring ICS export to preserve event details and daily recurrence.
+ * Returns a direct URL to compose an event on Outlook Web / Live.
  */
 export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', customUrl = '') {
-  const icsContent = generateRoutineICS(startTime, endTime, customUrl)
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`
+  const { isoStart, isoEnd } = getEventDates(startTime, endTime)
+  const title = '📖 StudyLoop Daily Study Session'
+  const details = buildDescription(customUrl)
+
+  const params = new URLSearchParams({
+    path: '/calendar/action/compose',
+    rru: 'addevent',
+    subject: title,
+    body: details,
+    startdt: isoStart,
+    enddt: isoEnd,
+  })
+
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`
 }
 
 /**

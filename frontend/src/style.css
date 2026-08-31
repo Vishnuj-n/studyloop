@@ -117,6 +117,16 @@ body {
   overflow: hidden;
 }
 
+a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 select {
   appearance: none;
   -webkit-appearance: none;

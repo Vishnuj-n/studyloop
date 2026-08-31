@@ -189,6 +189,6 @@ describe('Dashboard.vue Integration', () => {
 
     const sessionPill = wrapper.find('.session-pill')
     expect(sessionPill.exists()).toBe(true)
-    expect(sessionPill.text()).toContain('2 / 3 Sessions Today')
+    expect(sessionPill.text()).toContain('2 / 3 Reading Sessions Today')
   })
 })

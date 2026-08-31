@@ -1,15 +1,25 @@
 import { ref, computed } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
-import { listExtensions } from '../services/appApi'
+import { listExtensions, getExtensionConfig, saveExtensionConfig } from '../services/appApi'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 
-// Official extensions are enabled by default out-of-the-box
+// Built-in lightweight extensions are enabled by default; external/python tools require explicit setup & opt-in
 const DEFAULT_ENABLED_EXTENSIONS = {
   text_simplifier: true,
-  deep_pdf: true,
-  youtube: true,
-  audio_overview: true,
+  deep_pdf: false,
+  youtube: false,
+  audio_overview: false,
+}
+
+export const DEFAULT_EXTENSION_CONFIG = {
+  audio_overview: {
+    voice: 'en-US-ChristopherNeural',
+    speed: 1.0,
+  },
+  text_simplifier: {
+    level: 'eli15',
+  },
 }
 
 function loadPersistedState() {
@@ -33,7 +43,9 @@ function savePersistedState(state) {
 
 const enabledMap = ref(loadPersistedState())
 const extensionsMetadata = ref([])
+const extensionConfig = ref(JSON.parse(JSON.stringify(DEFAULT_EXTENSION_CONFIG)))
 let metadataFetched = false
+let configFetched = false
 
 async function refreshExtensionsMetadata() {
   try {
@@ -47,12 +59,34 @@ async function refreshExtensionsMetadata() {
   }
 }
 
+async function refreshExtensionConfig() {
+  try {
+    const raw = await getExtensionConfig()
+    if (raw && typeof raw === 'string' && raw.trim() !== '') {
+      const parsed = JSON.parse(raw)
+      extensionConfig.value = {
+        audio_overview: { ...DEFAULT_EXTENSION_CONFIG.audio_overview, ...(parsed.audio_overview || {}) },
+        text_simplifier: { ...DEFAULT_EXTENSION_CONFIG.text_simplifier, ...(parsed.text_simplifier || {}) },
+        youtube: { ...DEFAULT_EXTENSION_CONFIG.youtube, ...(parsed.youtube || {}) },
+        ...parsed,
+      }
+    }
+    configFetched = true
+  } catch (_) {
+    // Fallback to defaults
+  }
+}
+
 export function useExtensions() {
   const clerkAuth = useClerkAuth()
   const isPro = computed(() => clerkAuth.isPro.value)
 
   if (!metadataFetched) {
     refreshExtensionsMetadata()
+  }
+
+  if (!configFetched) {
+    refreshExtensionConfig()
   }
 
   function isEnabled(extensionId) {
@@ -82,15 +116,40 @@ export function useExtensions() {
     setExtensionEnabled(extensionId, !isEnabled(extensionId))
   }
 
+  function getExtensionSetting(extensionId, key, fallback = null) {
+    const extConf = extensionConfig.value[extensionId]
+    if (extConf && extConf[key] !== undefined) {
+      return extConf[key]
+    }
+    return fallback
+  }
+
+  async function setExtensionSetting(extensionId, key, value) {
+    if (!extensionConfig.value[extensionId]) {
+      extensionConfig.value[extensionId] = {}
+    }
+    extensionConfig.value[extensionId][key] = value
+    try {
+      await saveExtensionConfig(JSON.stringify(extensionConfig.value))
+    } catch (err) {
+      console.error('Failed to save extension setting:', err)
+    }
+  }
+
   return {
     enabledMap,
     extensionsMetadata,
+    extensionConfig,
     isPro,
     isEnabled,
     isExtensionActive,
     refreshExtensionsMetadata,
+    refreshExtensionConfig,
     setExtensionEnabled,
-    toggleExtension
+    toggleExtension,
+    getExtensionSetting,
+    setExtensionSetting,
   }
 }
+
 
