@@ -194,9 +194,9 @@ function applyDurationPreset(preset) {
   emit('apply-duration-preset', preset)
 }
 
-function openExternalLink(url) {
+async function openExternalLink(url) {
   try {
-    openURLInBrowser(url)
+    await openURLInBrowser(url)
   } catch {
     window.open(url, '_blank')
   }

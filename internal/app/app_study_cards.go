@@ -117,7 +117,11 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 	}
 
 	tutorStyle := "socratic"
-	if userSettings, err := repo.GetUserSettings(); err == nil && userSettings != nil && userSettings.TutorStyle != "" {
+	userSettings, err := repo.GetUserSettings()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user settings for task %s: %w", task.ID, err)
+	}
+	if userSettings != nil && userSettings.TutorStyle != "" {
 		tutorStyle = userSettings.TutorStyle
 	}
 

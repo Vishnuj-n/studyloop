@@ -233,6 +233,7 @@ onMounted(async () => {
     }
 
     if (autoGenerate === 'true' && selectedNotebookID.value) {
+      await router.replace({ query: { ...route.query, autoGenerate: undefined } })
       await generate()
     }
   } catch {

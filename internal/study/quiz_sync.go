@@ -325,7 +325,11 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
 	userQuizCount := 8
 	userPassingScore := 70
-	if userSettings, err := s.repo.GetUserSettings(); err == nil && userSettings != nil {
+	userSettings, err := s.repo.GetUserSettings()
+	if err != nil {
+		return models.QuizTaskPayload{}, fmt.Errorf("failed to get user settings: %w", err)
+	}
+	if userSettings != nil {
 		if userSettings.QuizQuestionCount > 0 {
 			userQuizCount = userSettings.QuizQuestionCount
 		}

@@ -328,7 +328,8 @@ const isCloudAccount = computed(() => {
   return cloudConfigured.value && !!(
     settings.value?.classroom_code ||
     settings.value?.cloud_api_token ||
-    settings.value?.cloud_student_id
+    settings.value?.cloud_student_id ||
+    settings.value?.cloud_session_token
   )
 })
 

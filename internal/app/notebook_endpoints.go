@@ -248,10 +248,6 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 			}
 		}
 
-		if err := repo.UpdateNotebookExtractionEngine(nbID, "deep_structured"); err != nil {
-			utils.Warnf("[DEEP_PDF] Failed to update extraction engine for %s (%s): %v", fileName, nbID, err)
-		}
-
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
@@ -262,6 +258,10 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
 			})
 			return
+		}
+
+		if err := repo.UpdateNotebookExtractionEngine(nbID, "deep_structured"); err != nil {
+			utils.Warnf("[DEEP_PDF] Failed to update extraction engine for %s (%s): %v", fileName, nbID, err)
 		}
 
 		emitIngestionProgress(a, ingestionProgressPayload{
@@ -1151,7 +1151,9 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 
 	repo := a.getRepo()
 	if repo != nil {
-		_ = repo.UpdateNotebookStudyStatus(nb.ID, "dormant")
+		if err := repo.UpdateNotebookStudyStatus(nb.ID, "dormant"); err != nil {
+			return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook study status: %v", err)}
+		}
 	}
 
 	// Delegate to unified extraction worker
