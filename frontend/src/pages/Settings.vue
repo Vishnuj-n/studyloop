@@ -405,7 +405,9 @@ onUnmounted(() => {
 .settings-workspace {
   display: flex;
   margin: -16px -20px;
-  min-height: calc(100vh - 20px);
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);
   background: var(--background);
@@ -421,6 +423,9 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 24px 16px;
   gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .rail-header {
@@ -525,6 +530,8 @@ onUnmounted(() => {
 .settings-content-viewport {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
   padding: 24px 40px 48px;
   display: flex;
   flex-direction: column;

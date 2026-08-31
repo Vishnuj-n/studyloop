@@ -65,8 +65,8 @@
       </p>
       <p class="hint">
         Get free key:
-        <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq (Recommended Fast) ↗</a> ·
-        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+        <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
+        <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
       </p>
     </div>
 
@@ -149,8 +149,8 @@
         </p>
         <p class="hint">
           Get free key:
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio (Recommended Heavy) ↗</a> ·
-          <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+          <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio (Recommended Heavy) ↗</a> ·
+          <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
         </p>
       </div>
       <div class="form-group">
@@ -178,6 +178,7 @@
 <script setup>
 import { computed } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
+import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   llmSettings: { type: Object, required: true },
@@ -194,6 +195,14 @@ const hasFastTokenWarning = computed(() => {
 })
 
 defineEmits(['apply-preset', 'remove-keys', 'update:llmFastKey', 'update:llmHeavyKey'])
+
+async function openExternalLink(url) {
+  try {
+    await openURLInBrowser(url)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
 </script>
 
 <style scoped>
