@@ -71,13 +71,15 @@ func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *Extracte
 Video: %s
 Total segments: %d
 
-Segment text sample with segment numbers (1-based):
+Segment text sample with segment numbers (1-based) and their timestamps:
 %s
 
 Task: Merge short, fragmented, or introductory video segments into cohesive, comprehensive study topics.
 Rules:
 - Output strict JSON only: {"chapters":[{"title":"...","start_page":1,"end_page":4}]}
 - "start_page" and "end_page" are 1-based segment indices (1 to %d).
+- Aim for 4–8 chapters total. Each merged chapter should represent at least 5 minutes of video content.
+- Any segment shorter than 3 minutes MUST be merged into the adjacent segment with the most topic overlap — never left as its own chapter.
 - Group related micro-segments into substantive study chapters (each chapter representing a major concept or question).
 - Omit or merge trivial segments (like intros, sponsor callouts, and outros) into adjacent study topics.
 - Ensure sequential, contiguous segment ranges without gaps or overlaps.`,
@@ -324,10 +326,15 @@ func buildPageSample(doc *ExtractedDocument, maxSections int) string {
 			break
 		}
 		text := strings.TrimSpace(section.Text)
-		if text == "" {
+		heading := strings.TrimSpace(section.Heading)
+		if text == "" && heading == "" {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("[Page %d] %s", section.PageNum, firstN(text, 2000)))
+		label := fmt.Sprintf("[Page %d]", section.PageNum)
+		if heading != "" {
+			label = fmt.Sprintf("[Page %d: %s]", section.PageNum, heading)
+		}
+		parts = append(parts, fmt.Sprintf("%s %s", label, firstN(text, 2000)))
 	}
 	joined := strings.Join(parts, "\n\n")
 	if len(joined) > topicExtractionMaxChars {
