@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"time"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
@@ -164,6 +165,12 @@ func (vi *VectorIndexer) indexChunks(
 
 		if emitProgress != nil {
 			emitProgress(end, len(chunksToReindex), len(failedChunks))
+		}
+
+		// ponytail: yield CPU and give foreground tasks (PDF extraction, UI) breathing room between embedding batches
+		if end < len(chunksToReindex) {
+			time.Sleep(10 * time.Millisecond)
+			runtime.Gosched()
 		}
 	}
 
@@ -332,15 +339,15 @@ func (vi *VectorIndexer) emitNotebookIndexingProgress(notebookID string, process
 	wailsruntime.EventsEmit(vi.ctx, "notebook-indexing-progress", payload)
 }
 
-// optimalBatchSize calculates the optimal batch size for local ONNX embedding inference.
-// Clamped between 8 (low-spec dual-core laptops) and 32 (L3 cache & SIMD ceiling).
+// optimalBatchSize calculates the batch size for background ONNX embedding inference.
+// ponytail: keep batches modest (4-16) to avoid starving foreground PDF extraction and UI.
 func optimalBatchSize() int {
-	bs := runtime.NumCPU() * 2
-	if bs < 8 {
-		return 8
+	bs := runtime.NumCPU() / 2
+	if bs < 4 {
+		return 4
 	}
-	if bs > 32 {
-		return 32
+	if bs > 16 {
+		return 16
 	}
 	return bs
 }
