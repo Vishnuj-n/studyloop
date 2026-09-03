@@ -434,6 +434,17 @@ async function handleDeepStructuredUpload() {
     if (result?.error) {
       throw new Error(result.error)
     }
+    if (result?.duplicate) {
+      await loadNotebooks()
+      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      await alertDialog({
+        title: 'Document Already Exists',
+        message: `This textbook is already in your library as '${result?.file_name || 'book'}'.`,
+        confirmText: 'OK',
+        type: 'info',
+      })
+      return
+    }
     await loadNotebooks()
     await alertDialog({
       title: '⚡ Deep Structure Analysis Started',
@@ -505,6 +516,21 @@ async function uploadFile(file) {
 
     if (result?.error) {
       throw new Error(result.error)
+    }
+
+    if (result?.duplicate) {
+      uploadProgress.value = 100
+      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      successMessage.value = `Found existing notebook: ${result?.file_name || ''}`
+      if (result?.id) {
+        await openSyllabusDraft(result.id, result?.file_name || '')
+      }
+      setTimeout(() => {
+        uploadProgress.value = 0
+        successMessage.value = ''
+        void loadNotebooks()
+      }, 2000)
+      return
     }
 
     if (result?.id) {

@@ -157,6 +157,25 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 		title = filepath.Base(uploadResult.FilePath)
 	}
 
+	// Check for duplicate document in the current profile (or global)
+	existingNb, findErr := repo.FindNotebookByFileHash(fileHash, profileID)
+	if findErr != nil {
+		utils.Warnf("finalizeDeepStructuredPDFUpload: error checking duplicate file_hash: %v", findErr)
+	} else if existingNb != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"id":            existingNb.ID,
+			"file_name":     existingNb.Title,
+			"file_type":     existingNb.FileType,
+			"page_count":    existingNb.PageCount,
+			"chunk_count":   existingNb.ChunkCount,
+			"status":        existingNb.Status,
+			"duplicate":     true,
+			"existing_id":   existingNb.ID,
+			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+		}
+	}
+
 	// Register notebook immediately in SQLite
 	err := repo.CreateNotebook(uploadResult.ID, title, uploadResult.FilePath, uploadResult.FileType, "", fileHash, 0, profileID)
 	if err != nil {
@@ -444,6 +463,25 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 	}
 
 	profileID := a.resolveExplicitActiveProfileID()
+	// Check for duplicate document in the current profile (or global)
+	existingNb, findErr := repo.FindNotebookByFileHash(fileHash, profileID)
+	if findErr != nil {
+		utils.Warnf("finalizeNotebookUpload: error checking duplicate file_hash: %v", findErr)
+	} else if existingNb != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"id":            existingNb.ID,
+			"file_name":     existingNb.Title,
+			"file_type":     existingNb.FileType,
+			"page_count":    existingNb.PageCount,
+			"chunk_count":   existingNb.ChunkCount,
+			"status":        existingNb.Status,
+			"duplicate":     true,
+			"existing_id":   existingNb.ID,
+			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+		}
+	}
+
 	// Create notebook record as unlinked; Sprint 11 uses a draft/confirm ingestion flow.
 	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount, profileID)
 	if err != nil {

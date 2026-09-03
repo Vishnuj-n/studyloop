@@ -36,11 +36,11 @@ func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *Extracte
 	}
 
 	bookmarkLikeDraft := []models.SyllabusChapterDraft{}
-	var rawBookmarkJSON []byte // full nested tree from pdfcpu, used for LLM context
+	var rawBookmarkJSON []byte
 	if strings.EqualFold(strings.TrimSpace(fileType), "pdf") && strings.TrimSpace(filePath) != "" {
-		bookmarkLikeDraft = extractPDFCPUBookmarkDraft(filePath, doc.PageCount, s.config.UploadDir)
-		if raw, err := runPDFCPUBookmarksExport(filePath, s.config.UploadDir); err == nil {
+		if raw, err := runPDFCPUBookmarksExport(filePath, s.config.UploadDir); err == nil && len(raw) > 0 {
 			rawBookmarkJSON = raw
+			bookmarkLikeDraft = ParsePDFCPUBookmarkDraftFromJSON(raw, doc.PageCount)
 		}
 	} else if strings.EqualFold(strings.TrimSpace(fileType), "md") || strings.EqualFold(strings.TrimSpace(fileType), "markdown") {
 		// For markdown files, headings extracted in doc.Sections serve as deterministic chapter drafts

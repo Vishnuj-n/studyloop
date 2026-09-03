@@ -129,21 +129,40 @@ func (e *OnnxEmbedder) Embed(text string) ([]float32, error) {
 		return nil, fmt.Errorf("input text is empty")
 	}
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	vector, err := e.embedInternal(text)
+	results, err := e.EmbedBatch([]string{text})
 	if err != nil {
 		return nil, err
 	}
-	if e.dimCount == 0 {
-		e.dimCount = int32(len(vector))
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no embedding returned")
 	}
-	if len(vector) != int(e.dimCount) {
-		return nil, fmt.Errorf("embedding dimension mismatch: got %d, expected %d", len(vector), e.dimCount)
+	return results[0], nil
+}
+
+// EmbedBatch generates embedding vectors for a slice of texts using batched tensor execution.
+func (e *OnnxEmbedder) EmbedBatch(texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
 	}
 
-	return vector, nil
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	vectors, err := e.embedBatchInternal(texts)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vector := range vectors {
+		if e.dimCount == 0 {
+			e.dimCount = int32(len(vector))
+		}
+		if len(vector) != int(e.dimCount) {
+			return nil, fmt.Errorf("embedding dimension mismatch: got %d, expected %d", len(vector), e.dimCount)
+		}
+	}
+
+	return vectors, nil
 }
 
 // GetDimension returns the embedding vector dimension.
@@ -178,6 +197,17 @@ func (e *OnnxEmbedder) Close() error {
 }
 
 func (e *OnnxEmbedder) embedInternal(text string) ([]float32, error) {
+	vectors, err := e.embedBatchInternal([]string{text})
+	if err != nil {
+		return nil, err
+	}
+	if len(vectors) == 0 {
+		return nil, fmt.Errorf("no embedding returned")
+	}
+	return vectors[0], nil
+}
+
+func (e *OnnxEmbedder) embedBatchInternal(texts []string) ([][]float32, error) {
 	if e.tokenizer == nil {
 		return nil, fmt.Errorf("tokenizer not initialized")
 	}
@@ -185,13 +215,44 @@ func (e *OnnxEmbedder) embedInternal(text string) ([]float32, error) {
 		return nil, fmt.Errorf("onnx session not initialized")
 	}
 
-	inputIDs, attentionMask, tokenTypeIDs, err := e.tokenize(text)
-	if err != nil {
-		return nil, err
+	batchSize := len(texts)
+	tokenizedIDs := make([][]int64, batchSize)
+	tokenizedMask := make([][]int64, batchSize)
+	tokenizedTypeIDs := make([][]int64, batchSize)
+
+	maxSeqLenInBatch := 1
+	for i, text := range texts {
+		t := strings.TrimSpace(text)
+		if t == "" {
+			t = "empty"
+		}
+		ids, mask, typeIDs, err := e.tokenize(t)
+		if err != nil {
+			return nil, fmt.Errorf("failed to tokenize text index %d: %w", i, err)
+		}
+		if len(ids) > maxSeqLenInBatch {
+			maxSeqLenInBatch = len(ids)
+		}
+		tokenizedIDs[i] = ids
+		tokenizedMask[i] = mask
+		tokenizedTypeIDs[i] = typeIDs
 	}
 
-	shape := ort.NewShape(1, int64(len(inputIDs)))
-	inputs, err := e.buildInputValues(shape, inputIDs, attentionMask, tokenTypeIDs)
+	flatSize := batchSize * maxSeqLenInBatch
+	paddedIDs := make([]int64, flatSize)
+	paddedMask := make([]int64, flatSize)
+	paddedTypeIDs := make([]int64, flatSize)
+
+	for i := 0; i < batchSize; i++ {
+		offset := i * maxSeqLenInBatch
+		seqLen := len(tokenizedIDs[i])
+		copy(paddedIDs[offset:offset+seqLen], tokenizedIDs[i])
+		copy(paddedMask[offset:offset+seqLen], tokenizedMask[i])
+		copy(paddedTypeIDs[offset:offset+seqLen], tokenizedTypeIDs[i])
+	}
+
+	shape := ort.NewShape(int64(batchSize), int64(maxSeqLenInBatch))
+	inputs, err := e.buildInputValues(shape, paddedIDs, paddedMask, paddedTypeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -199,17 +260,19 @@ func (e *OnnxEmbedder) embedInternal(text string) ([]float32, error) {
 
 	outputs := make([]ort.Value, len(e.outputInfo))
 	if err := e.session.Run(inputs, outputs); err != nil {
-		return nil, fmt.Errorf("onnx inference failed: %w", err)
+		return nil, fmt.Errorf("onnx batch inference failed: %w", err)
 	}
 	defer destroyValues(outputs)
 
-	vector, err := extractEmbedding(outputs, e.outputInfo, attentionMask)
+	vectors, err := extractBatchEmbedding(outputs, e.outputInfo, paddedMask, batchSize, maxSeqLenInBatch)
 	if err != nil {
 		return nil, err
 	}
 
-	normalizeL2(vector)
-	return vector, nil
+	for _, vec := range vectors {
+		normalizeL2(vec)
+	}
+	return vectors, nil
 }
 
 func (e *OnnxEmbedder) tokenize(text string) ([]int64, []int64, []int64, error) {
@@ -320,22 +383,33 @@ func tensorFromInputData(info ort.InputOutputInfo, shape ort.Shape, data []int64
 }
 
 func extractEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo, attentionMask []int64) ([]float32, error) {
+	vectors, err := extractBatchEmbedding(outputs, outputInfo, attentionMask, 1, len(attentionMask))
+	if err != nil {
+		return nil, err
+	}
+	if len(vectors) == 0 {
+		return nil, fmt.Errorf("no embedding extracted")
+	}
+	return vectors[0], nil
+}
+
+func extractBatchEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo, attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
 	for i, output := range outputs {
 		if output == nil {
 			continue
 		}
 
 		if tensor, ok := output.(*ort.Tensor[float32]); ok {
-			vector, err := poolFloat32Tensor(tensor, attentionMask)
-			if err == nil && len(vector) > 0 {
-				return vector, nil
+			vectors, err := poolFloat32TensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
+			if err == nil && len(vectors) == batchSize {
+				return vectors, nil
 			}
 		}
 
 		if tensor, ok := output.(*ort.Tensor[float64]); ok {
-			vector, err := poolFloat64Tensor(tensor, attentionMask)
-			if err == nil && len(vector) > 0 {
-				return vector, nil
+			vectors, err := poolFloat64TensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
+			if err == nil && len(vectors) == batchSize {
+				return vectors, nil
 			}
 		}
 
@@ -345,6 +419,91 @@ func extractEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo, att
 	}
 
 	return nil, fmt.Errorf("model did not return a supported float embedding tensor")
+}
+
+func poolFloat32TensorBatch(t *ort.Tensor[float32], attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
+	shape := t.GetShape()
+	data := t.GetData()
+	if len(data) == 0 {
+		return nil, fmt.Errorf("output tensor is empty")
+	}
+
+	switch len(shape) {
+	case 2:
+		rows := int(shape[0])
+		cols := int(shape[1])
+		if rows != batchSize || cols <= 0 {
+			return nil, fmt.Errorf("unexpected 2D output shape for batch: %v (expected %d rows)", shape, batchSize)
+		}
+		vectors := make([][]float32, batchSize)
+		for b := 0; b < batchSize; b++ {
+			vectors[b] = make([]float32, cols)
+			copy(vectors[b], data[b*cols:(b+1)*cols])
+		}
+		return vectors, nil
+	case 3:
+		b := int(shape[0])
+		seqLen := int(shape[1])
+		hidden := int(shape[2])
+		if b != batchSize || seqLen <= 0 || hidden <= 0 {
+			return nil, fmt.Errorf("invalid 3D output shape for batch: %v (expected batch=%d)", shape, batchSize)
+		}
+		vectors := make([][]float32, batchSize)
+		for i := 0; i < batchSize; i++ {
+			itemMask := attentionMask[i*maxSeqLen : (i+1)*maxSeqLen]
+			itemData := data[i*seqLen*hidden : (i+1)*seqLen*hidden]
+			vectors[i] = meanPool3D(itemData, seqLen, hidden, itemMask)
+		}
+		return vectors, nil
+	default:
+		return nil, fmt.Errorf("unsupported output tensor rank for batch: %d", len(shape))
+	}
+}
+
+func poolFloat64TensorBatch(t *ort.Tensor[float64], attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
+	shape := t.GetShape()
+	data := t.GetData()
+	if len(data) == 0 {
+		return nil, fmt.Errorf("output tensor is empty")
+	}
+
+	switch len(shape) {
+	case 2:
+		rows := int(shape[0])
+		cols := int(shape[1])
+		if rows != batchSize || cols <= 0 {
+			return nil, fmt.Errorf("unexpected 2D output shape for batch: %v (expected %d rows)", shape, batchSize)
+		}
+		vectors := make([][]float32, batchSize)
+		for b := 0; b < batchSize; b++ {
+			vectors[b] = make([]float32, cols)
+			for c := 0; c < cols; c++ {
+				vectors[b][c] = float32(data[b*cols+c])
+			}
+		}
+		return vectors, nil
+	case 3:
+		b := int(shape[0])
+		seqLen := int(shape[1])
+		hidden := int(shape[2])
+		if b != batchSize || seqLen <= 0 || hidden <= 0 {
+			return nil, fmt.Errorf("invalid 3D output shape for batch: %v (expected batch=%d)", shape, batchSize)
+		}
+		vectors := make([][]float32, batchSize)
+		for i := 0; i < batchSize; i++ {
+			itemMask := attentionMask[i*maxSeqLen : (i+1)*maxSeqLen]
+			itemData := data[i*seqLen*hidden : (i+1)*seqLen*hidden]
+			pooled64 := meanPool3DFloat64(itemData, seqLen, hidden, itemMask)
+			vec32 := make([]float32, hidden)
+			for h := 0; h < hidden; h++ {
+				vec32[h] = float32(pooled64[h])
+			}
+			vectors[i] = vec32
+		}
+		return vectors, nil
+	default:
+		return nil, fmt.Errorf("unsupported output tensor rank for batch: %d", len(shape))
+	}
 }
 
 func poolFloat32Tensor(t *ort.Tensor[float32], attentionMask []int64) ([]float32, error) {
