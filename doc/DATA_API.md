@@ -165,10 +165,22 @@ Get/set user's quiz failure preference: `CLASSIC` (reread first) or `FAST` (dire
 
 ---
 
-## Ingestion API
+## Ingestion & Notebook API
 
 ### ProcessPDF
-Extracts text, creates chunks. Returns topic_id, title, chunks_created, tasks_inserted.
+Extracts text, creates chunks using deterministic sliding window. Returns topic_id, title, chunks_created, tasks_inserted.
+
+### UploadYouTubeNotebook
+Ingests YouTube video URL or ID via the `youtube` extension (`yt-dlp`), extracts timestamped chapter transcripts into canonical `ExtractedDocument` sections, persists video metadata JSON, and creates a notebook with syllabus chapters.
+
+### SelectAndUploadDeepStructuredPDF / UploadDeepStructuredPDFFromPath
+Performs zero-copy or path-based deep structured PDF ingestion via the `deep_pdf` (`fast_pdf` / PyMuPDF4LLM) engine. Converts documents to structured Markdown, preserving tables and code blocks, and runs markdown-aware semantic chunking.
+
+### DownloadYouTubeVideo
+Runs background video download via `yt-dlp` using configured quality settings, enabling offline local video playback in `YouTubeReader`.
+
+### GetYouTubeSegmentTimestamps
+Reads persisted YouTube metadata to extract start and end timestamp boundaries for chapter navigation.
 
 ---
 
