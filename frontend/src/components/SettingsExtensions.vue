@@ -83,8 +83,10 @@
           class="setting-select"
           :disabled="disabled"
         >
-          <option value="720p">720p (Recommended - Fast download &amp; compact size)</option>
+          <option value="max">Max / Best (Up to 4K / 2160p)</option>
+          <option value="1440p">1440p (2K Quad HD)</option>
           <option value="1080p">1080p (Full HD)</option>
+          <option value="720p">720p (Recommended - Fast download &amp; compact size)</option>
           <option value="480p">480p (Low bandwidth)</option>
         </select>
       </div>
