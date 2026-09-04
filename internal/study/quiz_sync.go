@@ -257,6 +257,7 @@ func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []strin
 		"",
 		"=== QUESTION RULES ===",
 		"Each question must have exactly 4 options.",
+		"Option length uniformity: For each question, all 4 options MUST be of approximately similar length and detail (either ALL short/concise or ALL long/elaborate). NEVER make the correct answer noticeably longer, more detailed, or structured differently than the incorrect options.",
 		"correct_answer must match one option exactly.",
 		"AVOID yes/no questions. PREFER 'why', 'how', 'what happens if', and 'what causes' questions.",
 		"",
