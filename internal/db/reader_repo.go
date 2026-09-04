@@ -30,15 +30,53 @@ func (r *Repository) queryChunks(filter string, args ...interface{}) ([]models.C
 }
 
 // GetChunksForTopicPageRange retrieves chunks for a topic within a page range.
+// It directly matches chunks by topic_id and page bounds, falling back to notebook page chunks if topic bounds shifted.
 func (r *Repository) GetChunksForTopicPageRange(topicID string, startPage, endPage int) ([]models.Chunk, error) {
 	// Validate that either both bounds are provided or neither is
 	if (startPage > 0) != (endPage > 0) {
 		return nil, fmt.Errorf("both startPage and endPage must be provided together, or neither")
 	}
 
-	if startPage > 0 && endPage > 0 {
-		return r.queryChunks("WHERE topic_id = ? AND page_num BETWEEN ? AND ?", topicID, startPage, endPage)
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return nil, fmt.Errorf("topic id is required")
 	}
+
+	if startPage > 0 && endPage > 0 {
+		if startPage > endPage {
+			startPage, endPage = endPage, startPage
+		}
+		// 1. Try direct topic chunks in page range
+		chunks, err := r.queryChunks("WHERE topic_id = ? AND page_num BETWEEN ? AND ?", topicID, startPage, endPage)
+		if err != nil {
+			return nil, err
+		}
+		if len(chunks) > 0 {
+			return chunks, nil
+		}
+
+		// 2. Fallback: query chunks joined through notebook_chunks for the topic's notebook (same as GetReaderTopicBundle)
+		rows, err := r.db.Query(`
+			SELECT c.id, c.topic_id, c.chunk_text, c.importance_score, c.weakness_score, nc.page_num
+			FROM chunks c
+			JOIN notebook_chunks nc ON nc.chunk_id = c.id
+			WHERE nc.notebook_id IN (
+				SELECT notebook_id FROM notebook_topics WHERE topic_id = ?
+				UNION
+				SELECT notebook_id FROM topics WHERE id = ?
+				UNION
+				SELECT nc2.notebook_id FROM notebook_chunks nc2 JOIN chunks c2 ON c2.id = nc2.chunk_id WHERE c2.topic_id = ?
+			)
+			AND nc.page_num BETWEEN ? AND ?
+			ORDER BY nc.page_num ASC, c.id ASC
+		`, topicID, topicID, topicID, startPage, endPage)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = rows.Close() }()
+		return scanChunks(rows)
+	}
+
 	return r.queryChunks("WHERE topic_id = ?", topicID)
 }
 
