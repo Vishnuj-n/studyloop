@@ -16,7 +16,7 @@
           FREE PLAN
         </div>
         <button v-if="!isPro" class="upgrade-btn-header" @click="handleUpgrade">
-          Upgrade to Pro
+          ★ Support Dev &bull; Get Early Access
         </button>
       </div>
     </header>
@@ -123,13 +123,12 @@
       </div>
     </section>
 
-    <!-- Pro Extensions Section -->
+    <!-- Early Access Extensions Section -->
     <section class="extension-section pro-section">
       <div class="section-title-row">
         <div class="section-heading">
-          <h2>Pro Extensions</h2>
-          <span class="pro-crown-symbol" title="Pro Features">👑</span>
-          <span class="count-badge pro">{{ proExtensions.length }} pro tools</span>
+          <h2>Early Access Extensions</h2>
+          <span class="count-badge pro">Support Dev &bull; {{ proExtensions.length }} preview tools</span>
         </div>
       </div>
 
@@ -168,13 +167,13 @@
             <div class="ext-meta">
               <div class="title-line">
                 <h3 class="ext-name">{{ ext.name }}</h3>
-                <span class="tier-tag pro">PRO</span>
+                <span class="tier-tag pro">EARLY ACCESS</span>
               </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Advanced' }}</span>
             </div>
 
             <!-- Pro Toggle Switch -->
-            <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Pro'">
+            <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Early Access'">
               <input
                 type="checkbox"
                 :checked="isPro && isExtensionEnabled(ext.id)"
@@ -185,7 +184,7 @@
             </label>
           </div>
 
-          <p class="ext-desc">{{ ext.description || 'Advanced StudyLoop Pro integration.' }}</p>
+          <p class="ext-desc">{{ ext.description || 'Advanced StudyLoop integration.' }}</p>
 
           <div class="card-bottom">
             <button
@@ -209,7 +208,7 @@
               class="action-btn unlock-action"
               @click="handleUpgrade"
             >
-              Unlock with Pro
+              ★ Support Dev &bull; Get Early Access
             </button>
 
             <button

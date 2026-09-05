@@ -35,15 +35,17 @@
       </div>
 
       <div class="account-actions">
+        <!-- ponytail: 1 button is enough; upgrade when free, manage when pro -->
         <button
           v-if="!clerkAuth.isPro.value"
           type="button"
           class="upgrade-btn"
           @click="onBillingClick"
         >
-          Upgrade to Pro
+          ★ Support Dev &bull; Get Early Access
         </button>
         <button
+          v-else
           type="button"
           class="billing-btn"
           @click="onBillingClick"

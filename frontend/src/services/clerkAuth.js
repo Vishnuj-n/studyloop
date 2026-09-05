@@ -9,7 +9,7 @@ export async function initClerk() {
   return null
 }
 
-import { startBrowserAuth } from './appApi'
+import { startBrowserAuth, openURLInBrowser } from './appApi'
 
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
@@ -113,25 +113,9 @@ export function useClerkAuth() {
       authError.value = ''
       localStorage.removeItem('studyloop_user_session')
     },
-    openBilling: async () => {
-      console.log('[CLERK_AUTH] openBilling() triggered, calling backend startBrowserAuth...')
-      authError.value = ''
-      try {
-        const res = await startBrowserAuth('billing')
-        console.log('[CLERK_AUTH] openBilling response:', res)
-        if (res?.error) {
-          throw new Error(res.error)
-        }
-        if (!res?.url) {
-          throw new Error('Failed to start billing server')
-        }
-        return { success: true }
-      } catch (err) {
-        const errMsg = err?.message || String(err) || 'Failed to open billing'
-        console.error('[CLERK_AUTH] openBilling error:', errMsg)
-        authError.value = errMsg
-        return { success: false, error: errMsg }
-      }
+    openBilling: () => {
+      // ponytail: direct to pricing section for early access / pro support
+      openURLInBrowser('https://studyloop-landing.vercel.app/#pricing')
     },
   }
 }
