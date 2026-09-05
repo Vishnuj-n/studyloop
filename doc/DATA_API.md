@@ -173,8 +173,8 @@ Extracts text, creates chunks using deterministic sliding window. Returns topic_
 ### UploadYouTubeNotebook
 Ingests YouTube video URL or ID via the `youtube` extension (`yt-dlp`), extracts timestamped chapter transcripts into canonical `ExtractedDocument` sections, persists video metadata JSON, and creates a notebook with syllabus chapters.
 
-### SelectAndUploadDeepStructuredPDF / UploadDeepStructuredPDFFromPath
-Performs zero-copy or path-based deep structured PDF ingestion via the `deep_pdf` (`fast_pdf` / PyMuPDF4LLM) engine. Converts documents to structured Markdown, preserving tables and code blocks, and runs markdown-aware semantic chunking.
+### SelectAndUploadDeepStructuredPDF
+Performs deep structured PDF ingestion via the `deep_pdf` (`fast_pdf` / PyMuPDF4LLM) engine. Converts documents to structured Markdown, preserving tables and code blocks, and runs markdown-aware semantic chunking.
 
 ### DownloadYouTubeVideo
 Runs background video download via `yt-dlp` using configured quality settings, enabling offline local video playback in `YouTubeReader`.

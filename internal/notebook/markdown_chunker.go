@@ -3,7 +3,6 @@ package notebook
 import (
 	"strings"
 
-	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/models"
 )
 
@@ -271,17 +270,4 @@ func ExtractSyllabusChaptersFromMarkdown(markdownText string, totalPages int) []
 	}
 
 	return chapters
-}
-
-// BuildBreadcrumbText prepends section heading metadata to chunk text for vector similarity embeddings.
-func BuildBreadcrumbText(heading string, chunkText string) string {
-	heading = strings.TrimSpace(heading)
-	chunkText = embeddings.NormalizeWhitespace(chunkText)
-	if heading == "" {
-		return chunkText
-	}
-	if strings.HasPrefix(chunkText, "#") {
-		return chunkText
-	}
-	return "[" + heading + "]\n" + chunkText
 }

@@ -107,36 +107,6 @@ func (a *App) SelectAndUploadDeepStructuredPDF(isPro bool) map[string]interface{
 	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
 }
 
-// UploadDeepStructuredPDFFromPath imports a local PDF directly by path using the deep_pdf structured markdown parser.
-// This is the optimal zero-copy desktop flow that bypasses IPC array buffering.
-func (a *App) UploadDeepStructuredPDFFromPath(sourcePath string, isPro bool) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{"error": "notebook service not initialized"}
-	}
-
-	var ext *extension.Extension
-	if a.extManager != nil {
-		ext, _ = a.extManager.Get("deep_pdf")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
-			return map[string]interface{}{
-				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
-				"requires_pro": true,
-			}
-		}
-	}
-
-	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(sourcePath)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
-}
-
 func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
