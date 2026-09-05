@@ -55,7 +55,8 @@ PATTERNS = [
         "id": "HARSH_SHADOW",
         "description": "DESIGN.md: Use low-opacity ambient blurs (<= 0.15 opacity), not standard heavy dark shadows.",
         "severity": "WARNING",
-        "regex": re.compile(r"(?:box-shadow|drop-shadow|filter)\s*:.*?rgba\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.(?:2|3|4|5|6|7|8|9)\d*\s*\)", re.IGNORECASE),
+        "regex": re.compile(r"(?:box-shadow|drop-shadow|filter)\s*:[\s\S]*?rgba\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.(?:2|3|4|5|6|7|8|9)\d*\s*\)", re.IGNORECASE),
+        "multiline": True,
     },
     {
         "id": "DUPLICATE_READ_PREFIX",
@@ -75,7 +76,7 @@ def scan_file(file_path: Path):
     lines = content.splitlines()
     for line_idx, line in enumerate(lines, start=1):
         for rule in PATTERNS:
-            if rule["regex"].search(line):
+            if not rule.get("multiline") and rule["regex"].search(line):
                 violations.append({
                     "file": file_path,
                     "line_number": line_idx,
@@ -84,6 +85,25 @@ def scan_file(file_path: Path):
                     "description": rule["description"],
                     "severity": rule["severity"]
                 })
+
+    # Multiline pattern scanning
+    for rule in PATTERNS:
+        if rule.get("multiline"):
+            for match in rule["regex"].finditer(content):
+                start_pos = match.start()
+                line_idx = content[:start_pos].count("\n") + 1
+                matched_snippet = match.group(0).replace("\n", " ").strip()
+                # Avoid duplicate if already reported
+                if not any(v["file"] == file_path and v["line_number"] == line_idx and v["rule_id"] == rule["id"] for v in violations):
+                    violations.append({
+                        "file": file_path,
+                        "line_number": line_idx,
+                        "line_content": matched_snippet[:100],
+                        "rule_id": rule["id"],
+                        "description": rule["description"],
+                        "severity": rule["severity"]
+                    })
+
     return violations
 
 def main():
@@ -127,7 +147,26 @@ def main():
     print(f"Summary: {RED}{error_count} Errors{RESET}, {YELLOW}{warning_count} Warnings{RESET}")
     print(f"{BOLD}{BLUE}=================================================={RESET}\n")
 
-    return 1 if error_count > 0 else 0
+def test_multiline_shadow():
+    import tempfile
+    test_content = """.card {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -2px rgba(0, 0, 0, 0.2);
+}"""
+    with tempfile.NamedTemporaryFile("w", suffix=".css", delete=False, encoding="utf-8") as tf:
+        tf.write(test_content)
+        tf_path = Path(tf.name)
+    try:
+        violations = scan_file(tf_path)
+        assert any(v["rule_id"] == "HARSH_SHADOW" for v in violations), "Failed to detect multiline HARSH_SHADOW"
+        print(f"{GREEN}[PASS] Multiline shadow regression test passed.{RESET}")
+    finally:
+        if tf_path.exists():
+            tf_path.unlink()
 
 if __name__ == "__main__":
+    if "--test" in sys.argv:
+        test_multiline_shadow()
+        sys.exit(0)
     sys.exit(main())

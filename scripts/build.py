@@ -21,19 +21,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def load_env(path=PROJECT_ROOT / ".env"):
     if not path.exists():
         return {}
-    return dict(
-        line.strip().split("=", 1)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if "=" in line and not line.strip().startswith("#")
-    )
+    res = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            if len(v) >= 2 and ((v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'"))):
+                v = v[1:-1]
+            res[k] = v
+    return res
 
 _ENV = load_env()
 
-# Production Sync & Research Analytics Credentials (loaded directly from .env)
-PRODUCTION_SYNC_URL = _ENV.get("CLOUD_SYNC_URL", "")
-PRODUCTION_ANON_KEY = _ENV.get("SUPABASE_ANON_KEY", "")
-PRODUCTION_RESEARCH_URL = _ENV.get("RESEARCH_ANALYTICS_URL", "")
-PRODUCTION_RESEARCH_ANON_KEY = _ENV.get("SUPABASE_PUBLISHABLE_KEY_LOG", _ENV.get("RESEARCH_ANALYTICS_ANON_KEY", ""))
+# Production Sync & Research Analytics Credentials (loaded from os.environ first, then .env)
+PRODUCTION_SYNC_URL = os.environ.get("CLOUD_SYNC_URL", _ENV.get("CLOUD_SYNC_URL", ""))
+PRODUCTION_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", _ENV.get("SUPABASE_ANON_KEY", ""))
+PRODUCTION_RESEARCH_URL = os.environ.get("RESEARCH_ANALYTICS_URL", _ENV.get("RESEARCH_ANALYTICS_URL", ""))
+PRODUCTION_RESEARCH_ANON_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY_LOG", os.environ.get("RESEARCH_ANALYTICS_ANON_KEY", _ENV.get("SUPABASE_PUBLISHABLE_KEY_LOG", _ENV.get("RESEARCH_ANALYTICS_ANON_KEY", ""))))
 
 # Extension Authorization Key (Injected into Go binary and PyArmor-obfuscated Python extensions)
 EXTENSION_SECRET_KEY = os.environ.get("EXTENSION_SECRET_KEY", "").strip()

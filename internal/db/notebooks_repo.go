@@ -480,6 +480,8 @@ func (r *Repository) FindNotebookByFileHash(fileHash, profileID string) (*models
 	if profileID != "" {
 		query += ` AND (profile_id = ? OR profile_id IS NULL OR profile_id = '')`
 		args = append(args, profileID)
+	} else {
+		query += ` AND (profile_id IS NULL OR profile_id = '')`
 	}
 	query += ` ORDER BY uploaded_at DESC LIMIT 1`
 

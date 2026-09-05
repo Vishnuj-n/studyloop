@@ -261,30 +261,52 @@ func (e *Engine) searchWithScope(
 	const rrfK = 60.0
 	rrfScores := make(map[string]float64)
 
-	// 1. Dense Vector Search (semantic similarity)
-	var vectorMatched bool
-	if e.embedder != nil {
-		queryVec, embedErr := e.embedder.Embed(query)
-		if embedErr == nil {
-			chunkIDs, searchErr := vectorSearch(queryVec, candidateK)
-			if searchErr == nil && len(chunkIDs) > 0 {
-				vectorMatched = true
-				for rank, cid := range chunkIDs {
-					if _, exists := byID[cid]; exists {
-						rrfScores[cid] += 1.0 / (rrfK + float64(rank+1))
-					}
+	var (
+		wg             sync.WaitGroup
+		vectorMatched  bool
+		chunkIDs       []string
+		lexicalResults []SearchResult
+		lexicalMatched bool
+	)
+
+	// Run vector search and lexical search concurrently
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if e.embedder != nil {
+			queryVec, embedErr := e.embedder.Embed(query)
+			if embedErr == nil {
+				cIDs, searchErr := vectorSearch(queryVec, candidateK)
+				if searchErr == nil && len(cIDs) > 0 {
+					vectorMatched = true
+					chunkIDs = cIDs
+				} else if searchErr != nil {
+					log.Printf("retrieval: %s vector search unavailable: %v", scopeName, searchErr)
 				}
-			} else if searchErr != nil {
-				log.Printf("retrieval: %s vector search unavailable: %v", scopeName, searchErr)
+			} else {
+				log.Printf("retrieval: query embedding failed: %v", embedErr)
 			}
-		} else {
-			log.Printf("retrieval: query embedding failed: %v", embedErr)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		lexicalResults = e.lexicalSearch(query, chunks, candidateK)
+	}()
+
+	wg.Wait()
+
+	// Apply reciprocal rank fusion for vector results
+	if vectorMatched {
+		for rank, cid := range chunkIDs {
+			if _, exists := byID[cid]; exists {
+				rrfScores[cid] += 1.0 / (rrfK + float64(rank+1))
+			}
 		}
 	}
 
-	// 2. Lexical Search (exact keyword similarity)
-	lexicalResults := e.lexicalSearch(query, chunks, candidateK)
-	var lexicalMatched bool
+	// Apply reciprocal rank fusion for lexical results
 	for rank, res := range lexicalResults {
 		if res.Score > 0 {
 			lexicalMatched = true

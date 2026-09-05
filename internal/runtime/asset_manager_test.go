@@ -45,6 +45,9 @@ func TestBuildDownloadURL(t *testing.T) {
 }
 
 func TestPingRagAssetsDownloadURL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network ping test in short mode")
+	}
 	downloadURL := BuildDownloadURL("")
 	t.Logf("Pinging asset download URL: %s", downloadURL)
 

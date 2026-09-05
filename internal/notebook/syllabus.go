@@ -27,7 +27,6 @@ type SyllabusDraftResult struct {
 	FallbackUsed bool
 }
 
-
 // DraftSyllabusChapters creates editable chapter ranges for HITL verification.
 // Uses LLM with bookmark context when llmProvider is non-nil.
 func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *ExtractedDocument, llmProvider LLMProvider) (*SyllabusDraftResult, error) {
@@ -66,6 +65,44 @@ func (s *Service) DraftSyllabusChapters(fileType, filePath string, doc *Extracte
 
 		var prompt string
 		if strings.EqualFold(strings.TrimSpace(fileType), "youtube") {
+			limits := llmProvider.GetLimits()
+			maxInputTokens := limits.MaxInputTokens
+			if maxInputTokens <= 0 {
+				return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
+			}
+
+			emptyTemplate := fmt.Sprintf(`You are structuring a study syllabus from a video transcript.
+
+Video: %s
+Total segments: %d
+
+Segment text sample with segment numbers (1-based) and their timestamps:
+
+
+Task: Merge short, fragmented, or introductory video segments into cohesive, comprehensive study topics.
+Rules:
+- Output strict JSON only: {"chapters":[{"title":"...","start_page":1,"end_page":4}]}
+- "start_page" and "end_page" are 1-based segment indices (1 to %d).
+- Aim for 4–8 chapters total. Each merged chapter should represent at least 5 minutes of video content.
+- Any segment shorter than 3 minutes MUST be merged into the adjacent segment with the most topic overlap — never left as its own chapter.
+- Group related micro-segments into substantive study chapters (each chapter representing a major concept or question).
+- Omit or merge trivial segments (like intros, sponsor callouts, and outros) into adjacent study topics.
+- Ensure sequential, contiguous segment ranges without gaps or overlaps.`,
+				bookName, doc.PageCount, doc.PageCount)
+
+			templateTokens, err := embeddings.CountTokens(emptyTemplate)
+			if err != nil {
+				templateTokens = 300
+			}
+			availableBudget := maxInputTokens - templateTokens - 100
+			if availableBudget > 0 {
+				if sampleTokens, err := embeddings.CountTokens(sample); err == nil && sampleTokens > availableBudget {
+					if truncated, err := embeddings.TruncateToTokens(sample, availableBudget); err == nil && len(truncated) > 0 {
+						sample = truncated
+					}
+				}
+			}
+
 			prompt = fmt.Sprintf(`You are structuring a study syllabus from a video transcript.
 
 Video: %s
@@ -174,20 +211,22 @@ Rules:
 				bookName, strings.ToLower(fileType), doc.PageCount, sample)
 		}
 
-		// Token budgeting check
-		limits := llmProvider.GetLimits()
-		maxInputTokens := limits.MaxInputTokens
-		if maxInputTokens <= 0 {
-			return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
-		}
-		promptTokens, err := embeddings.CountTokens(prompt)
-		if err == nil && promptTokens > maxInputTokens {
-			targetTokens := maxInputTokens - 200
-			if targetTokens <= 0 {
-				targetTokens = maxInputTokens
+		// Token budgeting check for non-youtube files
+		if !strings.EqualFold(strings.TrimSpace(fileType), "youtube") {
+			limits := llmProvider.GetLimits()
+			maxInputTokens := limits.MaxInputTokens
+			if maxInputTokens <= 0 {
+				return nil, fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for LLM provider", maxInputTokens)
 			}
-			if truncated, err := embeddings.TruncateToTokens(prompt, targetTokens); err == nil && len(truncated) > 0 {
-				prompt = truncated
+			promptTokens, err := embeddings.CountTokens(prompt)
+			if err == nil && promptTokens > maxInputTokens {
+				targetTokens := maxInputTokens - 200
+				if targetTokens <= 0 {
+					targetTokens = maxInputTokens
+				}
+				if truncated, err := embeddings.TruncateToTokens(prompt, targetTokens); err == nil && len(truncated) > 0 {
+					prompt = truncated
+				}
 			}
 		}
 

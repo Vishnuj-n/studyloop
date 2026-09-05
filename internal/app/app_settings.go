@@ -619,7 +619,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 	settings.CloudAPIToken = loginResp.SessionToken
 	settings.ClassroomCode = loginResp.ClassroomCode
 	settings.StudentUsername = loginResp.Username
-	if settings.CloudSyncURL == "" {
+	if settings.CloudSyncURL == "" && baseURL != "" {
 		settings.CloudSyncURL = fmt.Sprintf("%s/rest/v1/rpc/handle_cloud_sync", strings.TrimSuffix(baseURL, "/"))
 	}
 
