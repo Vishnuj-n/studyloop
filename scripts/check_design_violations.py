@@ -55,7 +55,7 @@ PATTERNS = [
         "id": "HARSH_SHADOW",
         "description": "DESIGN.md: Use low-opacity ambient blurs (<= 0.15 opacity), not standard heavy dark shadows.",
         "severity": "WARNING",
-        "regex": re.compile(r"(?:box-shadow|drop-shadow|filter)\s*:[\s\S]*?rgba\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.(?:2|3|4|5|6|7|8|9)\d*\s*\)", re.IGNORECASE),
+        "regex": re.compile(r"(?:box-shadow|drop-shadow|filter)\s*:[^;}]*?rgba\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.(?:2|3|4|5|6|7|8|9)\d*\s*\)", re.IGNORECASE),
         "multiline": True,
     },
     {
