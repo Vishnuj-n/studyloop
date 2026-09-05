@@ -382,17 +382,6 @@ func tensorFromInputData(info ort.InputOutputInfo, shape ort.Shape, data []int64
 	}
 }
 
-func extractEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo, attentionMask []int64) ([]float32, error) {
-	vectors, err := extractBatchEmbedding(outputs, outputInfo, attentionMask, 1, len(attentionMask))
-	if err != nil {
-		return nil, err
-	}
-	if len(vectors) == 0 {
-		return nil, fmt.Errorf("no embedding extracted")
-	}
-	return vectors[0], nil
-}
-
 func extractBatchEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo, attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
 	for i, output := range outputs {
 		if output == nil {
@@ -503,85 +492,6 @@ func poolFloat64TensorBatch(t *ort.Tensor[float64], attentionMask []int64, batch
 		return vectors, nil
 	default:
 		return nil, fmt.Errorf("unsupported output tensor rank for batch: %d", len(shape))
-	}
-}
-
-func poolFloat32Tensor(t *ort.Tensor[float32], attentionMask []int64) ([]float32, error) {
-	shape := t.GetShape()
-	data := t.GetData()
-	if len(data) == 0 {
-		return nil, fmt.Errorf("output tensor is empty")
-	}
-
-	switch len(shape) {
-	case 1:
-		vector := make([]float32, len(data))
-		copy(vector, data)
-		return vector, nil
-	case 2:
-		rows := int(shape[0])
-		cols := int(shape[1])
-		if rows <= 0 || cols <= 0 {
-			return nil, fmt.Errorf("invalid 2D output shape: %v", shape)
-		}
-		if rows == 1 {
-			vector := make([]float32, cols)
-			copy(vector, data[:cols])
-			return vector, nil
-		}
-		return meanPool2D(data, rows, cols, attentionMask), nil
-	case 3:
-		batch := int(shape[0])
-		seqLen := int(shape[1])
-		hidden := int(shape[2])
-		if batch <= 0 || seqLen <= 0 || hidden <= 0 {
-			return nil, fmt.Errorf("invalid 3D output shape: %v", shape)
-		}
-		return meanPool3D(data, seqLen, hidden, attentionMask), nil
-	default:
-		return nil, fmt.Errorf("unsupported output tensor rank: %d", len(shape))
-	}
-}
-
-func poolFloat64Tensor(t *ort.Tensor[float64], attentionMask []int64) ([]float32, error) {
-	shape := t.GetShape()
-	data := t.GetData()
-	if len(data) == 0 {
-		return nil, fmt.Errorf("output tensor is empty")
-	}
-
-	toFloat32 := func(in []float64) []float32 {
-		out := make([]float32, len(in))
-		for i, v := range in {
-			out[i] = float32(v)
-		}
-		return out
-	}
-
-	switch len(shape) {
-	case 1:
-		return toFloat32(data), nil
-	case 2:
-		rows := int(shape[0])
-		cols := int(shape[1])
-		if rows <= 0 || cols <= 0 {
-			return nil, fmt.Errorf("invalid 2D output shape: %v", shape)
-		}
-		if rows == 1 {
-			return toFloat32(data[:cols]), nil
-		}
-		pooled := meanPool2DFloat64(data, rows, cols, attentionMask)
-		return toFloat32(pooled), nil
-	case 3:
-		seqLen := int(shape[1])
-		hidden := int(shape[2])
-		if seqLen <= 0 || hidden <= 0 {
-			return nil, fmt.Errorf("invalid 3D output shape: %v", shape)
-		}
-		pooled := meanPool3DFloat64(data, seqLen, hidden, attentionMask)
-		return toFloat32(pooled), nil
-	default:
-		return nil, fmt.Errorf("unsupported output tensor rank: %d", len(shape))
 	}
 }
 
