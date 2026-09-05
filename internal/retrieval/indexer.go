@@ -3,6 +3,8 @@ package retrieval
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"time"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
@@ -114,27 +116,61 @@ func (vi *VectorIndexer) indexChunks(
 	embeddingBatch := make([]db.ChunkEmbeddingBatchItem, 0, len(chunksToReindex))
 	failedChunks := make(map[string]struct{})
 
-	for i, chunk := range chunksToReindex {
-		vector, err := vi.embedder.Embed(chunk.Text)
-		if err != nil {
-			utils.Warnf("embedding failed for chunk %s: %v", chunk.ID, err)
-			failedChunks[chunk.ID] = struct{}{}
-		} else {
-			hash := computeTextHash(chunk.Text)
-
-			vectorBatch = append(vectorBatch, db.ChunkVectorBatchItem{
-				ChunkID: chunk.ID,
-				Vector:  vector,
-			})
-
-			embeddingBatch = append(embeddingBatch, db.ChunkEmbeddingBatchItem{
-				ChunkID: chunk.ID,
-				Hash:    hash,
-			})
+	batchSize := optimalBatchSize()
+	for i := 0; i < len(chunksToReindex); i += batchSize {
+		end := i + batchSize
+		if end > len(chunksToReindex) {
+			end = len(chunksToReindex)
+		}
+		batch := chunksToReindex[i:end]
+		texts := make([]string, len(batch))
+		for j, c := range batch {
+			texts[j] = c.Text
 		}
 
-		if emitProgress != nil && ((i+1)%10 == 0 || i == len(chunksToReindex)-1) {
-			emitProgress(i+1, len(chunksToReindex), len(failedChunks))
+		vectors, err := vi.embedder.EmbedBatch(texts)
+		if err != nil {
+			// ponytail: fallback to 1-by-1 embedding for this mini-batch to isolate any corrupt chunk
+			for _, chunk := range batch {
+				vector, singleErr := vi.embedder.Embed(chunk.Text)
+				if singleErr != nil {
+					utils.Warnf("embedding failed for chunk %s: %v", chunk.ID, singleErr)
+					failedChunks[chunk.ID] = struct{}{}
+				} else {
+					hash := computeTextHash(chunk.Text)
+					vectorBatch = append(vectorBatch, db.ChunkVectorBatchItem{
+						ChunkID: chunk.ID,
+						Vector:  vector,
+					})
+					embeddingBatch = append(embeddingBatch, db.ChunkEmbeddingBatchItem{
+						ChunkID: chunk.ID,
+						Hash:    hash,
+					})
+				}
+			}
+		} else {
+			for j, vector := range vectors {
+				chunk := batch[j]
+				hash := computeTextHash(chunk.Text)
+				vectorBatch = append(vectorBatch, db.ChunkVectorBatchItem{
+					ChunkID: chunk.ID,
+					Vector:  vector,
+				})
+				embeddingBatch = append(embeddingBatch, db.ChunkEmbeddingBatchItem{
+					ChunkID: chunk.ID,
+					Hash:    hash,
+				})
+			}
+		}
+
+		if emitProgress != nil {
+			emitProgress(end, len(chunksToReindex), len(failedChunks))
+		}
+
+		// ponytail: yield CPU and give foreground tasks (PDF extraction, UI) breathing room between embedding batches
+		if end < len(chunksToReindex) {
+			time.Sleep(10 * time.Millisecond)
+			runtime.Gosched()
 		}
 	}
 
@@ -301,4 +337,17 @@ func (vi *VectorIndexer) emitNotebookIndexingProgress(notebookID string, process
 		"percent":          int((float64(processed) / float64(total)) * 100),
 	}
 	wailsruntime.EventsEmit(vi.ctx, "notebook-indexing-progress", payload)
+}
+
+// optimalBatchSize calculates the batch size for background ONNX embedding inference.
+// ponytail: keep batches modest (4-16) to avoid starving foreground PDF extraction and UI.
+func optimalBatchSize() int {
+	bs := runtime.NumCPU() / 2
+	if bs < 4 {
+		return 4
+	}
+	if bs > 16 {
+		return 16
+	}
+	return bs
 }

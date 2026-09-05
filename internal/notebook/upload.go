@@ -461,8 +461,12 @@ func (s *Service) ExtractDocumentSample(filePath string, fileType string, maxPag
 		doc.Sections = make([]ExtractedSection, limit)
 		for i := 0; i < limit; i++ {
 			ch := ingestResult.Chapters[i]
+			title := ch.Title
+			if title == "" {
+				title = fmt.Sprintf("Segment %d", i+1)
+			}
 			doc.Sections[i] = ExtractedSection{
-				Heading: ch.Title,
+				Heading: fmt.Sprintf("%s (%02d:%02d - %02d:%02d)", title, ch.StartSeconds/60, ch.StartSeconds%60, ch.EndSeconds/60, ch.EndSeconds%60),
 				Text:    ch.Transcript,
 				PageNum: i + 1,
 			}

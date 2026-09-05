@@ -274,6 +274,7 @@ type ReaderTopicBundle struct {
 	TopicStartPage   int             `json:"topic_start_page"`
 	TopicEndPage     int             `json:"topic_end_page"`
 	RawContent       string          `json:"raw_content,omitempty"`
+	CachedVideoURL   string          `json:"cached_video_url,omitempty"`
 	Sections         []ReaderSection `json:"sections"`
 	Subtopics        []Subtopic      `json:"subtopics,omitempty"`
 }

@@ -64,12 +64,13 @@ func GetTaskContext(taskID string) (*TaskContext, error)
 
 **File:** `frontend/src/pages/Reader.vue` + `internal/study/reader_ai.go`
 
-**Responsibility:** Render PDF content for reading (execution surface only, Reading Layer)
+**Responsibility:** Render PDF, structured Markdown, and YouTube lecture content for reading/study (execution surface only, Reading Layer)
 
 **Does:**
 - Display content from `block_id`
-- Open to `start_page` (authoritative entry point)
-- Show assigned page range (`start_page` to `end_page`)
+- Open to `start_page` or video chapter (authoritative entry point)
+- Render PDF view, Markdown reader (`MarkdownReader.vue`), or YouTube video reader with transcript drawer (`YouTubeReader.vue`)
+- Show assigned page/chapter range (`start_page` to `end_page`)
 - Track reading progress (`current_page_cursor` for information only)
 - Provide "Complete Session" button (always enabled during active task)
 - Call "Complete" when user signals completion (trust-based)
@@ -282,22 +283,23 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 
 ## Ingestion Pipeline
 
-**File:** `internal/notebook/` (upload.go, ingestion.go, pdfcpu.go, syllabus.go)
+**File:** `internal/notebook/` (upload.go, ingestion.go, pdfcpu.go, syllabus.go, deep_pdf.go, markdown_chunker.go, youtube.go)
 
-**Responsibility:** PDF → Chunks → Queue
+**Responsibility:** Document / Video → Chunks / Chapters → Queue
 
 **Does:**
-- Extract text from PDF
-- Extract chapter boundaries
-- Sliding window chunking (2500 words, 200 overlap)
- - Create chunks in database (legacy docs may call these `blocks`)
+- Extract text from PDF (pdfcpu or PyMuPDF4LLM Markdown parser)
+- Ingest YouTube video transcripts and timestamped chapters via `yt-dlp` extension
+- Extract chapter boundaries (PDF bookmarks, AI syllabus detection, or YouTube chapter marks)
+- Sliding window and Markdown-aware semantic chunking
+- Create chunks in database (legacy docs may call these `blocks`)
 - Insert READING tasks into queue
 - AI cleanup with graceful fallback (LLM failure → bookmark chapters → single "General" chapter)
 - Format topic titles via `CleanTopicTitle` utility
 
 **Does NOT:**
-- Use AI for chunking
-- Use semantic boundaries
+- Use AI for arbitrary chunking
+- Use non-deterministic boundaries
 
 **API:**
 ```go

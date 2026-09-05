@@ -80,7 +80,7 @@
       @apply-preset="applyDurationPreset"
     />
 
-    <!-- Calendar Sync & Offline Reminders -->
+    <!-- Calendar Sync -->
     <div class="calendar-sync-card">
       <div class="calendar-header">
         <div>
@@ -89,28 +89,6 @@
             Export your daily study routine to your calendar. Your phone and laptop will remind you every day with alarms even when StudyLoop is closed.
           </p>
         </div>
-        <button
-          type="button"
-          class="test-chime-btn"
-          title="Play sample in-app chime"
-          @click="playStudyChime"
-        >
-          Test In-App Chime
-        </button>
-      </div>
-
-      <div class="form-group custom-url-group">
-        <label for="custom-study-url">Custom Study Portal / Web Link (Optional)</label>
-        <input
-          id="custom-study-url"
-          v-model="customStudyUrl"
-          type="url"
-          placeholder="e.g. https://my-school.edu/dashboard or your custom notes URL"
-          class="custom-url-input"
-        />
-        <p class="hint">
-          This link will be included in the reminder description on your phone & desktop calendar.
-        </p>
       </div>
 
       <div class="calendar-actions">
@@ -138,12 +116,32 @@
       </div>
     </div>
 
-    <SettingsToggle
-      v-model="settings.reminders_enabled"
-      :disabled="disabled"
-      title="Enable In-App Study Chimes & Banners"
-      hint="Play an audio chime and show banners when daily study time starts and ends while StudyLoop is open."
-    />
+    <!-- In-App Notifications Section -->
+    <div class="notification-card">
+      <div class="notification-header">
+        <div>
+          <h3>In-App Notifications</h3>
+          <p class="hint">
+            Play an audio chime and show banner alerts when daily study time starts and ends while StudyLoop is open.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="test-chime-btn"
+          title="Play sample in-app chime"
+          @click="playStudyChime"
+        >
+          🔔 Test Chime
+        </button>
+      </div>
+
+      <SettingsToggle
+        v-model="settings.reminders_enabled"
+        :disabled="disabled"
+        title="Enable Study Time Chimes & Banners"
+        hint="Notify when your scheduled study session begins and concludes."
+      />
+    </div>
 
     <SettingsToggle
       v-model="settings.analytics_enabled"
@@ -162,7 +160,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import TimeRangeInput from './TimeRangeInput.vue'
 import {
@@ -180,8 +178,6 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
 })
 
-const customStudyUrl = ref('')
-
 const hasTokenWarning = computed(() => {
   const words = Number(props.settings?.target_session_words) || 0
   const maxTokens = Number(props.maxInputTokens) || 4000
@@ -198,15 +194,14 @@ async function openExternalLink(url) {
   try {
     await openURLInBrowser(url)
   } catch {
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 }
 
 function openGoogle() {
   const url = getGoogleCalendarUrl(
     props.settings?.study_start_time,
-    props.settings?.study_end_time,
-    customStudyUrl.value
+    props.settings?.study_end_time
   )
   openExternalLink(url)
 }
@@ -214,8 +209,7 @@ function openGoogle() {
 function openOutlook() {
   const url = getOutlookCalendarUrl(
     props.settings?.study_start_time,
-    props.settings?.study_end_time,
-    customStudyUrl.value
+    props.settings?.study_end_time
   )
   openExternalLink(url)
 }
@@ -223,8 +217,7 @@ function openOutlook() {
 function downloadICS() {
   downloadRoutineICS(
     props.settings?.study_start_time,
-    props.settings?.study_end_time,
-    customStudyUrl.value
+    props.settings?.study_end_time
   )
 }
 </script>
@@ -327,7 +320,26 @@ h2 {
   flex-wrap: wrap;
 }
 
-.calendar-header h3 {
+/* Notification Card */
+.notification-card {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.notification-header h3 {
   margin: 0 0 4px;
   font-size: 16px;
   font-weight: 700;
@@ -354,17 +366,6 @@ h2 {
   background: var(--surface-container-high);
   border-color: var(--primary);
   transform: translateY(-1px);
-}
-
-.custom-url-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.custom-url-input {
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .calendar-actions {

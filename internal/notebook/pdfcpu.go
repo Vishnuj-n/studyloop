@@ -14,16 +14,6 @@ import (
 	"ai-tutor/internal/models"
 )
 
-// extractPDFCPUBookmarkDraft extracts level-1 chapter drafts from PDF bookmarks using pdfcpu.
-func extractPDFCPUBookmarkDraft(filePath string, pageCount int, uploadDir string) []models.SyllabusChapterDraft {
-	jsonOutput, err := runPDFCPUBookmarksExport(filePath, uploadDir)
-	if err != nil || strings.TrimSpace(string(jsonOutput)) == "" {
-		return nil
-	}
-
-	return ParsePDFCPUBookmarkDraftFromJSON(jsonOutput, pageCount)
-}
-
 type bookmarkNode struct {
 	title string
 	page  int

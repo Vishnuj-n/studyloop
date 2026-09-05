@@ -140,6 +140,26 @@ func TestNormalizeL2(t *testing.T) {
 	assertFloat32SliceClose(t, vector, []float32{0.6, 0.8})
 }
 
+func TestMeanPool3DBatch(t *testing.T) {
+	// 2 items in batch, seqLen=2, hidden=2
+	// Item 0: token 0 (1, 2), token 1 masked (3, 4) -> (1, 2)
+	// Item 1: token 0 (5, 6), token 1 (7, 8) -> (6, 7)
+	data := []float32{
+		1, 2, 3, 4,
+		5, 6, 7, 8,
+	}
+	mask := []int64{
+		1, 0,
+		1, 1,
+	}
+
+	res0 := meanPool3D(data[0:4], 2, 2, mask[0:2])
+	assertFloat32SliceClose(t, res0, []float32{1, 2})
+
+	res1 := meanPool3D(data[4:8], 2, 2, mask[2:4])
+	assertFloat32SliceClose(t, res1, []float32{6, 7})
+}
+
 func tokenizerAssetPath(t *testing.T) string {
 	t.Helper()
 

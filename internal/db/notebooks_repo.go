@@ -449,6 +449,58 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 	return &nb, nil
 }
 
+// FindNotebookByFileHash finds an existing notebook with the same file hash in the specified profile (or unassigned).
+func (r *Repository) FindNotebookByFileHash(fileHash, profileID string) (*models.Notebook, error) {
+	fileHash = strings.TrimSpace(fileHash)
+	if fileHash == "" {
+		return nil, nil
+	}
+
+	query := `
+		SELECT 
+			id, title, file_path, file_type, COALESCE(topic_id, ''), COALESCE(status, 'uploaded'), 
+			COALESCE(indexing_status, 'PENDING'), page_count, chunk_count, COALESCE(priority, 5), 
+			exam_deadline, uploaded_at, COALESCE(profile_id, ''), COALESCE(study_status, 'dormant'),
+			COALESCE(file_hash, ''),
+			COALESCE(extraction_engine, 'standard'),
+			COALESCE((
+				SELECT MAX(COALESCE(t.external_help_required, 0))
+				FROM topics t
+				WHERE t.id = notebooks.topic_id
+				   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
+			), 0) AS external_help_required,
+			COALESCE((SELECT MIN(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), 1) AS start_page,
+			COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page
+		FROM notebooks
+		WHERE file_hash = ?`
+
+	var args []interface{}
+	args = append(args, fileHash)
+
+	if profileID != "" {
+		query += ` AND (profile_id = ? OR profile_id IS NULL OR profile_id = '')`
+		args = append(args, profileID)
+	} else {
+		query += ` AND (profile_id IS NULL OR profile_id = '')`
+	}
+	query += ` ORDER BY uploaded_at DESC LIMIT 1`
+
+	var nb models.Notebook
+	err := r.db.QueryRow(query, args...).Scan(
+		&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
+		&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
+		&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &nb, nil
+}
+
 // UpdateNotebookExtractionEngine updates the extraction engine field for a notebook.
 func (r *Repository) UpdateNotebookExtractionEngine(notebookID, engine string) error {
 	notebookID = strings.TrimSpace(notebookID)

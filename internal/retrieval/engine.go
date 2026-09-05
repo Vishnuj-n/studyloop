@@ -17,7 +17,6 @@ import (
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/models"
-	"ai-tutor/internal/utils"
 )
 
 var ErrInvalidNotebookContext = errors.New("invalid notebook context: notebook ID is required")
@@ -248,55 +247,98 @@ func (e *Engine) searchWithScope(
 		return nil, fmt.Errorf("no chunks found")
 	}
 
-	k := topK
-	if len(chunks) < k {
-		k = len(chunks)
+	// ponytail: candidate pool size for hybrid fusion (up to 50 items)
+	candidateK := 50
+	if candidateK > len(chunks) {
+		candidateK = len(chunks)
 	}
 
-	// We'll collect chunk-level results in chunkResults
-	var chunkResults []SearchResult
+	byID := make(map[string]models.Chunk, len(chunks))
+	for _, c := range chunks {
+		byID[c.ID] = c
+	}
 
-	// --- ONNX path (preferred) ---
-	if e.embedder != nil {
-		queryVec, embedErr := e.embedder.Embed(query)
-		if embedErr == nil {
-			chunkIDs, searchErr := vectorSearch(queryVec, k)
-			if searchErr == nil && len(chunkIDs) > 0 {
-				byID := make(map[string]models.Chunk, len(chunks))
-				for _, c := range chunks {
-					byID[c.ID] = c
+	const rrfK = 60.0
+	rrfScores := make(map[string]float64)
+
+	var (
+		wg             sync.WaitGroup
+		vectorMatched  bool
+		chunkIDs       []string
+		lexicalResults []SearchResult
+		lexicalMatched bool
+	)
+
+	// Run vector search and lexical search concurrently
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if e.embedder != nil {
+			queryVec, embedErr := e.embedder.Embed(query)
+			if embedErr == nil {
+				cIDs, searchErr := vectorSearch(queryVec, candidateK)
+				if searchErr == nil && len(cIDs) > 0 {
+					vectorMatched = true
+					chunkIDs = cIDs
+				} else if searchErr != nil {
+					log.Printf("retrieval: %s vector search unavailable: %v", scopeName, searchErr)
 				}
-				results := make([]SearchResult, 0, len(chunkIDs))
-				for i, cid := range chunkIDs {
-					c, ok := byID[cid]
-					if !ok {
-						continue
-					}
-					results = append(results, SearchResult{
-						ChunkID:         c.ID,
-						Text:            c.Text,
-						TopicID:         c.TopicID,
-						PageNum:         c.PageNum,
-						ImportanceScore: c.ImportanceScore,
-						WeaknessScore:   c.WeaknessScore,
-						Score:           float64(len(chunkIDs) - i),
-					})
-				}
-				chunkResults = results
+			} else {
+				log.Printf("retrieval: query embedding failed: %v", embedErr)
 			}
-			if searchErr != nil {
-				log.Printf("retrieval: %s unavailable, falling back to lexical: %v", scopeName, searchErr)
-			}
-		} else {
-			log.Printf("retrieval: query embedding failed, falling back to lexical: %v", embedErr)
 		}
-	} else {
-		utils.RagLogger.Warn("retrieval: embedder is nil, falling back to lexical search", "scope", scopeName)
+	}()
+
+	go func() {
+		defer wg.Done()
+		lexicalResults = e.lexicalSearch(query, chunks, candidateK)
+	}()
+
+	wg.Wait()
+
+	// Apply reciprocal rank fusion for vector results
+	if vectorMatched {
+		for rank, cid := range chunkIDs {
+			if _, exists := byID[cid]; exists {
+				rrfScores[cid] += 1.0 / (rrfK + float64(rank+1))
+			}
+		}
 	}
 
-	// If ONNX didn't produce results, use lexical fallback
-	if len(chunkResults) == 0 {
-		chunkResults = e.lexicalSearch(query, chunks, k)
+	// Apply reciprocal rank fusion for lexical results
+	for rank, res := range lexicalResults {
+		if res.Score > 0 {
+			lexicalMatched = true
+			rrfScores[res.ChunkID] += 1.0 / (rrfK + float64(rank+1))
+		}
+	}
+
+	// 3. Assemble and rank combined results
+	chunkResults := make([]SearchResult, 0, len(rrfScores))
+	for cid, score := range rrfScores {
+		c, ok := byID[cid]
+		if !ok {
+			continue
+		}
+		chunkResults = append(chunkResults, SearchResult{
+			ChunkID:         c.ID,
+			Text:            c.Text,
+			TopicID:         c.TopicID,
+			PageNum:         c.PageNum,
+			ImportanceScore: c.ImportanceScore,
+			WeaknessScore:   c.WeaknessScore,
+			Score:           score,
+		})
+	}
+
+	// Fallback: If neither vector nor lexical produced non-zero hits, fall back to top lexical chunks
+	if !vectorMatched && !lexicalMatched && len(lexicalResults) > 0 {
+		limit := topK
+		if limit > len(lexicalResults) {
+			limit = len(lexicalResults)
+		}
+		chunkResults = lexicalResults[:limit]
 	}
 
 	sort.Slice(chunkResults, func(i, j int) bool { return chunkResults[i].Score > chunkResults[j].Score })

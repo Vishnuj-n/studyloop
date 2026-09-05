@@ -59,12 +59,21 @@ Crash recovery: ACTIVE tasks > 30 min revert to PENDING on startup.
 
 ## 2. Ingestion Pipeline
 
-PDF upload → Chapter selection → Sliding window chunking → READING tasks inserted
+### Standard & Deep PDF Ingestion
+Document upload → Chapter selection → Sliding window / Markdown chunking → READING tasks inserted
 
-1. PDF Upload: user uploads, system extracts text
-2. Chapter Selection: user reviews/prunes chapters
-3. Sliding Window: 2500-word chunks, 200-word overlap, deterministic
-4. READING tasks inserted (one per chunk)
+1. **PDF Upload:** Standard (pdfcpu) or Deep Structured (`fast_pdf` / PyMuPDF4LLM into Markdown).
+2. **Chapter Selection:** User reviews/prunes chapters (or uses AI chapter cleanup with bookmark fallback).
+3. **Chunking:** 2500-word reading sessions, 500-word embedding chunks, deterministic headings & table preservation.
+4. **Queue Seeding:** `READING` tasks inserted into `study_queue` (one per session chunk).
+
+### YouTube Video Ingestion
+YouTube URL/ID input → `yt-dlp` extraction → Chapter mapping → Embedded video reader & transcripts
+
+1. **URL Input:** User pastes video link or ID.
+2. **Extraction:** Python `youtube` extension fetches metadata, duration, timestamped chapters, and subtitles/transcripts.
+3. **Chapter Normalization:** Chapters mapped 1:1 into canonical `ExtractedDocument` sections with time bounds `(MM:SS - MM:SS)`.
+4. **Study & Playback:** Renders via dedicated `YouTubeReader.vue` with embedded player, segment timestamps, offline video support, and downstream Quiz/Flashcard task generation.
 
 ---
 

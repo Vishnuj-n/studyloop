@@ -58,6 +58,43 @@
         <p class="hint">Rewrites dense textbooks to match your target comprehension level.</p>
       </div>
     </article>
+
+    <!-- YouTube & Video Ingestion -->
+    <article class="panel form-grid">
+      <h2>YouTube Ingestion &amp; Video Playback</h2>
+
+      <div class="form-group checkbox-group">
+        <label class="checkbox-label">
+          <input
+            v-model="youtubeAutoDownload"
+            type="checkbox"
+            :disabled="disabled"
+          />
+          <span>Auto-download video for offline study</span>
+        </label>
+        <p class="hint">Streams immediately on import, then caches a local copy in the background for zero-buffering offline playback.</p>
+      </div>
+
+      <div v-if="youtubeAutoDownload" class="form-group">
+        <label for="youtube-quality">Video Download Quality</label>
+        <select
+          id="youtube-quality"
+          v-model="youtubeQuality"
+          class="setting-select"
+          :disabled="disabled"
+        >
+          <option value="max">Max / Best (Up to 4K / 2160p)</option>
+          <option value="1440p">1440p (2K Quad HD)</option>
+          <option value="1080p">1080p (Full HD)</option>
+          <option value="720p">720p (Recommended - Fast download &amp; compact size)</option>
+          <option value="480p">480p (Low bandwidth)</option>
+        </select>
+      </div>
+
+      <div v-if="configError" class="error-banner">
+        {{ configError }}
+      </div>
+    </article>
   </div>
 </template>
 
@@ -72,7 +109,7 @@ defineProps({
   },
 })
 
-const { extensionConfig, setExtensionSetting } = useExtensions()
+const { extensionConfig, configError, setExtensionSetting } = useExtensions()
 
 const audioVoice = computed({
   get: () => extensionConfig.value?.audio_overview?.voice || 'en-US-ChristopherNeural',
@@ -87,6 +124,22 @@ const audioSpeed = computed({
 const simplifierLevel = computed({
   get: () => extensionConfig.value?.text_simplifier?.level || 'eli15',
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
+})
+
+const youtubeAutoDownload = computed({
+  get: () => Boolean(extensionConfig.value?.youtube?.auto_download),
+  set: (val) => {
+    console.log('[SettingsExtensions] Setting youtube.auto_download:', val)
+    return setExtensionSetting('youtube', 'auto_download', Boolean(val))
+  },
+})
+
+const youtubeQuality = computed({
+  get: () => extensionConfig.value?.youtube?.download_quality || '720p',
+  set: (val) => {
+    console.log('[SettingsExtensions] Setting youtube.download_quality:', val)
+    return setExtensionSetting('youtube', 'download_quality', val)
+  },
 })
 </script>
 
@@ -122,6 +175,28 @@ h2 {
   flex-direction: column;
 }
 
+.checkbox-group {
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface);
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
 label {
   font-weight: 600;
   font-size: 14px;
@@ -153,6 +228,16 @@ select:focus {
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
+}
+
+.error-banner {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 </style>
 

@@ -94,13 +94,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useDialog } from '../composables/useDialog'
 import { useExtensions } from '../composables/useExtensions'
 import { getAvailableImporters } from '../services/importerRegistry'
 import YoutubeImportModal from './YoutubeImportModal.vue'
 
-defineProps({
+const props = defineProps({
   isCloudProfile: { type: Boolean, default: false },
   classroomCode: { type: String, default: '' },
   uploadProgress: { type: Number, default: 0 },
@@ -120,6 +120,24 @@ const localError = ref('')
 const activeModal = ref(null)
 
 const activeImporters = computed(() => getAvailableImporters(isExtensionActive))
+
+watch(
+  () => props.uploadProgress,
+  (val) => {
+    if (val === 100) {
+      activeModal.value = null
+    }
+  }
+)
+
+watch(
+  () => props.successMessage,
+  (val) => {
+    if (val) {
+      activeModal.value = null
+    }
+  }
+)
 
 function openImporter(importer) {
   localError.value = ''

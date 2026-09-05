@@ -7,8 +7,11 @@
       </div>
 
       <p class="modal-warning">
-        Use absolute PDF page numbers. Page labels shown inside the PDF viewer may differ from file
-        page numbers.
+        {{
+          fileType === 'youtube'
+            ? 'Verify video chapter segments. Segments map to video timestamps.'
+            : 'Use absolute PDF page numbers. Page labels shown inside the PDF viewer may differ from file page numbers.'
+        }}
       </p>
 
       <div class="modal-title-edit">
@@ -45,8 +48,8 @@
           <thead>
             <tr>
               <th>Title</th>
-              <th>Start Page</th>
-              <th>End Page</th>
+              <th>{{ fileType === 'youtube' ? 'Start Segment' : 'Start Page' }}</th>
+              <th>{{ fileType === 'youtube' ? 'End Segment' : 'End Page' }}</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -71,6 +74,9 @@
                   :disabled="isCleaning"
                   @change="sanitizeChapterPages(chapter)"
                 />
+                <div v-if="fileType === 'youtube' && getStartTimestamp(chapter.start_page)" class="timestamp-pill">
+                  ⏱ {{ getStartTimestamp(chapter.start_page) }}
+                </div>
               </td>
               <td>
                 <input
@@ -82,6 +88,12 @@
                   :disabled="isCleaning"
                   @change="sanitizeChapterPages(chapter)"
                 />
+                <div v-if="fileType === 'youtube' && getEndTimestamp(chapter.end_page)" class="timestamp-pill">
+                  ⏱ {{ getEndTimestamp(chapter.end_page) }}
+                  <span v-if="getChapterDuration(chapter.start_page, chapter.end_page)" class="duration-pill">
+                    ({{ getChapterDuration(chapter.start_page, chapter.end_page) }})
+                  </span>
+                </div>
               </td>
               <td>
                 <button
@@ -131,10 +143,12 @@ import { ref, watch } from 'vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
+  fileType: { type: String, default: 'pdf' },
   notebookTitle: { type: String, default: '' },
   notebookPriority: { type: Number, default: 5 },
   pageCount: { type: Number, default: 1 },
   chapters: { type: Array, default: () => [] },
+  segments: { type: Array, default: () => [] },
   isConfirming: { type: Boolean, default: false },
   isCleaning: { type: Boolean, default: false },
   error: { type: String, default: '' },
@@ -212,6 +226,30 @@ function sanitizeChapterPages(chapter) {
     chapter.start_page,
     Math.min(Number(chapter.end_page) || chapter.start_page, props.pageCount)
   )
+}
+
+function getStartTimestamp(pageNum) {
+  if (!Array.isArray(props.segments) || props.segments.length === 0) return ''
+  const seg = props.segments.find((s) => s.segment_index === pageNum)
+  return seg?.start_time || ''
+}
+
+function getEndTimestamp(pageNum) {
+  if (!Array.isArray(props.segments) || props.segments.length === 0) return ''
+  const seg = props.segments.find((s) => s.segment_index === pageNum)
+  return seg?.end_time || ''
+}
+
+function getChapterDuration(startPage, endPage) {
+  if (!Array.isArray(props.segments) || props.segments.length === 0) return ''
+  const startSeg = props.segments.find((s) => s.segment_index === startPage)
+  const endSeg = props.segments.find((s) => s.segment_index === endPage)
+  if (!startSeg || !endSeg) return ''
+  const durationSec = Math.max(0, endSeg.end_seconds - startSeg.start_seconds)
+  const min = Math.floor(durationSec / 60)
+  const sec = durationSec % 60
+  if (min === 0) return `${sec}s`
+  return `${min}m ${sec > 0 ? `${sec}s` : ''}`.trim()
 }
 
 function confirm() {
@@ -387,6 +425,21 @@ function confirm() {
 
 .chapter-page {
   min-width: 100px;
+}
+
+.timestamp-pill {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.duration-pill {
+  color: var(--primary, #3b82f6);
+  font-weight: 600;
 }
 
 .row-delete {

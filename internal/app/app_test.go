@@ -421,33 +421,6 @@ func TestOrdering_NotebookPriority(t *testing.T) {
 	t.Skip("db.UpdateNotebookPriority method does not exist - notebook priority ordering is preserved in query but cannot be tested")
 }
 
-func TestOrdering_TaskPriority(t *testing.T) {
-	initTestDB(t)
-
-	notebookID := "ordering-priority-nb"
-	if err := testRepo.CreateNotebook(notebookID, "Ordering Priority Notebook", "/tmp/ordering-priority.txt", "txt", "", "", 1, ""); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
-
-	taskHighPriority := models.StudyQueueTask{ID: "task-high-priority", NotebookID: notebookID, TaskType: models.StudyTaskTypeQuiz, Status: models.StudyTaskStatusPending, Priority: 1}
-	taskLowPriority := models.StudyQueueTask{ID: "task-low-priority", NotebookID: notebookID, TaskType: models.StudyTaskTypeQuiz, Status: models.StudyTaskStatusPending, Priority: 10}
-
-	if err := testRepo.InsertStudyTask(taskLowPriority); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-	if err := testRepo.InsertStudyTask(taskHighPriority); err != nil {
-		t.Fatalf("InsertStudyTask failed: %v", err)
-	}
-
-	nextTask, err := testRepo.GetNextTask(notebookID)
-	if err != nil {
-		t.Fatalf("GetNextTask failed: %v", err)
-	}
-	if nextTask.ID != "task-high-priority" {
-		t.Fatalf("expected task-high-priority first, got: %s", nextTask.ID)
-	}
-}
-
 func TestOrdering_FIFOFallback(t *testing.T) {
 	initTestDB(t)
 

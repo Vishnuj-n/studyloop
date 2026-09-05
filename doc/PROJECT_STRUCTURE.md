@@ -43,11 +43,14 @@ internal/
     sync.go           # Cloud sync + FLASHCARD_GENERATE tasks
     queue_transition.go # Unified task transition switchboard
 
-  notebook/           # Upload + ingestion (4 files)
+  notebook/           # Upload + ingestion (7 files)
     upload.go         # PDF upload
-    ingestion.go      # PDF processing pipeline
-    pdfcpu.go         # PDF text extraction
+    ingestion.go      # Document processing pipeline
+    pdfcpu.go         # Standard PDF text extraction
     syllabus.go       # Chapter boundary detection
+    deep_pdf.go       # Fast PyMuPDF4LLM Markdown extraction
+    markdown_chunker.go # Heading & table preserving Markdown chunking
+    youtube.go        # YouTube lecture transcript ingestion & video downloader
 
   scheduler/          # Scheduling algorithms (2 files)
     fsrs.go           # FSRS spaced repetition
@@ -115,6 +118,9 @@ frontend/src/
     ErrorMessage.vue     # Error display
     ReaderChat.vue       # Ask AI panel for Reader
     StudyPageLayout.vue  # Shared study page layout
+    YouTubeReader.vue    # Embedded video player & transcript drawer
+    MarkdownReader.vue   # Structured Markdown reader for deep PDF ingestion
+    NotebookUpload.vue   # PDF / Deep PDF / YouTube upload modal
 
   services/
     appApi.js            # Wails backend bridge

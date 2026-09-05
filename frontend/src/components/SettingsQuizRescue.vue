@@ -237,8 +237,7 @@ h2 {
   color: var(--on-surface);
 }
 
-input[type='number'],
-select {
+input[type='number'] {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
   background: var(--surface-container-low);
@@ -253,23 +252,10 @@ select {
   box-sizing: border-box;
 }
 
-input[type='number']:focus,
-select:focus {
+input[type='number']:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
-}
-
-.settings-row-pair {
-  display: flex;
-  gap: 16px;
-  width: 100%;
-}
-
-.field-half {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 .option-desc {

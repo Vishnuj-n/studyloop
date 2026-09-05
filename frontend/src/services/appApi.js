@@ -69,9 +69,11 @@ export function getTask(taskID) {
   return appBridge().GetTask(taskID)
 }
 
-export function GetTaskContext(taskID) {
+export function getTaskContext(taskID) {
   return appBridge().GetTaskContext(taskID)
 }
+export const GetTaskContext = getTaskContext
+
 
 export function generateQuizForPageRange(notebookID, startPage, endPage) {
   return appBridge().GenerateQuizForPageRange(notebookID, startPage, endPage)
@@ -144,10 +146,6 @@ export function uploadYouTubeNotebook(videoURL, isPro = false) {
 
 export async function selectAndUploadDeepStructuredPDF(isPro = false) {
   return await appBridge().SelectAndUploadDeepStructuredPDF(isPro)
-}
-
-export async function uploadDeepStructuredPDFFromPath(sourcePath, isPro = false) {
-  return await appBridge().UploadDeepStructuredPDFFromPath(sourcePath, isPro)
 }
 
 export async function upgradeNotebookToDeepPDF(notebookID) {

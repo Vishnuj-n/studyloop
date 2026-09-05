@@ -48,6 +48,7 @@ export function useReaderBase(taskID) {
   // Document state
   const topicTitle = ref('Reader')
   const notebookUrl = ref('')
+  const cachedVideoUrl = ref('')
   const fileType = ref('')
   const pageCount = ref(1)
   const currentPage = ref(1)
@@ -291,6 +292,7 @@ export function useReaderBase(taskID) {
       // Apply bundle data safely (bundle might be null/empty)
       topicTitle.value = cleanTopicTitle(bundle?.topic_title || task.topic_title) || 'Reader'
       notebookUrl.value = bundle?.notebook_url || ''
+      cachedVideoUrl.value = bundle?.cached_video_url || ''
       fileType.value = (bundle?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(bundle?.page_count) || 1)
       topicStartPage.value = Number(bundle?.topic_start_page ?? 0)
@@ -352,6 +354,7 @@ export function useReaderBase(taskID) {
 
       topicTitle.value = cleanTopicTitle(result?.topic_title || selectedTopicTitle.value) || 'Reader'
       notebookUrl.value = result?.notebook_url || ''
+      cachedVideoUrl.value = result?.cached_video_url || ''
       fileType.value = (result?.file_type || '').toLowerCase()
       pageCount.value = Math.max(1, Number(result?.page_count) || 1)
       topicStartPage.value = Number(result?.topic_start_page) || 0
@@ -455,6 +458,7 @@ export function useReaderBase(taskID) {
     isMarkdown,
     isYouTube,
     youtubeEmbedUrl,
+    cachedVideoUrl,
     isPdf,
     pdfVisible,
     hasNavigationBounds,

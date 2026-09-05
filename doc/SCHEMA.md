@@ -362,13 +362,15 @@ Singleton table for global preferences.
 | `rag_notebook_chapter` | BOOLEAN DEFAULT 1 | RAG over notebook chapters |
 | `rag_entire_notebook` | BOOLEAN DEFAULT 1 | RAG over entire notebook |
 | `rag_queue_study` | BOOLEAN DEFAULT 1 | RAG over queued study content |
-| `default_remedial_strategy` | TEXT DEFAULT 'CLASSIC' | User preference for quiz failure handling (`CLASSIC` or `FAST`) |
+| `default_remedial_strategy` | TEXT DEFAULT 'FAST' | User preference for quiz failure handling (`CLASSIC` or `FAST`) |
 | `classroom_code` | TEXT DEFAULT '' | Classroom code for teacher-student association in cloud sync |
+| `student_username` | TEXT DEFAULT '' | Student username for cloud sync authentication |
 | `last_synced_at` | INTEGER DEFAULT 0 | Timestamp of last successful cloud sync |
 | `target_session_words` | INTEGER NOT NULL DEFAULT 3000 | Target word count per reading session |
 | `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
 | `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |
+| `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 
 **Foreign keys:** `active_profile_id` → `study_profiles(id)` ON DELETE SET NULL.
@@ -415,6 +417,9 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 | `id` | TEXT PRIMARY KEY | Profile identifier |
 | `name` | TEXT NOT NULL | Human-readable profile name |
 | `deadline_at` | INTEGER NOT NULL | Unix timestamp of target deadline |
+| `classroom_code` | TEXT DEFAULT '' | Classroom code associated with profile |
+| `student_username` | TEXT DEFAULT '' | Student username associated with profile |
+| `cloud_api_token` | TEXT DEFAULT '' | Cloud authentication token associated with profile |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time |
 
 **Referenced by:** `user_settings.active_profile_id` (FK → `id` ON DELETE SET NULL), `notebooks.profile_id` (FK → `id` ON DELETE SET NULL).

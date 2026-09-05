@@ -17,6 +17,11 @@ func (e *OnnxEmbedder) Embed(text string) ([]float32, error) {
 	return nil, errors.New("onnx embedder is not supported in builds with CGO disabled")
 }
 
+// EmbedBatch returns an error indicating that ONNX runtime is not supported when CGO is disabled.
+func (e *OnnxEmbedder) EmbedBatch(texts []string) ([][]float32, error) {
+	return nil, errors.New("onnx embedder is not supported in builds with CGO disabled")
+}
+
 // GetDimension returns 0 when CGO is disabled.
 func (e *OnnxEmbedder) GetDimension() int32 {
 	return 0

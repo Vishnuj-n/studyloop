@@ -99,10 +99,12 @@
     <!-- Syllabus Modal -->
     <NotebookSyllabusModal
       :show="showSyllabusModal"
+      :file-type="draftNotebookFileType"
       :notebook-title="draftNotebookTitle"
       :notebook-priority="draftNotebookPriority"
       :page-count="draftPageCount"
       :chapters="draftChapters"
+      :segments="draftSegments"
       :is-confirming="isConfirmingDraft"
       :is-cleaning="isAICleaning"
       :error="draftError"
@@ -189,12 +191,14 @@ const indexingStatusMessage = ref('')
 const showSyllabusModal = ref(false)
 const draftNotebookID = ref('')
 const draftNotebookTitle = ref('')
+const draftNotebookFileType = ref('pdf')
 const draftNotebookPriority = ref(5)
 const originalDraftTitle = ref('')
 const originalDraftPriority = ref(5)
 
 const draftPageCount = ref(1)
 const draftChapters = ref([])
+const draftSegments = ref([])
 const originalDraftChapters = ref([])
 const draftError = ref('')
 const isConfirmingDraft = ref(false)
@@ -430,6 +434,17 @@ async function handleDeepStructuredUpload() {
     if (result?.error) {
       throw new Error(result.error)
     }
+    if (result?.duplicate) {
+      await loadNotebooks()
+      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      await alertDialog({
+        title: 'Document Already Exists',
+        message: `This textbook is already in your library as '${result?.file_name || 'book'}'.`,
+        confirmText: 'OK',
+        type: 'info',
+      })
+      return
+    }
     await loadNotebooks()
     await alertDialog({
       title: '⚡ Deep Structure Analysis Started',
@@ -503,6 +518,21 @@ async function uploadFile(file) {
       throw new Error(result.error)
     }
 
+    if (result?.duplicate) {
+      uploadProgress.value = 100
+      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      successMessage.value = `Found existing notebook: ${result?.file_name || ''}`
+      if (result?.id) {
+        await openSyllabusDraft(result.id, result?.file_name || '')
+      }
+      setTimeout(() => {
+        uploadProgress.value = 0
+        successMessage.value = ''
+        void loadNotebooks()
+      }, 2000)
+      return
+    }
+
     if (result?.id) {
       ingestionNotebookID.value = result.id
     }
@@ -549,6 +579,7 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
     }
 
     const chapters = Array.isArray(draft?.chapters) ? draft.chapters : []
+    draftSegments.value = Array.isArray(draft?.segments) ? draft.segments : []
     draftPageCount.value = Number(draft?.page_count) > 0 ? Number(draft.page_count) : 1
     draftChapters.value =
       chapters.length > 0
@@ -559,12 +590,17 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
           }))
         : [{ title: 'General', start_page: 1, end_page: draftPageCount.value }]
 
-    // Load notebook to get current priority
+    // Load notebook to get current priority and file type
     const notebook = notebooks.value.find((nb) => nb.id === notebookID)
     if (notebook) {
+      if (notebook.file_type) {
+        draftNotebookFileType.value = notebook.file_type
+      }
       if (notebook.priority) {
         draftNotebookPriority.value = notebook.priority
       }
+    } else {
+      draftNotebookFileType.value = 'pdf'
     }
 
     showSyllabusModal.value = true
@@ -617,6 +653,9 @@ async function aiCleanupChapters() {
     }
 
     const chapters = Array.isArray(result?.chapters) ? result.chapters : []
+    if (Array.isArray(result?.segments)) {
+      draftSegments.value = result.segments
+    }
     draftPageCount.value =
       Number(result?.page_count) > 0 ? Number(result.page_count) : draftPageCount.value
     draftChapters.value =

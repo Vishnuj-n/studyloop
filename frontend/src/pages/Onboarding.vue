@@ -245,8 +245,8 @@
           />
           <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
             Get free key:
-            <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq (Recommended Fast) ↗</a> ·
-            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+            <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
+            <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
           </p>
         </div>
 
@@ -299,8 +299,8 @@
             />
             <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
               Get free key:
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio (Recommended Heavy) ↗</a> ·
-              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter ↗</a>
+              <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio (Recommended Heavy) ↗</a> ·
+              <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
             </p>
           </div>
         </div>
@@ -549,6 +549,7 @@ import {
   saveLLMAPIKey,
   getLLMProviderPreset,
   testLLMConnection as testLLMConnectionApi,
+  openURLInBrowser,
 } from '../services/appApi'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 
@@ -559,6 +560,14 @@ const error = ref('')
 const isTestingLLM = ref(false)
 const testStatus = ref(null) // 'success' | 'error' | null
 const testStatusMsg = ref('')
+
+async function openExternalLink(url) {
+  try {
+    await openURLInBrowser(url)
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
 
 const appInitials = computed(() => {
   const name = BRANDING.appName || ''

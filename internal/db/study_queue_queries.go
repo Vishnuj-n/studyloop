@@ -74,7 +74,6 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
 	rows, err := r.db.Query(query)
@@ -111,7 +110,6 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
 	rows, err := r.db.Query(query, activeProfileID, activeProfileID, activeProfileID)
@@ -235,7 +233,6 @@ func (r *Repository) getNextTaskNoProfile(notebookID string) (models.StudyQueueT
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			sq.priority ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`
@@ -279,7 +276,6 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			sq.priority ASC, n.title ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
 	`

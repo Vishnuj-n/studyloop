@@ -171,11 +171,17 @@ Relational structure with JSON extensions, centered on **persistent queue**.
 - Proactive scheduling systems
 - Complex state machines
 
-## 5. Chunking: Sliding Window (Deterministic)
+## 5. Chunking & Ingestion: Sliding Window & Multi-Modal (Deterministic)
 
 ### What
 
-**Sliding Window Chunking** — deterministic, inspectable, sufficient for MVP.
+**Deterministic Chunking & Multi-Modal Ingestion Pipeline** — converts PDFs, structured Markdown, and YouTube video lectures into standard `ExtractedDocument` structures with deterministic session boundaries.
+
+### Ingestion Engines
+
+1. **Standard PDF Ingestion**: `pdfcpu` extracts text from standard PDFs with bookmark-aware or deterministic chapter boundaries.
+2. **Deep Structured PDF Ingestion (`deep_pdf` / PyMuPDF4LLM)**: Pro-tiered extension parser converts complex PDFs into structured Markdown. Preserves tables (`|---|`) and code fences (` ``` `), running heading-aligned markdown chunking (`SplitMarkdownIntoChunks`).
+3. **YouTube Video Lecture Ingestion (`youtube` / `yt-dlp`)**: Free-tiered extension extracts video metadata, timestamped chapters, and subtitles/transcripts, mapping chapters 1:1 into canonical `ExtractedDocument` sections with time markers `(MM:SS - MM:SS)`. Enables embedded playback with timestamp navigation and offline video playback.
 
 ### Why
 
@@ -196,8 +202,8 @@ Intentionally removed:
 - **Code & Markdown**: Tables and code blocks kept intact via markdown chunking
 
 Deterministic chunking pipeline:
-1. Ingest PDF / Markdown / TXT
-2. Split into ~500-word semantic chunks (preserving headings, tables, code)
+1. Ingest PDF / Markdown / YouTube Transcripts
+2. Split into ~500-word semantic chunks (preserving headings, tables, code, or chapter time bounds)
 3. Sliding Window / Heading Chunking → Deterministic boundaries (no AI)
 4. **Insert READING tasks** → Sized for study sessions into `study_queue`
 
@@ -362,9 +368,10 @@ ORDER BY
     WHEN 'EXAMINER' THEN 0
     ELSE 0
   END DESC,
-  n.priority DESC,
-  sq.priority ASC,
-  sq.created_at ASC;
+  COALESCE(n.priority, 5) DESC,
+  (SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+  COALESCE(sq.created_at, '') ASC,
+  sq.id ASC;
 ```
 
 ### How Retention Layer (FSRS) Integrates with Queue
@@ -524,7 +531,7 @@ Acceptable for MVP. Future refactoring may separate generation state to `quiz_se
 - **`sq.priority`** (task field): lower number = higher priority (ASC)
 - **`n.priority`** (notebook field): higher number = more frequent (DESC)
 
-Canonical ORDER BY: `task_type_tier DESC, n.priority DESC, sq.priority ASC, created_at ASC`
+Canonical ORDER BY: `task_type_tier DESC, n.priority DESC, last_completed_at ASC, created_at ASC, id ASC`
 
 | Legacy Priority | Task Type | Source |
 |----------|-----------|--------|

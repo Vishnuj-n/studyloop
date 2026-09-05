@@ -405,7 +405,9 @@ onUnmounted(() => {
 .settings-workspace {
   display: flex;
   margin: -16px -20px;
-  min-height: calc(100vh - 20px);
+  height: calc(100% + 32px);
+  min-height: calc(100vh);
+  overflow: hidden;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);
   background: var(--background);
@@ -421,6 +423,9 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 24px 16px;
   gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .rail-header {
@@ -458,7 +463,8 @@ onUnmounted(() => {
   gap: 2px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
+  border-color: transparent;
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -525,6 +531,8 @@ onUnmounted(() => {
 .settings-content-viewport {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
   padding: 24px 40px 48px;
   display: flex;
   flex-direction: column;
@@ -589,17 +597,24 @@ onUnmounted(() => {
   .settings-workspace {
     flex-direction: column;
     margin: 0;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
   .settings-category-rail {
     width: 100%;
     min-width: 100%;
+    height: auto;
     border-right: none;
     border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.06));
+    overflow: visible;
   }
   .profiles-layout {
     grid-template-columns: 1fr;
   }
   .settings-content-viewport {
+    height: auto;
+    overflow: visible;
     padding: 20px 0;
   }
 }

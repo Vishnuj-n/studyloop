@@ -479,10 +479,9 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
+	// ponytail: try server first, fallback to direct supabase rest if syncURL exists
+	serverURL := study.ResolveCloudServerURL()
 	syncURL := study.ResolveCloudSyncURL(settings.CloudSyncURL)
-	if syncURL == "" {
-		return map[string]interface{}{"error": "Cloud connection URL is not configured"}
-	}
 	anonKey := study.ResolveAnonKey()
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -493,18 +492,6 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 		Username      string `json:"username"`
 	}
 
-	baseURL := syncURL
-	if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
-		baseURL = baseURL[:idx]
-	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
-
-	// 1. Try Go cloud server endpoint /api/auth/login
-	serverURL := study.ResolveCloudServerURL()
-	if serverURL == study.DefaultProductionCloudServerURL && baseURL != "" && !strings.Contains(baseURL, "your-supabase-project") {
-		serverURL = baseURL
-	}
-
 	payload := map[string]interface{}{
 		"username":   username,
 		"password":   password,
@@ -513,21 +500,33 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 	jsonBytes, _ := json.Marshal(payload)
 
 	var authenticated bool
-	req, reqErr := http.NewRequest("POST", fmt.Sprintf("%s/api/auth/login", serverURL), bytes.NewBuffer(jsonBytes))
-	if reqErr == nil {
-		req.Header.Set("Content-Type", "application/json")
-		if anonKey != "" {
-			req.Header.Set("apikey", anonKey)
-		}
-		resp, err := client.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
-					authenticated = true
+	if serverURL != "" {
+		req, reqErr := http.NewRequest("POST", fmt.Sprintf("%s/api/auth/login", serverURL), bytes.NewBuffer(jsonBytes))
+		if reqErr == nil {
+			req.Header.Set("Content-Type", "application/json")
+			if anonKey != "" {
+				req.Header.Set("apikey", anonKey)
+			}
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
+						authenticated = true
+					}
 				}
 			}
 		}
+	}
+
+	baseURL := syncURL
+	if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
+		baseURL = baseURL[:idx]
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	if !authenticated && syncURL == "" {
+		return map[string]interface{}{"error": "Cloud connection URL is not configured"}
 	}
 
 
@@ -620,7 +619,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 	settings.CloudAPIToken = loginResp.SessionToken
 	settings.ClassroomCode = loginResp.ClassroomCode
 	settings.StudentUsername = loginResp.Username
-	if settings.CloudSyncURL == "" {
+	if settings.CloudSyncURL == "" && baseURL != "" {
 		settings.CloudSyncURL = fmt.Sprintf("%s/rest/v1/rpc/handle_cloud_sync", strings.TrimSuffix(baseURL, "/"))
 	}
 

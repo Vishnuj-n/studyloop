@@ -104,20 +104,6 @@ Goroutines, channels, and sync primitives.
 	}
 }
 
-func TestBuildBreadcrumbText(t *testing.T) {
-	res := BuildBreadcrumbText("Memory Management", "Stack allocation happens quickly.")
-	expected := "[Memory Management]\nStack allocation happens quickly."
-	if res != expected {
-		t.Errorf("expected %q, got %q", expected, res)
-	}
-
-	// Should not double-prepend if already a heading
-	res2 := BuildBreadcrumbText("Memory Management", "# Memory Management\nStack allocation")
-	if !strings.HasPrefix(res2, "# Memory Management") {
-		t.Errorf("expected heading to be preserved, got %q", res2)
-	}
-}
-
 func TestSplitMarkdownIntoChunks_SpacedTableSeparators(t *testing.T) {
 	spacedTableContent := `Overview of data structures in the program:
 

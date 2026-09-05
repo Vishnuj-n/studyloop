@@ -9,23 +9,21 @@ import {
 } from './calendarService'
 
 describe('calendarService', () => {
-  it('generates a valid Google Calendar URL with daily recurrence and custom URL', () => {
-    const url = getGoogleCalendarUrl('17:00', '19:00', 'https://my-school.edu/study')
+  it('generates a valid Google Calendar URL with daily recurrence', () => {
+    const url = getGoogleCalendarUrl('17:00', '19:00')
     expect(url).toContain('https://calendar.google.com/calendar/render')
     expect(url).toContain('RRULE%3AFREQ%3DDAILY')
     expect(url).toContain('StudyLoop')
-    expect(url).toContain('https%3A%2F%2Fmy-school.edu%2Fstudy')
   })
 
   it('generates a valid Outlook Web calendar URL with event details', () => {
-    const url = getOutlookCalendarUrl('18:30', '20:00', 'https://custom-notes.com')
+    const url = getOutlookCalendarUrl('18:30', '20:00')
     expect(url).toContain('https://outlook.live.com/calendar/0/deeplink/compose')
     expect(url).toContain('path=%2Fcalendar%2Faction%2Fcompose')
     expect(url).toContain('rru=addevent')
     expect(url).toContain('subject=%F0%9F%93%96+StudyLoop+Daily+Study+Session')
     expect(url).toContain('startdt=')
     expect(url).toContain('enddt=')
-    expect(url).toContain('https%3A%2F%2Fcustom-notes.com')
   })
 
   it('escapes RFC 5545 TEXT characters in strict order (backslashes, commas, semicolons, line breaks)', () => {
@@ -33,8 +31,9 @@ describe('calendarService', () => {
     const escaped = escapeICSText(raw)
     expect(escaped).toBe('Path\\\\to\\\\folder\\, with\\; semi\\nand newlines\\ntoo')
 
-    const ics = generateRoutineICS('17:00', '19:00', 'https://foo.com/a\\b,c;d\ne')
-    expect(ics).toContain('https://foo.com/a\\\\b\\,c\\;d\\ne')
+    const ics = generateRoutineICS('17:00', '19:00')
+    expect(ics).toContain('BEGIN:VCALENDAR')
+    expect(ics).toContain('RRULE:FREQ=DAILY')
   })
 
   it('triggers an .ics download without crashing', () => {
@@ -54,7 +53,7 @@ describe('calendarService', () => {
       return el
     })
 
-    downloadRoutineICS('16:00', '17:30', 'https://portal.study.edu')
+    downloadRoutineICS('16:00', '17:30')
 
     expect(clickSpy).toHaveBeenCalled()
     expect(appendSpy).toHaveBeenCalled()

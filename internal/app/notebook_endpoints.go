@@ -107,36 +107,6 @@ func (a *App) SelectAndUploadDeepStructuredPDF(isPro bool) map[string]interface{
 	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
 }
 
-// UploadDeepStructuredPDFFromPath imports a local PDF directly by path using the deep_pdf structured markdown parser.
-// This is the optimal zero-copy desktop flow that bypasses IPC array buffering.
-func (a *App) UploadDeepStructuredPDFFromPath(sourcePath string, isPro bool) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if a.notebookService == nil {
-		return map[string]interface{}{"error": "notebook service not initialized"}
-	}
-
-	var ext *extension.Extension
-	if a.extManager != nil {
-		ext, _ = a.extManager.Get("deep_pdf")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
-			return map[string]interface{}{
-				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
-				"requires_pro": true,
-			}
-		}
-	}
-
-	uploadResult, err := a.notebookService.SaveUploadedFileFromPath(sourcePath)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return a.finalizeDeepStructuredPDFUpload(uploadResult, ext)
-}
-
 func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResult, ext *extension.Extension) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
@@ -155,6 +125,25 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 	title := strings.TrimSpace(uploadResult.FileName)
 	if title == "" {
 		title = filepath.Base(uploadResult.FilePath)
+	}
+
+	// Check for duplicate document in the current profile (or global)
+	existingNb, findErr := repo.FindNotebookByFileHash(fileHash, profileID)
+	if findErr != nil {
+		utils.Warnf("finalizeDeepStructuredPDFUpload: error checking duplicate file_hash: %v", findErr)
+	} else if existingNb != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"id":            existingNb.ID,
+			"file_name":     existingNb.Title,
+			"file_type":     existingNb.FileType,
+			"page_count":    existingNb.PageCount,
+			"chunk_count":   existingNb.ChunkCount,
+			"status":        existingNb.Status,
+			"duplicate":     true,
+			"existing_id":   existingNb.ID,
+			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+		}
 	}
 
 	// Register notebook immediately in SQLite
@@ -300,6 +289,23 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 		}
 	}
 
+	var downloadQuality string
+	var autoDownload bool
+	if extJSON, err := repo.GetExtensionConfig(); err == nil && extJSON != "" && extJSON != "{}" {
+		var extCfg map[string]map[string]interface{}
+		if err := json.Unmarshal([]byte(extJSON), &extCfg); err == nil {
+			if ytCfg, ok := extCfg["youtube"]; ok {
+				if ad, ok := ytCfg["auto_download"].(bool); ok {
+					autoDownload = ad
+				}
+				if dq, ok := ytCfg["download_quality"].(string); ok {
+					downloadQuality = dq
+				}
+			}
+		}
+	}
+	utils.Infof("[YOUTUBE_INGEST] Settings resolved -> auto_download: %v, download_quality: %q", autoDownload, downloadQuality)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
@@ -362,6 +368,25 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 		}
 	}
 
+	// Trigger non-blocking background video download if enabled
+	if autoDownload {
+		videoDir := filepath.Join(a.notebookUploadDir, "videos")
+		videoFilePath := filepath.Join(videoDir, fmt.Sprintf("%s.mp4", notebookID))
+		if downloadQuality == "" {
+			downloadQuality = "720p"
+		}
+		go func(vURL, outPath, qual string) {
+			dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			defer dlCancel()
+			utils.Infof("[YOUTUBE_CACHE] Starting background video download for %s (%s)...", notebookID, vURL)
+			if err := a.notebookService.DownloadYouTubeVideo(dlCtx, vURL, outPath, qual, a.extRunner, ext); err != nil {
+				utils.Warnf("[YOUTUBE_CACHE] Background video download failed for %s: %v", notebookID, err)
+			} else {
+				utils.Infof("[YOUTUBE_CACHE] Video successfully cached at %s", outPath)
+			}
+		}(cleanURL, videoFilePath, downloadQuality)
+	}
+
 	return map[string]interface{}{
 		"id":            notebookID,
 		"file_name":     title,
@@ -408,6 +433,25 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 	}
 
 	profileID := a.resolveExplicitActiveProfileID()
+	// Check for duplicate document in the current profile (or global)
+	existingNb, findErr := repo.FindNotebookByFileHash(fileHash, profileID)
+	if findErr != nil {
+		utils.Warnf("finalizeNotebookUpload: error checking duplicate file_hash: %v", findErr)
+	} else if existingNb != nil {
+		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
+		return map[string]interface{}{
+			"id":            existingNb.ID,
+			"file_name":     existingNb.Title,
+			"file_type":     existingNb.FileType,
+			"page_count":    existingNb.PageCount,
+			"chunk_count":   existingNb.ChunkCount,
+			"status":        existingNb.Status,
+			"duplicate":     true,
+			"existing_id":   existingNb.ID,
+			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+		}
+	}
+
 	// Create notebook record as unlinked; Sprint 11 uses a draft/confirm ingestion flow.
 	err = repo.CreateNotebook(uploadResult.ID, uploadResult.FileName, uploadResult.FilePath, uploadResult.FileType, "", fileHash, meta.PageCount, profileID)
 	if err != nil {
@@ -496,7 +540,12 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return errResp
 	}
 
-	notebookID = strings.TrimSpace(notebookID)
+	var segments interface{}
+	if strings.EqualFold(strings.TrimSpace(nb.FileType), "youtube") {
+		if segList, err := a.notebookService.GetYouTubeSegmentTimestamps(nb.FilePath); err == nil {
+			segments = segList
+		}
+	}
 
 	// Try to load persisted draft if not regenerating
 	if !regenerate {
@@ -507,13 +556,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		if draftJSON != "" {
 			var persistedDraft models.SyllabusDraft
 			if err := json.Unmarshal([]byte(draftJSON), &persistedDraft); err == nil {
-				return map[string]interface{}{
+				resp := map[string]interface{}{
 					"notebook_id":   notebookID,
 					"page_count":    persistedDraft.PageCount,
 					"chapters":      persistedDraft.Chapters,
 					"status":        "draft_ready",
 					"fallback_used": persistedDraft.FallbackUsed,
 				}
+				if segments != nil {
+					resp["segments"] = segments
+				}
+				return resp
 			}
 		}
 	}
@@ -553,13 +606,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, chapters, fallbackUsed); err != nil {
 			return map[string]interface{}{"error": err.Error()}
 		}
-		return map[string]interface{}{
+		resp := map[string]interface{}{
 			"notebook_id":   notebookID,
 			"page_count":    doc.PageCount,
 			"chapters":      chapters,
 			"status":        "draft_ready",
 			"fallback_used": fallbackUsed,
 		}
+		if segments != nil {
+			resp["segments"] = segments
+		}
+		return resp
 	}
 
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
@@ -579,13 +636,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	if err := persistSyllabusDraft(repo, notebookID, doc.PageCount, result.Chapters, result.FallbackUsed); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{
+	resp := map[string]interface{}{
 		"notebook_id":   notebookID,
 		"page_count":    doc.PageCount,
 		"chapters":      result.Chapters,
 		"status":        "draft_ready",
 		"fallback_used": result.FallbackUsed,
 	}
+	if segments != nil {
+		resp["segments"] = segments
+	}
+	return resp
 }
 
 // AICleanupNotebookSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.

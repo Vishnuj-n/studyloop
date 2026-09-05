@@ -1,7 +1,23 @@
 <template>
   <aside class="panel chat" :class="{ closed: chat.chatCollapsed.value, 'rag-off': !ragEnabled }">
     <div class="chat-head">
-      <h2>AI Chat</h2>
+      <div class="chat-head-title-group">
+        <h2>AI Chat</h2>
+        <router-link
+          v-if="selectedNotebookID"
+          :to="{
+            path: '/tutor',
+            query: {
+              notebookId: selectedNotebookID,
+              topicId: selectedTopicID || '',
+            },
+          }"
+          class="chat-tutor-link"
+          title="Open full-screen Socratic Tutor for this topic"
+        >
+          🧠 Socratic Tutor ↗
+        </router-link>
+      </div>
       <button class="ghost" @click="chat.toggleChat">
         {{ chat.chatCollapsed.value ? 'Expand' : 'Collapse' }}
       </button>
@@ -230,6 +246,35 @@ function handleEnterKey(event) {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.chat-head-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chat-tutor-link {
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 2px 8px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.chat-tutor-link:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border-color: var(--primary);
+}
+
+.chat.closed .chat-tutor-link {
+  display: none;
 }
 
 h2 {

@@ -1,9 +1,30 @@
 <template>
   <div class="youtube-player-container">
-    <div v-if="startSeconds > 0 || endSeconds > 0 || videoId" class="video-timecode-banner">
+    <div v-if="startSeconds > 0 || endSeconds > 0 || videoId || cachedVideoUrl" class="video-timecode-banner">
       <div class="timecode-info">
         <span v-if="startSeconds > 0 || endSeconds > 0" class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
         <span v-if="durationText" class="duration-badge">Duration: {{ durationText }}</span>
+
+        <!-- Source Mode Switcher (Local Offline vs Online YouTube) -->
+        <div v-if="cachedVideoUrl" class="source-toggle-group">
+          <button
+            type="button"
+            class="source-toggle-btn"
+            :class="{ active: sourceMode === 'local' }"
+            @click="sourceMode = 'local'"
+          >
+            💾 Offline Video
+          </button>
+          <button
+            type="button"
+            class="source-toggle-btn"
+            :class="{ active: sourceMode === 'youtube' }"
+            @click="sourceMode = 'youtube'"
+          >
+            🌐 YouTube Stream
+          </button>
+        </div>
+
         <button
           v-if="externalWatchUrl"
           type="button"
@@ -15,11 +36,38 @@
         </button>
         <span v-if="browserError" class="browser-error-msg">⚠️ {{ browserError }}</span>
       </div>
-      <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.</p>
+      <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">
+        This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.
+        <span v-if="sourceMode === 'local'" class="offline-active-hint">(Playing high-speed offline copy from disk)</span>
+      </p>
     </div>
 
     <div class="video-wrapper">
+      <!-- Local Video Player when offline/cached mode -->
+      <video
+        v-if="sourceMode === 'local' && cachedVideoUrl"
+        ref="videoRef"
+        :src="cachedVideoUrl"
+        class="video-element"
+        controls
+        autoplay
+        playsinline
+        @loadedmetadata="onVideoMetadata"
+        @canplay="onVideoMetadata"
+        @timeupdate="onTimeUpdate"
+      >
+        <track
+          v-if="captionTrackUrl"
+          kind="subtitles"
+          srclang="en"
+          label="English"
+          :src="captionTrackUrl"
+        />
+      </video>
+
+      <!-- Remote YouTube Iframe -->
       <iframe
+        v-else
         :src="embedUrl"
         class="youtube-iframe"
         frameborder="0"
@@ -50,12 +98,16 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import MarkdownReader from './MarkdownReader.vue'
 import { openURLInBrowser } from '../services/appApi'
 
 const props = defineProps({
   embedUrl: {
+    type: String,
+    default: '',
+  },
+  cachedVideoUrl: {
     type: String,
     default: '',
   },
@@ -101,6 +153,19 @@ defineEmits(['complete'])
 
 const showTranscript = ref(true)
 const browserError = ref('')
+const videoRef = ref(null)
+// Default to local if cached video is available
+const sourceMode = ref(props.cachedVideoUrl ? 'local' : 'youtube')
+
+watch(
+  () => props.cachedVideoUrl,
+  (newVal, oldVal) => {
+    if (newVal && !oldVal) {
+      sourceMode.value = 'local'
+    }
+  },
+  { immediate: true }
+)
 
 const startSeconds = computed(() => {
   if (props.videoStartSeconds > 0) return props.videoStartSeconds
@@ -122,6 +187,47 @@ const endSeconds = computed(() => {
   }
 })
 
+let userInteractedPastEnd = false
+
+function onVideoMetadata() {
+  if (videoRef.value) {
+    userInteractedPastEnd = false
+    if (startSeconds.value > 0 && Math.abs(videoRef.value.currentTime - startSeconds.value) > 1) {
+      videoRef.value.currentTime = startSeconds.value
+    }
+  }
+}
+
+// ponytail: Auto-pause when chapter ends; user can press play again if they wish to continue
+function onTimeUpdate() {
+  if (!videoRef.value) return
+  const current = videoRef.value.currentTime
+
+  if (endSeconds.value > 0 && current >= endSeconds.value) {
+    if (!videoRef.value.paused && !userInteractedPastEnd) {
+      videoRef.value.pause()
+      userInteractedPastEnd = true
+    }
+  } else if (current < endSeconds.value) {
+    userInteractedPastEnd = false
+  }
+}
+
+watch(
+  [() => startSeconds.value, () => sourceMode.value],
+  async () => {
+    userInteractedPastEnd = false
+    await nextTick()
+    if (sourceMode.value === 'local' && videoRef.value) {
+      if (startSeconds.value > 0) {
+        videoRef.value.currentTime = startSeconds.value
+      } else {
+        videoRef.value.currentTime = 0
+      }
+    }
+  }
+)
+
 function formatTime(totalSeconds) {
   if (!totalSeconds || isNaN(totalSeconds) || totalSeconds < 0) return '0:00'
   const hrs = Math.floor(totalSeconds / 3600)
@@ -133,6 +239,43 @@ function formatTime(totalSeconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+function formatVttTimestamp(totalSeconds) {
+  const secsVal = Math.max(0, Number(totalSeconds) || 0)
+  const hrs = Math.floor(secsVal / 3600)
+  const mins = Math.floor((secsVal % 3600) / 60)
+  const secs = Math.floor(secsVal % 60)
+  const ms = Math.floor((secsVal % 1) * 1000)
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
+}
+
+// ponytail: Slice transcript into clean, bite-sized subtitle cues (1-2 lines at a time)
+const captionTrackUrl = computed(() => {
+  if (!props.transcriptContent) return ''
+  const start = startSeconds.value || 0
+  const end = endSeconds.value > start ? endSeconds.value : start + 600
+  const text = props.transcriptContent.replace(/<[^>]+>/g, '').replace(/[#*`_[\]]/g, '').trim()
+  if (!text) return ''
+
+  const words = text.split(/\s+/)
+  const chunkSize = 7 // 7 words per line looks neat and compact
+  const totalChunks = Math.ceil(words.length / chunkSize)
+  if (totalChunks === 0) return ''
+
+  const chunkDuration = (end - start) / totalChunks
+  let vtt = 'WEBVTT\n\n'
+
+  for (let i = 0; i < totalChunks; i++) {
+    const s1 = start + i * chunkDuration
+    const s2 = Math.min(end, s1 + chunkDuration)
+    const t1 = formatVttTimestamp(s1)
+    const t2 = formatVttTimestamp(s2)
+    const line = words.slice(i * chunkSize, (i + 1) * chunkSize).join(' ')
+    vtt += `${t1} --> ${t2}\n${line}\n\n`
+  }
+
+  return URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+})
+
 const durationText = computed(() => {
   if (!endSeconds.value || endSeconds.value <= startSeconds.value) return ''
   const durSec = endSeconds.value - startSeconds.value
@@ -142,6 +285,7 @@ const durationText = computed(() => {
   if (mins > 0) return `${mins} min`
   return `${secs}s`
 })
+
 const videoId = computed(() => {
   if (!props.embedUrl) return ''
   const match = props.embedUrl.match(/\/embed\/([^/?#]+)/)
@@ -256,6 +400,44 @@ async function openInExternalBrowser() {
   line-height: 1.4;
 }
 
+.source-toggle-group {
+  display: inline-flex;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.source-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--on-surface-variant);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.source-toggle-btn.active {
+  background: var(--primary);
+  color: var(--on-primary, #ffffff);
+}
+
+.source-toggle-btn:not(.active):hover {
+  color: var(--on-surface);
+  background: var(--surface-container-highest);
+}
+
+.offline-active-hint {
+  color: var(--primary);
+  font-weight: 600;
+  margin-left: 6px;
+}
+
 .video-wrapper {
   position: relative;
   width: 100%;
@@ -263,9 +445,10 @@ async function openInExternalBrowser() {
   background: #000000;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(45, 51, 56, 0.08);
 }
 
+.video-element,
 .youtube-iframe {
   position: absolute;
   top: 0;
@@ -273,6 +456,16 @@ async function openInExternalBrowser() {
   width: 100%;
   height: 100%;
   border: none;
+  object-fit: contain;
+}
+
+.video-element::cue {
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.4;
+  font-family: inherit;
+  border-radius: 4px;
 }
 
 .transcript-drawer {

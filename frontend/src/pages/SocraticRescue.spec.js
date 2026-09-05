@@ -10,7 +10,7 @@ const routeQuery = ref({})
 vi.mock('../services/appApi', () => ({
   getTopicSectionsContent: vi.fn(),
   completeSocraticRescue: vi.fn(),
-  GetTaskContext: vi.fn(),
+  getTaskContext: vi.fn(),
   activateTask: vi.fn(),
 }))
 
@@ -41,8 +41,8 @@ describe('SocraticRescue.vue Integration', () => {
       },
     })
 
-    // Mock GetTaskContext
-    appApi.GetTaskContext.mockResolvedValue({
+    // Mock getTaskContext
+    appApi.getTaskContext.mockResolvedValue({
       task: {
         id: 'task-456',
         topic_id: 'topic-123',
@@ -56,7 +56,7 @@ describe('SocraticRescue.vue Integration', () => {
     appApi.activateTask.mockResolvedValue({ error: null })
   })
 
-  it('loads source material and displays generated socratic prompt', async () => {
+  it('loads source material and displays generated socratic prompt in summary and preview', async () => {
     appApi.getTopicSectionsContent.mockResolvedValue({
       content: 'DeepMind builds AI agents.',
     })
@@ -64,13 +64,15 @@ describe('SocraticRescue.vue Integration', () => {
     const wrapper = mount(SocraticRescue)
     await flushPromises()
 
-    expect(appApi.GetTaskContext).toHaveBeenCalledWith('task-456')
+    expect(appApi.getTaskContext).toHaveBeenCalledWith('task-456')
     expect(appApi.activateTask).toHaveBeenCalledWith('task-456')
     expect(appApi.getTopicSectionsContent).toHaveBeenCalledWith('topic-123', 'notebook-789')
-    expect(wrapper.find('.source-text').text()).toBe('DeepMind builds AI agents.')
-    expect(wrapper.find('.prompt-textarea').element.value).toContain(
-      'Socratic Prompt text for AI tutoring.'
-    )
+    expect(wrapper.find('.summary-package-box').exists()).toBe(true)
+
+    // Verify native details preview element
+    const textarea = wrapper.find('.raw-prompt-preview')
+    expect(textarea.exists()).toBe(true)
+    expect(textarea.element.value).toContain('Socratic Prompt text for AI tutoring.')
   })
 
   it('completes socratic rescue session when user clicks I completed the session', async () => {

@@ -600,3 +600,37 @@ func mustNotebookChunkCount(t *testing.T, notebookID string) int {
 	}
 	return len(chunks)
 }
+
+func TestUploadNotebookDuplicateFileDetection(t *testing.T) {
+	initCleanTestDB(t)
+	uploadDir := t.TempDir()
+	service := notebook.NewService(uploadDir)
+	app := &App{repo: testRepo, notebookService: service}
+
+	content := []byte("Sample text for duplicate detection test.")
+
+	// First upload: should succeed and create notebook
+	firstRes := app.UploadNotebook(content, "sample.txt")
+	if firstRes["error"] != nil {
+		t.Fatalf("first upload failed: %v", firstRes["error"])
+	}
+	firstID, ok := firstRes["id"].(string)
+	if !ok || firstID == "" {
+		t.Fatalf("expected valid id from first upload: %#v", firstRes)
+	}
+	if isDup, _ := firstRes["duplicate"].(bool); isDup {
+		t.Fatalf("first upload should not be marked duplicate")
+	}
+
+	// Second upload with identical content: should be detected as duplicate
+	secondRes := app.UploadNotebook(content, "sample_copy.txt")
+	if secondRes["error"] != nil {
+		t.Fatalf("second upload failed: %v", secondRes["error"])
+	}
+	if isDup, _ := secondRes["duplicate"].(bool); !isDup {
+		t.Fatalf("expected second upload to be flagged as duplicate: %#v", secondRes)
+	}
+	if secondRes["existing_id"] != firstID {
+		t.Fatalf("expected existing_id %q, got %q", firstID, secondRes["existing_id"])
+	}
+}

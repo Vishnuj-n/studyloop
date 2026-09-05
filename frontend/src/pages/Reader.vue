@@ -137,6 +137,7 @@
         <YouTubeReader
           v-else-if="reader.isYouTube.value"
           :embed-url="reader.youtubeEmbedUrl.value"
+          :cached-video-url="reader.cachedVideoUrl.value"
           :transcript-content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
           :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"

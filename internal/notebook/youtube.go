@@ -101,3 +101,79 @@ func (s *Service) IngestYouTubeVideo(ctx context.Context, videoURL string, runne
 
 	return doc, &res, nil
 }
+
+// DownloadYouTubeVideo runs yt-dlp to download a video file asynchronously in the background.
+func (s *Service) DownloadYouTubeVideo(ctx context.Context, videoURL string, outputPath string, quality string, runner *extension.Runner, ext *extension.Extension) error {
+	cleanURL := strings.TrimSpace(videoURL)
+	if cleanURL == "" {
+		return fmt.Errorf("video URL cannot be empty")
+	}
+	if runner == nil {
+		runner = extension.NewRunner()
+	}
+
+	entrypoint := "ingest.py"
+	if ext != nil && ext.Entrypoint() != "" {
+		entrypoint = ext.Entrypoint()
+	} else {
+		extDir := extension.ResolveExtensionsDir("")
+		ext = &extension.Extension{
+			Manifest: extension.Manifest{ID: "youtube", Name: "YouTube", Runtime: "python", Entrypoint: "ingest.py"},
+			Dir:      filepath.Join(extDir, "youtube"),
+		}
+	}
+
+	pythonPath, err := extension.FindExtensionPython(ext)
+	if err != nil {
+		return fmt.Errorf("python is required for youtube download: %w", err)
+	}
+
+	outputBytes, err := runner.Run(ctx, ext, pythonPath, entrypoint, cleanURL, "--download-video", outputPath, "--quality", quality)
+	if err != nil {
+		return fmt.Errorf("video download failed: %w (output: %s)", err, string(outputBytes))
+	}
+	return nil
+}
+
+// GetYouTubeSegmentTimestamps reads the saved youtube JSON metadata and returns start/end second bounds for each 1-based segment.
+func (s *Service) GetYouTubeSegmentTimestamps(filePath string) ([]struct {
+	SegmentIndex int    `json:"segment_index"`
+	StartSeconds int    `json:"start_seconds"`
+	EndSeconds   int    `json:"end_seconds"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+}, error) {
+	raw, err := s.readFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var res YouTubeIngestResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, err
+	}
+	segments := make([]struct {
+		SegmentIndex int    `json:"segment_index"`
+		StartSeconds int    `json:"start_seconds"`
+		EndSeconds   int    `json:"end_seconds"`
+		StartTime    string `json:"start_time"`
+		EndTime      string `json:"end_time"`
+	}, len(res.Chapters))
+
+	for i, ch := range res.Chapters {
+		segments[i] = struct {
+			SegmentIndex int    `json:"segment_index"`
+			StartSeconds int    `json:"start_seconds"`
+			EndSeconds   int    `json:"end_seconds"`
+			StartTime    string `json:"start_time"`
+			EndTime      string `json:"end_time"`
+		}{
+			SegmentIndex: i + 1,
+			StartSeconds: ch.StartSeconds,
+			EndSeconds:   ch.EndSeconds,
+			StartTime:    fmt.Sprintf("%02d:%02d", ch.StartSeconds/60, ch.StartSeconds%60),
+			EndTime:      fmt.Sprintf("%02d:%02d", ch.EndSeconds/60, ch.EndSeconds%60),
+		}
+	}
+	return segments, nil
+}
+
