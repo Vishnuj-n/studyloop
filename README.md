@@ -1,90 +1,97 @@
-# StudyLoop
+# 🔄 StudyLoop
 
-StudyLoop is a local-first desktop app that guides learners through a structured study loop.
+### **You shouldn't look at your notes 6 months from now and ask "What was that?"**
 
-It is not a chatbot, PDF viewer, or standalone flashcard app. It is a guided tutor system:
+Most AI study tools give you the illusion of learning. You upload a 300-page textbook to a NotebookLM clone, chat with a bot, generate a neat summary, and feel productive. But passive consumption doesn't create memory. Six months later, when exams hit or you need the knowledge in production, it's completely gone.
 
-1. Read concepts
-2. Understand with contextual AI help
-3. Review with FSRS spaced repetition
+**StudyLoop is not an open-source NotebookLM or a PDF chat sandbox.**  
+It is a local-first **active learning and long-term retention engine** designed so you actually remember what you study months and years down the line.
 
-## Product Overview
+---
 
-### What
+## 🔁 The Knowledge Intake & Retention Loop
 
-- A guided learning workflow driven by a persistent SQLite study queue
-- Local storage for content, embeddings, progress, and scheduling state
-- Topic-scoped AI for explanations and quiz generation only
+StudyLoop turns passive source material (textbooks, lecture videos, markdown notes) into a deterministic daily queue powered by cognitive science:
 
-### Why
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      MULTI-SOURCE KNOWLEDGE INTAKE                      │
+│                                                                         │
+│   📄 Textbooks & PDFs        📝 Markdown Notes       🎥 Video Lectures  │
+│   (Standard & Deep OCR)        (Native .md notes)       (YouTube + yt-dlp)│
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ Auto-Chunk & Seed Queue
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        THE ACTIVE RETENTION LOOP                        │
+│                                                                         │
+│   [ 1. LEARN / READ ] ──▶ Focus-locked reading & timestamped video      │
+│            │                                                            │
+│            ▼                                                            │
+│   [ 2. VERIFY ]       ──▶ AI Checkpoint Quizzes & Socratic Rescue       │
+│            │              (2-strike rule prevents false mastery)        │
+│            ▼                                                            │
+│   [ 3. RETAIN ]       ──▶ FSRS Spaced Repetition Flashcards             │
+│                           (Targeted, long-term memory encoding)         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-- Keep user data private and fully local by default
-- Reduce decision fatigue with a clear daily study flow
-- Keep implementation simple and maintainable for a solo developer
+> **The Core Difference:** NotebookLM is built for *referencing* documents. StudyLoop is built for *encoding knowledge into your long-term memory*.
 
-### How
+---
 
-- Backend and desktop shell: Go + Wails
-- Frontend: Vue 3 multi-page app with left sidebar navigation
-- Local data: SQLite + sqlite-vec embeddings
-- LLM layer: OpenAI-compatible API with dual-tier support (Fast + Heavy)
+## ⚡ Why StudyLoop?
 
-## Core Features
+| Dimension | NotebookLM / PDF Chatbots | Flashcard Apps (Anki) | 🔄 **StudyLoop** |
+| :--- | :--- | :--- | :--- |
+| **Primary Goal** | Passive Q&A / Summaries | Rote flashcard review | **End-to-End Long-Term Retention** |
+| **Supported Sources** | PDFs / Docs | Manual card creation | **PDFs (OCR), Markdown (`.md`), YouTube Lectures** |
+| **Learning Workflow** | Open-ended conversational sandbox | Flashcard queue only | **Deterministic Loop (Read ➔ Quiz ➔ Socratic Rescue ➔ FSRS)** |
+| **Failure Intervention** | None (gives you answers) | Manual card reset | **2-Strike Socratic Rescue (Forces you to understand)** |
+| **Data Privacy** | Cloud-hosted / Vendor AI | Local sync / plugins | **100% Local-First (SQLite + ONNX embeddings + OS Keyring)** |
 
-- **Dashboard:**
-	- Today tasks (due reviews, new topics, generated quizzes)
-	- Progress summary
-	- Starvation protection (review-heavy queues surface reading tasks)
-- **Reader:**
-	- Structured content view with page locking
-	- Ask AI panel (primary placement)
-	- Trust-based reading completion (no surveillance)
-- **Quiz:**
-	- Topic-based quiz sets generated from learned content
-	- Synchronous LLM generation with loading state
-	- Pass/fail evaluation with reread remediation
-- **Flashcards:**
-	- FSRS spaced repetition: Again, Hard, Good, Easy
-	- Queue-driven review sessions (one task per chunk)
-	- Explain action (secondary Ask AI placement)
-- **Socratic Tutor:**
-	- Guided questioning mode scoped to current topic
-	- 2-strike rescue pipeline for struggling topics
-	- Enter to send, Shift+Enter for new line
-- **SocraticRescue (Concept Rescue):**
-	- 2-strike rescue pipeline for repeated quiz failures
-	- Pre-engineered Socratic prompt for external LLM copy-to-clipboard
-	- Queue-blocking until rescue session completed
-- **Examiner (Written Assessment):**
-	- Advanced assessment tasks for mastery verification
-	- Notebook selection and scoring
-- **Notebooks:**
-	- Bookshelf for managing uploaded textbooks
-	- Batch PDF upload with chapter extraction
-	- Per-notebook priority (1-10 scale)
-- **Settings:**
-	- Dual-tier LLM config (Fast + Heavy) with provider presets (Groq, OpenAI, OpenRouter, Custom)
-	- API key storage via OS keyring
-	- RAG toggles and configuration
-	- Theme selector (Light Classic, Warm Sepia, Deep Indigo Night, Nord Frost, Forest Emerald)
-	- Study profiles with deadlines
-	- Cloud sync (URL + token)
-- **Onboarding:**
-	- Multi-step first-run setup wizard
+---
 
-## Local-First and Offline Behavior
+## 🌟 Core Pillars & Features
 
-**Works offline:**
+### 1. Multi-Source Knowledge Ingestion
+- **📄 Textbooks & PDFs:** Standard layout extraction plus Deep Structured OCR (`deep_pdf`) with heading preservation.
+- **📝 Markdown Notes (`.md`):** Ingest raw markdown documentation, obsidian notes, or course notes with table and code-block integrity.
+- **🎥 YouTube Video Lectures:** Paste video URLs to extract timestamped chapters, synchronized transcripts, and offline cached playback via `yt-dlp`.
 
-- Reading
-- FSRS review
-- Scheduling
-- Local progress and content access
+### 2. Deterministic Study Queue
+- **Zero Decision Fatigue:** The SQLite-backed `study_queue` serves your next highest-priority task automatically.
+- **Multi-Notebook Priorities:** Balance multiple subjects with configurable notebook weights (1–10).
+- **Starvation Protection:** Ensures new reading tasks never get indefinitely buried beneath heavy review loads.
 
-**Requires internet:**
+### 3. Mastery Verification & Socratic Rescue
+- **Checkpoint Quizzes:** Dynamic AI-generated quizzes immediately following reading sessions.
+- **2-Strike Concept Rescue:** If you fail a quiz twice, the queue blocks progression and launches a Socratic intervention to fix the conceptual flaw before letting you advance.
+- **Examiner Assessments:** Open-ended written mastery assessments evaluated with rigorous criteria.
 
-- Ask AI
-- Quiz generation
+### 4. Spaced Repetition (FSRS Engine)
+- **Modern Spaced Repetition:** Powered by the state-of-the-art **FSRS-4** algorithm (Free Spaced Repetition Scheduler), outperforming legacy SM-2.
+- **Automatic Deck Generation:** Flashcards generated directly from your ingested chapters and reading blocks.
+- **Integrated Explanations:** In-card AI deep-dives for any flashcard concept you struggle with.
+
+### 5. Local-First, Private & Fast
+- **Local Data & Embeddings:** SQLite database (`Studyloop.db`) with local ONNX INT8 vector embeddings (`sqlite-vec`).
+- **Dual-Tier LLM Architecture:** Route quick quizzes through ultra-fast models (e.g. Groq / Llama 3) and deep Socratic evaluations through reasoning models (OpenAI / OpenRouter).
+- **Secure Key Storage:** API credentials stored securely in your operating system's native keyring.
+
+---
+
+## 📡 Local-First and Offline Behavior
+
+**Works 100% Offline:**
+- Reading textbook & markdown chunks
+- Video playback (cached YouTube lectures)
+- FSRS flashcard reviews & scheduling
+- Queue progression, notes, and local vector searches
+
+**Requires Internet:**
+- AI Socratic tutor & Ask-AI queries
+- Dynamic quiz generation & Examiner grading
 
 **Failure rule:**
 
