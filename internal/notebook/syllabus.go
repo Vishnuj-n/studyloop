@@ -362,4 +362,3 @@ func firstN(text string, n int) string {
 	}
 	return text[:n]
 }
-

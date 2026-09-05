@@ -244,7 +244,7 @@ import {
   getUserSettings,
   completeSocraticRescue,
   activateTask,
-  GetTaskContext,
+  getTaskContext,
 } from '../services/appApi'
 import { renderMarkdown } from '../services/markdown'
 
@@ -349,7 +349,7 @@ onMounted(async () => {
         globalError.value = activate.error
         return
       }
-      const context = await GetTaskContext(taskId.value)
+      const context = await getTaskContext(taskId.value)
       if (context?.error) {
         globalError.value = context.error
         return

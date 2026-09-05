@@ -143,7 +143,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   getTopicSectionsContent,
   completeSocraticRescue,
-  GetTaskContext,
+  getTaskContext,
   activateTask,
 } from '../services/appApi'
 
@@ -178,7 +178,7 @@ onMounted(async () => {
 
   try {
     loading.value = true
-    const contextRes = await GetTaskContext(taskID.value)
+    const contextRes = await getTaskContext(taskID.value)
     if (contextRes?.error) {
       error.value = `Failed to load task context: ${contextRes.error}`
       loading.value = false

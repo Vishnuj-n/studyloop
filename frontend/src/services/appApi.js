@@ -69,9 +69,11 @@ export function getTask(taskID) {
   return appBridge().GetTask(taskID)
 }
 
-export function GetTaskContext(taskID) {
+export function getTaskContext(taskID) {
   return appBridge().GetTaskContext(taskID)
 }
+export const GetTaskContext = getTaskContext
+
 
 export function generateQuizForPageRange(notebookID, startPage, endPage) {
   return appBridge().GenerateQuizForPageRange(notebookID, startPage, endPage)
