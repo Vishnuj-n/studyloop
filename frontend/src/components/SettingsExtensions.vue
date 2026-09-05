@@ -90,6 +90,10 @@
           <option value="480p">480p (Low bandwidth)</option>
         </select>
       </div>
+
+      <div v-if="configError" class="error-banner">
+        {{ configError }}
+      </div>
     </article>
   </div>
 </template>
@@ -105,7 +109,7 @@ defineProps({
   },
 })
 
-const { extensionConfig, setExtensionSetting } = useExtensions()
+const { extensionConfig, configError, setExtensionSetting } = useExtensions()
 
 const audioVoice = computed({
   get: () => extensionConfig.value?.audio_overview?.voice || 'en-US-ChristopherNeural',
@@ -126,7 +130,7 @@ const youtubeAutoDownload = computed({
   get: () => Boolean(extensionConfig.value?.youtube?.auto_download),
   set: (val) => {
     console.log('[SettingsExtensions] Setting youtube.auto_download:', val)
-    setExtensionSetting('youtube', 'auto_download', Boolean(val))
+    return setExtensionSetting('youtube', 'auto_download', Boolean(val))
   },
 })
 
@@ -134,7 +138,7 @@ const youtubeQuality = computed({
   get: () => extensionConfig.value?.youtube?.download_quality || '720p',
   set: (val) => {
     console.log('[SettingsExtensions] Setting youtube.download_quality:', val)
-    setExtensionSetting('youtube', 'download_quality', val)
+    return setExtensionSetting('youtube', 'download_quality', val)
   },
 })
 </script>
@@ -224,6 +228,16 @@ select:focus {
   font-size: 12px;
   color: var(--muted-text);
   line-height: 1.4;
+}
+
+.error-banner {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 </style>
 

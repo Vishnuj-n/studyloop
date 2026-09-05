@@ -597,17 +597,24 @@ onUnmounted(() => {
   .settings-workspace {
     flex-direction: column;
     margin: 0;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
   .settings-category-rail {
     width: 100%;
     min-width: 100%;
+    height: auto;
     border-right: none;
     border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.06));
+    overflow: visible;
   }
   .profiles-layout {
     grid-template-columns: 1fr;
   }
   .settings-content-viewport {
+    height: auto;
+    overflow: visible;
     padding: 20px 0;
   }
 }

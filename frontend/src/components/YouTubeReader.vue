@@ -159,8 +159,8 @@ const sourceMode = ref(props.cachedVideoUrl ? 'local' : 'youtube')
 
 watch(
   () => props.cachedVideoUrl,
-  (newVal) => {
-    if (newVal && !sourceMode.value) {
+  (newVal, oldVal) => {
+    if (newVal && !oldVal) {
       sourceMode.value = 'local'
     }
   },
@@ -239,6 +239,15 @@ function formatTime(totalSeconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+function formatVttTimestamp(totalSeconds) {
+  const secsVal = Math.max(0, Number(totalSeconds) || 0)
+  const hrs = Math.floor(secsVal / 3600)
+  const mins = Math.floor((secsVal % 3600) / 60)
+  const secs = Math.floor(secsVal % 60)
+  const ms = Math.floor((secsVal % 1) * 1000)
+  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
+}
+
 // ponytail: Slice transcript into clean, bite-sized subtitle cues (1-2 lines at a time)
 const captionTrackUrl = computed(() => {
   if (!props.transcriptContent) return ''
@@ -258,8 +267,8 @@ const captionTrackUrl = computed(() => {
   for (let i = 0; i < totalChunks; i++) {
     const s1 = start + i * chunkDuration
     const s2 = Math.min(end, s1 + chunkDuration)
-    const t1 = (formatTime(s1).length <= 4 ? '00:0' : '00:') + formatTime(s1) + '.000'
-    const t2 = (formatTime(s2).length <= 4 ? '00:0' : '00:') + formatTime(s2) + '.000'
+    const t1 = formatVttTimestamp(s1)
+    const t2 = formatVttTimestamp(s2)
     const line = words.slice(i * chunkSize, (i + 1) * chunkSize).join(' ')
     vtt += `${t1} --> ${t2}\n${line}\n\n`
   }
@@ -436,7 +445,7 @@ async function openInExternalBrowser() {
   background: #000000;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(45, 51, 56, 0.08);
 }
 
 .video-element,

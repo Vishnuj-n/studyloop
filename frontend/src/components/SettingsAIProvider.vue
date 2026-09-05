@@ -200,7 +200,7 @@ async function openExternalLink(url) {
   try {
     await openURLInBrowser(url)
   } catch {
-    window.open(url, '_blank')
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 }
 </script>

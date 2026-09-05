@@ -81,6 +81,8 @@ async function refreshExtensionConfig() {
   }
 }
 
+const configError = ref('')
+
 export function useExtensions() {
   const clerkAuth = useClerkAuth()
   const isPro = computed(() => clerkAuth.isPro.value)
@@ -132,14 +134,19 @@ export function useExtensions() {
     if (!extensionConfig.value[extensionId]) {
       extensionConfig.value[extensionId] = {}
     }
+    const priorValue = extensionConfig.value[extensionId][key]
     extensionConfig.value[extensionId][key] = value
+    configError.value = ''
     console.log(`[useExtensions] Updating config for [${extensionId}.${key}] =>`, value)
     try {
       const payload = JSON.stringify(extensionConfig.value)
       await saveExtensionConfig(payload)
       console.log(`[useExtensions] Successfully persisted extension config:`, extensionConfig.value)
     } catch (err) {
+      extensionConfig.value[extensionId][key] = priorValue
+      configError.value = err?.message || String(err)
       console.error(`[useExtensions] Failed to save extension setting [${extensionId}.${key}]:`, err)
+      throw err
     }
   }
 
@@ -147,6 +154,7 @@ export function useExtensions() {
     enabledMap,
     extensionsMetadata,
     extensionConfig,
+    configError,
     isPro,
     isEnabled,
     isExtensionActive,

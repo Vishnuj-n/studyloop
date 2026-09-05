@@ -498,22 +498,6 @@ h1 {
   flex: 1;
 }
 
-.package-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px dashed var(--outline-variant);
-  padding-bottom: 10px;
-}
-
-.package-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-text);
-}
-
 .preview-toggle-btn {
   background: transparent;
   border: 1px solid var(--outline-variant);
