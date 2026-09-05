@@ -1,6 +1,6 @@
 # 🔄 StudyLoop
 
-### **You shouldn't look at your notes 6 months from now and ask "What was that?"**
+## **You shouldn't look at your notes 6 months from now and ask "What was that?"**
 
 Most AI study tools give you the illusion of learning. You upload a 300-page textbook to a NotebookLM clone, chat with a bot, generate a neat summary, and feel productive. But passive consumption doesn't create memory. Six months later, when exams hit or you need the knowledge in production, it's completely gone.
 
@@ -13,7 +13,7 @@ It is a local-first **active learning and long-term retention engine** designed 
 
 StudyLoop turns passive source material (textbooks, lecture videos, markdown notes) into a deterministic daily queue powered by cognitive science:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      MULTI-SOURCE KNOWLEDGE INTAKE                      │
 │                                                                         │

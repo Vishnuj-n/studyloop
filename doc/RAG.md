@@ -101,7 +101,7 @@ No global knowledge search. No chat memory. No agent planning. No background aut
 1. Tokenize with `asset/tokenizer.json` (Hugging Face format)
 2. Generate embeddings with ONNX (`yalue/onnxruntime_go`, `asset/model_int8.onnx`):
    - Single inference: `Embed(text)`
-   - Mini-batch inference: `EmbedBatch(texts)` with dynamic mini-batch padding (default batch size: 32 chunks)
+   - Mini-batch inference: `EmbedBatch(texts)` with dynamic mini-batch padding (batch size selected by caller)
 3. Persist: chunk text in relational tables, vectors in sqlite-vec virtual table
 4. Retrieve top-k: embed query → pre-filter by topic_id/page_num → hybrid vector + lexical search via Reciprocal Rank Fusion (RRF, K=60)
 5. Build token-budgeted prompt → call LLM once → return answer + citations

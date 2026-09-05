@@ -158,14 +158,14 @@ The optimal embedding batch strategy also depends on the **total chunk count and
 * **Small Articles / Syllabus (< 10 pages, < 16 chunks)**:
   - Mini-batching at **Batch = 4 to 8** runs immediately (`~10–20s total`) without memory spiking or thread coordination delay.
 * **Full Textbooks (300 to 1,000+ pages, 300–800 chunks)**:
-  - **Batch = 32 to 64** is required to amortize per-batch graph allocation and memory copies, yielding a **~9x speedup** (`333 words/sec` vs `37 words/sec` for unbatched).
+  - **Batch = 32 to 64 (historical benchmark)**: Demonstrated a **~9x speedup** (`333 words/sec` vs `37 words/sec` for unbatched) in unconstrained standalone benchmarks, though current production limits background indexing batches to 4–16 to avoid foreground thread contention.
 
 ### 📊 Results Matrix (Evaluated on 64 Chunks / 9,664 Words across 16 CPU Threads)
 
 | Batch Size | Total Time (s) | Chunks / sec | Words / sec | Speedup | Dimensions | Best Fit by Book Size |
 | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Batch = 64** | **`29.024s`** | **`2.2 c/s`** | **`333.0 w/s`** | 🏆 **`8.97x`** | 768-d | **🏆 Large Textbooks (300–1,000+ pages)** |
-| **Batch = 32** | `34.620s` | `1.8 c/s` | `279.1 w/s` | `7.52x` | 768-d | **Medium Coursebooks (50–300 pages)** |
+| **Batch = 64** | **`29.024s`** | **`2.2 c/s`** | **`333.0 w/s`** | 🏆 **`8.97x`** | 768-d | **🏆 Large Textbooks (300–1,000+ pages) [Historical Benchmark]** |
+| **Batch = 32** | `34.620s` | `1.8 c/s` | `279.1 w/s` | `7.52x` | 768-d | **Medium Coursebooks (50–300 pages) [Historical Benchmark]** |
 | **Batch = 16** | `45.540s` | `1.4 c/s` | `212.2 w/s` | `5.72x` | 768-d | Short Chapters / Booklets |
 | **Batch = 8** | `97.948s` | `0.7 c/s` | `98.7 w/s` | `2.66x` | 768-d | Small Syllabus / Articles (<15 pages) |
 | **Batch = 4** | `136.168s` | `0.5 c/s` | `71.0 w/s` | `1.91x` | 768-d | Micro-extracts / Single Page |
@@ -174,7 +174,7 @@ The optimal embedding batch strategy also depends on the **total chunk count and
 ### ⚡ Architectural Decision & Dynamic Scaling
 * **Background Worker Queue (`doc/solutions/21062026_background_rag.md`)**:
   - Embedding runs in the background `VectorIndexQueue` without blocking the desktop UI.
-  - Chunks are dispatched in mini-batches dynamically bounded by `min(chunkCount, 32)` or `64`, ensuring rapid feedback on small assignments while achieving near-instant insertion rates (>100k rows/s) into SQLite WAL via `UpsertChunkVectorsBatch`.
+  - Chunks are dispatched in mini-batches dynamically bounded by `4–16` (`runtime.NumCPU() / 2` clamped), ensuring rapid feedback on small assignments while achieving near-instant insertion rates (>100k rows/s) into SQLite WAL via `UpsertChunkVectorsBatch`.
 
 
 

@@ -368,9 +368,9 @@ ORDER BY
     WHEN 'EXAMINER' THEN 0
     ELSE 0
   END DESC,
-  n.priority DESC,
+  COALESCE(n.priority, 5) DESC,
   (SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-  sq.created_at ASC,
+  COALESCE(sq.created_at, '') ASC,
   sq.id ASC;
 ```
 

@@ -176,9 +176,6 @@ Ingests YouTube video URL or ID via the `youtube` extension (`yt-dlp`), extracts
 ### SelectAndUploadDeepStructuredPDF
 Performs deep structured PDF ingestion via the `deep_pdf` (`fast_pdf` / PyMuPDF4LLM) engine. Converts documents to structured Markdown, preserving tables and code blocks, and runs markdown-aware semantic chunking.
 
-### DownloadYouTubeVideo
-Runs background video download via `yt-dlp` using configured quality settings, enabling offline local video playback in `YouTubeReader`.
-
 ### GetYouTubeSegmentTimestamps
 Reads persisted YouTube metadata to extract start and end timestamp boundaries for chapter navigation.
 

@@ -19,17 +19,17 @@
 - Replaced sequential chunk iteration with mini-batch processing using hardware-adaptive sizing:
   ```go
   func optimalBatchSize() int {
-      bs := runtime.NumCPU() * 2
-      if bs < 8 {
-          return 8
+      bs := runtime.NumCPU() / 2
+      if bs < 4 {
+          return 4
       }
-      if bs > 32 {
-          return 32
+      if bs > 16 {
+          return 16
       }
       return bs
   }
   ```
-- **Clamp Safety**: Guarantees a minimum batch of 8 on budget dual-core laptops for throughput, while capping at 32 to prevent CPU L3 cache thrashing and memory spikes on high-core workstations.
+- **Clamp Safety**: Guarantees a minimum batch of 4 on budget dual-core laptops for throughput, while capping at 16 to prevent CPU L3 cache thrashing and memory spikes on high-core workstations.
 - **Fault-Tolerant Fallback**: If a batch encounters an inference error, it automatically falls back to 1-by-1 embedding for that specific mini-batch to isolate any corrupt chunk without failing book ingestion.
 
 ### 3. Full Hybrid Reciprocal Rank Fusion (`internal/retrieval/engine.go`)
