@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -163,16 +164,16 @@ func computeCurrentStreak(nowClient time.Time, dateSet map[string]bool) int {
 
 // mapTaskError translates repository errors into API response maps.
 func mapTaskError(err error) map[string]interface{} {
-	switch err {
-	case db.ErrTaskNotFound:
+	switch {
+	case errors.Is(err, db.ErrTaskNotFound):
 		return map[string]interface{}{"error": "ErrNotFound", "code": 404}
-	case db.ErrTaskNotActive:
+	case errors.Is(err, db.ErrTaskNotActive):
 		return map[string]interface{}{"error": "ErrTaskNotActive", "code": 409}
-	case db.ErrTaskNotPending:
+	case errors.Is(err, db.ErrTaskNotPending):
 		return map[string]interface{}{"error": "ErrTaskNotPending", "code": 409}
-	case db.ErrReviewLinkNotPending:
+	case errors.Is(err, db.ErrReviewLinkNotPending):
 		return map[string]interface{}{"error": "ErrCardAlreadyReviewed", "code": 409}
-	case db.ErrReviewSessionOpen:
+	case errors.Is(err, db.ErrReviewSessionOpen):
 		return map[string]interface{}{"error": "ErrReviewSessionIncomplete", "code": 409}
 	default:
 		return map[string]interface{}{"error": err.Error()}
@@ -430,12 +431,24 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	}
 	todayCompleted := completedToday > 0
 
+	prof, errProf := repo.GetGamificationProfile()
+	shieldActive := false
+	streakFreezes := 0
+	if errProf == nil && prof != nil {
+		streakFreezes = prof.StreakFreezesOwned
+		if streakFreezes > 0 && !todayCompleted && currentStreak > 0 {
+			shieldActive = true
+		}
+	}
+
 	return map[string]interface{}{
-		"current_streak":  currentStreak,
-		"longest_streak":  longestStreak,
-		"active_dates":    activeDates,
-		"today_completed": todayCompleted,
-		"completed_today": completedToday,
+		"current_streak":       currentStreak,
+		"longest_streak":       longestStreak,
+		"active_dates":         activeDates,
+		"today_completed":      todayCompleted,
+		"completed_today":      completedToday,
+		"shield_active":        shieldActive,
+		"streak_freezes_owned": streakFreezes,
 	}
 }
 
@@ -609,6 +622,3 @@ func (a *App) BuyStreakFreeze() map[string]interface{} {
 		"profile": prof,
 	}
 }
-
-
-

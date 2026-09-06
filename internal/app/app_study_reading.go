@@ -215,5 +215,9 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	}
 
 	utils.Warnf("[COMPLETE_SESSION] CompleteReading TransitionTask result taskID=%s quizTaskID=%s", taskID, transitionRes.NextTaskID)
-	return map[string]interface{}{"ok": true, "quiz_task_id": transitionRes.NextTaskID}
+	return map[string]interface{}{
+		"ok":           true,
+		"quiz_task_id": transitionRes.NextTaskID,
+		"rewards":      transitionRes.Rewards,
+	}
 }

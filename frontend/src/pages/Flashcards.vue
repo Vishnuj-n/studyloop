@@ -243,13 +243,6 @@
     </section>
   </StudyPageLayout>
 
-  <!-- Reward Mystery Chest Modal (outside layout; Teleport renders to body) -->
-  <MysteryChestModal
-    v-if="earnedChest"
-    :box="earnedChest"
-    :new-title="earnedNewTitle"
-    @close="onChestModalClose"
-  />
 </template>
 
 <script setup>
@@ -268,7 +261,6 @@ import {
 import BaseButton from '../components/BaseButton.vue'
 import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import MysteryChestModal from '../components/MysteryChestModal.vue'
 import { playCardRatingTick } from '../utils/audioJuice'
 
 const route = useRoute()
@@ -284,8 +276,6 @@ const reviewIndex = ref(0)
 const reviewing = ref(false)
 const flipped = ref(false)
 const isSubmittingReview = ref(false)
-const earnedChest = ref(null)
-const earnedNewTitle = ref('')
 const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const reviewTaskID = ref('')
@@ -378,19 +368,14 @@ async function handleQueueCompletion() {
     return false
   }
 
-  if (completeRes?.rewards?.loot_box) {
-    earnedChest.value = completeRes.rewards.loot_box
-    earnedNewTitle.value = completeRes.rewards.new_title_unlocked || ''
-    return true
+  if (completeRes?.rewards) {
+    window.dispatchEvent(
+      new CustomEvent('study-reward-earned', { detail: { rewards: completeRes.rewards } })
+    )
   }
 
   router.push('/dashboard')
   return true
-}
-
-function onChestModalClose() {
-  earnedChest.value = null
-  router.push('/dashboard')
 }
 
 async function rate(ratingKey) {

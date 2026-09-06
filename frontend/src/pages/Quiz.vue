@@ -305,13 +305,6 @@
     </form>
   </StudyPageLayout>
 
-  <!-- Reward Mystery Chest Modal (outside layout; Teleport renders to body) -->
-  <MysteryChestModal
-    v-if="earnedChest"
-    :box="earnedChest"
-    :new-title="earnedNewTitle"
-    @close="onChestModalClose"
-  />
 </template>
 
 <script setup>
@@ -329,7 +322,6 @@ import {
   getUserSettings,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import MysteryChestModal from '../components/MysteryChestModal.vue'
 import { playCorrectChime, playIncorrectThud } from '../utils/audioJuice'
 
 const route = useRoute()
@@ -345,8 +337,6 @@ const answers = ref({})
 const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const result = ref(null)
-const earnedChest = ref(null)
-const earnedNewTitle = ref('')
 const generatingFlashcards = ref(false)
 
 const isMilestoneExam = ref(false)
@@ -475,6 +465,11 @@ async function submitMilestone() {
     if (res && res.error) {
       error.value = res.error
     } else {
+      if (res?.rewards) {
+        window.dispatchEvent(
+          new CustomEvent('study-reward-earned', { detail: { rewards: res.rewards } })
+        )
+      }
       router.push('/dashboard')
     }
   } catch (err) {
@@ -578,9 +573,10 @@ async function submitQuiz() {
 
     if (result.value?.passed) {
       playCorrectChime()
-      if (response?.rewards?.loot_box) {
-        earnedChest.value = response.rewards.loot_box
-        earnedNewTitle.value = response.rewards.new_title_unlocked || ''
+      if (response?.rewards) {
+        window.dispatchEvent(
+          new CustomEvent('study-reward-earned', { detail: { rewards: response.rewards } })
+        )
       }
     } else {
       playIncorrectThud()
@@ -631,6 +627,11 @@ async function handleContinue() {
         result.value.flashcards_pending = false
         return
       } else {
+        if (genResult?.rewards) {
+          window.dispatchEvent(
+            new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+          )
+        }
         // Update result with generated counts for dashboard banner
         result.value.flashcards_generated = genResult?.cards_scheduled || 0
         result.value.flashcards_pending = false
@@ -654,10 +655,6 @@ async function handleContinue() {
     query.highlight = result.value.reread_task_id
   }
   router.push({ path: '/dashboard', query })
-}
-
-function onChestModalClose() {
-  earnedChest.value = null
 }
 
 async function handleGoToExaminer() {

@@ -19,7 +19,14 @@
       <nav class="menu">
         <RouterLink v-for="item in topItems" :key="item.to" :to="item.to" class="menu-item">
           <span class="menu-icon" aria-hidden="true">{{ item.icon }}</span>
-          {{ item.label }}
+          <span class="menu-label">{{ item.label }}</span>
+          <span
+            v-if="item.to === '/rewards' && pendingChestsCount > 0"
+            class="unopened-chests-badge"
+            title="Unopened mystery chests waiting in vault"
+          >
+            🎁 {{ pendingChestsCount }}
+          </span>
         </RouterLink>
       </nav>
     </div>
@@ -115,11 +122,18 @@ async function handleSync() {
   }
 }
 
+const pendingChestsCount = ref(0)
+
 async function loadGamification() {
   try {
     const res = await getGamificationState()
     if (res?.profile) {
       gamification.value = res.profile
+    }
+    if (Array.isArray(res?.pending_chests)) {
+      pendingChestsCount.value = res.pending_chests.length
+    } else {
+      pendingChestsCount.value = 0
     }
   } catch (err) {
     console.warn('[SIDEBAR] Failed to load gamification profile:', err)
@@ -271,6 +285,36 @@ const topItems = [
   color: color-mix(in srgb, var(--muted-text) 65%, var(--on-surface));
   font-size: 12px;
   line-height: 1;
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.unopened-chests-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  animation: chest-pulse 2.4s infinite ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.2;
+}
+
+@keyframes chest-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.25);
+  }
 }
 
 .menu-item:hover {

@@ -104,6 +104,13 @@
       @claimed="onChestClaimed"
       @close="activeChest = null"
     />
+
+    <!-- Streak Freeze Acquired Modal -->
+    <StreakFreezeModal
+      v-if="showFreezeModal"
+      :total-freezes="profile.streak_freezes_owned"
+      @close="showFreezeModal = false"
+    />
   </StudyPageLayout>
 </template>
 
@@ -112,9 +119,11 @@ import { ref, computed, onMounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { getGamificationState, buyStreakFreeze } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
+import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 
 const loading = ref(true)
 const buying = ref(false)
+const showFreezeModal = ref(false)
 const profile = ref({
   total_xp: 0,
   coins: 0,
@@ -183,6 +192,7 @@ async function handleBuyStreakFreeze() {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
       profile.value = res.profile
+      showFreezeModal.value = true
       window.dispatchEvent(new Event('gamification-updated'))
     }
   } catch (err) {
