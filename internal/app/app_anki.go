@@ -172,6 +172,12 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		}
 		_ = repo.UpdateNotebookStatus(finalNotebookID, "ready")
 		_ = repo.LinkNotebookTopics(finalNotebookID, []string{finalTopicID})
+
+		// Auto-activate in the active lane if the profile has less than 4 active notebooks
+		// ponytail: matches textbook ingestion behavior
+		if activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID); err == nil && activeCount < 4 {
+			_ = repo.UpdateNotebookStudyStatus(finalNotebookID, "active")
+		}
 	}
 
 	// Prepare cards and initial FSRS states

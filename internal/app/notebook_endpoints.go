@@ -540,6 +540,12 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return errResp
 	}
 
+	if strings.EqualFold(strings.TrimSpace(nb.FileType), "anki") {
+		return map[string]interface{}{
+			"error": "Anki decks are standalone flashcard decks and do not require chapter ingestion.",
+		}
+	}
+
 	var segments interface{}
 	if strings.EqualFold(strings.TrimSpace(nb.FileType), "youtube") {
 		if segList, err := a.notebookService.GetYouTubeSegmentTimestamps(nb.FilePath); err == nil {

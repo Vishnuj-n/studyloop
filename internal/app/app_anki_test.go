@@ -8,6 +8,7 @@ import (
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/notebook"
 )
 
 func TestImportAnkiDeckStandalone(t *testing.T) {
@@ -18,8 +19,9 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 	}
 	defer func() { _ = repo.Close() }()
 
-	tempDir := t.TempDir()
-	mockApkg := filepath.Join(tempDir, "sample.apkg")
+	uploadDir := t.TempDir()
+	externalDir := t.TempDir()
+	mockApkg := filepath.Join(externalDir, "sample.apkg")
 	if err := os.WriteFile(mockApkg, []byte("fake-anki-content"), 0o644); err != nil {
 		t.Fatalf("failed to write mock apkg: %v", err)
 	}
@@ -70,7 +72,7 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 	// Create test App to verify DeleteNotebook safety
 	app := &App{
 		repo:            repo,
-		notebookService: nil,
+		notebookService: notebook.NewService(uploadDir),
 	}
 	// Verify deleting notebook leaves the external mockApkg untouched
 	delResp := app.DeleteNotebook("nb-anki")

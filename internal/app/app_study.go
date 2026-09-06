@@ -456,6 +456,10 @@ func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interfa
 			pendingNotebookError = err.Error()
 		} else {
 			for _, nb := range notebooks {
+				// ponytail: anki decks are standalone flashcard decks without chapter extraction or reading chunks
+				if nb.FileType == "anki" {
+					continue
+				}
 				if (nb.ChunkCount == 0 || nb.Status == "uploaded" || nb.Status == "draft_ready" || nb.Status == "") && nb.Status != "indexing" && nb.Status != "indexed" && nb.Status != "failed" {
 					pendingNotebook = map[string]interface{}{
 						"id":              nb.ID,
