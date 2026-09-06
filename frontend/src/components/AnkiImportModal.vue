@@ -79,8 +79,8 @@
           </div>
         </div>
 
-        <div v-if="error" class="error-box">
-          {{ error }}
+        <div v-if="error || localError" class="error-box">
+          {{ error || localError }}
         </div>
 
         <div v-if="isLoading" class="loading-box">
@@ -128,6 +128,7 @@ const selectedFilePath = ref('')
 const selectedFileName = ref('')
 const targetMode = ref('standalone')
 const selectedNotebookID = ref('')
+const localError = ref('')
 
 const canSubmit = computed(() => {
   if (!selectedFilePath.value) return false
@@ -143,12 +144,14 @@ watch(
       selectedFileName.value = ''
       targetMode.value = 'standalone'
       selectedNotebookID.value = ''
+      localError.value = ''
     }
   }
 )
 
 async function handleBrowseFile() {
   try {
+    localError.value = ''
     const res = await selectAnkiFile()
     if (res && res.file_path) {
       selectedFilePath.value = res.file_path
@@ -156,6 +159,9 @@ async function handleBrowseFile() {
     }
   } catch (err) {
     console.error('Failed to select Anki file:', err)
+    if (!props.error) {
+      localError.value = (err && err.message) || String(err) || 'Failed to select Anki file'
+    }
   }
 }
 

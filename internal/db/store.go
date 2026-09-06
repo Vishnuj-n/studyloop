@@ -460,7 +460,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		targetWords = 3000
 	}
 	maxActive := s.MaxActiveNotebooks
-	if maxActive < 0 {
+	if maxActive <= 0 {
 		maxActive = 4
 	}
 	quizCount := s.QuizQuestionCount

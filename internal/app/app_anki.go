@@ -89,6 +89,11 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 	var finalNotebookID string
 	var isStandalone bool
 	if targetNotebookID != "" {
+		// Validate target notebook exists
+		nb, err := repo.GetNotebookByID(targetNotebookID)
+		if err != nil || nb == nil {
+			return map[string]interface{}{"error": fmt.Sprintf("target notebook not found: %s", targetNotebookID)}
+		}
 		finalNotebookID = targetNotebookID
 	} else {
 		finalNotebookID = uuid.NewString()
@@ -96,9 +101,15 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 	}
 
 	// Prepare media directory under uploadDir/media/{finalNotebookID}
-	// ponytail: serve via Wails AssetServer at /notebooks/media/{finalNotebookID}/
+	// ponytail: stage extracted media separately, move on success or clean staged on error
 	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", finalNotebookID)
-	_ = os.MkdirAll(mediaDir, 0755)
+	stagingDir := filepath.Join(a.GetNotebookUploadDir(), "media", fmt.Sprintf("staging_%s_%d", finalNotebookID, time.Now().UnixNano()))
+	_ = os.MkdirAll(stagingDir, 0755)
+	defer func() {
+		// Clean up staging directory if it still exists
+		_ = os.RemoveAll(stagingDir)
+	}()
+
 	mediaPrefix := fmt.Sprintf("/notebooks/media/%s/", finalNotebookID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -107,7 +118,7 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 	args := []string{
 		ext.EntrypointPath(),
 		"--file", filePath,
-		"--media-dir", mediaDir,
+		"--media-dir", stagingDir,
 		"--media-prefix", mediaPrefix,
 	}
 	output, err := a.extRunner.Run(ctx, ext, pyExe, args...)
@@ -135,6 +146,8 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 	}
 
 	var finalTopicID string
+	var deckTitle string
+	var activate bool
 
 	if !isStandalone {
 		// Importing into existing notebook
@@ -142,18 +155,14 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 			finalTopicID = targetTopicID
 		} else {
 			finalTopicID = fmt.Sprintf("topic-anki-%s", uuid.NewString()[:8])
-			topicTitle := parsed.DeckName
-			if topicTitle == "" {
-				topicTitle = "Anki Flashcards"
-			}
-			if err := repo.EnsureTopic(finalTopicID, topicTitle); err != nil {
-				return map[string]interface{}{"error": fmt.Sprintf("Failed to create topic: %v", err)}
-			}
-			_ = repo.LinkNotebookTopics(finalNotebookID, []string{finalTopicID})
+		}
+		deckTitle = parsed.DeckName
+		if deckTitle == "" {
+			deckTitle = "Anki Flashcards"
 		}
 	} else {
 		// Standalone Notebook Creation (page_count = 0, no reading tasks)
-		deckTitle := parsed.DeckName
+		deckTitle = parsed.DeckName
 		if strings.TrimSpace(deckTitle) == "" {
 			deckTitle = strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 		}
@@ -162,26 +171,16 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		}
 
 		finalTopicID = fmt.Sprintf("topic-%s", finalNotebookID[:8])
-		if err := repo.EnsureTopicWithStatus(finalTopicID, deckTitle, "completed"); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("Failed to create topic: %v", err)}
-		}
-
-		fileHash, _ := utils.FileSHA256(filePath)
-		if err := repo.CreateNotebook(finalNotebookID, deckTitle, filePath, "anki", finalTopicID, fileHash, 0, profileID); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("Failed to create notebook: %v", err)}
-		}
-		_ = repo.UpdateNotebookStatus(finalNotebookID, "ready")
-		_ = repo.LinkNotebookTopics(finalNotebookID, []string{finalTopicID})
 
 		// Auto-activate in the active lane if the profile has less than max_active_notebooks
-		// ponytail: matches textbook ingestion behavior
+		// ponytail: matches textbook ingestion behavior using exact profile counting
 		settings, _ := repo.GetUserSettings()
 		maxActive := 4
 		if settings != nil {
 			maxActive = settings.MaxActiveNotebooks
 		}
-		if activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID); err == nil && (maxActive <= 0 || activeCount < maxActive) {
-			_ = repo.UpdateNotebookStudyStatus(finalNotebookID, "active")
+		if activeCount, err := repo.CountExactActiveNotebooksForProfile(profileID); err == nil && (maxActive <= 0 || activeCount < maxActive) {
+			activate = true
 		}
 	}
 
@@ -211,9 +210,37 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		}
 	}
 
-	createdCards, _, err := repo.GetOrCreateFlashcardsForTopic(finalTopicID, cardsToInsert, statesToInsert)
+	fileHash, _ := utils.FileSHA256(filePath)
+
+	createdCards, err := repo.PersistAnkiDeckImport(db.AnkiDeckImportInput{
+		IsStandalone: isStandalone,
+		NotebookID:   finalNotebookID,
+		TopicID:      finalTopicID,
+		DeckTitle:    deckTitle,
+		FilePath:     filePath,
+		FileHash:     fileHash,
+		ProfileID:    profileID,
+		Activate:     activate,
+		Cards:        cardsToInsert,
+		CardStates:   statesToInsert,
+	})
 	if err != nil {
-		return map[string]interface{}{"error": fmt.Sprintf("Failed to persist flashcards: %v", err)}
+		return map[string]interface{}{"error": fmt.Sprintf("Failed to persist Anki deck: %v", err)}
+	}
+
+	// Promote staged media to final notebook media directory
+	if entries, err := os.ReadDir(stagingDir); err == nil && len(entries) > 0 {
+		_ = os.MkdirAll(mediaDir, 0755)
+		for _, entry := range entries {
+			srcPath := filepath.Join(stagingDir, entry.Name())
+			destPath := filepath.Join(mediaDir, entry.Name())
+			// Move or copy file
+			if renErr := os.Rename(srcPath, destPath); renErr != nil {
+				if content, rErr := os.ReadFile(srcPath); rErr == nil {
+					_ = os.WriteFile(destPath, content, 0644)
+				}
+			}
+		}
 	}
 
 	return map[string]interface{}{

@@ -950,7 +950,7 @@ func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, pr
 		if err == nil && settings != nil {
 			maxActive = settings.MaxActiveNotebooks
 		}
-		activeCount, countErr := repo.CountActiveNotebooksForActiveProfile(profileID)
+		activeCount, countErr := repo.CountExactActiveNotebooksForProfile(profileID)
 		if countErr != nil {
 			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, countErr)
 		} else if maxActive <= 0 || activeCount < maxActive {

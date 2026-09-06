@@ -85,9 +85,8 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 }
 
 func TestExtensionDiscoveryAnki(t *testing.T) {
-	// In go test ./internal/app, Cwd is ./internal/app, so repo root extensions is ../../extensions
-	extDir := "../../extensions"
-	if _, err := os.Stat(extDir); err != nil {
+	extDir := filepath.Join("..", "..", "extensions")
+	if _, err := os.Stat(filepath.Join(extDir, "anki_importer", "manifest.json")); err != nil {
 		extDir = "extensions"
 	}
 	mgr := extension.NewManager(extDir)
