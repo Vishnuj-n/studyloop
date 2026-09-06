@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	"time"
@@ -280,10 +281,15 @@ func validateAndConvertQuestions(parsed *quizLLMResponse) []models.QuizTaskQuest
 		if !ok {
 			continue
 		}
+		shuffledOptions := make([]string, len(q.Options))
+		copy(shuffledOptions, q.Options)
+		rand.Shuffle(len(shuffledOptions), func(i, j int) {
+			shuffledOptions[i], shuffledOptions[j] = shuffledOptions[j], shuffledOptions[i]
+		})
 		questions = append(questions, models.QuizTaskQuestion{
 			ID:            "q_" + uuid.NewString(),
 			Prompt:        strings.TrimSpace(q.Prompt),
-			Options:       q.Options,
+			Options:       shuffledOptions,
 			CorrectAnswer: matchedOption,
 			SourceChunkID: strings.TrimSpace(q.SourceChunkID),
 		})

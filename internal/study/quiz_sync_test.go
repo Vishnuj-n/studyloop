@@ -177,6 +177,40 @@ func TestValidateAndConvertQuestions(t *testing.T) {
 	if questions[0].Prompt != "Valid prompt?" {
 		t.Errorf("expected prompt 'Valid prompt?', got '%s'", questions[0].Prompt)
 	}
+	if len(questions[0].Options) != 4 {
+		t.Fatalf("expected 4 options, got %d", len(questions[0].Options))
+	}
+	if questions[0].CorrectAnswer != "Opt A" {
+		t.Errorf("expected CorrectAnswer 'Opt A', got '%s'", questions[0].CorrectAnswer)
+	}
+}
+
+func TestValidateAndConvertQuestions_PreservesAndRandomizesOptions(t *testing.T) {
+	// With 4 options, probability of remaining at index 0 every time in 30 trials is (1/4)^30 ~ 1e-18
+	atLeastOneNonZeroIndex := false
+	for i := 0; i < 30; i++ {
+		resp := &quizLLMResponse{
+			Questions: []quizLLMQuestion{
+				{
+					Prompt:        "Question?",
+					Options:       []string{"Opt A", "Opt B", "Opt C", "Opt D"},
+					CorrectAnswer: "Opt A",
+					SourceChunkID: "c1",
+				},
+			},
+		}
+		q := validateAndConvertQuestions(resp)
+		if len(q) != 1 {
+			t.Fatalf("expected 1 question, got %d", len(q))
+		}
+		if q[0].Options[0] != "Opt A" {
+			atLeastOneNonZeroIndex = true
+			break
+		}
+	}
+	if !atLeastOneNonZeroIndex {
+		t.Errorf("expected options to be shuffled across trials, but correct answer was always at index 0")
+	}
 }
 
 func TestIsFrontMatterChunk(t *testing.T) {
