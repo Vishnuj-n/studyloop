@@ -51,6 +51,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getUserSettings } from '../services/appApi'
 
 const props = defineProps({
   rewards: {
@@ -65,7 +66,8 @@ const props = defineProps({
 
 const emit = defineEmits(['open-chest', 'dismiss'])
 
-const visible = ref(true)
+const visible = ref(false)
+const notificationsEnabled = ref(false)
 const remainingMs = ref(props.durationMs)
 let intervalId = null
 let isPaused = false
@@ -134,8 +136,19 @@ function clearTimer() {
   }
 }
 
-onMounted(() => {
-  startTimer()
+onMounted(async () => {
+  try {
+    const settings = await getUserSettings()
+    notificationsEnabled.value = settings?.show_reward_notifications !== false
+  } catch (err) {
+    console.warn('[REWARD_TOAST] Failed to load notification preference:', err)
+    notificationsEnabled.value = true
+  }
+
+  if (notificationsEnabled.value) {
+    visible.value = true
+    startTimer()
+  }
 })
 
 onUnmounted(() => {
