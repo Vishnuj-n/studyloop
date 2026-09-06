@@ -241,15 +241,15 @@
         <BaseButton id="fc-new-session-btn" @click="reset">New Session</BaseButton>
       </div>
     </section>
-
-    <!-- Reward Mystery Chest Modal -->
-    <MysteryChestModal
-      v-if="earnedChest"
-      :box="earnedChest"
-      :new-title="earnedNewTitle"
-      @close="onChestModalClose"
-    />
   </StudyPageLayout>
+
+  <!-- Reward Mystery Chest Modal (outside layout; Teleport renders to body) -->
+  <MysteryChestModal
+    v-if="earnedChest"
+    :box="earnedChest"
+    :new-title="earnedNewTitle"
+    @close="onChestModalClose"
+  />
 </template>
 
 <script setup>

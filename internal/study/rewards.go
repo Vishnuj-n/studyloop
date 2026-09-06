@@ -2,16 +2,11 @@ package study
 
 import (
 	"math/rand"
-	"time"
 
 	"ai-tutor/internal/models"
 
 	"github.com/google/uuid"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // RollTaskRewards calculates guaranteed base XP & coins plus a variable-tier mystery chest.
 func RollTaskRewards(taskType models.StudyTaskType, quizScore int, isAce bool) (int, int, *models.PendingLootBox) {

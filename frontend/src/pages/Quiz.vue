@@ -251,14 +251,6 @@
       </div>
     </article>
 
-    <!-- Reward Mystery Chest Modal -->
-    <MysteryChestModal
-      v-if="earnedChest"
-      :box="earnedChest"
-      :new-title="earnedNewTitle"
-      @close="onChestModalClose"
-    />
-
     <!-- Empty state: no questions -->
     <article v-else-if="questions.length === 0 && !generating" class="state-panel">
       <p class="state-text">No quiz questions found for this task.</p>
@@ -312,6 +304,14 @@
       </div>
     </form>
   </StudyPageLayout>
+
+  <!-- Reward Mystery Chest Modal (outside layout; Teleport renders to body) -->
+  <MysteryChestModal
+    v-if="earnedChest"
+    :box="earnedChest"
+    :new-title="earnedNewTitle"
+    @close="onChestModalClose"
+  />
 </template>
 
 <script setup>

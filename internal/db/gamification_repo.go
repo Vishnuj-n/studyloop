@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 // Title milestones: minimum XP required for each title rank
@@ -320,7 +321,7 @@ func (r *Repository) GetZeigarnikOpenLoops(activeProfileID string) ([]models.Zei
 					NotebookID:      nb.ID,
 					NotebookTitle:   nb.Title,
 					TopicID:         t.TopicID,
-					TopicTitle:      t.Title,
+					TopicTitle:      utils.CleanTopicTitle(t.Title),
 					CompletionRatio: ratio,
 					RemainingPages:  remaining,
 					Message:         msg,

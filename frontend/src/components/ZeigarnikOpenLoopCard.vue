@@ -5,7 +5,7 @@
         <svg class="progress-ring" width="48" height="48">
           <circle
             class="progress-ring-bg"
-            stroke="#334155"
+            stroke="var(--outline-variant)"
             stroke-width="4"
             fill="transparent"
             r="20"
@@ -14,7 +14,7 @@
           />
           <circle
             class="progress-ring-circle"
-            stroke="#3b82f6"
+            stroke="var(--primary)"
             stroke-width="4"
             fill="transparent"
             r="20"
@@ -73,9 +73,9 @@ function getOffset(ratio) {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-left: 4px solid #3b82f6;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-left: 4px solid var(--primary);
   border-radius: 10px;
   padding: 0.85rem 1.25rem;
 }
@@ -103,7 +103,7 @@ function getOffset(ratio) {
   position: absolute;
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--text-primary, #f8fafc);
+  color: var(--on-surface);
 }
 
 .zeigarnik-content {
@@ -114,7 +114,7 @@ function getOffset(ratio) {
 .notebook-title-badge {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--muted-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: block;
@@ -124,7 +124,7 @@ function getOffset(ratio) {
   margin: 0.15rem 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary, #f8fafc);
+  color: var(--on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -133,12 +133,12 @@ function getOffset(ratio) {
 .tension-message {
   margin: 0;
   font-size: 0.82rem;
-  color: #fbbf24;
+  color: var(--warning, #d97706);
 }
 
 .resume-btn {
-  background: #3b82f6;
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   border: none;
   font-size: 0.85rem;
   font-weight: 600;
@@ -146,10 +146,10 @@ function getOffset(ratio) {
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .resume-btn:hover {
-  background: #2563eb;
+  opacity: 0.85;
 }
 </style>

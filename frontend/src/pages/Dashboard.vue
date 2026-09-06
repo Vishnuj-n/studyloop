@@ -397,14 +397,8 @@ async function loadAgenda() {
 }
 
 function handleResumeLoop(loop) {
-  if (!loop) return
-  router.push({
-    path: '/reader',
-    query: {
-      notebook_id: loop.notebook_id,
-      topic_id: loop.topic_id,
-    },
-  })
+  const task = tasks.value.find((t) => t.notebook_id === loop.notebook_id && (!loop.topic_id || t.topic_id === loop.topic_id))
+  if (task) startTask(task)
 }
 
 function applyDashboardOverview(overview) {

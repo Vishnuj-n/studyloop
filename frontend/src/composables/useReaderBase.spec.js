@@ -17,4 +17,9 @@ describe('cleanTopicTitle', () => {
     expect(cleanTopicTitle('just-some-random-title')).toBe('just-some-random-title')
     expect(cleanTopicTitle('nb-without-chapter')).toBe('nb-without-chapter')
   })
+
+  it('strips redundant leading chapter number from suffix', () => {
+    expect(cleanTopicTitle('nb-d124bc64-6474-4136-bbde-2c9a45b79be2-ch-03-3-drawing-a-line-clo')).toBe('Chapter 3: Drawing A Line Clo')
+    expect(cleanTopicTitle('nb-uuid-ch-05-05-linear-regression')).toBe('Chapter 5: Linear Regression')
+  })
 })

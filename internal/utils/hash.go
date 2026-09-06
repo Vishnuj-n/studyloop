@@ -71,5 +71,16 @@ func CleanTopicTitle(title string) string {
 		return redundantPrefix
 	}
 
+	// Strip redundant leading chapter number in suffix e.g. "3 Drawing A Line" -> "Drawing A Line"
+	if strings.HasPrefix(formattedSuffix, chNumStr+" ") {
+		formattedSuffix = strings.TrimSpace(strings.TrimPrefix(formattedSuffix, chNumStr+" "))
+	} else if strings.HasPrefix(formattedSuffix, subParts[0]+" ") {
+		formattedSuffix = strings.TrimSpace(strings.TrimPrefix(formattedSuffix, subParts[0]+" "))
+	}
+
+	if formattedSuffix == "" {
+		return redundantPrefix
+	}
+
 	return "Chapter " + chNumStr + ": " + formattedSuffix
 }
