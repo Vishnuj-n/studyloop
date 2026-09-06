@@ -182,6 +182,7 @@ Relational structure with JSON extensions, centered on **persistent queue**.
 1. **Standard PDF Ingestion**: `pdfcpu` extracts text from standard PDFs with bookmark-aware or deterministic chapter boundaries.
 2. **Deep Structured PDF Ingestion (`deep_pdf` / PyMuPDF4LLM)**: Pro-tiered extension parser converts complex PDFs into structured Markdown. Preserves tables (`|---|`) and code fences (` ``` `), running heading-aligned markdown chunking (`SplitMarkdownIntoChunks`).
 3. **YouTube Video Lecture Ingestion (`youtube` / `yt-dlp`)**: Free-tiered extension extracts video metadata, timestamped chapters, and subtitles/transcripts, mapping chapters 1:1 into canonical `ExtractedDocument` sections with time markers `(MM:SS - MM:SS)`. Enables embedded playback with timestamp navigation and offline video playback.
+4. **Anki Deck Package Ingestion (`anki_importer`)**: Free-tiered extension unpacks `.apkg` and `.colpkg` archives (including modern zstd `.anki21b` SQLite collections), normalizes cloze deletions `{{c1::...}}` and HTML markup into prompt/answer pairs, and seeds immediate FSRS review flashcards (`fsrs_cards`). Supports standalone flashcard notebooks (`page_count: 0`) and existing notebook attachment.
 
 ### Why
 

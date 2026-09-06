@@ -24,9 +24,11 @@
       :indexing-status-message="indexingStatusMessage"
       :upload-error="uploadError"
       :success-message="successMessage"
+      :available-notebooks="notebooks"
       @upload-file="uploadFile"
       @upload-deep-structured="handleDeepStructuredUpload"
       @upload-youtube="uploadYouTube"
+      @upload-anki="handleAnkiUpload"
     />
 
     <!-- Active Lane (prioritized section) -->
@@ -152,6 +154,7 @@ import {
   uploadNotebook as apiUploadNotebook,
   selectAndUploadDeepStructuredPDF,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
+  importAnkiDeck as apiImportAnkiDeck,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
   confirmNotebookSyllabus as apiConfirmNotebookSyllabus,
@@ -413,6 +416,33 @@ async function uploadYouTube(url) {
     if (res.id) {
       void openSyllabusDraft(res.id, res.file_name)
     }
+  } catch (err) {
+    uploadError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    setTimeout(() => {
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+    }, 2000)
+  }
+}
+
+async function handleAnkiUpload({ filePath, targetNotebookID }) {
+  uploadError.value = ''
+  successMessage.value = ''
+  ingestionStatusMessage.value = 'Parsing and importing Anki flashcards...'
+  uploadProgress.value = 40
+  try {
+    const res = await apiImportAnkiDeck(filePath, targetNotebookID)
+    if (res?.error) {
+      uploadError.value = res.error
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+      return
+    }
+    uploadProgress.value = 100
+    successMessage.value = res.message || `Anki deck imported: ${res.deck_name || 'Flashcards'}`
+    await loadNotebooks()
+    showToast(`🎴 Imported ${res.cards_count || 0} flashcards from Anki`)
   } catch (err) {
     uploadError.value = err instanceof Error ? err.message : String(err)
   } finally {

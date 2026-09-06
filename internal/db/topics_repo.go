@@ -12,6 +12,11 @@ import (
 
 // EnsureTopic inserts a topic if it does not already exist.
 func (r *Repository) EnsureTopic(topicID, title string) error {
+	return r.EnsureTopicWithStatus(topicID, title, "reading")
+}
+
+// EnsureTopicWithStatus inserts a topic with an explicit initial status if it does not already exist.
+func (r *Repository) EnsureTopicWithStatus(topicID, title, status string) error {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
 		return fmt.Errorf("topic id is required")
@@ -19,12 +24,15 @@ func (r *Repository) EnsureTopic(topicID, title string) error {
 	if title == "" {
 		title = topicID
 	}
+	if status == "" {
+		status = "reading"
+	}
 
 	_, err := r.db.Exec(`
 		INSERT INTO topics (id, title, status)
-		VALUES (?, ?, 'reading')
+		VALUES (?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET title = excluded.title
-	`, topicID, title)
+	`, topicID, title, status)
 	return err
 }
 

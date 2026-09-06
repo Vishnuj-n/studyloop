@@ -127,6 +127,12 @@ Extracts a ZIP archive into the extensions directory and parses the manifest.
 ### CheckExtensionReadiness
 Inspects an extension's virtual environment and executes a smoke test to ensure all dependencies are met before allowing the UI toggle.
 
+### SelectAnkiFile
+Opens desktop native file dialog filtering for `.apkg` and `.colpkg` Anki archives.
+
+### ImportAnkiDeck
+Runs `anki_importer` extension to parse Anki package, extracts cards & cloze deletions, creates standalone Notebook (status `ready`, `page_count: 0`) or attaches to existing topic, and stores cards in `fsrs_cards` initialized in clean review state.
+
 ---
 
 ## Milestone Exam API

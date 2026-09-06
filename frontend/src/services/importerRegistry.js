@@ -19,6 +19,13 @@ export const NOTEBOOK_IMPORTERS = [
     description: 'Fetch video transcript & auto-generate structured chapter notes from a YouTube URL.',
     modalName: 'youtube',
   },
+  {
+    id: 'anki_importer',
+    name: 'Anki Deck (.apkg)',
+    icon: '🎴',
+    description: 'Import Anki decks (.apkg, .colpkg) directly as flashcards with spaced repetition.',
+    modalName: 'anki',
+  },
 ]
 
 export function getAvailableImporters(isExtensionActive) {
