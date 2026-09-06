@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"ai-tutor/internal/db"
 	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
