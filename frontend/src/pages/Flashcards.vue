@@ -133,7 +133,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
-              <p class="card-text">{{ currentCard.prompt }}</p>
+              <p class="card-text" v-html="currentCard.prompt"></p>
               <button id="fc-reveal-btn" class="reveal-btn" @click="flipped = true">
                 Show Answer
               </button>
@@ -159,7 +159,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
-              <p class="card-text answer-text">{{ currentCard.answer }}</p>
+              <p class="card-text answer-text" v-html="currentCard.answer"></p>
               <button class="flip-back-btn" @click="flipped = false">Show Question</button>
               <div class="rating-row">
                 <button
@@ -749,6 +749,22 @@ async function loadQueueSession(taskID, notebookID = '') {
   text-align: center;
   line-height: 1.6;
   max-width: 48ch;
+}
+.card-text :deep(img),
+.card-text img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin: 8px auto;
+  display: block;
+}
+.card-text :deep(audio),
+.card-text audio {
+  max-width: 100%;
+  height: 36px;
+  margin: 8px auto;
+  display: block;
 }
 .answer-text {
   font-weight: 600;

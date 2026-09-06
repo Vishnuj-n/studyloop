@@ -16,6 +16,9 @@ Added support for importing Anki flashcard decks (`.apkg`, `.colpkg`) into Study
 3. **Clean Separation of Concerns**:
    - Python unpacks zip/zstd, parses Anki schema variations, normalizes cloze into Q&A, and outputs clean JSON to STDOUT.
    - Go backend receives the JSON, validates records, initializes FSRS calibration states (`StateCode: 2`, `Reps: 0`, `due_at: now`), and inserts records via `repo.GetOrCreateFlashcardsForTopic(...)`.
+4. **Non-Destructive Deletion**:
+   - Deleting a notebook never deletes user files located outside the app's internal upload directory (e.g. `Downloads`, `Documents`).
+   - Only internal cached assets (`dev_data/uploads/media/{notebook_id}/`) and database records are removed.
 
 ---
 
@@ -41,14 +44,15 @@ Added support for importing Anki flashcard decks (`.apkg`, `.colpkg`) into Study
 - **[extensions/anki_importer/ingest.py](../../extensions/anki_importer/ingest.py)**:
   - Supports `--test` / `--smoke-test` probe for environment verification and self-test.
   - Automatically unpacks archive, decompresses `collection.anki21b` via `zstandard` or reads `collection.anki2` / `.anki21`.
+  - Unpacks the Anki `media` dictionary and extracts audio/image assets directly into the notebook's media directory.
   - Normalizes `{{c1::...}}` Cloze deletions into prompt/answer pairs.
-  - Strips HTML markup into clean text.
+  - Rewrites `[sound:file.mp3]` to `<audio controls src="...">` and updates `<img src="...">` with the asset prefix.
   - Emits normalized JSON schema `{"deck_name": "...", "cards": [...]}` to STDOUT.
 
 ### 2. Backend Go Layer
 - **[internal/app/app_anki.go](../../internal/app/app_anki.go)**:
   - `SelectAnkiFile()`: Native desktop OS file dialog filtering for `.apkg` and `.colpkg`.
-  - `ImportAnkiDeck(filePath, targetNotebookID, targetTopicID)`: Invokes the Python runner, unmarshals flashcards, seeds initial FSRS states (`StateCode: 2`, `Reps: 0`, `due_at: now`), and persists cards via `repo.GetOrCreateFlashcardsForTopic(...)`.
+  - `ImportAnkiDeck(filePath, targetNotebookID, targetTopicID)`: Provisions `dev_data/uploads/media/{notebook_id}/`, passes `--media-dir` and `--media-prefix /notebooks/media/{notebook_id}/` to the Python runner, unmarshals flashcards, seeds initial FSRS states (`StateCode: 2`, `Reps: 0`, `due_at: now`), and persists cards via `repo.GetOrCreateFlashcardsForTopic(...)`. Media assets are served directly through Wails' built-in `AssetServer`.
 - **[internal/db/topics_repo.go](../../internal/db/topics_repo.go)**:
   - Added `EnsureTopicWithStatus(topicID, title, status)` to allow creating topics with custom initial statuses (`completed` for standalone flashcards).
 - **[internal/app/app_anki_test.go](../../internal/app/app_anki_test.go)**:

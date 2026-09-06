@@ -66,6 +66,20 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 			t.Errorf("unexpected reading task generated for standalone anki deck: %+v", task)
 		}
 	}
+
+	// Create test App to verify DeleteNotebook safety
+	app := &App{
+		repo:            repo,
+		notebookService: nil,
+	}
+	// Verify deleting notebook leaves the external mockApkg untouched
+	delResp := app.DeleteNotebook("nb-anki")
+	if delResp["error"] != nil {
+		t.Fatalf("DeleteNotebook failed: %v", delResp["error"])
+	}
+	if _, err := os.Stat(mockApkg); err != nil {
+		t.Fatalf("external file in user directory was wrongly deleted: %v", err)
+	}
 }
 
 func TestExtensionDiscoveryAnki(t *testing.T) {

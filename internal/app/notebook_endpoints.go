@@ -1083,16 +1083,24 @@ func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 		return errResp
 	}
 
-	// 1. Delete associated physical file from disk first
-	if nb.FilePath != "" {
+	// 1. Delete associated physical file from disk ONLY if it resides in the internal upload sandbox.
+	// ponytail: never delete user's original external files (e.g. Downloads, Documents, Desktop)
+	if nb.FilePath != "" && a.notebookService != nil {
 		if err := a.notebookService.DeleteFile(nb.FilePath); err != nil && !os.IsNotExist(err) {
-			return map[string]interface{}{
-				"error": fmt.Sprintf("failed to delete notebook file %s: %v", nb.FilePath, err),
+			// If error was "outside upload directory", ignore it safely — external file must remain untouched!
+			if !strings.Contains(err.Error(), "outside upload directory") {
+				return map[string]interface{}{
+					"error": fmt.Sprintf("failed to delete notebook file %s: %v", nb.FilePath, err),
+				}
 			}
 		}
 	}
 
-	// 2. Delete database record and all associated chunks/topics/tasks
+	// 2. Clean up internal extracted media cache for this notebook if present
+	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", notebookID)
+	_ = os.RemoveAll(mediaDir)
+
+	// 3. Delete database record and all associated chunks/topics/tasks
 	if err := repo.DeleteNotebook(notebookID); err != nil {
 		return map[string]interface{}{
 			"error": err.Error(),

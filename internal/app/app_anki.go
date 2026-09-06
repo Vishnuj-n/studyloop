@@ -82,10 +82,34 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		return map[string]interface{}{"error": "Anki Importer environment not initialized. Please click Setup in Settings."}
 	}
 
+	profileID := a.resolveExplicitActiveProfileID()
+	targetNotebookID = strings.TrimSpace(targetNotebookID)
+	targetTopicID = strings.TrimSpace(targetTopicID)
+
+	var finalNotebookID string
+	var isStandalone bool
+	if targetNotebookID != "" {
+		finalNotebookID = targetNotebookID
+	} else {
+		finalNotebookID = uuid.NewString()
+		isStandalone = true
+	}
+
+	// Prepare media directory under uploadDir/media/{finalNotebookID}
+	// ponytail: serve via Wails AssetServer at /notebooks/media/{finalNotebookID}/
+	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", finalNotebookID)
+	_ = os.MkdirAll(mediaDir, 0755)
+	mediaPrefix := fmt.Sprintf("/notebooks/media/%s/", finalNotebookID)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	args := []string{ext.EntrypointPath(), "--file", filePath}
+	args := []string{
+		ext.EntrypointPath(),
+		"--file", filePath,
+		"--media-dir", mediaDir,
+		"--media-prefix", mediaPrefix,
+	}
 	output, err := a.extRunner.Run(ctx, ext, pyExe, args...)
 	if err != nil {
 		return map[string]interface{}{
@@ -110,16 +134,10 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		return map[string]interface{}{"error": "No valid flashcards found in Anki package."}
 	}
 
-	profileID := a.resolveExplicitActiveProfileID()
-	targetNotebookID = strings.TrimSpace(targetNotebookID)
-	targetTopicID = strings.TrimSpace(targetTopicID)
-
-	var finalNotebookID string
 	var finalTopicID string
 
-	if targetNotebookID != "" {
+	if !isStandalone {
 		// Importing into existing notebook
-		finalNotebookID = targetNotebookID
 		if targetTopicID != "" {
 			finalTopicID = targetTopicID
 		} else {
@@ -135,7 +153,6 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		}
 	} else {
 		// Standalone Notebook Creation (page_count = 0, no reading tasks)
-		finalNotebookID = uuid.NewString()
 		deckTitle := parsed.DeckName
 		if strings.TrimSpace(deckTitle) == "" {
 			deckTitle = strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
