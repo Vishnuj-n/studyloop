@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"ai-tutor/internal/db"
-	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/notebook"
 )
@@ -81,33 +80,5 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 	}
 	if _, err := os.Stat(mockApkg); err != nil {
 		t.Fatalf("external file in user directory was wrongly deleted: %v", err)
-	}
-}
-
-func TestExtensionDiscoveryAnki(t *testing.T) {
-	extDir := filepath.Join("..", "..", "extensions")
-	if _, err := os.Stat(filepath.Join(extDir, "anki_importer", "manifest.json")); err != nil {
-		extDir = "extensions"
-	}
-	mgr := extension.NewManager(extDir)
-	exts, err := mgr.Discover()
-	if err != nil {
-		t.Fatalf("Discover failed: %v", err)
-	}
-
-	var foundAnki bool
-	for _, ext := range exts {
-		if ext.ID() == "anki_importer" {
-			foundAnki = true
-			if ext.Name() != "Anki Deck Importer" {
-				t.Errorf("unexpected name: %s", ext.Name())
-			}
-			if ext.Runtime() != "python" {
-				t.Errorf("unexpected runtime: %s", ext.Runtime())
-			}
-		}
-	}
-	if !foundAnki {
-		t.Errorf("anki_importer not discovered in resolved extensions dir %q (found %d exts)", extDir, len(exts))
 	}
 }

@@ -947,13 +947,19 @@ func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, pr
 	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
 		settings, err := repo.GetUserSettings()
 		maxActive := 4
+		targetProfileID := profileID
 		if err == nil && settings != nil {
-			maxActive = settings.MaxActiveNotebooks
+			if settings.MaxActiveNotebooks > 0 {
+				maxActive = settings.MaxActiveNotebooks
+			}
+			if targetProfileID == "" {
+				targetProfileID = settings.ActiveProfileID
+			}
 		}
-		activeCount, countErr := repo.CountExactActiveNotebooksForProfile(profileID)
+		activeCount, countErr := repo.CountExactActiveNotebooksForProfile(targetProfileID)
 		if countErr != nil {
-			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, countErr)
-		} else if maxActive <= 0 || activeCount < maxActive {
+			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", targetProfileID, countErr)
+		} else if activeCount < maxActive {
 			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
 				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
 			} else {
