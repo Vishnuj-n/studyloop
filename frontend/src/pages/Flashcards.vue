@@ -241,6 +241,14 @@
         <BaseButton id="fc-new-session-btn" @click="reset">New Session</BaseButton>
       </div>
     </section>
+
+    <!-- Reward Mystery Chest Modal -->
+    <MysteryChestModal
+      v-if="earnedChest"
+      :box="earnedChest"
+      :new-title="earnedNewTitle"
+      @close="onChestModalClose"
+    />
   </StudyPageLayout>
 </template>
 
@@ -260,6 +268,8 @@ import {
 import BaseButton from '../components/BaseButton.vue'
 import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import MysteryChestModal from '../components/MysteryChestModal.vue'
+import { playCardRatingTick } from '../utils/audioJuice'
 
 const route = useRoute()
 const router = useRouter()
@@ -274,6 +284,8 @@ const reviewIndex = ref(0)
 const reviewing = ref(false)
 const flipped = ref(false)
 const isSubmittingReview = ref(false)
+const earnedChest = ref(null)
+const earnedNewTitle = ref('')
 const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const reviewTaskID = ref('')
@@ -365,8 +377,20 @@ async function handleQueueCompletion() {
     error.value = `Failed to complete session: ${completeRes.error}`
     return false
   }
+
+  if (completeRes?.rewards?.loot_box) {
+    earnedChest.value = completeRes.rewards.loot_box
+    earnedNewTitle.value = completeRes.rewards.new_title_unlocked || ''
+    return true
+  }
+
   router.push('/dashboard')
   return true
+}
+
+function onChestModalClose() {
+  earnedChest.value = null
+  router.push('/dashboard')
 }
 
 async function rate(ratingKey) {
@@ -385,6 +409,8 @@ async function rate(ratingKey) {
     error.value = 'Invalid rating selection. Please try again.'
     return
   }
+
+  playCardRatingTick(ratingKey)
 
   isSubmittingReview.value = true
   try {

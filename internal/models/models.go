@@ -577,3 +577,48 @@ type LLMSettings struct {
 	Fast            LLMTierSettings `json:"fast"`
 	Heavy           LLMTierSettings `json:"heavy"`
 }
+
+// GamificationProfile represents the persistent user progression and title stats.
+type GamificationProfile struct {
+	UserID                int    `json:"user_id"`
+	TotalXP               int    `json:"total_xp"`
+	Coins                 int    `json:"coins"`
+	CurrentTitle          string `json:"current_title"`
+	NextTitle             string `json:"next_title"`
+	NextTitleXP           int    `json:"next_title_xp"`
+	CurrentTitleMinXP     int    `json:"current_title_min_xp"`
+	StreakFreezesOwned    int    `json:"streak_freezes_owned"`
+	UnlockedCosmeticsJSON string `json:"unlocked_cosmetics_json"`
+	UpdatedAt             string `json:"updated_at"`
+}
+
+// PendingLootBox represents an unopened or opened mystery chest.
+type PendingLootBox struct {
+	ID           string `json:"id"`
+	TaskID       string `json:"task_id"`
+	BoxTier      string `json:"box_tier"` // BRONZE, SILVER, GOLD, MYTHIC
+	RewardType   string `json:"reward_type"` // XP, COINS, STREAK_FREEZE
+	RewardAmount int    `json:"reward_amount"`
+	Opened       bool   `json:"opened"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// RewardPayload is emitted on task completion to trigger frontend juicing.
+type RewardPayload struct {
+	XPEarned         int             `json:"xp_earned"`
+	CoinsEarned      int             `json:"coins_earned"`
+	LootBox          *PendingLootBox `json:"loot_box,omitempty"`
+	NewTitleUnlocked string          `json:"new_title_unlocked,omitempty"`
+}
+
+// ZeigarnikLoopCard represents an unfinished study chapter to drive tension and resumption.
+type ZeigarnikLoopCard struct {
+	NotebookID      string  `json:"notebook_id"`
+	NotebookTitle   string  `json:"notebook_title"`
+	TopicID         string  `json:"topic_id"`
+	TopicTitle      string  `json:"topic_title"`
+	CompletionRatio float64 `json:"completion_ratio"` // e.g. 0.75 for 75%
+	RemainingPages  int     `json:"remaining_pages"`
+	Message         string  `json:"message"`
+}
+

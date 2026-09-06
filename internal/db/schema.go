@@ -265,6 +265,27 @@ func InitSchema(tx *sql.Tx) error {
 			synced BOOLEAN DEFAULT 0,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+
+		// Gamification tables
+		`CREATE TABLE IF NOT EXISTS user_gamification (
+			user_id INTEGER PRIMARY KEY CHECK (user_id = 1),
+			total_xp INTEGER NOT NULL DEFAULT 0,
+			coins INTEGER NOT NULL DEFAULT 0,
+			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
+			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
+			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '[]',
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS pending_loot_boxes (
+			id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			box_tier TEXT NOT NULL,
+			reward_type TEXT NOT NULL,
+			reward_amount INTEGER NOT NULL,
+			opened BOOLEAN NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
 	}
 
 	// Execute all table creation statements
@@ -291,6 +312,7 @@ func InitSchema(tx *sql.Tx) error {
 		`CREATE INDEX IF NOT EXISTS idx_reread_attempts_last_attempt_at ON reread_attempts(last_attempt_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_manual_flashcards_notebook_id ON manual_flashcards(notebook_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_synced ON analytics_events(synced)`,
+		`CREATE INDEX IF NOT EXISTS idx_pending_loot_boxes_opened ON pending_loot_boxes(opened, created_at DESC)`,
 	}
 
 	for _, stmt := range indexes {
@@ -379,6 +401,15 @@ func InitSchema(tx *sql.Tx) error {
 		ON CONFLICT(tier) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
+	}
+
+	// Initialize default gamification state
+	if _, err := tx.Exec(`
+		INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json)
+		VALUES (1, 0, 0, 'The Apprentice', 1, '[]')
+		ON CONFLICT(user_id) DO NOTHING
+	`); err != nil {
+		return fmt.Errorf("failed to initialize user gamification: %w", err)
 	}
 
 	return nil

@@ -549,3 +549,82 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 		"timeline": timeline,
 	}
 }
+
+// GetGamificationState returns the user's XP, coins, titles, streak freezes, and unopened loot boxes.
+func (a *App) GetGamificationState() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.GetGamificationProfile()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	boxes, err := repo.GetUnopenedLootBoxes()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"profile":        prof,
+		"pending_chests": boxes,
+	}
+}
+
+// ClaimLootBox opens a mystery chest and applies rewards to the profile.
+func (a *App) ClaimLootBox(boxID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	box, prof, err := repo.ClaimLootBox(boxID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"claimed": box,
+		"profile": prof,
+	}
+}
+
+// BuyStreakFreeze purchases a streak freeze with 50 coins.
+func (a *App) BuyStreakFreeze() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.BuyStreakFreeze(50)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"profile": prof,
+	}
+}
+
+// GetZeigarnikOpenLoops returns unfinished chapters between 35% and 99% progress.
+func (a *App) GetZeigarnikOpenLoops() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	activeProfileID, _ := repo.GetActiveProfileID()
+	loops, err := repo.GetZeigarnikOpenLoops(activeProfileID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"open_loops": loops,
+	}
+}
+

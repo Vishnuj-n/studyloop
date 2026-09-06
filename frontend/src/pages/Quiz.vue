@@ -251,6 +251,14 @@
       </div>
     </article>
 
+    <!-- Reward Mystery Chest Modal -->
+    <MysteryChestModal
+      v-if="earnedChest"
+      :box="earnedChest"
+      :new-title="earnedNewTitle"
+      @close="onChestModalClose"
+    />
+
     <!-- Empty state: no questions -->
     <article v-else-if="questions.length === 0 && !generating" class="state-panel">
       <p class="state-text">No quiz questions found for this task.</p>
@@ -321,6 +329,8 @@ import {
   getUserSettings,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import MysteryChestModal from '../components/MysteryChestModal.vue'
+import { playCorrectChime, playIncorrectThud } from '../utils/audioJuice'
 
 const route = useRoute()
 const router = useRouter()
@@ -335,6 +345,8 @@ const answers = ref({})
 const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const result = ref(null)
+const earnedChest = ref(null)
+const earnedNewTitle = ref('')
 const generatingFlashcards = ref(false)
 
 const isMilestoneExam = ref(false)
@@ -564,6 +576,16 @@ async function submitQuiz() {
     result.value = response?.result || null
     submitted.value = true
 
+    if (result.value?.passed) {
+      playCorrectChime()
+      if (response?.rewards?.loot_box) {
+        earnedChest.value = response.rewards.loot_box
+        earnedNewTitle.value = response.rewards.new_title_unlocked || ''
+      }
+    } else {
+      playIncorrectThud()
+    }
+
     if (analyticsEnabled.value) {
       const notebook = notebooks.value.find((n) => n.id === taskMeta.value?.notebook_id)
       const fileHash = notebook?.file_hash || ''
@@ -632,6 +654,10 @@ async function handleContinue() {
     query.highlight = result.value.reread_task_id
   }
   router.push({ path: '/dashboard', query })
+}
+
+function onChestModalClose() {
+  earnedChest.value = null
 }
 
 async function handleGoToExaminer() {

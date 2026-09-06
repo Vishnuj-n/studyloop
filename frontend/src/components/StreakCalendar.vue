@@ -10,7 +10,15 @@
     <template v-else>
       <header class="streak-header-row">
         <div class="streak-title-container">
-          <span class="streak-flame-icon" :class="{ active: streakState.today_completed }">🔥</span>
+          <span
+            class="streak-flame-icon"
+            :class="{
+              active: streakState.today_completed,
+              warning: isEveningWarning && !streakState.today_completed,
+              shielded: streakState.shield_active,
+            }"
+            :title="flameTooltip"
+          >{{ flameEmoji }}</span>
           <div class="streak-counts">
             <span class="streak-count-val">{{ streakState.current_streak }}</span>
             <span class="streak-count-label">day streak</span>
@@ -65,7 +73,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   streakState: {
     type: Object,
     default: () => ({
@@ -73,11 +83,31 @@ defineProps({
       longest_streak: 0,
       active_dates: [],
       today_completed: false,
+      shield_active: false,
     }),
   },
   streakError: { type: String, default: '' },
   calendarDays: { type: Array, default: () => [] },
   monthLabel: { type: String, default: '' },
+})
+
+const isEveningWarning = computed(() => {
+  const hour = new Date().getHours()
+  return hour >= 20
+})
+
+const flameEmoji = computed(() => {
+  if (props.streakState?.shield_active) return '🛡️'
+  if (props.streakState?.today_completed) return '🔥'
+  if (isEveningWarning.value) return '⚠️'
+  return '🔥'
+})
+
+const flameTooltip = computed(() => {
+  if (props.streakState?.shield_active) return 'Streak protected by active freeze shield'
+  if (props.streakState?.today_completed) return 'Streak active for today!'
+  if (isEveningWarning.value) return 'Warning: Study today before midnight to preserve your streak!'
+  return 'Study today to maintain your streak!'
 })
 </script>
 
@@ -116,6 +146,10 @@ defineProps({
   animation: pulse-flame 2s infinite ease-in-out;
 }
 
+.streak-flame-icon.warning {
+  animation: pulse-warning 1s infinite ease-in-out;
+}
+
 @keyframes pulse-flame {
   0% {
     transform: scale(1);
@@ -128,6 +162,16 @@ defineProps({
   100% {
     transform: scale(1);
     filter: drop-shadow(0 0 2px rgba(230, 126, 34, 0.4));
+  }
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
   }
 }
 
