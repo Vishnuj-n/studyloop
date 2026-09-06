@@ -17,6 +17,21 @@
       <p class="hint">Caps the number of FSRS reviews active in any single study session.</p>
     </div>
 
+    <div class="form-group">
+      <label for="max-active-notebooks">Max Active Notebooks</label>
+      <input
+        id="max-active-notebooks"
+        v-model.number="settings.max_active_notebooks"
+        type="number"
+        min="0"
+        max="50"
+        step="1"
+        :disabled="disabled"
+        required
+      />
+      <p class="hint">Maximum active textbooks/decks per profile simultaneously (default 4, set 0 for unlimited).</p>
+    </div>
+
     <div class="settings-row-pair">
       <div class="form-group field-half">
         <label for="quiz-question-count">Questions per Quiz</label>

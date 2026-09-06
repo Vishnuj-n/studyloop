@@ -142,6 +142,36 @@ func TestProfileAndSettingsLifecycle(t *testing.T) {
 		t.Errorf("expected activation to fail because profile already has 4 active notebooks")
 	}
 
+	// Update max_active_notebooks to 5 and verify notebook 5 can now activate
+	settings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	settings.MaxActiveNotebooks = 5
+	if err := testRepo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+
+	err = testRepo.UpdateNotebookStudyStatus("nb-5", "active")
+	if err != nil {
+		t.Errorf("expected activation to succeed after bumping max_active_notebooks to 5: %v", err)
+	}
+
+	// Set max_active_notebooks to 0 (unlimited) and verify another can activate
+	settings.MaxActiveNotebooks = 0
+	if err := testRepo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook("nb-6", "Book 6", "path6.pdf", "pdf", "", "", 10, ""); err != nil {
+		t.Fatalf("failed to create nb-6: %v", err)
+	}
+	if err := testRepo.AssignNotebookToProfile("nb-6", "prof-1"); err != nil {
+		t.Fatalf("failed to assign nb-6: %v", err)
+	}
+	if err := testRepo.UpdateNotebookStudyStatus("nb-6", "active"); err != nil {
+		t.Errorf("expected activation to succeed when unlimited (0): %v", err)
+	}
+
 	// 6. Test DeleteProfile cleans up references
 	if err := testRepo.DeleteProfile("prof-1"); err != nil {
 		t.Fatalf("DeleteProfile failed: %v", err)

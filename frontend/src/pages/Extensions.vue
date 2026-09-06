@@ -93,7 +93,7 @@
               Open Simplifier ➔
             </button>
             <button
-              v-else-if="ext.id === 'youtube'"
+              v-else-if="ext.id === 'youtube' || ext.id === 'anki_importer'"
               class="action-btn primary-action"
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/notebooks')"

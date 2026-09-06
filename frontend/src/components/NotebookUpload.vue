@@ -88,6 +88,16 @@
           @close="closeActiveModal"
           @submit="handleYoutubeSubmit"
         />
+
+        <AnkiImportModal
+          :show="activeModal === 'anki'"
+          :is-loading="uploadProgress > 0 && uploadProgress < 100"
+          :status-message="ingestionStatusMessage"
+          :error="uploadError || localError"
+          :available-notebooks="availableNotebooks"
+          @close="closeActiveModal"
+          @submit="handleAnkiSubmit"
+        />
       </template>
     </div>
   </div>
@@ -99,6 +109,7 @@ import { useDialog } from '../composables/useDialog'
 import { useExtensions } from '../composables/useExtensions'
 import { getAvailableImporters } from '../services/importerRegistry'
 import YoutubeImportModal from './YoutubeImportModal.vue'
+import AnkiImportModal from './AnkiImportModal.vue'
 
 const props = defineProps({
   isCloudProfile: { type: Boolean, default: false },
@@ -108,9 +119,10 @@ const props = defineProps({
   indexingStatusMessage: { type: String, default: '' },
   uploadError: { type: String, default: '' },
   successMessage: { type: String, default: '' },
+  availableNotebooks: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['upload-file', 'upload-deep-structured', 'upload-youtube'])
+const emit = defineEmits(['upload-file', 'upload-deep-structured', 'upload-youtube', 'upload-anki'])
 const { confirm } = useDialog()
 const { isExtensionActive } = useExtensions()
 
@@ -155,6 +167,11 @@ function closeActiveModal() {
 function handleYoutubeSubmit(url) {
   localError.value = ''
   emit('upload-youtube', url)
+}
+
+function handleAnkiSubmit(payload) {
+  localError.value = ''
+  emit('upload-anki', payload)
 }
 
 function triggerFilePicker() {

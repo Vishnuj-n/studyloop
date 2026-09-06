@@ -540,6 +540,12 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		return errResp
 	}
 
+	if strings.EqualFold(strings.TrimSpace(nb.FileType), "anki") {
+		return map[string]interface{}{
+			"error": "Anki decks are standalone flashcard decks and do not require chapter ingestion.",
+		}
+	}
+
 	var segments interface{}
 	if strings.EqualFold(strings.TrimSpace(nb.FileType), "youtube") {
 		if segList, err := a.notebookService.GetYouTubeSegmentTimestamps(nb.FilePath); err == nil {
@@ -937,12 +943,23 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
 	isActivated := currentStudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
+	// Auto-activate the notebook if the active profile currently has less than max_active_notebooks
 	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
-		activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID)
-		if err != nil {
-			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, err)
-		} else if activeCount < 4 {
+		settings, err := repo.GetUserSettings()
+		maxActive := 4
+		targetProfileID := profileID
+		if err == nil && settings != nil {
+			if settings.MaxActiveNotebooks > 0 {
+				maxActive = settings.MaxActiveNotebooks
+			}
+			if targetProfileID == "" {
+				targetProfileID = settings.ActiveProfileID
+			}
+		}
+		activeCount, countErr := repo.CountExactActiveNotebooksForProfile(targetProfileID)
+		if countErr != nil {
+			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", targetProfileID, countErr)
+		} else if activeCount < maxActive {
 			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
 				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
 			} else {
@@ -1083,16 +1100,24 @@ func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 		return errResp
 	}
 
-	// 1. Delete associated physical file from disk first
-	if nb.FilePath != "" {
+	// 1. Delete associated physical file from disk ONLY if it resides in the internal upload sandbox.
+	// ponytail: never delete user's original external files (e.g. Downloads, Documents, Desktop)
+	if nb.FilePath != "" && a.notebookService != nil {
 		if err := a.notebookService.DeleteFile(nb.FilePath); err != nil && !os.IsNotExist(err) {
-			return map[string]interface{}{
-				"error": fmt.Sprintf("failed to delete notebook file %s: %v", nb.FilePath, err),
+			// If error was "outside upload directory", ignore it safely — external file must remain untouched!
+			if !strings.Contains(err.Error(), "outside upload directory") {
+				return map[string]interface{}{
+					"error": fmt.Sprintf("failed to delete notebook file %s: %v", nb.FilePath, err),
+				}
 			}
 		}
 	}
 
-	// 2. Delete database record and all associated chunks/topics/tasks
+	// 2. Clean up internal extracted media cache for this notebook if present
+	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", notebookID)
+	_ = os.RemoveAll(mediaDir)
+
+	// 3. Delete database record and all associated chunks/topics/tasks
 	if err := repo.DeleteNotebook(notebookID); err != nil {
 		return map[string]interface{}{
 			"error": err.Error(),

@@ -988,7 +988,7 @@ func (r *Repository) UpdateNotebookStudyStatus(notebookID string, studyStatus st
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
-		// If activating, we enforce the hard limit of 3-4 active notebooks per profile.
+		// If activating, enforce user-configured limit of active notebooks per profile (0 = unlimited).
 		if studyStatus == "active" {
 			var profileID sql.NullString
 			err := tx.QueryRow(`SELECT profile_id FROM notebooks WHERE id = ?`, notebookID).Scan(&profileID)
@@ -996,16 +996,27 @@ func (r *Repository) UpdateNotebookStudyStatus(notebookID string, studyStatus st
 				return err
 			}
 			if profileID.Valid && profileID.String != "" {
-				var activeCount int
-				err = tx.QueryRow(`
-					SELECT COUNT(*) FROM notebooks
-					WHERE profile_id = ? AND study_status = 'active'
-				`, profileID.String).Scan(&activeCount)
-				if err != nil {
+				var maxActive int
+				err = tx.QueryRow(`SELECT COALESCE(max_active_notebooks, 4) FROM user_settings WHERE id = 1`).Scan(&maxActive)
+				if err != nil && err != sql.ErrNoRows {
 					return err
 				}
-				if activeCount >= 4 {
-					return fmt.Errorf("profile already has the maximum limit of 4 active notebooks")
+				if err == sql.ErrNoRows {
+					maxActive = 4
+				}
+
+				if maxActive > 0 {
+					var activeCount int
+					err = tx.QueryRow(`
+						SELECT COUNT(*) FROM notebooks
+						WHERE profile_id = ? AND study_status = 'active'
+					`, profileID.String).Scan(&activeCount)
+					if err != nil {
+						return err
+					}
+					if activeCount >= maxActive {
+						return fmt.Errorf("profile already has the maximum limit of %d active notebooks", maxActive)
+					}
 				}
 			}
 		}
@@ -1173,4 +1184,119 @@ func (r *Repository) CountActiveNotebooksForActiveProfile(activeProfileID string
 	err := r.db.QueryRow(`SELECT COUNT(*) FROM notebooks WHERE study_status = 'active'`).Scan(&count)
 	return count, err
 }
+
+// CountExactActiveNotebooksForProfile returns the count of active notebooks matching the exact profile,
+// treating an empty profile ID as matching NULL or empty profile_id in the database.
+func (r *Repository) CountExactActiveNotebooksForProfile(profileID string) (int, error) {
+	var count int
+	profileID = strings.TrimSpace(profileID)
+	if profileID != "" {
+		err := r.db.QueryRow(`
+			SELECT COUNT(*) FROM notebooks
+			WHERE study_status = 'active' AND profile_id = ?
+		`, profileID).Scan(&count)
+		return count, err
+	}
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) FROM notebooks
+		WHERE study_status = 'active' AND (profile_id IS NULL OR profile_id = '')
+	`).Scan(&count)
+	return count, err
+}
+
+// AnkiDeckImportInput holds all parameters for atomic Anki deck persistence.
+type AnkiDeckImportInput struct {
+	IsStandalone bool
+	NotebookID   string
+	TopicID      string
+	DeckTitle    string
+	FilePath     string
+	FileHash     string
+	ProfileID    string
+	Activate     bool
+	Cards        []models.Flashcard
+	CardStates   map[string]models.FlashcardState
+}
+
+// PersistAnkiDeckImport atomically executes notebook, topic, status, link, and flashcard creation.
+func (r *Repository) PersistAnkiDeckImport(input AnkiDeckImportInput) ([]models.Flashcard, error) {
+	var createdCards []models.Flashcard
+	err := r.withTx(func(tx *sql.Tx) error {
+		if input.IsStandalone {
+			// Standalone notebook creation
+			topicTitle := input.DeckTitle
+			if topicTitle == "" {
+				topicTitle = "Anki Deck"
+			}
+			if _, err := tx.Exec(`
+				INSERT INTO topics (id, title, status)
+				VALUES (?, ?, 'completed')
+				ON CONFLICT(id) DO UPDATE SET title = excluded.title
+			`, input.TopicID, topicTitle); err != nil {
+				return fmt.Errorf("failed to create topic: %w", err)
+			}
+
+			var pID interface{} = nil
+			if input.ProfileID != "" {
+				pID = input.ProfileID
+			}
+
+			if _, err := tx.Exec(`
+				INSERT INTO notebooks (id, title, file_path, file_type, topic_id, file_hash, status, indexing_status, page_count, profile_id)
+				VALUES (?, ?, ?, 'anki', ?, ?, 'ready', 'PENDING', 0, ?)
+			`, input.NotebookID, topicTitle, input.FilePath, input.TopicID, input.FileHash, pID); err != nil {
+				return fmt.Errorf("failed to create notebook: %w", err)
+			}
+
+			if _, err := tx.Exec(`
+				INSERT INTO notebook_topics (notebook_id, topic_id)
+				VALUES (?, ?)
+			`, input.NotebookID, input.TopicID); err != nil {
+				return fmt.Errorf("failed to link notebook topic: %w", err)
+			}
+
+			if input.Activate {
+				if _, err := tx.Exec(`UPDATE notebooks SET study_status = 'active' WHERE id = ?`, input.NotebookID); err != nil {
+					return fmt.Errorf("failed to set active study status: %w", err)
+				}
+			}
+		} else {
+			// Existing notebook: ensure topic exists and link
+			topicTitle := input.DeckTitle
+			if topicTitle == "" {
+				topicTitle = "Anki Flashcards"
+			}
+			if _, err := tx.Exec(`
+				INSERT INTO topics (id, title, status)
+				VALUES (?, ?, 'reading')
+				ON CONFLICT(id) DO UPDATE SET title = excluded.title
+			`, input.TopicID, topicTitle); err != nil {
+				return fmt.Errorf("failed to ensure topic: %w", err)
+			}
+
+			// Add link if not already linked
+			if _, err := tx.Exec(`
+				INSERT OR IGNORE INTO notebook_topics (notebook_id, topic_id)
+				VALUES (?, ?)
+			`, input.NotebookID, input.TopicID); err != nil {
+				return fmt.Errorf("failed to link notebook topic: %w", err)
+			}
+		}
+
+		var err error
+		createdCards, _, err = r.GetOrCreateFlashcardsForTopicTx(tx, input.TopicID, input.Cards, input.CardStates)
+		if err != nil {
+			return fmt.Errorf("failed to persist flashcards: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return createdCards, nil
+}
+
+
 

@@ -367,6 +367,7 @@ Singleton table for global preferences.
 | `student_username` | TEXT DEFAULT '' | Student username for cloud sync authentication |
 | `last_synced_at` | INTEGER DEFAULT 0 | Timestamp of last successful cloud sync |
 | `target_session_words` | INTEGER NOT NULL DEFAULT 3000 | Target word count per reading session |
+| `max_active_notebooks` | INTEGER NOT NULL DEFAULT 4 | Maximum active textbooks/decks per profile simultaneously (0 = unlimited) |
 | `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
 | `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |

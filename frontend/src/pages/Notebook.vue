@@ -24,15 +24,19 @@
       :indexing-status-message="indexingStatusMessage"
       :upload-error="uploadError"
       :success-message="successMessage"
+      :available-notebooks="notebooks"
       @upload-file="uploadFile"
       @upload-deep-structured="handleDeepStructuredUpload"
       @upload-youtube="uploadYouTube"
+      @upload-anki="handleAnkiUpload"
     />
 
     <!-- Active Lane (prioritized section) -->
     <div v-if="!loading && activeNotebooks.length > 0" class="active-lane-section">
-      <h2>Active Lane ({{ activeNotebooks.length }} / 4)</h2>
-      <p class="section-hint">Your currently studying textbooks. Maximum 4 active at a time.</p>
+      <h2>Active Lane ({{ activeNotebooks.length }}{{ maxActiveNotebooks > 0 ? ` / ${maxActiveNotebooks}` : '' }})</h2>
+      <p class="section-hint">
+        Your currently studying textbooks. {{ maxActiveNotebooks > 0 ? `Maximum ${maxActiveNotebooks} active at a time.` : 'Unlimited active textbooks allowed.' }}
+      </p>
       <div class="notebook-grid">
         <NotebookCard
           v-for="notebook in activeNotebooks"
@@ -86,7 +90,7 @@
           :is-pro="isPro"
           :extraction-progress="extractionProgressMap[notebook.id]"
           variant="dormant"
-          :active-limit-reached="activeNotebooks.length >= 4"
+          :active-limit-reached="maxActiveNotebooks > 0 && activeNotebooks.length >= maxActiveNotebooks"
           @edit-syllabus="openSyllabusDraft"
           @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
@@ -152,6 +156,7 @@ import {
   uploadNotebook as apiUploadNotebook,
   selectAndUploadDeepStructuredPDF,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
+  importAnkiDeck as apiImportAnkiDeck,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
   aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
   confirmNotebookSyllabus as apiConfirmNotebookSyllabus,
@@ -217,6 +222,7 @@ const isCloudProfile = computed(() => !!classroomCode.value.trim())
 let loadNotebooksToken = 0
 const ragEnabled = ref(false)
 const ragNotebookChapter = ref(true)
+const maxActiveNotebooks = ref(4)
 
 const activeNotebooks = computed(() => {
   if (!Array.isArray(notebooks.value)) return []
@@ -263,6 +269,9 @@ onMounted(async () => {
       ragEnabled.value = settings.rag_enabled || false
       if (typeof settings.rag_notebook_chapter !== 'undefined') {
         ragNotebookChapter.value = settings.rag_notebook_chapter
+      }
+      if (typeof settings.max_active_notebooks !== 'undefined') {
+        maxActiveNotebooks.value = settings.max_active_notebooks
       }
     } else if (settings && settings.error) {
       settingsError.value = settings.error
@@ -413,6 +422,33 @@ async function uploadYouTube(url) {
     if (res.id) {
       void openSyllabusDraft(res.id, res.file_name)
     }
+  } catch (err) {
+    uploadError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    setTimeout(() => {
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+    }, 2000)
+  }
+}
+
+async function handleAnkiUpload({ filePath, targetNotebookID }) {
+  uploadError.value = ''
+  successMessage.value = ''
+  ingestionStatusMessage.value = 'Parsing and importing Anki flashcards...'
+  uploadProgress.value = 40
+  try {
+    const res = await apiImportAnkiDeck(filePath, targetNotebookID)
+    if (res?.error) {
+      uploadError.value = res.error
+      uploadProgress.value = 0
+      ingestionStatusMessage.value = ''
+      return
+    }
+    uploadProgress.value = 100
+    successMessage.value = res.message || `Anki deck imported: ${res.deck_name || 'Flashcards'}`
+    await loadNotebooks()
+    showToast(`🎴 Imported ${res.cards_count || 0} flashcards from Anki`)
   } catch (err) {
     uploadError.value = err instanceof Error ? err.message : String(err)
   } finally {
