@@ -10,10 +10,7 @@
 
       <!-- Compact Gamification Pill -->
       <RouterLink to="/rewards" class="gamification-sidebar-pill" title="View Rewards & Progression">
-        <div class="pill-top-row">
-          <span class="pill-title">{{ gamification.current_title }}</span>
-          <span class="pill-coins"><span class="coin-dot">●</span> {{ gamification.coins }}</span>
-        </div>
+        <span class="pill-title">{{ gamification.current_title }}</span>
         <div class="pill-xp-bar">
           <div class="pill-xp-fill" :style="{ width: xpPercent + '%' }"></div>
         </div>
@@ -54,7 +51,6 @@ const gamification = ref({
   total_xp: 0,
   next_title_xp: 500,
   current_title_min_xp: 0,
-  coins: 0,
 })
 
 const xpPercent = computed(() => {
@@ -223,13 +219,6 @@ const topItems = [
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
 }
 
-.pill-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-}
-
 .pill-title {
   font-weight: 700;
   color: var(--on-surface);
@@ -237,19 +226,6 @@ const topItems = [
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.pill-coins {
-  font-weight: 600;
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.coin-dot {
-  font-size: 10px;
-  color: var(--primary);
 }
 
 .pill-xp-bar {

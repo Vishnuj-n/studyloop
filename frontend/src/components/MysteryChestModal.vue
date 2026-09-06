@@ -146,6 +146,7 @@ async function handleOpen() {
     opened.value = true
     playChestOpenFanfare()
     emit('claimed', props.box)
+    window.dispatchEvent(new Event('gamification-updated'))
   }
 }
 

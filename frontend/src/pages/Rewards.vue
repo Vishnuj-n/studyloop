@@ -183,6 +183,7 @@ async function handleBuyStreakFreeze() {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
       profile.value = res.profile
+      window.dispatchEvent(new Event('gamification-updated'))
     }
   } catch (err) {
     console.error('Failed to buy streak freeze:', err)
