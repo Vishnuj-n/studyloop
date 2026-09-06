@@ -50,6 +50,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"analytics_enabled":          s.AnalyticsEnabled,
 		"anonymous_user_id":          s.AnonymousUserID,
 		"target_session_words":       s.TargetSessionWords,
+		"max_active_notebooks":       s.MaxActiveNotebooks,
 	}
 }
 
@@ -57,6 +58,9 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if s.MaxActiveNotebooks < 0 || s.MaxActiveNotebooks > 50 {
+		return map[string]interface{}{"error": "max active notebooks must be between 0 (unlimited) and 50"}
 	}
 	if s.MaxFlashcardsPerSession < 5 || s.MaxFlashcardsPerSession > 200 {
 		return map[string]interface{}{"error": "max flashcards per session must be between 5 and 200"}

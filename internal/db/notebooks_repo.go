@@ -988,7 +988,7 @@ func (r *Repository) UpdateNotebookStudyStatus(notebookID string, studyStatus st
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
-		// If activating, we enforce the hard limit of 3-4 active notebooks per profile.
+		// If activating, enforce user-configured limit of active notebooks per profile (0 = unlimited).
 		if studyStatus == "active" {
 			var profileID sql.NullString
 			err := tx.QueryRow(`SELECT profile_id FROM notebooks WHERE id = ?`, notebookID).Scan(&profileID)
@@ -996,16 +996,27 @@ func (r *Repository) UpdateNotebookStudyStatus(notebookID string, studyStatus st
 				return err
 			}
 			if profileID.Valid && profileID.String != "" {
-				var activeCount int
-				err = tx.QueryRow(`
-					SELECT COUNT(*) FROM notebooks
-					WHERE profile_id = ? AND study_status = 'active'
-				`, profileID.String).Scan(&activeCount)
-				if err != nil {
+				var maxActive int
+				err = tx.QueryRow(`SELECT COALESCE(max_active_notebooks, 4) FROM user_settings WHERE id = 1`).Scan(&maxActive)
+				if err != nil && err != sql.ErrNoRows {
 					return err
 				}
-				if activeCount >= 4 {
-					return fmt.Errorf("profile already has the maximum limit of 4 active notebooks")
+				if err == sql.ErrNoRows {
+					maxActive = 4
+				}
+
+				if maxActive > 0 {
+					var activeCount int
+					err = tx.QueryRow(`
+						SELECT COUNT(*) FROM notebooks
+						WHERE profile_id = ? AND study_status = 'active'
+					`, profileID.String).Scan(&activeCount)
+					if err != nil {
+						return err
+					}
+					if activeCount >= maxActive {
+						return fmt.Errorf("profile already has the maximum limit of %d active notebooks", maxActive)
+					}
 				}
 			}
 		}

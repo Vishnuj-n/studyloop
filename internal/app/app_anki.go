@@ -173,9 +173,14 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		_ = repo.UpdateNotebookStatus(finalNotebookID, "ready")
 		_ = repo.LinkNotebookTopics(finalNotebookID, []string{finalTopicID})
 
-		// Auto-activate in the active lane if the profile has less than 4 active notebooks
+		// Auto-activate in the active lane if the profile has less than max_active_notebooks
 		// ponytail: matches textbook ingestion behavior
-		if activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID); err == nil && activeCount < 4 {
+		settings, _ := repo.GetUserSettings()
+		maxActive := 4
+		if settings != nil {
+			maxActive = settings.MaxActiveNotebooks
+		}
+		if activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID); err == nil && (maxActive <= 0 || activeCount < maxActive) {
 			_ = repo.UpdateNotebookStudyStatus(finalNotebookID, "active")
 		}
 	}

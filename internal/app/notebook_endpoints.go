@@ -943,12 +943,17 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
 	isActivated := currentStudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than 4 active notebooks
+	// Auto-activate the notebook if the active profile currently has less than max_active_notebooks
 	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
-		activeCount, err := repo.CountActiveNotebooksForActiveProfile(profileID)
-		if err != nil {
-			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, err)
-		} else if activeCount < 4 {
+		settings, err := repo.GetUserSettings()
+		maxActive := 4
+		if err == nil && settings != nil {
+			maxActive = settings.MaxActiveNotebooks
+		}
+		activeCount, countErr := repo.CountActiveNotebooksForActiveProfile(profileID)
+		if countErr != nil {
+			utils.Warnf("[INGESTION] failed to count active notebooks for profile %s: %v", profileID, countErr)
+		} else if maxActive <= 0 || activeCount < maxActive {
 			if err := repo.UpdateNotebookStudyStatus(notebookID, "active"); err != nil {
 				utils.Warnf("[INGESTION] failed to auto-activate notebook %s: %v", notebookID, err)
 			} else {

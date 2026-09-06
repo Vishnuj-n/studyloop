@@ -1213,10 +1213,14 @@ func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
 	if settings.TutorStyle != "socratic" {
 		t.Fatalf("expected default TutorStyle 'socratic', got %q", settings.TutorStyle)
 	}
+	if settings.MaxActiveNotebooks != 4 {
+		t.Fatalf("expected default MaxActiveNotebooks 4, got %d", settings.MaxActiveNotebooks)
+	}
 
 	settings.QuizQuestionCount = 5
 	settings.QuizPassingScore = 80
 	settings.TutorStyle = "direct"
+	settings.MaxActiveNotebooks = 10
 
 	if err := testRepo.UpdateUserSettings(*settings); err != nil {
 		t.Fatalf("UpdateUserSettings failed: %v", err)
@@ -1234,5 +1238,8 @@ func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
 	}
 	if updated.TutorStyle != "direct" {
 		t.Fatalf("expected updated TutorStyle 'direct', got %q", updated.TutorStyle)
+	}
+	if updated.MaxActiveNotebooks != 10 {
+		t.Fatalf("expected updated MaxActiveNotebooks 10, got %d", updated.MaxActiveNotebooks)
 	}
 }
