@@ -114,9 +114,6 @@
       <div class="dashboard-grid">
         <!-- Main Panel (Focus Hero Task & Vertical Queue) -->
         <div class="dashboard-main">
-          <!-- Zeigarnik Open Loops (Psychological Continuation Tension) -->
-          <ZeigarnikOpenLoopCard :loops="openLoops" @resume="handleResumeLoop" />
-
           <div v-if="tasks.length > 0" class="tasks-container">
             <!-- TIER 1: FOCUS HERO CARD (Action) -->
             <section class="focus-hero-section">
@@ -208,7 +205,6 @@ import {
   forceDueFlashcardsNow,
   getNotebooks,
   getFlashcardDueTimeline,
-  getZeigarnikOpenLoops,
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
 
@@ -220,13 +216,12 @@ import OnboardingCard from '../components/OnboardingCard.vue'
 import TelemetryWidget from '../components/TelemetryWidget.vue'
 import StreakCalendar from '../components/StreakCalendar.vue'
 import ForecastChart from '../components/ForecastChart.vue'
-import ZeigarnikOpenLoopCard from '../components/ZeigarnikOpenLoopCard.vue'
+
 
 const router = useRouter()
 const route = useRoute()
 
 // --- Reactive State ---
-const openLoops = ref([])
 const loading = ref(true)
 const error = ref('')
 const actionError = ref('')
@@ -379,26 +374,12 @@ async function loadAgenda() {
       return
     }
 
-    try {
-      const loopsRes = await getZeigarnikOpenLoops()
-      if (loopsRes && Array.isArray(loopsRes.open_loops)) {
-        openLoops.value = loopsRes.open_loops
-      }
-    } catch (e) {
-      console.warn('Failed to load Zeigarnik open loops:', e)
-    }
-
     await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset)])
   } catch (err) {
     error.value = err.message || 'Failed to load tasks'
   } finally {
     loading.value = false
   }
-}
-
-function handleResumeLoop(loop) {
-  const task = tasks.value.find((t) => t.notebook_id === loop.notebook_id && (!loop.topic_id || t.topic_id === loop.topic_id))
-  if (task) startTask(task)
 }
 
 function applyDashboardOverview(overview) {

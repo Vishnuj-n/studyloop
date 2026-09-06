@@ -388,7 +388,3 @@ export function claimLootBox(boxID) {
 export function buyStreakFreeze() {
   return appBridge().BuyStreakFreeze()
 }
-
-export function getZeigarnikOpenLoops() {
-  return appBridge().GetZeigarnikOpenLoops()
-}

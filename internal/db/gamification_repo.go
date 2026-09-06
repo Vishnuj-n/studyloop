@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"ai-tutor/internal/models"
-	"ai-tutor/internal/utils"
 )
 
 // Title milestones: minimum XP required for each title rank
@@ -273,66 +272,4 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 	return r.GetGamificationProfile()
 }
 
-// GetZeigarnikOpenLoops calculates unfinished chapters at 35% - 99% progress to prompt user resumption.
-func (r *Repository) GetZeigarnikOpenLoops(activeProfileID string) ([]models.ZeigarnikLoopCard, error) {
-	notebooks, err := r.GetNotebooks("", activeProfileID)
-	if err != nil {
-		return nil, err
-	}
 
-	loops := make([]models.ZeigarnikLoopCard, 0)
-	for _, nb := range notebooks {
-		if nb.FileType == "anki" || nb.ChunkCount == 0 {
-			continue
-		}
-
-		topics, err := r.GetNotebookTopicsWithBounds(nb.ID)
-		if err != nil {
-			continue
-		}
-
-		for _, t := range topics {
-			totalPages := (t.EndPage - t.StartPage) + 1
-			if totalPages <= 1 {
-				continue
-			}
-
-			var cursor int
-			var status string
-			_ = r.db.QueryRow("SELECT COALESCE(current_page_cursor, 0), COALESCE(status, '') FROM topics WHERE id = ?", t.TopicID).Scan(&cursor, &status)
-
-			readPages := (cursor - t.StartPage) + 1
-			if readPages < 0 {
-				readPages = 0
-			}
-			if readPages > totalPages {
-				readPages = totalPages
-			}
-
-			ratio := float64(readPages) / float64(totalPages)
-			if ratio >= 0.35 && ratio < 1.0 && status != "completed" {
-				remaining := totalPages - readPages
-				msg := fmt.Sprintf("You are %d pages away from completing this section!", remaining)
-				if remaining == 1 {
-					msg = "Only 1 page left to finish this section!"
-				}
-
-				loops = append(loops, models.ZeigarnikLoopCard{
-					NotebookID:      nb.ID,
-					NotebookTitle:   nb.Title,
-					TopicID:         t.TopicID,
-					TopicTitle:      utils.CleanTopicTitle(t.Title),
-					CompletionRatio: ratio,
-					RemainingPages:  remaining,
-					Message:         msg,
-				})
-
-				if len(loops) >= 3 {
-					return loops, nil
-				}
-			}
-		}
-	}
-
-	return loops, nil
-}

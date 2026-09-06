@@ -611,14 +611,4 @@ type RewardPayload struct {
 	NewTitleUnlocked string          `json:"new_title_unlocked,omitempty"`
 }
 
-// ZeigarnikLoopCard represents an unfinished study chapter to drive tension and resumption.
-type ZeigarnikLoopCard struct {
-	NotebookID      string  `json:"notebook_id"`
-	NotebookTitle   string  `json:"notebook_title"`
-	TopicID         string  `json:"topic_id"`
-	TopicTitle      string  `json:"topic_title"`
-	CompletionRatio float64 `json:"completion_ratio"` // e.g. 0.75 for 75%
-	RemainingPages  int     `json:"remaining_pages"`
-	Message         string  `json:"message"`
-}
 

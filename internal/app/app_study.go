@@ -610,21 +610,5 @@ func (a *App) BuyStreakFreeze() map[string]interface{} {
 	}
 }
 
-// GetZeigarnikOpenLoops returns unfinished chapters between 35% and 99% progress.
-func (a *App) GetZeigarnikOpenLoops() map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
 
-	activeProfileID, _ := repo.GetActiveProfileID()
-	loops, err := repo.GetZeigarnikOpenLoops(activeProfileID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return map[string]interface{}{
-		"open_loops": loops,
-	}
-}
 
