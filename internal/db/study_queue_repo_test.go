@@ -1634,6 +1634,10 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
+	if err := testRepo.EnsureNotebookTopic(notebookID, topicID); err != nil {
+		t.Fatalf("EnsureNotebookTopic failed: %v", err)
+	}
+
 	// Insert 4 quiz tasks and attempts
 	for i := 1; i <= 4; i++ {
 		taskID := fmt.Sprintf("quiz-task-%d", i)
@@ -1664,7 +1668,7 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 	}
 
 	// Fetch unexamined for topic
-	topicAttempts, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(topicID)
+	topicAttempts, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID)
 	if err != nil {
 		t.Fatalf("GetUnexaminedPassedQuizAttemptsByTopic failed: %v", err)
 	}
@@ -1686,7 +1690,7 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 	}
 
 	// Now unexamined should only be attempts 3 and 4
-	topicAttemptsAfter, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(topicID)
+	topicAttemptsAfter, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID)
 	if err != nil {
 		t.Fatalf("GetUnexaminedPassedQuizAttemptsByTopic after milestone failed: %v", err)
 	}

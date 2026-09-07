@@ -273,7 +273,7 @@ func checkAndInsertMilestoneExam(repo *db.Repository, task models.StudyQueueTask
 		return
 	}
 
-	unexamined, err := repo.GetUnexaminedPassedQuizAttemptsByTopic(task.TopicID)
+	unexamined, err := repo.GetUnexaminedPassedQuizAttemptsByTopic(task.NotebookID, task.TopicID)
 	if err != nil || len(unexamined) < 3 {
 		return
 	}
@@ -304,7 +304,7 @@ func insertMilestoneForAttempts(repo *db.Repository, notebookID string, attempts
 		}
 	}
 
-	if len(quizzes) == 0 || representativeAttemptID == "" {
+	if len(quizzes) < 3 || representativeAttemptID == "" {
 		return
 	}
 

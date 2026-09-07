@@ -465,16 +465,6 @@ async function submitMilestone() {
     if (res && res.error) {
       error.value = res.error
     } else {
-      if (analyticsEnabled.value) {
-        const notebook = notebooks.value.find((n) => n.id === taskMeta.value?.notebook_id)
-        const fileHash = notebook?.file_hash || ''
-        trackAnalyticsEvent('milestone_exam_complete', fileHash, taskMeta.value?.start_page || 0, {
-          task_id: taskID.value,
-          score: 100,
-          passed: true,
-          anonymous_user_id: anonymousUserID.value,
-        })
-      }
       if (res?.rewards) {
         window.dispatchEvent(
           new CustomEvent('study-reward-earned', { detail: { rewards: res.rewards } })

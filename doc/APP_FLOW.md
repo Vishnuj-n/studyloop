@@ -102,7 +102,6 @@ Reader does not route to Quiz. Only generated follow-up quiz tasks transition th
 ```
 QUIZ → COMPLETED
 → Insert FLASHCARD_REVIEW or move to next task
-→ If 10th quiz for notebook: insert MILESTONE_EXAM
 → Dashboard shows next
 ```
 

@@ -696,11 +696,29 @@ func (r *Repository) GetQuestionsForQuizAttempts(attemptIDs []string) ([]models.
 	return allQuestions, nil
 }
 
-// GetUnexaminedPassedQuizAttemptsByTopic returns passed quiz attempts for a topic that have not yet been included in any MILESTONE_EXAM task.
-func (r *Repository) GetUnexaminedPassedQuizAttemptsByTopic(topicID string) ([]QuizAttemptWithPayload, error) {
+// GetUnexaminedPassedQuizAttemptsByTopic returns passed quiz attempts for a topic that have not yet been included in any MILESTONE_EXAM task for the given notebook.
+func (r *Repository) GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID string) ([]QuizAttemptWithPayload, error) {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return nil, fmt.Errorf("notebook ID is required")
+	}
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
 		return nil, fmt.Errorf("topic ID is required")
+	}
+
+	// Verify topic belongs to notebook
+	var exists int
+	err := r.db.QueryRow(`
+		SELECT 1 FROM notebook_topics
+		WHERE notebook_id = ? AND topic_id = ?
+		LIMIT 1
+	`, notebookID, topicID).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("topic %s not found in notebook %s", topicID, notebookID)
+		}
+		return nil, fmt.Errorf("failed to verify notebook topic: %w", err)
 	}
 
 	rows, err := r.db.Query(`
@@ -713,11 +731,12 @@ func (r *Repository) GetUnexaminedPassedQuizAttemptsByTopic(topicID string) ([]Q
 			COALESCE(sq.payload_json, '')
 		FROM quiz_attempts qa
 		JOIN study_queue sq ON qa.task_id = sq.id
-		WHERE sq.topic_id = ?
+		WHERE sq.notebook_id = ?
+		  AND sq.topic_id = ?
 		  AND sq.task_type = 'QUIZ'
 		  AND qa.passed = 1
 		ORDER BY qa.completed_at ASC
-	`, topicID)
+	`, notebookID, topicID)
 	if err != nil {
 		return nil, err
 	}
@@ -728,23 +747,14 @@ func (r *Repository) GetUnexaminedPassedQuizAttemptsByTopic(topicID string) ([]Q
 		return nil, err
 	}
 
-	var notebookID string
-	_ = r.db.QueryRow(`
-		SELECT COALESCE(nt.notebook_id, COALESCE(n.id, COALESCE(sq.notebook_id, '')))
-		FROM topics t
-		LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
-		LEFT JOIN notebooks n ON (n.topic_id = t.id OR n.id = nt.notebook_id)
-		LEFT JOIN study_queue sq ON sq.topic_id = t.id
-		WHERE t.id = ?
-		LIMIT 1
-	`, topicID).Scan(&notebookID)
-
 	unexamined := make([]QuizAttemptWithPayload, 0, len(allAttempts))
 	for _, attempt := range allAttempts {
-		if notebookID != "" {
-			if hasMilestone, err := r.HasMilestoneExamForAttemptID(notebookID, attempt.ID); err == nil && hasMilestone {
-				continue
-			}
+		hasMilestone, err := r.HasMilestoneExamForAttemptID(notebookID, attempt.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed checking milestone for attempt %s: %w", attempt.ID, err)
+		}
+		if hasMilestone {
+			continue
 		}
 		unexamined = append(unexamined, attempt)
 	}

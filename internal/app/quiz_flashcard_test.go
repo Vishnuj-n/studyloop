@@ -1071,6 +1071,57 @@ func TestMilestoneExamTriggers(t *testing.T) {
 	if countAfterShort != 1 {
 		t.Fatalf("expected 1 milestone exam (short chapter should NOT create milestone), got %d", countAfterShort)
 	}
+
+	// Scenario 3: 3 quiz candidates where 1 has a corrupt payload -> no 2-quiz milestone exam created
+	topic3 := "topic-ms-ch3-corrupt"
+	if err := testRepo.EnsureTopic(topic3, "Chapter 3 Corrupt"); err != nil {
+		t.Fatalf("EnsureTopic ch3 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topic3, 16, 25); err != nil {
+		t.Fatalf("UpdateTopicPageBounds ch3 failed: %v", err)
+	}
+	if err := testRepo.EnsureNotebookTopic(notebookID, topic3); err != nil {
+		t.Fatalf("EnsureNotebookTopic ch3 failed: %v", err)
+	}
+	for p := 16; p <= 25; p++ {
+		mustInsertMockChunk(t, notebookID, topic3, fmt.Sprintf("chunk-ms-p%d", p), p)
+	}
+
+	for i := 1; i <= 3; i++ {
+		taskID := fmt.Sprintf("task-ms-ch3-q%d", i)
+		startP := 16 + (i-1)*3
+		endP := startP + 2
+		if i == 3 {
+			endP = 25
+		}
+		task := models.StudyQueueTask{
+			ID:          taskID,
+			NotebookID:  notebookID,
+			TopicID:     topic3,
+			TaskType:    models.StudyTaskTypeQuiz,
+			Status:      models.StudyTaskStatusActive,
+			PayloadJSON: `{"questions":[{"id":"q1","prompt":"P1","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+			StartPage:   startP,
+			EndPage:     endP,
+		}
+		if err := testRepo.InsertStudyTask(task); err != nil {
+			t.Fatalf("insert ch3 task %d failed: %v", i, err)
+		}
+		_ = app.SubmitQuizAttempt(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+		if i == 2 {
+			// Corrupt the attempt's answers JSON so ComputeCorrectnessFlags fails
+			if _, err := testRepo.ExecForTest(`UPDATE quiz_attempts SET answers_json = 'corrupt-json' WHERE task_id = ?`, taskID); err != nil {
+				t.Fatalf("corrupt ch3 attempt 2 failed: %v", err)
+			}
+		}
+		_ = app.GenerateFlashcardsForQuizTask(taskID)
+	}
+
+	// Count milestones: still 1 because the corrupt attempt leaves only 2 valid quizzes (< 3)
+	countAfterCorrupt, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
+	if countAfterCorrupt != 1 {
+		t.Fatalf("expected milestone count to remain 1 after corrupt attempt dropped valid quizzes below 3, got %d", countAfterCorrupt)
+	}
 }
 
 
