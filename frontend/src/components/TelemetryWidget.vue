@@ -123,11 +123,6 @@ function formatDaysRemainingShort(days) {
   font-weight: 500;
 }
 
-.pill-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
 .pill-text {
   line-height: 1.2;
 }

@@ -1109,30 +1109,6 @@ h3 {
   gap: 8px;
 }
 
-.field {
-  display: grid;
-  gap: 5px;
-}
-
-.field span {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted-text);
-}
-
-select {
-  width: 100%;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
-  border-radius: 10px;
-  font: inherit;
-  padding: 10px;
-  outline: 0;
-}
-
 button {
   border: 0;
   border-radius: 10px;
