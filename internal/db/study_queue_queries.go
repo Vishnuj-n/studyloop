@@ -595,13 +595,13 @@ func (r *Repository) GetPassedQuizAttempts(notebookID string) ([]QuizAttemptWith
 	return scanQuizAttemptsWithPayload(rows)
 }
 
-// GetCompletedTaskTimes returns a list of completion times in UTC for completed reading tasks.
+// GetCompletedTaskTimes returns a list of completion times in UTC for completed study tasks (excluding background generation/sync tasks).
 func (r *Repository) GetCompletedTaskTimes() ([]time.Time, error) {
 	rows, err := r.db.Query(`
 		SELECT completed_at
 		FROM study_queue
 		WHERE status = 'COMPLETED' 
-		  AND task_type IN ('READING', 'REREAD')
+		  AND task_type NOT IN ('FLASHCARD_GENERATE', 'FLASHCARD_SYNC')
 		  AND completed_at IS NOT NULL 
 		  AND completed_at != ''
 	`)
