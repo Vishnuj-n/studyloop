@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -163,16 +164,16 @@ func computeCurrentStreak(nowClient time.Time, dateSet map[string]bool) int {
 
 // mapTaskError translates repository errors into API response maps.
 func mapTaskError(err error) map[string]interface{} {
-	switch err {
-	case db.ErrTaskNotFound:
+	switch {
+	case errors.Is(err, db.ErrTaskNotFound):
 		return map[string]interface{}{"error": "ErrNotFound", "code": 404}
-	case db.ErrTaskNotActive:
+	case errors.Is(err, db.ErrTaskNotActive):
 		return map[string]interface{}{"error": "ErrTaskNotActive", "code": 409}
-	case db.ErrTaskNotPending:
+	case errors.Is(err, db.ErrTaskNotPending):
 		return map[string]interface{}{"error": "ErrTaskNotPending", "code": 409}
-	case db.ErrReviewLinkNotPending:
+	case errors.Is(err, db.ErrReviewLinkNotPending):
 		return map[string]interface{}{"error": "ErrCardAlreadyReviewed", "code": 409}
-	case db.ErrReviewSessionOpen:
+	case errors.Is(err, db.ErrReviewSessionOpen):
 		return map[string]interface{}{"error": "ErrReviewSessionIncomplete", "code": 409}
 	default:
 		return map[string]interface{}{"error": err.Error()}
@@ -421,22 +422,74 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	currentStreak, longestStreak, activeDates := calculateStreak(times, timezoneOffsetMinutes)
 
 	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
-	todayStr := time.Now().In(loc).Format(dateFormatYYYYMMDD)
+	nowClient := time.Now().In(loc)
+	todayStr := nowClient.Format(dateFormatYYYYMMDD)
 	completedToday := 0
+
+	dateSet := make(map[string]bool)
 	for _, t := range times {
-		if t.In(loc).Format(dateFormatYYYYMMDD) == todayStr {
+		d := t.In(loc).Format(dateFormatYYYYMMDD)
+		dateSet[d] = true
+		if d == todayStr {
 			completedToday++
 		}
 	}
 	todayCompleted := completedToday > 0
 
-	return map[string]interface{}{
-		"current_streak":  currentStreak,
-		"longest_streak":  longestStreak,
-		"active_dates":    activeDates,
-		"today_completed": todayCompleted,
-		"completed_today": completedToday,
+	prof, errProf := repo.GetGamificationProfile()
+	shieldActive := false
+	streakFreezes := 0
+	var streakSavedEvent map[string]interface{}
+
+	if errProf == nil && prof != nil {
+		streakFreezes = prof.StreakFreezesOwned
+		yesterdayStr := nowClient.AddDate(0, 0, -1).Format(dateFormatYYYYMMDD)
+
+		// If the user did not study today, and missed yesterday, check if yesterday can be saved with a streak freeze
+		if currentStreak == 0 && !todayCompleted && !dateSet[yesterdayStr] && streakFreezes > 0 {
+			// Check if day before yesterday was part of a streak
+			yesterdayTime := time.Now().In(loc).AddDate(0, 0, -1)
+			potentialStreak := computeCurrentStreak(yesterdayTime, dateSet)
+			if potentialStreak > 0 {
+				// Consume 1 streak freeze and bridge yesterday
+				updatedProf, consumeErr := repo.ConsumeStreakFreeze()
+				if consumeErr == nil && updatedProf != nil {
+					streakFreezes = updatedProf.StreakFreezesOwned
+					// Add yesterday to dateSet to bridge the streak
+					dateSet[yesterdayStr] = true
+					activeDates = append(activeDates, yesterdayStr)
+					sort.Strings(activeDates)
+					currentStreak = computeCurrentStreak(nowClient, dateSet)
+					if currentStreak > longestStreak {
+						longestStreak = currentStreak
+					}
+					streakSavedEvent = map[string]interface{}{
+						"streak_length":     currentStreak,
+						"freezes_remaining": streakFreezes,
+					}
+				}
+			}
+		}
+
+		if streakFreezes > 0 && !todayCompleted && currentStreak > 0 {
+			shieldActive = true
+		}
 	}
+
+	res := map[string]interface{}{
+		"current_streak":       currentStreak,
+		"longest_streak":       longestStreak,
+		"active_dates":         activeDates,
+		"today_completed":      todayCompleted,
+		"completed_today":      completedToday,
+		"shield_active":        shieldActive,
+		"streak_freezes_owned": streakFreezes,
+	}
+	if streakSavedEvent != nil {
+		res["streak_saved_event"] = streakSavedEvent
+	}
+
+	return res
 }
 
 // GetDashboardOverview consolidates settings, profiles, today plan, streak state, and pending ingestion info into a single IPC payload.
@@ -547,5 +600,65 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 
 	return map[string]interface{}{
 		"timeline": timeline,
+	}
+}
+
+// GetGamificationState returns the user's XP, coins, titles, streak freezes, and unopened loot boxes.
+func (a *App) GetGamificationState() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.GetGamificationProfile()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	boxes, err := repo.GetUnopenedLootBoxes()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"profile":        prof,
+		"pending_chests": boxes,
+	}
+}
+
+// ClaimLootBox opens a mystery chest and applies rewards to the profile.
+func (a *App) ClaimLootBox(boxID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	box, prof, err := repo.ClaimLootBox(boxID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"claimed": box,
+		"profile": prof,
+	}
+}
+
+// BuyStreakFreeze purchases a streak freeze with 50 coins.
+func (a *App) BuyStreakFreeze() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.BuyStreakFreeze(50)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"profile": prof,
 	}
 }

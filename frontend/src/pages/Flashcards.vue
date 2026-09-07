@@ -133,6 +133,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text" v-html="currentCard.prompt"></p>
               <button id="fc-reveal-btn" class="reveal-btn" @click="flipped = true">
                 Show Answer
@@ -159,6 +160,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text answer-text" v-html="currentCard.answer"></p>
               <button class="flip-back-btn" @click="flipped = false">Show Question</button>
               <div class="rating-row">
@@ -242,6 +244,7 @@
       </div>
     </section>
   </StudyPageLayout>
+
 </template>
 
 <script setup>
@@ -260,6 +263,7 @@ import {
 import BaseButton from '../components/BaseButton.vue'
 import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import { playCardRatingTick } from '../utils/audioJuice'
 
 const route = useRoute()
 const router = useRouter()
@@ -365,6 +369,13 @@ async function handleQueueCompletion() {
     error.value = `Failed to complete session: ${completeRes.error}`
     return false
   }
+
+  if (completeRes?.rewards) {
+    window.dispatchEvent(
+      new CustomEvent('study-reward-earned', { detail: { rewards: completeRes.rewards } })
+    )
+  }
+
   router.push('/dashboard')
   return true
 }
@@ -385,6 +396,8 @@ async function rate(ratingKey) {
     error.value = 'Invalid rating selection. Please try again.'
     return
   }
+
+  playCardRatingTick(ratingKey)
 
   isSubmittingReview.value = true
   try {

@@ -530,11 +530,6 @@ onMounted(async () => {
   letter-spacing: -0.01em;
 }
 
-.pro-crown-symbol {
-  font-size: 16px;
-  opacity: 0.85;
-}
-
 .count-badge {
   font-size: 12px;
   font-weight: 500;

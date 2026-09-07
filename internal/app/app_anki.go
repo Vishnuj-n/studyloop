@@ -185,19 +185,29 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 		}
 	}
 
-	// Prepare cards and initial FSRS states
+	// Prepare cards and initial FSRS states.
+	// Drip cards across days using MaxFlashcardsPerSession as the batch size so
+	// the forecast graph shows a natural ramp instead of a pile-up spike on day 1.
 	now := time.Now().Unix()
+	const secsPerDay = int64(86400)
+
+	dripRate := 30 // default: matches scheduler fallback
+	if allSettings, sErr := repo.GetUserSettings(); sErr == nil && allSettings != nil && allSettings.MaxFlashcardsPerSession > 0 {
+		dripRate = allSettings.MaxFlashcardsPerSession
+	}
+
 	cardsToInsert := make([]models.Flashcard, 0, len(parsed.Cards))
 	statesToInsert := make(map[string]models.FlashcardState, len(parsed.Cards))
 
-	for _, c := range parsed.Cards {
+	for i, c := range parsed.Cards {
+		dayOffset := int64(i/dripRate) * secsPerDay // cards 0..dripRate-1 → today, next batch → tomorrow, etc.
 		cardID := uuid.NewString()
 		cardsToInsert = append(cardsToInsert, models.Flashcard{
 			ID:        cardID,
 			TopicID:   finalTopicID,
 			Prompt:    c.Prompt,
 			Answer:    c.Answer,
-			DueAt:     now, // immediately available for review
+			DueAt:     now + dayOffset,
 			Suspended: false,
 		})
 		statesToInsert[cardID] = models.FlashcardState{

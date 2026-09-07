@@ -14,6 +14,7 @@
         :disabled="disabled"
         @change="$emit('apply-preset', 'fast')"
       >
+        <option value="gemini">Google Gemini (AI Studio)</option>
         <option value="groq">Groq</option>
         <option value="openai">ChatGPT / OpenAI</option>
         <option value="openrouter">OpenRouter</option>
@@ -65,6 +66,7 @@
       </p>
       <p class="hint">
         Get free key:
+        <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio ↗</a> ·
         <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
         <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
       </p>
@@ -102,6 +104,7 @@
           :disabled="disabled"
           @change="$emit('apply-preset', 'heavy')"
         >
+          <option value="gemini">Google Gemini (AI Studio)</option>
           <option value="groq">Groq</option>
           <option value="openai">ChatGPT / OpenAI</option>
           <option value="openrouter">OpenRouter</option>

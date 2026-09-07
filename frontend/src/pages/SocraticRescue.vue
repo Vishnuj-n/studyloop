@@ -284,6 +284,11 @@ async function finishRescueSession() {
       completing.value = false
       return
     }
+    if (res?.rewards) {
+      window.dispatchEvent(
+        new CustomEvent('study-reward-earned', { detail: { rewards: res.rewards } })
+      )
+    }
     // Successfully completed! Route directly to the quiz if task id is returned, else fallback to dashboard
     const nextRoute = res?.quiz_task_id ? `/quiz?taskId=${res.quiz_task_id}` : '/dashboard'
     router.push(nextRoute)

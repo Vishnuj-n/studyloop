@@ -443,7 +443,6 @@ func CardToFlashcardState(card fsrs.Card) FlashcardState {
 
 // FlashcardStateToCard converts FlashcardState and timestamps to a go-fsrs Card.
 
-
 // Subtopic represents a logical section within a parent topic for study task organization.
 type Subtopic struct {
 	ID            string `json:"id"`
@@ -528,6 +527,7 @@ type UserSettings struct {
 	StudyStartTime          string `json:"study_start_time"`
 	StudyEndTime            string `json:"study_end_time"`
 	RemindersEnabled        bool   `json:"reminders_enabled"`
+	ShowRewardNotifications bool   `json:"show_reward_notifications"`
 	ActiveProfileID         string `json:"active_profile_id"`
 	SkipToReadingActive     bool   `json:"skip_to_reading_active"`
 	CloudSyncURL            string `json:"cloud_sync_url"`
@@ -576,4 +576,37 @@ type LLMSettings struct {
 	UseSameForHeavy bool            `json:"use_same_for_heavy"`
 	Fast            LLMTierSettings `json:"fast"`
 	Heavy           LLMTierSettings `json:"heavy"`
+}
+
+// GamificationProfile represents the persistent user progression and title stats.
+type GamificationProfile struct {
+	UserID                int    `json:"user_id"`
+	TotalXP               int    `json:"total_xp"`
+	Coins                 int    `json:"coins"`
+	CurrentTitle          string `json:"current_title"`
+	NextTitle             string `json:"next_title"`
+	NextTitleXP           int    `json:"next_title_xp"`
+	CurrentTitleMinXP     int    `json:"current_title_min_xp"`
+	StreakFreezesOwned    int    `json:"streak_freezes_owned"`
+	UnlockedCosmeticsJSON string `json:"unlocked_cosmetics_json"`
+	UpdatedAt             string `json:"updated_at"`
+}
+
+// PendingLootBox represents an unopened or opened mystery chest.
+type PendingLootBox struct {
+	ID           string `json:"id"`
+	TaskID       string `json:"task_id"`
+	BoxTier      string `json:"box_tier"`    // BRONZE, SILVER, GOLD, MYTHIC
+	RewardType   string `json:"reward_type"` // XP, COINS, STREAK_FREEZE
+	RewardAmount int    `json:"reward_amount"`
+	Opened       bool   `json:"opened"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// RewardPayload is emitted on task completion to trigger frontend juicing.
+type RewardPayload struct {
+	XPEarned         int             `json:"xp_earned"`
+	CoinsEarned      int             `json:"coins_earned"`
+	LootBox          *PendingLootBox `json:"loot_box,omitempty"`
+	NewTitleUnlocked string          `json:"new_title_unlocked,omitempty"`
 }

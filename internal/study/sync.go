@@ -107,18 +107,42 @@ type AssignedNotebook struct {
 	EndPage     *int   `json:"end_page"`
 }
 
+// ---------------------------------------------------------------------------
+// IMPORTANT ARCHITECTURAL BOUNDARY:
+// Classroom Sync and Anonymous Research Telemetry are two strictly separate
+// systems targeting different endpoints, databases, and use cases.
+//
+// 1. Classroom Sync (Teacher Dashboard / Assignments / Delta Logs):
+//    Target: Teacher/School Supabase RPC (CLOUD_SYNC_URL).
+//    Trigger: Only when user joins a classroom (classroom_code + cloud_sync_url).
+//
+// 2. Anonymous Research Telemetry (Product Improvement & Analytics):
+//    Target: Research Telemetry DB (RESEARCH_ANALYTICS_URL).
+//    Trigger: User settings (AnalyticsEnabled = true), regardless of classroom state.
+//
+// DO NOT conflate, chain, or make one a fallback of the other.
+// ---------------------------------------------------------------------------
+
 func StartCloudSyncLoop(repo *db.Repository) {
 	ticker := time.NewTicker(15 * time.Minute)
 	go func() {
-		utils.Warnf("[SYNC] Background cloud sync worker started.")
+		utils.Warnf("[SYNC] Background cloud sync & telemetry worker started.")
 		for range ticker.C {
+			// 1. Run Teacher / Classroom Sync (if configured)
 			if err := TriggerCloudSync(repo); err != nil {
-				utils.Warnf("[SYNC] Periodic sync warning: %v", err)
+				utils.Warnf("[SYNC] Periodic classroom sync warning: %v", err)
+			}
+
+			// 2. Run Anonymous Research Telemetry independently (if opted-in)
+			if err := TriggerAnonymousTelemetrySync(repo); err != nil {
+				utils.Warnf("[SYNC-ANALYTICS] Periodic anonymous telemetry warning: %v", err)
 			}
 		}
 	}()
 }
 
+// TriggerCloudSync runs teacher/classroom synchronization.
+// It is strictly for student classroom rosters, teacher notebook assignments, and study delta logs.
 func TriggerCloudSync(repo *db.Repository) error {
 	settings, err := repo.GetUserSettings()
 	if err != nil {
@@ -130,16 +154,10 @@ func TriggerCloudSync(repo *db.Repository) error {
 	anonKey := ResolveAnonKey()
 
 	if syncURL == "" {
-		// ponytail: cloud sync is independent of study queue tasks
-		if settings.AnalyticsEnabled {
-			if fbErr := syncAnalyticsFallback(repo); fbErr != nil {
-				utils.Warnf("[SYNC] fallback analytics upload failed: %v", fbErr)
-			}
-		}
-		return nil // Cloud sync not configured
+		return nil // Classroom cloud sync not configured for this profile
 	}
 
-	utils.Warnf("[SYNC] Running cloud sync to: %s", syncURL)
+	utils.Warnf("[SYNC] Running classroom cloud sync to: %s", syncURL)
 
 	// Build slim notebook records — filename only, no local paths or internal IDs
 	notebooks, err := repo.GetNotebooks("", "")
@@ -214,24 +232,33 @@ func TriggerCloudSync(repo *db.Repository) error {
 		if setErr := repo.SetLastSyncedAt(maxReviewedAt); setErr != nil {
 			utils.Warnf("[SYNC] failed to persist last_synced_at: %v", setErr)
 		}
-
-
-
 	}
 
 	if lastErr != nil {
-		utils.Warnf("[SYNC] Cloud sync failed after %d attempts: %v", 3, lastErr)
+		utils.Warnf("[SYNC] Classroom sync failed after %d attempts: %v", 3, lastErr)
 		return lastErr
 	}
 
-	utils.Warnf("[SYNC] Cloud sync completed successfully.")
+	utils.Warnf("[SYNC] Classroom sync completed successfully.")
 	return nil
 }
 
-func syncAnalyticsFallback(repo *db.Repository) error {
+// TriggerAnonymousTelemetrySync transmits anonymized study research telemetry events.
+// It is completely independent of classroom sync and user profile mode.
+// DO NOT combine this with TriggerCloudSync or classroom session tokens.
+func TriggerAnonymousTelemetrySync(repo *db.Repository) error {
+	settings, err := repo.GetUserSettings()
+	if err != nil {
+		return err
+	}
+
+	if !settings.AnalyticsEnabled {
+		return nil // User has opted out of anonymous research telemetry
+	}
+
 	events, ids, err := repo.GetUnsyncedAnalyticsEvents()
 	if err != nil {
-		return fmt.Errorf("failed to fetch unsynced analytics for fallback: %w", err)
+		return fmt.Errorf("failed to fetch unsynced analytics events: %w", err)
 	}
 	if len(events) == 0 {
 		return nil
@@ -250,13 +277,13 @@ func syncAnalyticsFallback(repo *db.Repository) error {
 	}
 
 	if researchURL == "" || researchToken == "" {
-		// Analytics endpoint/credentials not configured; skip upload cleanly
+		// Research telemetry endpoint/credentials not configured; skip cleanly
 		return nil
 	}
 
 	jsonBytes, err := json.Marshal(events)
 	if err != nil {
-		return fmt.Errorf("failed to marshal fallback analytics: %w", err)
+		return fmt.Errorf("failed to marshal anonymous analytics payload: %w", err)
 	}
 
 	headers := map[string]string{
@@ -269,9 +296,9 @@ func syncAnalyticsFallback(repo *db.Repository) error {
 	}
 
 	if err := repo.MarkAnalyticsSynced(ids); err != nil {
-		utils.Warnf("[SYNC-ANALYTICS] failed to mark fallback events synced: %v", err)
+		utils.Warnf("[SYNC-ANALYTICS] failed to mark anonymous events synced: %v", err)
 	}
-	utils.Warnf("[SYNC-ANALYTICS] Fallback analytics sync of %d events succeeded.", len(events))
+	utils.Warnf("[SYNC-ANALYTICS] Anonymous research telemetry sync of %d events succeeded.", len(events))
 	return nil
 }
 

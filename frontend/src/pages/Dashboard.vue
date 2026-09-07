@@ -1,24 +1,64 @@
 <template>
   <section class="page">
     <header class="topbar">
-      <!-- Active Profile Dropdown Selector -->
-      <div class="profile-selector-container">
-        <label for="active-profile-select">Current Profile:</label>
-        <select
+      <!-- Compact profile switcher: keep profile context visible without adding dashboard cards. -->
+      <div class="profile-selector-container" @click.stop>
+        <span class="profile-context-label">Profile</span>
+        <button
           id="active-profile-select"
-          v-model="userSettings.active_profile_id"
-          class="topbar-select"
-          @change="changeActiveProfile($event)"
+          type="button"
+          class="profile-switcher-trigger"
+          :aria-expanded="profileMenuOpen"
+          aria-haspopup="listbox"
+          @click="profileMenuOpen = !profileMenuOpen"
         >
-          <option value="">-- No Profile Selected --</option>
-          <option v-for="p in profiles" :key="p.id" :value="p.id">
-            {{ p.classroom_code ? `☁️ ${p.name} (${p.classroom_code})` : p.name }}
-          </option>
-        </select>
+          <span class="profile-trigger-status" aria-hidden="true"></span>
+          <span class="profile-trigger-name">{{ activeProfileName }}</span>
+          <span class="profile-trigger-chevron" aria-hidden="true">⌄</span>
+        </button>
+
+        <div v-if="profileMenuOpen" class="profile-switcher-menu" role="listbox" aria-label="Switch profile">
+          <button
+            v-for="p in profiles"
+            :key="p.id"
+            type="button"
+            class="profile-menu-item"
+            :class="{ active: p.id === userSettings.active_profile_id }"
+            role="option"
+            :aria-selected="p.id === userSettings.active_profile_id"
+            @click="selectProfile(p.id)"
+          >
+            <span class="profile-menu-dot" aria-hidden="true"></span>
+            <span class="profile-menu-copy">
+              <strong>{{ p.name }}</strong>
+              <small>{{ profileDeadlineLabel(p) }}</small>
+            </span>
+            <span v-if="p.id === userSettings.active_profile_id" class="profile-menu-current">Active</span>
+          </button>
+
+          <div class="profile-menu-divider" aria-hidden="true"></div>
+          <button type="button" class="profile-menu-action" @click="goToProfileSettings">
+            <span aria-hidden="true">⚙</span>
+            Manage profiles
+          </button>
+          <button type="button" class="profile-menu-action" @click="goToProfileOverview">
+            <span aria-hidden="true">◈</span>
+            View all profiles
+          </button>
+        </div>
       </div>
     </header>
 
     <!-- Status Banners -->
+    <StatusBanner
+      v-if="streakSavedEvent"
+      variant="info"
+      icon="🛡️"
+      title="Your streak was saved!"
+      :subtitle="`We used 1 Streak Freeze to protect your ${streakSavedEvent.streak_length}-day streak yesterday. You have ${streakSavedEvent.freezes_remaining} freeze(s) remaining.`"
+      action-label="Dismiss"
+      @action="streakSavedEvent = null"
+    />
     <StatusBanner
       v-if="pendingIngestionBook"
       variant="warning"
@@ -168,42 +208,17 @@
         </div>
       </div>
     </template>
-
-    <!-- Dev Mode Bypass Panel -->
-    <div v-if="appEnv === 'dev'" class="dev-panel card">
-      <header class="dev-header">
-        <h4>🛠 Dev Tools</h4>
-        <span class="dev-badge">APP_ENV = dev</span>
-      </header>
-      <div class="dev-actions">
-        <button type="button" class="dev-btn" :disabled="forcingRescue" @click="forceRescueState">
-          {{ forcingRescue ? 'Forcing...' : 'Force Socratic Rescue' }}
-        </button>
-        <button type="button" class="dev-btn" :disabled="forcingSync" @click="forceSyncTask">
-          {{ forcingSync ? 'Forcing...' : 'Force Flashcard Generate' }}
-        </button>
-        <button type="button" class="dev-btn" :disabled="forcingDue" @click="forceDueFlashcards">
-          {{ forcingDue ? 'Forcing...' : 'Force Flashcards Due Now' }}
-        </button>
-      </div>
-      <p v-if="devMessage" class="dev-message">{{ devMessage }}</p>
-    </div>
   </section>
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   getDashboardOverview,
   updateUserSettings,
   getProfileDailyPace,
   retryFlashcardGeneration,
-  getAppEnv,
-  devForceSocraticRescue,
-  devForceFlashcardGenerate,
-  forceDueFlashcardsNow,
-  getNotebooks,
   getFlashcardDueTimeline,
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
@@ -217,6 +232,7 @@ import TelemetryWidget from '../components/TelemetryWidget.vue'
 import StreakCalendar from '../components/StreakCalendar.vue'
 import ForecastChart from '../components/ForecastChart.vue'
 
+
 const router = useRouter()
 const route = useRoute()
 
@@ -225,6 +241,7 @@ const loading = ref(true)
 const error = ref('')
 const actionError = ref('')
 const flashcardNotice = ref('')
+const streakSavedEvent = ref(null)
 const tasks = ref([])
 const hasActiveStudyContent = ref(false)
 const dueReviewCards = ref(0)
@@ -260,12 +277,8 @@ const streakState = ref({
   completed_today: 0,
 })
 const streakError = ref('')
-
-const appEnv = ref('')
-const forcingRescue = ref(false)
-const forcingSync = ref(false)
-const devMessage = ref('')
 const isSyncing = ref(false)
+const profileMenuOpen = ref(false)
 
 // --- Calendar computeds ---
 const currentDate = new Date()
@@ -321,6 +334,16 @@ const activeProfileName = computed(() => {
   return p ? p.name : 'Unknown'
 })
 
+function profileDeadlineLabel(profile) {
+  const deadlineAt = Number(profile?.deadline_at)
+  if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'No deadline set'
+
+  const daysLeft = Math.ceil((deadlineAt * 1000 - Date.now()) / 86400000)
+  if (daysLeft < 0) return 'Deadline passed'
+  if (daysLeft === 0) return 'Due today'
+  return `${daysLeft}d left`
+}
+
 const hasSocraticRescueTask = computed(() => {
   return tasks.value.some((t) => t.action_type === 'socratic_remedial')
 })
@@ -343,20 +366,17 @@ const completedSessionsToday = computed(() => {
 
 // --- Lifecycle ---
 onMounted(async () => {
-  try {
-    const envRes = await getAppEnv()
-    if (envRes && envRes.env) {
-      appEnv.value = envRes.env
-    }
-  } catch (err) {
-    console.error('Failed to get APP_ENV:', err)
-  }
+  window.addEventListener('click', closeProfileMenu)
   if (flashcardsJustCreated.value > 0) {
     const newQuery = { ...route.query }
     delete newQuery.flashcardsCreated
     await router.replace({ query: newQuery })
   }
   await loadAgenda()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeProfileMenu)
 })
 
 // --- Data Fetching ---
@@ -417,6 +437,9 @@ function applyDashboardOverview(overview) {
   } else if (overview.streak_state) {
     streakState.value = overview.streak_state
     streakError.value = ''
+    if (overview.streak_state.streak_saved_event) {
+      streakSavedEvent.value = overview.streak_state.streak_saved_event
+    }
   }
 
   if (overview.pending_notebook_error) {
@@ -455,8 +478,12 @@ async function loadFlashcardTimeline(tzOffset) {
 }
 
 // --- User Actions ---
-async function changeActiveProfile(event) {
-  const newProfileID = event?.target?.value ?? ''
+function closeProfileMenu() {
+  profileMenuOpen.value = false
+}
+
+async function selectProfile(newProfileID) {
+  profileMenuOpen.value = false
   const oldProfileID = lastPersistedProfile.value
   try {
     loading.value = true
@@ -478,6 +505,16 @@ async function changeActiveProfile(event) {
   } finally {
     loading.value = false
   }
+}
+
+function goToProfileSettings() {
+  profileMenuOpen.value = false
+  router.push('/settings')
+}
+
+function goToProfileOverview() {
+  profileMenuOpen.value = false
+  router.push({ path: '/settings', query: { category: 'profiles' } })
 }
 
 async function toggleEscapeHatch() {
@@ -561,82 +598,7 @@ function goToNotebooks() {
   router.push('/notebooks')
 }
 
-// --- Dev Mode ---
-async function forceRescueState() {
-  forcingRescue.value = true
-  devMessage.value = ''
-  try {
-    const nbsRes = await getNotebooks()
-    const notebooks = Array.isArray(nbsRes) ? nbsRes.filter((n) => !n.error) : []
-    if (notebooks.length === 0) {
-      devMessage.value = 'No notebooks found. Please upload a notebook first.'
-      forcingRescue.value = false
-      return
-    }
 
-    const validNb = notebooks.find((n) => n.topic_id)
-    if (!validNb) {
-      devMessage.value = 'No notebook with a linked topic found. Confirm syllabus first.'
-      forcingRescue.value = false
-      return
-    }
-
-    const res = await devForceSocraticRescue(validNb.id, validNb.topic_id)
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = 'Successfully forced Socratic Rescue state!'
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingRescue.value = false
-  }
-}
-
-async function forceSyncTask() {
-  forcingSync.value = true
-  devMessage.value = ''
-  try {
-    const nbsRes = await getNotebooks()
-    const notebooks = Array.isArray(nbsRes) ? nbsRes.filter((n) => !n.error) : []
-    let nbId = 'system_default'
-    if (notebooks.length > 0) {
-      nbId = notebooks[0].id
-    }
-    const res = await devForceFlashcardGenerate(nbId)
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = 'Successfully forced Flashcard Generate task!'
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingSync.value = false
-  }
-}
-
-const forcingDue = ref(false)
-async function forceDueFlashcards() {
-  forcingDue.value = true
-  devMessage.value = ''
-  try {
-    const res = await forceDueFlashcardsNow()
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = `Successfully forced ${res.updated_cards ?? 0} flashcard(s) DUE NOW!`
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingDue.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -656,12 +618,13 @@ async function forceDueFlashcards() {
 }
 
 .profile-selector-container {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.profile-selector-container label {
+.profile-context-label {
   font-size: 13px;
   font-weight: 700;
   color: var(--muted-text, #666);
@@ -669,40 +632,154 @@ async function forceDueFlashcards() {
   letter-spacing: 0.05em;
 }
 
-.topbar-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
+.profile-switcher-trigger {
+  min-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   border: 1px solid var(--outline-variant, #e0e0e0);
   border-radius: 12px;
   background: var(--surface-container-low, #f8f9fa);
   color: var(--on-surface, #1e1e1e);
-  padding: 8px 36px 8px 14px;
+  padding: 9px 12px;
+  font: inherit;
   font-size: 14px;
-  font-family: inherit;
-  font-weight: 600;
+  font-weight: 700;
+  text-align: left;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2364707d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 5 3 3 3-3'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 12px;
 }
 
-.topbar-select:hover {
+.profile-switcher-trigger:hover,
+.profile-switcher-trigger:focus-visible {
   border-color: var(--primary);
   background-color: var(--surface-container-highest);
 }
 
-.topbar-select:focus {
+.profile-switcher-trigger:focus-visible,
+.profile-menu-item:focus-visible,
+.profile-menu-action:focus-visible {
   outline: none;
-  border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
-.topbar-select option {
-  background-color: var(--surface-container-lowest);
-  color: var(--on-surface);
+.profile-trigger-status,
+.profile-menu-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted-text, #64707d);
+}
+
+.profile-trigger-status {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.profile-trigger-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-trigger-chevron {
+  margin-left: auto;
+  color: var(--muted-text, #64707d);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.profile-switcher-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 66px;
+  z-index: 20;
+  width: 280px;
+  padding: 7px;
+  border: 1px solid var(--outline-variant, #e0e0e0);
+  border-radius: 14px;
+  background: var(--surface-container-lowest, #ffffff);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
+}
+
+.profile-menu-item,
+.profile-menu-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--on-surface, #1e1e1e);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-menu-item {
+  padding: 10px;
+}
+
+.profile-menu-item + .profile-menu-item {
+  margin-top: 4px;
+}
+
+.profile-menu-item:hover,
+.profile-menu-item.active {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.profile-menu-item.active .profile-menu-dot {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.profile-menu-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-menu-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.profile-menu-copy small {
+  color: var(--muted-text, #64707d);
+  font-size: 11px;
+}
+
+.profile-menu-current {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.profile-menu-divider {
+  height: 1px;
+  margin: 5px 3px;
+  background: var(--outline-variant, #e0e0e0);
+}
+
+.profile-menu-action {
+  padding: 9px 10px;
+  color: var(--muted-text, #64707d);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-menu-action:hover {
+  background: var(--surface-container-high, rgba(0, 0, 0, 0.04));
+  color: var(--on-surface, #1e1e1e);
 }
 
 .status-strip {
@@ -863,60 +940,4 @@ async function forceDueFlashcards() {
   gap: 16px;
 }
 
-/* Dev Panel */
-.dev-panel {
-  margin-top: 32px;
-  padding: 20px;
-  border-color: #f1c40f;
-  background: rgba(241, 196, 15, 0.05);
-}
-
-.dev-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.dev-header h4 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.dev-badge {
-  font-size: 11px;
-  font-weight: 700;
-  background: #f1c40f;
-  color: #2c3e50;
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.dev-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.dev-btn {
-  background: #34495e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.dev-btn:hover {
-  opacity: 0.9;
-}
-
-.dev-message {
-  margin: 10px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #16a085;
-}
 </style>

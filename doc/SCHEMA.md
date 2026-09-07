@@ -15,6 +15,7 @@ Generated from + must stay synchronized with `internal/db/schema.go`. Every `CRE
 | Assessment    | `quiz_attempts`, `reread_attempts`, `written_questions`, `written_user_answers`         |
 | Retention     | `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`                                    |
 | Configuration | `user_settings`, `llm_settings`, `study_profiles`                                       |
+| Gamification  | `user_gamification`, `pending_loot_boxes`                                               |
 | Utility       | `internal/utils/hash.go` — `CleanTopicTitle`, `MD5Hex`, `FileSHA256`                    |
 | Analytics     | `analytics_events`                                                                      |
 
@@ -353,6 +354,7 @@ Singleton table for global preferences.
 | `study_start_time` | TEXT DEFAULT '17:00' | Study window start time (HH:MM format) |
 | `study_end_time` | TEXT DEFAULT '18:00' | Study window end time (HH:MM format) |
 | `reminders_enabled` | BOOLEAN DEFAULT 1 | Whether study reminders enabled |
+| `show_reward_notifications` | BOOLEAN DEFAULT 1 | Whether reward popups & toasts are shown upon task completion |
 | `active_profile_id` | TEXT | Active study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
 | `skip_to_reading_active` | BOOLEAN DEFAULT 0 | Skip dashboard to active reading |
 | `cloud_sync_url` | TEXT DEFAULT '' | Remote sync endpoint URL |
@@ -424,6 +426,41 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time |
 
 **Referenced by:** `user_settings.active_profile_id` (FK → `id` ON DELETE SET NULL), `notebooks.profile_id` (FK → `id` ON DELETE SET NULL).
+
+## Gamification Tables
+
+### `user_gamification`
+
+Singleton table (user_id = 1) tracking XP, coins, narrative titles, and streak freezes.
+
+| Field | Type | Description |
+|---|---|---|
+| `user_id` | INTEGER PRIMARY KEY CHECK (user_id = 1) | User identifier |
+| `total_xp` | INTEGER NOT NULL DEFAULT 0 | Cumulative earned experience points |
+| `coins` | INTEGER NOT NULL DEFAULT 0 | Spendable study coins balance |
+| `current_title` | TEXT NOT NULL DEFAULT 'The Apprentice' | Current narrative rank title |
+| `streak_freezes_owned` | INTEGER NOT NULL DEFAULT 1 | Available streak freeze shields |
+| `unlocked_cosmetics_json` | TEXT NOT NULL DEFAULT '[]' | JSON list of unlocked cosmetics |
+| `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
+
+### `pending_loot_boxes`
+
+Unopened or opened mystery chests awarded upon task completion.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | TEXT PRIMARY KEY | Unique loot box identifier |
+| `task_id` | TEXT NOT NULL | Source study queue task ID |
+| `box_tier` | TEXT NOT NULL | Tier: `BRONZE`, `SILVER`, `GOLD`, `MYTHIC` |
+| `reward_type` | TEXT NOT NULL | Reward type: `XP`, `COINS`, `STREAK_FREEZE` |
+| `reward_amount` | INTEGER NOT NULL | Quantity awarded upon opening |
+| `opened` | BOOLEAN NOT NULL DEFAULT 0 | 0 = unopened / pending, 1 = claimed |
+| `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_pending_loot_boxes_opened ON pending_loot_boxes(opened, created_at DESC);
+```
 
 ## Key Relationships
 

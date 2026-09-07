@@ -304,6 +304,7 @@
       </div>
     </form>
   </StudyPageLayout>
+
 </template>
 
 <script setup>
@@ -321,6 +322,7 @@ import {
   getUserSettings,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import { playCorrectChime, playIncorrectThud } from '../utils/audioJuice'
 
 const route = useRoute()
 const router = useRouter()
@@ -463,6 +465,11 @@ async function submitMilestone() {
     if (res && res.error) {
       error.value = res.error
     } else {
+      if (res?.rewards) {
+        window.dispatchEvent(
+          new CustomEvent('study-reward-earned', { detail: { rewards: res.rewards } })
+        )
+      }
       router.push('/dashboard')
     }
   } catch (err) {
@@ -564,6 +571,17 @@ async function submitQuiz() {
     result.value = response?.result || null
     submitted.value = true
 
+    if (result.value?.passed) {
+      playCorrectChime()
+      if (response?.rewards) {
+        window.dispatchEvent(
+          new CustomEvent('study-reward-earned', { detail: { rewards: response.rewards } })
+        )
+      }
+    } else {
+      playIncorrectThud()
+    }
+
     if (analyticsEnabled.value) {
       const notebook = notebooks.value.find((n) => n.id === taskMeta.value?.notebook_id)
       const fileHash = notebook?.file_hash || ''
@@ -609,6 +627,11 @@ async function handleContinue() {
         result.value.flashcards_pending = false
         return
       } else {
+        if (genResult?.rewards) {
+          window.dispatchEvent(
+            new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+          )
+        }
         // Update result with generated counts for dashboard banner
         result.value.flashcards_generated = genResult?.cards_scheduled || 0
         result.value.flashcards_pending = false
@@ -650,6 +673,11 @@ async function handleGoToExaminer() {
         result.value.flashcards_pending = false
         return
       } else {
+        if (genResult?.rewards) {
+          window.dispatchEvent(
+            new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+          )
+        }
         result.value.flashcards_generated = genResult?.cards_scheduled || 0
         result.value.flashcards_pending = false
       }

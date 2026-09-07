@@ -8,10 +8,25 @@
         </div>
       </div>
 
+      <!-- Compact Gamification Pill -->
+      <RouterLink to="/rewards" class="gamification-sidebar-pill" title="View Rewards & Progression">
+        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : gamification.current_title }}</span>
+        <div v-if="!gamificationError" class="pill-xp-bar">
+          <div class="pill-xp-fill" :style="{ width: xpPercent + '%' }"></div>
+        </div>
+      </RouterLink>
+
       <nav class="menu">
         <RouterLink v-for="item in topItems" :key="item.to" :to="item.to" class="menu-item">
           <span class="menu-icon" aria-hidden="true">{{ item.icon }}</span>
-          {{ item.label }}
+          <span class="menu-label">{{ item.label }}</span>
+          <span
+            v-if="item.to === '/rewards' && pendingChestsCount > 0"
+            class="unopened-chests-badge"
+            title="Unopened mystery chests waiting in vault"
+          >
+            🎁 {{ pendingChestsCount }}
+          </span>
         </RouterLink>
       </nav>
     </div>
@@ -36,7 +51,24 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { triggerCloudSync, getUserSettings } from '../services/appApi'
+import { triggerCloudSync, getUserSettings, getGamificationState } from '../services/appApi'
+
+const gamification = ref({
+  current_title: 'The Apprentice',
+  total_xp: 0,
+  next_title_xp: 500,
+  current_title_min_xp: 0,
+})
+
+const xpPercent = computed(() => {
+  const min = gamification.value.current_title_min_xp || 0
+  const max = gamification.value.next_title_xp || 500
+  const cur = gamification.value.total_xp || 0
+  if (cur >= max) return 100
+  const range = max - min
+  if (range <= 0) return 100
+  return Math.min(100, Math.max(0, Math.round(((cur - min) / range) * 100)))
+})
 
 const syncing = ref(false)
 const syncState = ref('idle')
@@ -90,13 +122,37 @@ async function handleSync() {
   }
 }
 
+const pendingChestsCount = ref(0)
+const gamificationError = ref(false)
+
+async function loadGamification() {
+  try {
+    const res = await getGamificationState()
+    if (res?.profile) {
+      gamification.value = res.profile
+      gamificationError.value = false
+    }
+    if (Array.isArray(res?.pending_chests)) {
+      pendingChestsCount.value = res.pending_chests.length
+    } else {
+      pendingChestsCount.value = 0
+    }
+  } catch (err) {
+    console.warn('[SIDEBAR] Failed to load gamification profile:', err)
+    gamificationError.value = true
+  }
+}
+
 onMounted(() => {
   checkCloudAccount()
+  loadGamification()
   window.addEventListener('settings-updated', checkCloudAccount)
+  window.addEventListener('gamification-updated', loadGamification)
 })
 
 onUnmounted(() => {
   window.removeEventListener('settings-updated', checkCloudAccount)
+  window.removeEventListener('gamification-updated', loadGamification)
   if (syncTimer) {
     clearTimeout(syncTimer)
     syncTimer = null
@@ -111,6 +167,7 @@ const topItems = [
   { to: '/flashcards', label: 'Flashcards', icon: '◧' },
   { to: '/examiner', label: 'Examiner', icon: '✎' },
   { to: '/tutor', label: 'Tutor', icon: '◎' },
+  { to: '/rewards', label: 'Rewards', icon: '✦' },
   { to: '/extensions', label: 'Extensions', icon: '❖' },
 ]
 </script>
@@ -155,8 +212,54 @@ const topItems = [
   color: var(--on-surface);
 }
 
+.gamification-sidebar-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  background: color-mix(in srgb, var(--on-surface) 3%, transparent);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.2s ease,
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.gamification-sidebar-pill:hover {
+  background: var(--surface-container-low);
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--outline-variant));
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+}
+
+.pill-title {
+  font-weight: 700;
+  color: var(--on-surface);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-xp-bar {
+  height: 4px;
+  background: var(--outline-variant);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pill-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-dim), var(--primary));
+  transition: width 0.3s ease;
+}
+
 .menu {
-  margin-top: 28px;
+  margin-top: 20px;
   display: grid;
   gap: 6px;
 }
@@ -185,6 +288,36 @@ const topItems = [
   color: color-mix(in srgb, var(--muted-text) 65%, var(--on-surface));
   font-size: 12px;
   line-height: 1;
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.unopened-chests-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+  border: 1px solid var(--outline-variant);
+  animation: chest-pulse 2.4s infinite ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.2;
+}
+
+@keyframes chest-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.25);
+  }
 }
 
 .menu-item:hover {

@@ -112,6 +112,7 @@ func InitSchema(tx *sql.Tx) error {
 			study_start_time TEXT DEFAULT '17:00',
 			study_end_time TEXT DEFAULT '18:00',
 			reminders_enabled BOOLEAN DEFAULT 1,
+			show_reward_notifications BOOLEAN DEFAULT 1,
 			active_profile_id TEXT,
 			skip_to_reading_active BOOLEAN DEFAULT 0,
 			cloud_sync_url TEXT DEFAULT '',
@@ -265,6 +266,27 @@ func InitSchema(tx *sql.Tx) error {
 			synced BOOLEAN DEFAULT 0,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+
+		// Gamification tables
+		`CREATE TABLE IF NOT EXISTS user_gamification (
+			user_id INTEGER PRIMARY KEY CHECK (user_id = 1),
+			total_xp INTEGER NOT NULL DEFAULT 0,
+			coins INTEGER NOT NULL DEFAULT 0,
+			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
+			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
+			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '[]',
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS pending_loot_boxes (
+			id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			box_tier TEXT NOT NULL,
+			reward_type TEXT NOT NULL,
+			reward_amount INTEGER NOT NULL,
+			opened BOOLEAN NOT NULL DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
 	}
 
 	// Execute all table creation statements
@@ -291,6 +313,7 @@ func InitSchema(tx *sql.Tx) error {
 		`CREATE INDEX IF NOT EXISTS idx_reread_attempts_last_attempt_at ON reread_attempts(last_attempt_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_manual_flashcards_notebook_id ON manual_flashcards(notebook_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_synced ON analytics_events(synced)`,
+		`CREATE INDEX IF NOT EXISTS idx_pending_loot_boxes_opened ON pending_loot_boxes(opened, created_at DESC)`,
 	}
 
 	for _, stmt := range indexes {
@@ -381,6 +404,15 @@ func InitSchema(tx *sql.Tx) error {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
 	}
 
+	// Initialize default gamification state
+	if _, err := tx.Exec(`
+		INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json)
+		VALUES (1, 0, 0, 'The Apprentice', 1, '[]')
+		ON CONFLICT(user_id) DO NOTHING
+	`); err != nil {
+		return fmt.Errorf("failed to initialize user gamification: %w", err)
+	}
+
 	return nil
 }
 
@@ -393,6 +425,7 @@ var alterStatements = []struct {
 	{"user_settings", "study_start_time", "ALTER TABLE user_settings ADD COLUMN study_start_time TEXT DEFAULT '17:00'"},
 	{"user_settings", "study_end_time", "ALTER TABLE user_settings ADD COLUMN study_end_time TEXT DEFAULT '18:00'"},
 	{"user_settings", "reminders_enabled", "ALTER TABLE user_settings ADD COLUMN reminders_enabled BOOLEAN DEFAULT 1"},
+	{"user_settings", "show_reward_notifications", "ALTER TABLE user_settings ADD COLUMN show_reward_notifications BOOLEAN DEFAULT 1"},
 	{"user_settings", "default_remedial_strategy", "ALTER TABLE user_settings ADD COLUMN default_remedial_strategy TEXT DEFAULT 'FAST'"},
 	{"user_settings", "classroom_code", "ALTER TABLE user_settings ADD COLUMN classroom_code TEXT DEFAULT ''"},
 	{"user_settings", "student_username", "ALTER TABLE user_settings ADD COLUMN student_username TEXT DEFAULT ''"},

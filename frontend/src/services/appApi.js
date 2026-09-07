@@ -377,4 +377,14 @@ export function saveExtensionConfig(configJSON) {
   return appBridge().SaveExtensionConfig(configJSON)
 }
 
+export function getGamificationState() {
+  return appBridge().GetGamificationState()
+}
 
+export function claimLootBox(boxID) {
+  return appBridge().ClaimLootBox(boxID)
+}
+
+export function buyStreakFreeze() {
+  return appBridge().BuyStreakFreeze()
+}

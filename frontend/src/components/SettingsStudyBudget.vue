@@ -156,6 +156,13 @@
         title="Enable Study Time Chimes & Banners"
         hint="Notify when your scheduled study session begins and concludes."
       />
+
+      <SettingsToggle
+        v-model="settings.show_reward_notifications"
+        :disabled="disabled"
+        title="Show study reward notifications"
+        hint="Show the non-blocking XP and mystery chest confirmation after a study session. Rewards remain available in the vault when disabled."
+      />
     </div>
 
     <SettingsToggle

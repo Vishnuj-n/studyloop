@@ -21,14 +21,14 @@ func (a *App) CompleteMilestoneExam(taskID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	_, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+	res, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
 		TaskID: taskID,
 		Event:  studypkg.EventCompleteMilestoneExam,
 	})
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"ok": true}
+	return map[string]interface{}{"ok": true, "rewards": res.Rewards}
 }
 
 func (a *App) GetTask(taskID string) map[string]interface{} {
@@ -188,11 +188,22 @@ func (a *App) SubmitQuizAttempt(taskID string, answers []models.QuizAnswer) map[
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	result, err := a.studyService.SubmitQuizAttempt(taskID, answers)
+	transitionRes, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+		TaskID:      taskID,
+		Event:       studypkg.EventSubmitQuiz,
+		QuizAnswers: answers,
+	})
 	if err != nil {
 		return mapTaskError(err)
 	}
-	return map[string]interface{}{"result": result}
+	result := transitionRes.QuizResult
+	if result == nil {
+		return map[string]interface{}{"error": "quiz result missing"}
+	}
+	return map[string]interface{}{
+		"result":  *result,
+		"rewards": transitionRes.Rewards,
+	}
 }
 
 // GenerateFlashcardsForQuizTask generates flashcards based on a passed quiz task.
@@ -247,6 +258,7 @@ func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{
 		"review_task_id":    "",
 		"cards_scheduled":   transitionRes.CardsScheduled,
 		"flashcards_gen_ok": true,
+		"rewards":           transitionRes.Rewards,
 	}
 }
 
@@ -359,14 +371,14 @@ func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
-	_, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+	res, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
 		TaskID: taskID,
 		Event:  studypkg.EventCompleteFlashcardReview,
 	})
 	if err != nil {
 		return mapTaskError(err)
 	}
-	return map[string]interface{}{"ok": true}
+	return map[string]interface{}{"ok": true, "rewards": res.Rewards}
 }
 
 func (a *App) SuspendFlashcard(taskID, cardID string) map[string]interface{} {
@@ -418,7 +430,11 @@ func (a *App) CompleteSocraticRescue(taskID string) map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"ok": true, "quiz_task_id": res.NextTaskID}
+	return map[string]interface{}{
+		"ok":           true,
+		"quiz_task_id": res.NextTaskID,
+		"rewards":      res.Rewards,
+	}
 }
 
 // DevForceSocraticRescue forces a topic into the SOCRATIC_REMEDIAL queue task state.

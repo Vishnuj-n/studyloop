@@ -24,8 +24,21 @@ export function cleanTopicTitle(raw) {
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-  const suffix = suffixWords.join(' ')
-  if (suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() || suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase()) {
+  let suffix = suffixWords.join(' ')
+  if (
+    suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() ||
+    suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase() ||
+    suffix === chNum ||
+    suffix === subParts[0]
+  ) {
+    return `Chapter ${chNum}`
+  }
+  if (suffix.startsWith(`${chNum} `)) {
+    suffix = suffix.substring(chNum.length + 1).trim()
+  } else if (suffix.startsWith(`${subParts[0]} `)) {
+    suffix = suffix.substring(subParts[0].length + 1).trim()
+  }
+  if (!suffix) {
     return `Chapter ${chNum}`
   }
   return `Chapter ${chNum}: ${suffix}`

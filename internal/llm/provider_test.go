@@ -91,3 +91,13 @@ func TestLoadConfigFromSettingsLimitsOverride(t *testing.T) {
 	}
 }
 
+func TestDefaultBaseURLAndModelForGemini(t *testing.T) {
+	if got := defaultBaseURLForProvider("gemini"); got != "https://generativelanguage.googleapis.com/v1beta/openai" {
+		t.Fatalf("unexpected Gemini baseURL: %s", got)
+	}
+	if got := defaultModelForProvider("gemini"); got != "gemini-flash-lite-latest" {
+		t.Fatalf("unexpected Gemini model: %s", got)
+	}
+}
+
+

@@ -509,8 +509,8 @@ def main():
     else:
         format_report(findings, scanned_count, project_root, show_hints=not args.no_hints)
 
-    # Exit code: 0 if no warnings, 1 if warnings found
-    sys.exit(0)
+    # Exit code: 0 if clean, 1 if code smells found
+    sys.exit(1 if len(findings) > 0 else 0)
 
 
 if __name__ == "__main__":

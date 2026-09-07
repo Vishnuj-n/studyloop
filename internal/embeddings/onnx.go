@@ -389,14 +389,14 @@ func extractBatchEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo
 		}
 
 		if tensor, ok := output.(*ort.Tensor[float32]); ok {
-			vectors, err := poolFloat32TensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
+			vectors, err := poolTensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
 			if err == nil && len(vectors) == batchSize {
 				return vectors, nil
 			}
 		}
 
 		if tensor, ok := output.(*ort.Tensor[float64]); ok {
-			vectors, err := poolFloat64TensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
+			vectors, err := poolTensorBatch(tensor, attentionMask, batchSize, maxSeqLen)
 			if err == nil && len(vectors) == batchSize {
 				return vectors, nil
 			}
@@ -410,46 +410,7 @@ func extractBatchEmbedding(outputs []ort.Value, outputInfo []ort.InputOutputInfo
 	return nil, fmt.Errorf("model did not return a supported float embedding tensor")
 }
 
-func poolFloat32TensorBatch(t *ort.Tensor[float32], attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
-	shape := t.GetShape()
-	data := t.GetData()
-	if len(data) == 0 {
-		return nil, fmt.Errorf("output tensor is empty")
-	}
-
-	switch len(shape) {
-	case 2:
-		rows := int(shape[0])
-		cols := int(shape[1])
-		if rows != batchSize || cols <= 0 {
-			return nil, fmt.Errorf("unexpected 2D output shape for batch: %v (expected %d rows)", shape, batchSize)
-		}
-		vectors := make([][]float32, batchSize)
-		for b := 0; b < batchSize; b++ {
-			vectors[b] = make([]float32, cols)
-			copy(vectors[b], data[b*cols:(b+1)*cols])
-		}
-		return vectors, nil
-	case 3:
-		b := int(shape[0])
-		seqLen := int(shape[1])
-		hidden := int(shape[2])
-		if b != batchSize || seqLen <= 0 || hidden <= 0 {
-			return nil, fmt.Errorf("invalid 3D output shape for batch: %v (expected batch=%d)", shape, batchSize)
-		}
-		vectors := make([][]float32, batchSize)
-		for i := 0; i < batchSize; i++ {
-			itemMask := attentionMask[i*maxSeqLen : (i+1)*maxSeqLen]
-			itemData := data[i*seqLen*hidden : (i+1)*seqLen*hidden]
-			vectors[i] = meanPool3D(itemData, seqLen, hidden, itemMask)
-		}
-		return vectors, nil
-	default:
-		return nil, fmt.Errorf("unsupported output tensor rank for batch: %d", len(shape))
-	}
-}
-
-func poolFloat64TensorBatch(t *ort.Tensor[float64], attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
+func poolTensorBatch[T float32 | float64](t *ort.Tensor[T], attentionMask []int64, batchSize, maxSeqLen int) ([][]float32, error) {
 	shape := t.GetShape()
 	data := t.GetData()
 	if len(data) == 0 {
@@ -482,12 +443,7 @@ func poolFloat64TensorBatch(t *ort.Tensor[float64], attentionMask []int64, batch
 		for i := 0; i < batchSize; i++ {
 			itemMask := attentionMask[i*maxSeqLen : (i+1)*maxSeqLen]
 			itemData := data[i*seqLen*hidden : (i+1)*seqLen*hidden]
-			pooled64 := meanPool3DFloat64(itemData, seqLen, hidden, itemMask)
-			vec32 := make([]float32, hidden)
-			for h := 0; h < hidden; h++ {
-				vec32[h] = float32(pooled64[h])
-			}
-			vectors[i] = vec32
+			vectors[i] = meanPool(itemData, seqLen, hidden, itemMask)
 		}
 		return vectors, nil
 	default:
@@ -495,82 +451,17 @@ func poolFloat64TensorBatch(t *ort.Tensor[float64], attentionMask []int64, batch
 	}
 }
 
-func meanPool3D(data []float32, seqLen, hidden int, attentionMask []int64) []float32 {
-	vector := make([]float32, hidden)
+// meanPool computes the masked average along the steps dimension and returns a float32 vector.
+func meanPool[T float32 | float64](data []T, steps, dim int, attentionMask []int64) []float32 {
+	vector := make([]float32, dim)
 	count := float32(0)
-	for tokenIdx := 0; tokenIdx < seqLen; tokenIdx++ {
-		if tokenIdx < len(attentionMask) && attentionMask[tokenIdx] == 0 {
+	for step := 0; step < steps; step++ {
+		if step < len(attentionMask) && attentionMask[step] == 0 {
 			continue
 		}
-		offset := tokenIdx * hidden
-		for d := 0; d < hidden; d++ {
-			vector[d] += data[offset+d]
-		}
-		count++
-	}
-	if count == 0 {
-		count = 1
-	}
-	for i := range vector {
-		vector[i] /= count
-	}
-	return vector
-}
-
-func meanPool2D(data []float32, rows, cols int, attentionMask []int64) []float32 {
-	vector := make([]float32, cols)
-	count := float32(0)
-	for row := 0; row < rows; row++ {
-		if row < len(attentionMask) && attentionMask[row] == 0 {
-			continue
-		}
-		offset := row * cols
-		for col := 0; col < cols; col++ {
-			vector[col] += data[offset+col]
-		}
-		count++
-	}
-	if count == 0 {
-		count = 1
-	}
-	for i := range vector {
-		vector[i] /= count
-	}
-	return vector
-}
-
-func meanPool3DFloat64(data []float64, seqLen, hidden int, attentionMask []int64) []float64 {
-	vector := make([]float64, hidden)
-	count := float64(0)
-	for tokenIdx := 0; tokenIdx < seqLen; tokenIdx++ {
-		if tokenIdx < len(attentionMask) && attentionMask[tokenIdx] == 0 {
-			continue
-		}
-		offset := tokenIdx * hidden
-		for d := 0; d < hidden; d++ {
-			vector[d] += data[offset+d]
-		}
-		count++
-	}
-	if count == 0 {
-		count = 1
-	}
-	for i := range vector {
-		vector[i] /= count
-	}
-	return vector
-}
-
-func meanPool2DFloat64(data []float64, rows, cols int, attentionMask []int64) []float64 {
-	vector := make([]float64, cols)
-	count := float64(0)
-	for row := 0; row < rows; row++ {
-		if row < len(attentionMask) && attentionMask[row] == 0 {
-			continue
-		}
-		offset := row * cols
-		for col := 0; col < cols; col++ {
-			vector[col] += data[offset+col]
+		offset := step * dim
+		for d := 0; d < dim; d++ {
+			vector[d] += float32(data[offset+d])
 		}
 		count++
 	}

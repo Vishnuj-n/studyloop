@@ -113,6 +113,8 @@ func firstNonEmpty(values ...string) string {
 
 func defaultBaseURLForProvider(provider string) string {
 	switch strings.TrimSpace(strings.ToLower(provider)) {
+	case "gemini":
+		return "https://generativelanguage.googleapis.com/v1beta/openai"
 	case "groq":
 		return "https://api.groq.com/openai"
 	case "openai":
@@ -126,6 +128,8 @@ func defaultBaseURLForProvider(provider string) string {
 
 func defaultModelForProvider(provider string) string {
 	switch strings.TrimSpace(strings.ToLower(provider)) {
+	case "gemini":
+		return "gemini-flash-lite-latest"
 	case "groq":
 		return "openai/gpt-oss-120b"
 	case "openai":

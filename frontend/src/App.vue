@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar.vue'
 import { useRoute } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import MysteryChestModal from './components/MysteryChestModal.vue'
+import RewardToast from './components/RewardToast.vue'
 import {
   getUserSettings,
   updateUserSettings,
@@ -12,7 +14,7 @@ import {
 } from './services/appApi'
 import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
-import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
+import { EventsOn } from '../wailsjs/runtime/runtime'
 
 const { toast, hideToast, showNotice, showError } = useToast()
 
@@ -200,6 +202,33 @@ const showUpdateModal = ref(false)
 const currentVersion = ref('')
 const latestVersion = ref('')
 
+const pendingReward = ref(null)
+const activeChest = ref(null)
+const activeChestTitle = ref('')
+
+function handleStudyReward(event) {
+  const rewards = event?.detail?.rewards
+  if (!rewards) return
+
+  pendingReward.value = rewards
+  window.dispatchEvent(new Event('gamification-updated'))
+}
+
+function openRewardChest(box) {
+  activeChestTitle.value = pendingReward.value?.new_title_unlocked || ''
+  pendingReward.value = null
+  activeChest.value = box
+}
+
+function dismissRewardToast() {
+  pendingReward.value = null
+}
+
+function closeActiveChest() {
+  activeChest.value = null
+  activeChestTitle.value = ''
+}
+
 async function checkAppUpdates() {
   try {
     const res = await checkForUpdates()
@@ -225,6 +254,7 @@ onMounted(() => {
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
   cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
+  window.addEventListener('study-reward-earned', handleStudyReward)
 })
 
 onUnmounted(() => {
@@ -233,6 +263,7 @@ onUnmounted(() => {
     schedulerTimeout = null
   }
   window.removeEventListener('settings-updated', syncScheduler)
+  window.removeEventListener('study-reward-earned', handleStudyReward)
   if (cancelIngestionListener) cancelIngestionListener()
 })
 </script>
@@ -289,6 +320,19 @@ onUnmounted(() => {
 
       <RouterView />
       <ConfirmModal />
+
+      <RewardToast
+        v-if="pendingReward"
+        :rewards="pendingReward"
+        @open-chest="openRewardChest"
+        @dismiss="dismissRewardToast"
+      />
+      <MysteryChestModal
+        v-if="activeChest"
+        :box="activeChest"
+        :new-title="activeChestTitle"
+        @close="closeActiveChest"
+      />
 
       <!-- Global Toaster -->
       <div class="toast-stack">

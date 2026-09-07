@@ -682,6 +682,11 @@ async function finishRescue() {
       completingRescue.value = false
       return
     }
+    if (res?.rewards) {
+      window.dispatchEvent(
+        new CustomEvent('study-reward-earned', { detail: { rewards: res.rewards } })
+      )
+    }
     const nextRoute = res?.quiz_task_id ? `/quiz?taskId=${res.quiz_task_id}` : '/dashboard'
     router.push(nextRoute)
   } catch (err) {

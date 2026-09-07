@@ -10,6 +10,7 @@ export function useSettings(errorRef, successRef) {
     study_start_time: '17:00',
     study_end_time: '18:00',
     reminders_enabled: true,
+    show_reward_notifications: true,
     active_profile_id: '',
     skip_to_reading_active: false,
     cloud_sync_url: '',

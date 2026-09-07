@@ -39,13 +39,14 @@ type TransitionRequest struct {
 
 // TransitionResult provides the outcome and any spawned follow-up task IDs.
 type TransitionResult struct {
-	Success        bool               `json:"success"`
-	TaskID         string             `json:"task_id"`
-	NextTaskID     string             `json:"next_task_id,omitempty"`
-	NextTaskType   string             `json:"next_task_type,omitempty"`
-	QuizResult     *models.QuizResult `json:"quiz_result,omitempty"`
-	CardsScheduled int                `json:"cards_scheduled,omitempty"`
-	Message        string             `json:"message,omitempty"`
+	Success        bool                  `json:"success"`
+	TaskID         string                `json:"task_id"`
+	NextTaskID     string                `json:"next_task_id,omitempty"`
+	NextTaskType   string                `json:"next_task_type,omitempty"`
+	QuizResult     *models.QuizResult    `json:"quiz_result,omitempty"`
+	CardsScheduled int                   `json:"cards_scheduled,omitempty"`
+	Rewards        *models.RewardPayload `json:"rewards,omitempty"`
+	Message        string                `json:"message,omitempty"`
 }
 
 // TransitionTask serves as the unified switchboard for all study queue task state transitions.
@@ -66,11 +67,13 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete reading transition: %w", err)
 		}
+		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeReading, 0, false)
 		return TransitionResult{
 			Success:      true,
 			TaskID:       req.TaskID,
 			NextTaskID:   quizTaskID,
 			NextTaskType: string(models.StudyTaskTypeQuiz),
+			Rewards:      rewards,
 		}, nil
 
 	case EventSubmitQuiz:
@@ -81,10 +84,15 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to process quiz submission transition: %w", err)
 		}
+		var rewards *models.RewardPayload
+		if res.Passed {
+			rewards = s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeQuiz, res.Score, res.Score >= 100)
+		}
 		return TransitionResult{
 			Success:    true,
 			TaskID:     req.TaskID,
 			QuizResult: &res,
+			Rewards:    rewards,
 		}, nil
 
 	case EventCompleteFlashcards:
@@ -104,19 +112,23 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			}
 		}
 
+		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeFlashcardGenerate, 0, false)
 		return TransitionResult{
 			Success:        true,
 			TaskID:         req.TaskID,
 			CardsScheduled: req.CardCount,
+			Rewards:        rewards,
 		}, nil
 
 	case EventCompleteFlashcardReview:
 		if err := s.repo.CompleteReviewSession(req.TaskID); err != nil {
 			return TransitionResult{}, err
 		}
+		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeFlashcardReview, 0, false)
 		return TransitionResult{
 			Success: true,
 			TaskID:  req.TaskID,
+			Rewards: rewards,
 		}, nil
 
 	case EventCompleteMilestoneExam:
@@ -132,9 +144,11 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		}); err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete milestone exam: %w", err)
 		}
+		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeMilestoneExam, 100, true)
 		return TransitionResult{
 			Success: true,
 			TaskID:  req.TaskID,
+			Rewards: rewards,
 		}, nil
 
 	case EventCompleteSocraticRescue:
@@ -208,12 +222,14 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			return TransitionResult{}, fmt.Errorf("failed to commit socratic rescue completion: %w", err)
 		}
 
+		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeSocraticRemedial, 100, true)
 		utils.Warnf("[SOCRATIC_RESCUE] rescue_completed taskID=%s topicID=%s requizTaskID=%s", req.TaskID, task.TopicID, quizTaskID)
 		return TransitionResult{
 			Success:      true,
 			TaskID:       req.TaskID,
 			NextTaskID:   quizTaskID,
 			NextTaskType: string(models.StudyTaskTypeQuiz),
+			Rewards:      rewards,
 		}, nil
 
 	case EventFailTask:
@@ -232,3 +248,41 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		return TransitionResult{}, fmt.Errorf("unrecognized transition event: %s", req.Event)
 	}
 }
+
+// awardCompletionRewards calculates deterministic XP/coins and persists any mystery chest to SQLite atomically.
+func (s *StudyService) awardCompletionRewards(taskID string, taskType models.StudyTaskType, score int, isAce bool) *models.RewardPayload {
+	if s.repo == nil {
+		return nil
+	}
+
+	xp, coins, box := RollTaskRewards(taskType, score, isAce)
+	if box != nil {
+		box.TaskID = taskID
+	}
+
+	tx, err := s.repo.Begin()
+	if err != nil {
+		utils.Warnf("[GAMIFICATION] failed to begin reward transaction for task %s: %v", taskID, err)
+		return nil
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	newTitle, err := s.repo.AwardTaskRewardsTx(tx, xp, coins, box)
+	if err != nil {
+		utils.Warnf("[GAMIFICATION] failed to award completion rewards for task %s: %v", taskID, err)
+		return nil
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.Warnf("[GAMIFICATION] failed to commit reward transaction for task %s: %v", taskID, err)
+		return nil
+	}
+
+	return &models.RewardPayload{
+		XPEarned:         xp,
+		CoinsEarned:      coins,
+		LootBox:          box,
+		NewTitleUnlocked: newTitle,
+	}
+}
+

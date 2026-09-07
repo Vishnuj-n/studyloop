@@ -862,6 +862,11 @@ async function completeSession() {
       showError(done.error, 'Session Completion Failed')
       return
     }
+    if (done?.rewards) {
+      window.dispatchEvent(
+        new CustomEvent('study-reward-earned', { detail: { rewards: done.rewards } })
+      )
+    }
     if (analyticsEnabled.value) {
       const fileHash = reader.readerContext.value?.notebookFileHash || ''
       trackAnalyticsEvent('reading_complete', fileHash, reader.currentPage.value, {

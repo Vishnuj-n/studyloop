@@ -36,6 +36,11 @@ const routes = [
     name: 'simplify',
     component: () => import('../pages/Simplify.vue'),
   },
+  {
+    path: '/rewards',
+    name: 'rewards',
+    component: () => import('../pages/Rewards.vue'),
+  },
   { path: '/settings', name: 'settings', component: Settings },
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
 ]

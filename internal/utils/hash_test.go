@@ -37,6 +37,14 @@ func TestCleanTopicTitle(t *testing.T) {
 			input:    "   nb-uuid-ch-01-intro   ",
 			expected: "Chapter 1: Intro",
 		},
+		{
+			input:    "nb-d124bc64-6474-4136-bbde-2c9a45b79be2-ch-03-3-drawing-a-line-clo",
+			expected: "Chapter 3: Drawing A Line Clo",
+		},
+		{
+			input:    "nb-uuid-ch-05-05-linear-regression",
+			expected: "Chapter 5: Linear Regression",
+		},
 	}
 
 	for _, tc := range tests {
