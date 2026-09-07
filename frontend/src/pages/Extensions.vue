@@ -70,15 +70,19 @@
             </div>
 
             <!-- Toggle Switch -->
-            <label class="switch" :title="isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension'">
-              <input
-                type="checkbox"
-                :checked="isExtensionEnabled(ext.id)"
-                :disabled="isSettingUp(ext.id)"
-                @click.prevent="handleToggle(ext)"
-              />
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="isExtensionEnabled(ext.id)"
+              class="switch"
+              :class="{ 'is-active': isExtensionEnabled(ext.id), 'is-checking': isChecking(ext.id) }"
+              :title="isChecking(ext.id) ? 'Checking environment...' : (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension')"
+              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              @click.stop="handleToggle(ext)"
+            >
               <span class="slider"></span>
-            </label>
+              <span v-if="isChecking(ext.id)" class="switch-spinner"></span>
+            </button>
           </div>
 
           <p class="ext-desc">{{ ext.description || 'Local StudyLoop reader extension.' }}</p>
@@ -173,15 +177,19 @@
             </div>
 
             <!-- Pro Toggle Switch -->
-            <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Early Access'">
-              <input
-                type="checkbox"
-                :checked="isPro && isExtensionEnabled(ext.id)"
-                :disabled="isSettingUp(ext.id)"
-                @click.prevent="handleProToggle(ext)"
-              />
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="isPro && isExtensionEnabled(ext.id)"
+              class="switch"
+              :class="{ 'is-active': isPro && isExtensionEnabled(ext.id), 'is-checking': isChecking(ext.id) }"
+              :title="isPro ? (isChecking(ext.id) ? 'Checking environment...' : (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension')) : 'Unlock with Early Access'"
+              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              @click.stop="handleProToggle(ext)"
+            >
               <span class="slider"></span>
-            </label>
+              <span v-if="isChecking(ext.id)" class="switch-spinner"></span>
+            </button>
           </div>
 
           <p class="ext-desc">{{ ext.description || 'Advanced StudyLoop integration.' }}</p>
@@ -285,8 +293,14 @@ const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
 
+const checkingMap = ref({})
+
 function isSettingUp(id) {
   return !!settingUpMap.value[id]
+}
+
+function isChecking(id) {
+  return !!checkingMap.value[id]
 }
 
 function getActionButtonLabel(extId) {
@@ -297,7 +311,7 @@ function getActionButtonLabel(extId) {
 
 async function handleToggle(ext) {
   if (isExtensionEnabled(ext.id)) {
-    // User is turning it off
+    // User is turning it off: instant disable with zero delay
     setExtensionEnabled(ext.id, false)
     return
   }
@@ -305,6 +319,7 @@ async function handleToggle(ext) {
   // User is turning it on: check runtime readiness
   const runtime = (ext.runtime || '').toLowerCase()
   if (runtime === 'python' || runtime === 'py') {
+    checkingMap.value = { ...checkingMap.value, [ext.id]: true }
     try {
       const readiness = await checkExtensionReadiness(ext.id)
       if (readiness && readiness.is_ready) {
@@ -313,9 +328,11 @@ async function handleToggle(ext) {
       }
     } catch (e) {
       console.warn('Readiness check returned error, initiating setup:', e)
+    } finally {
+      checkingMap.value = { ...checkingMap.value, [ext.id]: false }
     }
 
-    // Needs setup: trigger setup popup modal
+    // Needs setup: trigger setup popup modal immediately
     triggerSetup(ext)
   } else {
     setExtensionEnabled(ext.id, true)
@@ -650,13 +667,16 @@ onMounted(async () => {
   height: 20px;
   flex-shrink: 0;
   margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
   cursor: pointer;
+  outline: none;
 }
 
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .slider {
@@ -664,7 +684,7 @@ onMounted(async () => {
   cursor: pointer;
   inset: 0;
   background-color: var(--surface-container-low);
-  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s ease, background-color 0.15s ease;
   border-radius: 20px;
 }
 
@@ -677,18 +697,35 @@ onMounted(async () => {
   bottom: 3px;
   background-color: var(--on-surface);
   opacity: 0.6;
-  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s ease, background-color 0.15s ease;
   border-radius: 50%;
 }
 
-input:checked + .slider {
+.switch.is-active .slider {
   background-color: var(--primary);
 }
 
-input:checked + .slider:before {
+.switch.is-active .slider:before {
   transform: translateX(16px);
   background-color: #ffffff;
   opacity: 1;
+}
+
+.switch-spinner {
+  position: absolute;
+  inset: 2px;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Descriptions */
