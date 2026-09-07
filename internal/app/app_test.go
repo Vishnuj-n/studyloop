@@ -903,3 +903,28 @@ func TestGetStreakState_CompletedToday(t *testing.T) {
 	}
 }
 
+func TestGetStreakState_StreakFreezeAutoConsume(t *testing.T) {
+	app := newTestApp(t)
+
+	// Ensure gamification profile has at least 1 freeze
+	prof, err := testRepo.GetGamificationProfile()
+	if err != nil {
+		t.Fatalf("GetGamificationProfile failed: %v", err)
+	}
+	if prof.StreakFreezesOwned == 0 {
+		_, _, err = testRepo.AddXPAndCoins(100, 100)
+		if err != nil {
+			t.Fatalf("AddXPAndCoins failed: %v", err)
+		}
+		_, err = testRepo.BuyStreakFreeze(50)
+		if err != nil {
+			t.Fatalf("BuyStreakFreeze failed: %v", err)
+		}
+	}
+
+	state := app.getStreakState(0)
+	if state["error"] != nil {
+		t.Fatalf("getStreakState failed: %v", state["error"])
+	}
+}
+

@@ -422,10 +422,15 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	currentStreak, longestStreak, activeDates := calculateStreak(times, timezoneOffsetMinutes)
 
 	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
-	todayStr := time.Now().In(loc).Format(dateFormatYYYYMMDD)
+	nowClient := time.Now().In(loc)
+	todayStr := nowClient.Format(dateFormatYYYYMMDD)
 	completedToday := 0
+
+	dateSet := make(map[string]bool)
 	for _, t := range times {
-		if t.In(loc).Format(dateFormatYYYYMMDD) == todayStr {
+		d := t.In(loc).Format(dateFormatYYYYMMDD)
+		dateSet[d] = true
+		if d == todayStr {
 			completedToday++
 		}
 	}
@@ -434,14 +439,44 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	prof, errProf := repo.GetGamificationProfile()
 	shieldActive := false
 	streakFreezes := 0
+	var streakSavedEvent map[string]interface{}
+
 	if errProf == nil && prof != nil {
 		streakFreezes = prof.StreakFreezesOwned
+		yesterdayStr := nowClient.AddDate(0, 0, -1).Format(dateFormatYYYYMMDD)
+
+		// If the user did not study today, and missed yesterday, check if yesterday can be saved with a streak freeze
+		if currentStreak == 0 && !todayCompleted && !dateSet[yesterdayStr] && streakFreezes > 0 {
+			// Check if day before yesterday was part of a streak
+			yesterdayTime := time.Now().In(loc).AddDate(0, 0, -1)
+			potentialStreak := computeCurrentStreak(yesterdayTime, dateSet)
+			if potentialStreak > 0 {
+				// Consume 1 streak freeze and bridge yesterday
+				updatedProf, consumeErr := repo.ConsumeStreakFreeze()
+				if consumeErr == nil && updatedProf != nil {
+					streakFreezes = updatedProf.StreakFreezesOwned
+					// Add yesterday to dateSet to bridge the streak
+					dateSet[yesterdayStr] = true
+					activeDates = append(activeDates, yesterdayStr)
+					sort.Strings(activeDates)
+					currentStreak = computeCurrentStreak(nowClient, dateSet)
+					if currentStreak > longestStreak {
+						longestStreak = currentStreak
+					}
+					streakSavedEvent = map[string]interface{}{
+						"streak_length":     currentStreak,
+						"freezes_remaining": streakFreezes,
+					}
+				}
+			}
+		}
+
 		if streakFreezes > 0 && !todayCompleted && currentStreak > 0 {
 			shieldActive = true
 		}
 	}
 
-	return map[string]interface{}{
+	res := map[string]interface{}{
 		"current_streak":       currentStreak,
 		"longest_streak":       longestStreak,
 		"active_dates":         activeDates,
@@ -450,6 +485,11 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 		"shield_active":        shieldActive,
 		"streak_freezes_owned": streakFreezes,
 	}
+	if streakSavedEvent != nil {
+		res["streak_saved_event"] = streakSavedEvent
+	}
+
+	return res
 }
 
 // GetDashboardOverview consolidates settings, profiles, today plan, streak state, and pending ingestion info into a single IPC payload.

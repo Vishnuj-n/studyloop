@@ -24,13 +24,32 @@
         Select a visual theme. Changing themes alters the colors of your study desk instantly.
       </p>
     </div>
+
+    <div class="form-group">
+      <SettingsToggle
+        v-model="soundEnabled"
+        title="Interactive Sound Effects"
+        hint="Play procedural audio chimes and feedback when answering quizzes, reviewing cards, and unlocking mystery chests."
+        :disabled="disabled"
+      />
+    </div>
   </article>
 </template>
 
 <script setup>
+import { ref, watch } from 'vue'
+import SettingsToggle from './SettingsToggle.vue'
+import { isAudioMuted, setAudioMuted } from '@/utils/audioJuice'
+
 const props = defineProps({
   settings: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
+})
+
+const soundEnabled = ref(!isAudioMuted())
+
+watch(soundEnabled, (enabled) => {
+  setAudioMuted(!enabled)
 })
 
 const themes = [

@@ -51,6 +51,15 @@
 
     <!-- Status Banners -->
     <StatusBanner
+      v-if="streakSavedEvent"
+      variant="info"
+      icon="🛡️"
+      title="Your streak was saved!"
+      :subtitle="`We used 1 Streak Freeze to protect your ${streakSavedEvent.streak_length}-day streak yesterday. You have ${streakSavedEvent.freezes_remaining} freeze(s) remaining.`"
+      action-label="Dismiss"
+      @action="streakSavedEvent = null"
+    />
+    <StatusBanner
       v-if="pendingIngestionBook"
       variant="warning"
       icon="⚡"
@@ -257,6 +266,7 @@ const loading = ref(true)
 const error = ref('')
 const actionError = ref('')
 const flashcardNotice = ref('')
+const streakSavedEvent = ref(null)
 const tasks = ref([])
 const hasActiveStudyContent = ref(false)
 const dueReviewCards = ref(0)
@@ -465,6 +475,9 @@ function applyDashboardOverview(overview) {
   } else if (overview.streak_state) {
     streakState.value = overview.streak_state
     streakError.value = ''
+    if (overview.streak_state.streak_saved_event) {
+      streakSavedEvent.value = overview.streak_state.streak_saved_event
+    }
   }
 
   if (overview.pending_notebook_error) {

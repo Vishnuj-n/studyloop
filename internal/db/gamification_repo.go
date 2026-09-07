@@ -272,4 +272,24 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 	return r.GetGamificationProfile()
 }
 
+// ConsumeStreakFreeze decrements streak_freezes_owned by 1 when saving an interrupted streak.
+func (r *Repository) ConsumeStreakFreeze() (*models.GamificationProfile, error) {
+	res, err := r.db.Exec(`
+		UPDATE user_gamification
+		SET streak_freezes_owned = streak_freezes_owned - 1, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1 AND streak_freezes_owned > 0
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to consume streak freeze: %w", err)
+	}
 
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify consumed streak freeze: %w", err)
+	}
+	if rows == 0 {
+		return nil, fmt.Errorf("no streak freezes available to consume")
+	}
+
+	return r.GetGamificationProfile()
+}

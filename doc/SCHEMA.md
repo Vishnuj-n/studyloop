@@ -354,6 +354,7 @@ Singleton table for global preferences.
 | `study_start_time` | TEXT DEFAULT '17:00' | Study window start time (HH:MM format) |
 | `study_end_time` | TEXT DEFAULT '18:00' | Study window end time (HH:MM format) |
 | `reminders_enabled` | BOOLEAN DEFAULT 1 | Whether study reminders enabled |
+| `show_reward_notifications` | BOOLEAN DEFAULT 1 | Whether reward popups & toasts are shown upon task completion |
 | `active_profile_id` | TEXT | Active study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
 | `skip_to_reading_active` | BOOLEAN DEFAULT 0 | Skip dashboard to active reading |
 | `cloud_sync_url` | TEXT DEFAULT '' | Remote sync endpoint URL |
