@@ -71,7 +71,7 @@ func TestBuildTokenArraysReturnsErrorForEmptyIDs(t *testing.T) {
 	}
 }
 
-func TestMeanPool3DRespectsAttentionMask(t *testing.T) {
+func TestMeanPoolRespectsAttentionMask(t *testing.T) {
 	data := []float32{
 		1, 2, // token 0
 		3, 4, // token 1 (masked out)
@@ -79,43 +79,21 @@ func TestMeanPool3DRespectsAttentionMask(t *testing.T) {
 	}
 	mask := []int64{1, 0, 1}
 
-	got := meanPool3D(data, 3, 2, mask)
+	got := meanPool(data, 3, 2, mask)
 	want := []float32{3, 4}
 	assertFloat32SliceClose(t, got, want)
 }
 
-func TestMeanPool2DRespectsAttentionMask(t *testing.T) {
-	data := []float32{
-		1, 3, // row 0
-		5, 7, // row 1 (masked out)
-		9, 11, // row 2
-	}
-	mask := []int64{1, 0, 1}
-
-	got := meanPool2D(data, 3, 2, mask)
-	want := []float32{5, 7}
-	assertFloat32SliceClose(t, got, want)
-}
-
 func TestMeanPoolFloat64RespectsAttentionMask(t *testing.T) {
-	data3D := []float64{
+	data64 := []float64{
 		2, 4,
 		6, 8,
 		10, 12,
 	}
 	mask := []int64{1, 0, 1}
-	got3D := meanPool3DFloat64(data3D, 3, 2, mask)
-	want3D := []float64{6, 8}
-	assertFloat64SliceClose(t, got3D, want3D)
-
-	data2D := []float64{
-		2, 6,
-		8, 10,
-		12, 14,
-	}
-	got2D := meanPool2DFloat64(data2D, 3, 2, mask)
-	want2D := []float64{7, 10}
-	assertFloat64SliceClose(t, got2D, want2D)
+	got := meanPool(data64, 3, 2, mask)
+	want := []float32{6, 8}
+	assertFloat32SliceClose(t, got, want)
 }
 
 func TestMeanPoolWithZeroMaskFallsBackToZeroVector(t *testing.T) {
@@ -125,7 +103,7 @@ func TestMeanPoolWithZeroMaskFallsBackToZeroVector(t *testing.T) {
 	}
 	mask := []int64{0, 0}
 
-	got := meanPool2D(data, 2, 2, mask)
+	got := meanPool(data, 2, 2, mask)
 	want := []float32{0, 0}
 	assertFloat32SliceClose(t, got, want)
 }
@@ -140,7 +118,7 @@ func TestNormalizeL2(t *testing.T) {
 	assertFloat32SliceClose(t, vector, []float32{0.6, 0.8})
 }
 
-func TestMeanPool3DBatch(t *testing.T) {
+func TestMeanPoolBatch(t *testing.T) {
 	// 2 items in batch, seqLen=2, hidden=2
 	// Item 0: token 0 (1, 2), token 1 masked (3, 4) -> (1, 2)
 	// Item 1: token 0 (5, 6), token 1 (7, 8) -> (6, 7)
@@ -153,10 +131,10 @@ func TestMeanPool3DBatch(t *testing.T) {
 		1, 1,
 	}
 
-	res0 := meanPool3D(data[0:4], 2, 2, mask[0:2])
+	res0 := meanPool(data[0:4], 2, 2, mask[0:2])
 	assertFloat32SliceClose(t, res0, []float32{1, 2})
 
-	res1 := meanPool3D(data[4:8], 2, 2, mask[2:4])
+	res1 := meanPool(data[4:8], 2, 2, mask[2:4])
 	assertFloat32SliceClose(t, res1, []float32{6, 7})
 }
 
