@@ -208,26 +208,6 @@
         </div>
       </div>
     </template>
-
-    <!-- Dev Mode Bypass Panel -->
-    <div v-if="appEnv === 'dev'" class="dev-panel card">
-      <header class="dev-header">
-        <h4>🛠 Dev Tools</h4>
-        <span class="dev-badge">APP_ENV = dev</span>
-      </header>
-      <div class="dev-actions">
-        <button type="button" class="dev-btn" :disabled="forcingRescue" @click="forceRescueState">
-          {{ forcingRescue ? 'Forcing...' : 'Force Socratic Rescue' }}
-        </button>
-        <button type="button" class="dev-btn" :disabled="forcingSync" @click="forceSyncTask">
-          {{ forcingSync ? 'Forcing...' : 'Force Flashcard Generate' }}
-        </button>
-        <button type="button" class="dev-btn" :disabled="forcingDue" @click="forceDueFlashcards">
-          {{ forcingDue ? 'Forcing...' : 'Force Flashcards Due Now' }}
-        </button>
-      </div>
-      <p v-if="devMessage" class="dev-message">{{ devMessage }}</p>
-    </div>
   </section>
 </template>
 
@@ -239,11 +219,6 @@ import {
   updateUserSettings,
   getProfileDailyPace,
   retryFlashcardGeneration,
-  getAppEnv,
-  devForceSocraticRescue,
-  devForceFlashcardGenerate,
-  forceDueFlashcardsNow,
-  getNotebooks,
   getFlashcardDueTimeline,
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
@@ -302,11 +277,6 @@ const streakState = ref({
   completed_today: 0,
 })
 const streakError = ref('')
-
-const appEnv = ref('')
-const forcingRescue = ref(false)
-const forcingSync = ref(false)
-const devMessage = ref('')
 const isSyncing = ref(false)
 const profileMenuOpen = ref(false)
 
@@ -397,14 +367,6 @@ const completedSessionsToday = computed(() => {
 // --- Lifecycle ---
 onMounted(async () => {
   window.addEventListener('click', closeProfileMenu)
-  try {
-    const envRes = await getAppEnv()
-    if (envRes && envRes.env) {
-      appEnv.value = envRes.env
-    }
-  } catch (err) {
-    console.error('Failed to get APP_ENV:', err)
-  }
   if (flashcardsJustCreated.value > 0) {
     const newQuery = { ...route.query }
     delete newQuery.flashcardsCreated
@@ -636,82 +598,7 @@ function goToNotebooks() {
   router.push('/notebooks')
 }
 
-// --- Dev Mode ---
-async function forceRescueState() {
-  forcingRescue.value = true
-  devMessage.value = ''
-  try {
-    const nbsRes = await getNotebooks()
-    const notebooks = Array.isArray(nbsRes) ? nbsRes.filter((n) => !n.error) : []
-    if (notebooks.length === 0) {
-      devMessage.value = 'No notebooks found. Please upload a notebook first.'
-      forcingRescue.value = false
-      return
-    }
 
-    const validNb = notebooks.find((n) => n.topic_id)
-    if (!validNb) {
-      devMessage.value = 'No notebook with a linked topic found. Confirm syllabus first.'
-      forcingRescue.value = false
-      return
-    }
-
-    const res = await devForceSocraticRescue(validNb.id, validNb.topic_id)
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = 'Successfully forced Socratic Rescue state!'
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingRescue.value = false
-  }
-}
-
-async function forceSyncTask() {
-  forcingSync.value = true
-  devMessage.value = ''
-  try {
-    const nbsRes = await getNotebooks()
-    const notebooks = Array.isArray(nbsRes) ? nbsRes.filter((n) => !n.error) : []
-    let nbId = 'system_default'
-    if (notebooks.length > 0) {
-      nbId = notebooks[0].id
-    }
-    const res = await devForceFlashcardGenerate(nbId)
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = 'Successfully forced Flashcard Generate task!'
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingSync.value = false
-  }
-}
-
-const forcingDue = ref(false)
-async function forceDueFlashcards() {
-  forcingDue.value = true
-  devMessage.value = ''
-  try {
-    const res = await forceDueFlashcardsNow()
-    if (res && res.error) {
-      devMessage.value = 'Error: ' + res.error
-    } else {
-      devMessage.value = `Successfully forced ${res.updated_cards ?? 0} flashcard(s) DUE NOW!`
-      await loadAgenda()
-    }
-  } catch (err) {
-    devMessage.value = 'Error: ' + err.message
-  } finally {
-    forcingDue.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -1053,60 +940,4 @@ async function forceDueFlashcards() {
   gap: 16px;
 }
 
-/* Dev Panel */
-.dev-panel {
-  margin-top: 32px;
-  padding: 20px;
-  border-color: #f1c40f;
-  background: rgba(241, 196, 15, 0.05);
-}
-
-.dev-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.dev-header h4 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.dev-badge {
-  font-size: 11px;
-  font-weight: 700;
-  background: #f1c40f;
-  color: #2c3e50;
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.dev-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.dev-btn {
-  background: #34495e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.dev-btn:hover {
-  opacity: 0.9;
-}
-
-.dev-message {
-  margin: 10px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #16a085;
-}
 </style>

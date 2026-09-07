@@ -145,6 +145,12 @@ func (a *App) GetLLMSettings() map[string]interface{} {
 func (a *App) GetLLMProviderPreset(provider string) map[string]interface{} {
 	provider = strings.TrimSpace(strings.ToLower(provider))
 	switch provider {
+	case "gemini":
+		return map[string]interface{}{
+			"provider": "gemini",
+			"base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+			"model":    "gemini-flash-lite-latest",
+		}
 	case "groq":
 		return map[string]interface{}{
 			"provider": "groq",

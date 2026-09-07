@@ -16,7 +16,11 @@ var TitleTiers = []struct {
 	{Title: "The Scholar", MinXP: 500},
 	{Title: "The Inquisitor", MinXP: 1500},
 	{Title: "The Archivist", MinXP: 3000},
-	{Title: "The Grandmaster", MinXP: 6000},
+	{Title: "The Polymath", MinXP: 5000},
+	{Title: "The Grandmaster", MinXP: 8000},
+	{Title: "The Paragon", MinXP: 12000},
+	{Title: "The Luminary", MinXP: 20000},
+	{Title: "The Mythic Sage", MinXP: 35000},
 }
 
 // ComputeTitleInfo determines the title, next title, and XP boundaries based on total XP.

@@ -208,6 +208,7 @@
             v-model="llmFast.provider"
             @change="applyProviderPreset('fast')"
           >
+            <option value="gemini">Google Gemini (AI Studio)</option>
             <option value="groq">Groq</option>
             <option value="openai">ChatGPT / OpenAI</option>
             <option value="openrouter">OpenRouter</option>
@@ -245,6 +246,7 @@
           />
           <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
             Get free key:
+            <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio ↗</a> ·
             <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
             <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
           </p>
@@ -265,6 +267,7 @@
               v-model="llmHeavy.provider"
               @change="applyProviderPreset('heavy')"
             >
+              <option value="gemini">Google Gemini (AI Studio)</option>
               <option value="groq">Groq</option>
               <option value="openai">ChatGPT / OpenAI</option>
               <option value="openrouter">OpenRouter</option>
