@@ -60,7 +60,7 @@
 import { ref, onMounted } from 'vue'
 import { playCorrectChime } from '../utils/audioJuice'
 
-const props = defineProps({
+defineProps({
   totalFreezes: {
     type: Number,
     default: 1,

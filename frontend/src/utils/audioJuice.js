@@ -27,7 +27,9 @@ export function isAudioMuted() {
 export function setAudioMuted(muted) {
   try {
     localStorage.setItem('studyloop_audio_muted', muted ? 'true' : 'false')
-  } catch {}
+  } catch {
+    // Ignore storage write errors (e.g. storage disabled or quota exceeded)
+  }
 }
 
 /**

@@ -133,6 +133,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text" v-html="currentCard.prompt"></p>
               <button id="fc-reveal-btn" class="reveal-btn" @click="flipped = true">
                 Show Answer
@@ -159,6 +160,7 @@
                   <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text answer-text" v-html="currentCard.answer"></p>
               <button class="flip-back-btn" @click="flipped = false">Show Question</button>
               <div class="rating-row">
