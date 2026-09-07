@@ -144,6 +144,21 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		}); err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete milestone exam: %w", err)
 		}
+
+		// Persist milestone_exam_complete telemetry to durable SQLite outbox
+		fileHash := ""
+		if nb, nbErr := s.repo.GetNotebookByID(task.NotebookID); nbErr == nil && nb != nil {
+			fileHash = nb.FileHash
+		}
+		metaBytes, _ := json.Marshal(map[string]interface{}{
+			"task_id": req.TaskID,
+			"score":   100,
+			"passed":  true,
+		})
+		if trackErr := s.repo.TrackAnalyticsEvent("milestone_exam_complete", fileHash, task.StartPage, string(metaBytes)); trackErr != nil {
+			utils.Warnf("[QUEUE_TRANSITION] failed to record milestone analytics event: %v", trackErr)
+		}
+
 		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeMilestoneExam, 100, true)
 		return TransitionResult{
 			Success: true,

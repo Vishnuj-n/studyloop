@@ -2,6 +2,7 @@ package db
 
 import (
 	"ai-tutor/internal/models"
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -1620,3 +1621,84 @@ func TestMultiSessionChapterSlicingAndProgression(t *testing.T) {
 		t.Fatalf("expected Chapter 2 slice 1 (pages 21-25, topic %s), got range %d-%d topic %s", topicID2, task5.StartPage, task5.EndPage, task5.TopicID)
 	}
 }
+
+func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-unexamined"
+	notebookID := "nb-unexamined"
+	if err := testRepo.EnsureTopic(topicID, "Unexamined Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(notebookID, "Unexamined NB", "/tmp/unexam.pdf", "pdf", topicID, "", 20, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	if err := testRepo.EnsureNotebookTopic(notebookID, topicID); err != nil {
+		t.Fatalf("EnsureNotebookTopic failed: %v", err)
+	}
+
+	// Insert 4 quiz tasks and attempts
+	for i := 1; i <= 4; i++ {
+		taskID := fmt.Sprintf("quiz-task-%d", i)
+		attemptID := fmt.Sprintf("quiz-attempt-%d", i)
+		if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+			ID:          taskID,
+			NotebookID:  notebookID,
+			TopicID:     topicID,
+			TaskType:    models.StudyTaskTypeQuiz,
+			Status:      models.StudyTaskStatusCompleted,
+			PayloadJSON: `{"questions":[{"id":"q1","prompt":"P","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+		}); err != nil {
+			t.Fatalf("insert quiz task failed: %v", err)
+		}
+		if err := testRepo.withTx(func(tx *sql.Tx) error {
+			return testRepo.SaveQuizAttemptTx(tx, models.QuizAttemptRecord{
+				ID:          attemptID,
+				TaskID:      taskID,
+				Score:       100,
+				Passed:      true,
+				AnswersJSON: `[{"question_id":"q1","selected":"A"}]`,
+				Feedback:    "Good",
+				CompletedAt: int64(1000 + i),
+			})
+		}); err != nil {
+			t.Fatalf("save quiz attempt failed: %v", err)
+		}
+	}
+
+	// Fetch unexamined for topic
+	topicAttempts, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID)
+	if err != nil {
+		t.Fatalf("GetUnexaminedPassedQuizAttemptsByTopic failed: %v", err)
+	}
+	if len(topicAttempts) != 4 {
+		t.Fatalf("expected 4 unexamined attempts, got %d", len(topicAttempts))
+	}
+
+	// Insert a milestone exam containing attempts 1 and 2
+	milestonePayload := models.MilestoneExamPayload{
+		Quizzes: map[string][]int{
+			"quiz-attempt-1": {1},
+			"quiz-attempt-2": {1},
+		},
+		PassingScore: 70,
+		QuizCount:    2,
+	}
+	if err := testRepo.InsertMilestoneExamTask(notebookID, milestonePayload); err != nil {
+		t.Fatalf("InsertMilestoneExamTask failed: %v", err)
+	}
+
+	// Now unexamined should only be attempts 3 and 4
+	topicAttemptsAfter, err := testRepo.GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID)
+	if err != nil {
+		t.Fatalf("GetUnexaminedPassedQuizAttemptsByTopic after milestone failed: %v", err)
+	}
+	if len(topicAttemptsAfter) != 2 {
+		t.Fatalf("expected 2 unexamined attempts after milestone insertion, got %d", len(topicAttemptsAfter))
+	}
+	if topicAttemptsAfter[0].ID != "quiz-attempt-3" || topicAttemptsAfter[1].ID != "quiz-attempt-4" {
+		t.Fatalf("unexpected unexamined attempts: %#v", topicAttemptsAfter)
+	}
+}
+

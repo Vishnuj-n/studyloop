@@ -51,14 +51,18 @@ func TestAnalyticsLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TrackAnalyticsEvent failed: %v", err)
 	}
+	err = repo.TrackAnalyticsEvent("milestone_exam_complete", "hash-123", 10, `{"score": 100, "passed": true}`)
+	if err != nil {
+		t.Fatalf("TrackAnalyticsEvent milestone_exam_complete failed: %v", err)
+	}
 
 	// 4. Fetch unsynced
 	payloads, ids, err := repo.GetUnsyncedAnalyticsEvents()
 	if err != nil {
 		t.Fatalf("GetUnsyncedAnalyticsEvents failed: %v", err)
 	}
-	if len(payloads) != 2 {
-		t.Fatalf("expected 2 analytics events, got %d", len(payloads))
+	if len(payloads) != 3 {
+		t.Fatalf("expected 3 analytics events, got %d", len(payloads))
 	}
 
 	if payloads[0].EventType != "reading_complete" || payloads[0].FileHash != "hash-123" || payloads[0].PageNumber != 4 {
