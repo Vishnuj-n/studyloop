@@ -143,7 +143,7 @@ Completes an active MILESTONE_EXAM task. Validates task type, evaluates answers 
 ### GetQuestionsForQuizAttempts
 Retrieves all quiz questions from original study_queue payload_json for given quiz attempt IDs. Used by milestone exam to reconstruct questions from past attempts.
 
-**Trigger:** Auto-inserted after every 10th completed quiz per notebook (`count % 10 == 0`).
+**Trigger:** Chapter completion (`task.EndPage >= topic.EndPage`) with $\ge 3$ passed quizzes for that chapter.
 
 **Payload format:** `{"quizzes": {"<attempt_id>": [1,0,1,0]}, "passing_score": 70}` — correctness arrays computed at insert time.
 

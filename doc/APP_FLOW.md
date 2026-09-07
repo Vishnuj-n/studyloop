@@ -175,20 +175,22 @@ On sync failure after retries → `FLASHCARD_GENERATE` task inserted (priority t
 
 ## 6. Milestone Exam
 
-Aggregate exam from past quiz attempts for a notebook. Triggered every 10 completed quizzes per notebook.
+Aggregate exam from past quiz attempts for a chapter. Triggered at chapter completion:
+- **Chapter Completion Trigger**: When a learner completes the final quiz of a chapter (`task.EndPage >= topic.EndPage`) and there are $\ge 3$ passed quizzes for that chapter.
 
 **Flow:**
-1. After quiz completion, backend counts completed quizzes for the notebook
-2. If count is a multiple of 10 (`count % 10 == 0`) → `MILESTONE_EXAM` task inserted
-3. Milestone exam reuses questions from last 10 quiz attempts (no new LLM generation)
-4. User completes the aggregate exam → score computed from embedded correctness arrays
-5. Pass → topic/notebook progression. Fail → standard remediation flow.
+1. After quiz completion and flashcard generation, backend checks if the quiz completed the chapter (`task.EndPage >= topic.EndPage`).
+2. If unexamined passed quizzes for the chapter $\ge 3$ → `MILESTONE_EXAM` task inserted with compact correctness flags. If $< 3$, no milestone exam is generated and the learner progresses to the next chapter.
+3. Milestone exam reuses questions from unexamined quiz attempts (no new LLM generation).
+4. User completes the aggregate exam → score evaluated and telemetry (`milestone_exam_complete`) tracked.
+5. Pass → rewards awarded and queue progression continues.
 
 **Key behaviors:**
-- Reuses existing quiz questions (no LLM call for generation)
-- Deduplicates: prevents duplicate milestone exams for same quiz attempt
-- Priority tier 2 (between QUIZ at tier 3 and READING at tier 1)
-- Skips corrupt quiz attempts gracefully
+- Minimum volume guard ($\ge 3$ passed quizzes) prevents redundant milestone exams for micro-chapters.
+- Reuses existing quiz questions (no LLM call for generation).
+- Deduplicates: prevents duplicate milestone exams for same quiz attempt.
+- Priority tier 2 (between QUIZ at tier 3 and READING at tier 1).
+- Skips corrupt quiz attempts gracefully.
 
 ---
 
