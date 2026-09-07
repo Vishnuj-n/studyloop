@@ -6,7 +6,6 @@
       :class="{ 'pill-target-met': completedSessions >= targetSessions && targetSessions > 0 }"
       title="Daily reading session completion progress"
     >
-      <span class="pill-icon">🎯</span>
       <span class="pill-text">
         <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Reading Sessions Today
       </span>
@@ -18,7 +17,6 @@
       :class="{ warning: pace.days_remaining <= 3 }"
       :title="`Target Exam Deadline: ${pace.deadline || 'Set'}`"
     >
-      <span class="pill-icon">⏳</span>
       <span class="pill-text">{{ formatDaysRemainingShort(pace.days_remaining) }}</span>
     </div>
 
@@ -27,7 +25,6 @@
       class="telemetry-pill pace-pill"
       :title="`Pace: ${pace.daily_pace} words/day (${pace.remaining_words || 0} remaining words)`"
     >
-      <span class="pill-icon">⚡</span>
       <span class="pill-text">{{ pace.daily_pace }} w/d</span>
       <span v-if="pace.pace_label" class="pace-sublabel">({{ pace.pace_label }})</span>
     </div>
@@ -38,7 +35,6 @@
       class="telemetry-pill session-pill"
       :class="{ 'pill-target-met': completedSessions >= targetSessions && targetSessions > 0 }"
     >
-      <span class="pill-icon">🎯</span>
       <span class="pill-text">
         <strong>{{ completedSessions }} / {{ targetSessions }}</strong> Reading Sessions Today
       </span>

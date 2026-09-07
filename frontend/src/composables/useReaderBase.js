@@ -44,6 +44,16 @@ export function cleanTopicTitle(raw) {
   return `Chapter ${chNum}: ${suffix}`
 }
 
+export function sortNotebookTopics(topics) {
+  if (!Array.isArray(topics)) return []
+  return [...topics].sort((a, b) => {
+    const aPage = a.start_page || parseInt(/\(Pages\s*(\d+)/i.exec(a.title || '')?.[1] || 0, 10)
+    const bPage = b.start_page || parseInt(/\(Pages\s*(\d+)/i.exec(b.title || '')?.[1] || 0, 10)
+    if (aPage && bPage && aPage !== bPage) return aPage - bPage
+    return (a.title || '').localeCompare(b.title || '', undefined, { numeric: true, sensitivity: 'base' })
+  })
+}
+
 /**
  * useReaderBase - Extracted base reader logic for task-flow-only reading sessions.
  * Handles: notebook/topic loading, page navigation, session initialization.
@@ -102,20 +112,7 @@ export function useReaderBase(taskID) {
 
   const isPdf = computed(() => fileType.value === 'pdf')
 
-  const availableTopics = computed(() => {
-    const topics = selectedNotebook.value?.topics || []
-    return [...topics].sort((a, b) => {
-      const aNum = extractChapterNumber(a.title)
-      const bNum = extractChapterNumber(b.title)
-      if (aNum !== null || bNum !== null) {
-        if (aNum !== null && bNum !== null) {
-          if (aNum !== bNum) return aNum - bNum
-        } else if (aNum !== null) return -1
-        else if (bNum !== null) return 1
-      }
-      return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
-    })
-  })
+  const availableTopics = computed(() => sortNotebookTopics(selectedNotebook.value?.topics || []))
 
   const selectedTopicTitle = computed(() => {
     const match = availableTopics.value.find((t) => t.topic_id === selectedTopicID.value)
@@ -176,12 +173,6 @@ export function useReaderBase(taskID) {
     } finally {
       loadingText.value = false
     }
-  }
-  function extractChapterNumber(title) {
-    const matches = /^chapter\s*(\d+)\b/i.exec(String(title).trim())
-    if (!matches) return null
-    const num = Number(matches[1])
-    return Number.isFinite(num) ? num : null
   }
 
   async function loadNotebookTree() {
@@ -345,7 +336,6 @@ export function useReaderBase(taskID) {
 
   async function loadBundle() {
     if (!selectedTopicID.value) {
-      globalError.value = 'Select topic to open Reader.'
       return false
     }
 
