@@ -419,8 +419,6 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to get completed times: %v", err)}
 	}
 
-	currentStreak, longestStreak, activeDates := calculateStreak(times, timezoneOffsetMinutes)
-
 	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
 	nowClient := time.Now().In(loc)
 	todayStr := nowClient.Format(dateFormatYYYYMMDD)
@@ -435,6 +433,22 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 		}
 	}
 	todayCompleted := completedToday > 0
+
+	// ponytail: load persistent frozen dates from sqlite
+	if frozenDates, err := repo.GetStreakFreezeUsageDates(); err == nil {
+		for _, fd := range frozenDates {
+			dateSet[fd] = true
+		}
+	}
+
+	var activeDates []string
+	for d := range dateSet {
+		activeDates = append(activeDates, d)
+	}
+	sort.Strings(activeDates)
+
+	longestStreak := computeLongestStreak(activeDates, loc)
+	currentStreak := computeCurrentStreak(nowClient, dateSet)
 
 	prof, errProf := repo.GetGamificationProfile()
 	shieldActive := false
@@ -451,8 +465,8 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 			yesterdayTime := time.Now().In(loc).AddDate(0, 0, -1)
 			potentialStreak := computeCurrentStreak(yesterdayTime, dateSet)
 			if potentialStreak > 0 {
-				// Consume 1 streak freeze and bridge yesterday
-				updatedProf, consumeErr := repo.ConsumeStreakFreeze()
+				// Consume 1 streak freeze and bridge yesterday permanently in SQLite
+				updatedProf, consumeErr := repo.ConsumeStreakFreeze(yesterdayStr)
 				if consumeErr == nil && updatedProf != nil {
 					streakFreezes = updatedProf.StreakFreezesOwned
 					// Add yesterday to dateSet to bridge the streak
