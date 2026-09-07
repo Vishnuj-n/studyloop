@@ -166,17 +166,3 @@ func assertFloat32SliceClose(t *testing.T, got, want []float32) {
 		}
 	}
 }
-
-func assertFloat64SliceClose(t *testing.T, got, want []float64) {
-	t.Helper()
-
-	if len(got) != len(want) {
-		t.Fatalf("length mismatch: got=%d want=%d", len(got), len(want))
-	}
-	for i := range got {
-		delta := got[i] - want[i]
-		if delta < -1e-9 || delta > 1e-9 {
-			t.Fatalf("value mismatch at %d: got=%f want=%f", i, got[i], want[i])
-		}
-	}
-}

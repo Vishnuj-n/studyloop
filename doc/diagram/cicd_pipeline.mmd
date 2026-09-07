@@ -1,0 +1,54 @@
+%% =============================================================================
+%% CI/CD Pipeline Architecture
+%% Parallel Multi-Job CI and Independent Code Quality Audits
+%% =============================================================================
+
+flowchart TD
+    Trigger(["Git Event: Push / Pull Request / Dispatch"])
+
+    Trigger --> CI["Workflow 1: CI Pipeline (.github/workflows/ci.yml)"]
+    Trigger --> Quality["Workflow 2: Quality Audits (.github/workflows/quality-audits.yml)"]
+
+    subgraph CI_Pipeline["CI Pipeline (Parallel Execution)"]
+        direction TB
+
+        subgraph Job_Backend["Job 1: Backend (Go Lint & Test)"]
+            B1["Setup Go (go.mod)"] --> B2["Create Embed Dummies"]
+            B2 --> B3["Run golangci-lint"]
+            B3 --> B4["Run go test -race (always runs)"]
+        end
+
+        subgraph Job_Frontend["Job 2: Frontend (Node Lint & Test)"]
+            F1["Setup Node 22 + npm ci"] --> F2["Run ESLint"]
+            F2 --> F3["Run Vitest (always runs)"]
+        end
+
+        subgraph Job_Wails["Job 3: Wails Build Verification"]
+            W1["Setup Go + Node 22"] --> W2["Install Wails CLI"]
+            W2 --> W3["wails generate module"]
+            W3 --> W4["npm run build (Vite Prod Bundle)"]
+        end
+    end
+
+    subgraph Quality_Pipeline["Quality Audits Pipeline"]
+        direction TB
+        subgraph Job_Audits["Job: Code Smells & UI Design Audits"]
+            Q1["Setup Python 3.12"] --> Q2["find_code_smells.py<br/>(AI slop & defensive checks)"]
+            Q2 --> Q3["find_redundant_css.py<br/>(Dead/duplicate CSS)"]
+            Q3 --> Q4["check_design_violations.py<br/>(Design token consistency)"]
+        end
+    end
+
+    CI --> CI_Pipeline
+    Quality --> Quality_Pipeline
+
+    %% Styling
+    classDef trigger fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef workflow fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef job fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef step fill:#ede7f6,stroke:#512da8,stroke-width:1px
+
+    class Trigger trigger
+    class CI,Quality workflow
+    class Job_Backend,Job_Frontend,Job_Wails,Job_Audits job
+    class B1,B2,B3,B4,F1,F2,F3,W1,W2,W3,W4,Q1,Q2,Q3,Q4 step

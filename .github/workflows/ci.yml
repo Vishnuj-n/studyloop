@@ -10,7 +10,63 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  backend:
+    name: Backend (Go Lint & Test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Create dummy embedded files for Go embed
+        run: |
+          mkdir -p frontend/dist && touch frontend/dist/index.html
+          mkdir -p internal/app && touch internal/app/VERSION
+
+      - name: Run Go linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          install-mode: goinstall
+          args: --timeout=5m ./...
+
+      - name: Run Go tests
+        if: success() || failure()
+        run: go test -v -count=1 -race ./...
+
+  frontend:
+    name: Frontend (Node Lint & Test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Test frontend
+        if: success() || failure()
+        run: npm test
+        working-directory: frontend
+
+  wails-build:
+    name: Wails & Frontend Build Verification
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,37 +83,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install Wails
+      - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Create dummy embedded files for Go embed
-        run: |
-          mkdir -p frontend/dist && touch frontend/dist/index.html
-          mkdir -p internal/app && touch internal/app/VERSION
 
       - name: Generate Wails bindings
         run: wails generate module
 
-      - name: Install frontend dependencies & build
+      - name: Build frontend production bundle
         run: |
           npm ci
           npm run build
-        working-directory: frontend
-
-      - name: Run Go linter
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          install-mode: goinstall
-          args: --timeout=5m ./...
-
-      - name: Run Go tests
-        run: go test -v -count=1 -race ./...
-
-      - name: Lint frontend
-        run: npm run lint
-        working-directory: frontend
-
-      - name: Test frontend
-        run: npm test
         working-directory: frontend
