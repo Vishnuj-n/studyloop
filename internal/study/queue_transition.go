@@ -249,23 +249,33 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 	}
 }
 
-// awardCompletionRewards calculates deterministic XP/coins and persists any mystery chest to SQLite.
+// awardCompletionRewards calculates deterministic XP/coins and persists any mystery chest to SQLite atomically.
 func (s *StudyService) awardCompletionRewards(taskID string, taskType models.StudyTaskType, score int, isAce bool) *models.RewardPayload {
 	if s.repo == nil {
 		return nil
 	}
 
 	xp, coins, box := RollTaskRewards(taskType, score, isAce)
-	_, newTitle, err := s.repo.AddXPAndCoins(xp, coins)
-	if err != nil {
-		utils.Warnf("[GAMIFICATION] failed to add XP/coins for task %s: %v", taskID, err)
-	}
-
 	if box != nil {
 		box.TaskID = taskID
-		if err := s.repo.CreatePendingLootBox(*box); err != nil {
-			utils.Warnf("[GAMIFICATION] failed to create pending loot box for task %s: %v", taskID, err)
-		}
+	}
+
+	tx, err := s.repo.Begin()
+	if err != nil {
+		utils.Warnf("[GAMIFICATION] failed to begin reward transaction for task %s: %v", taskID, err)
+		return nil
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	newTitle, err := s.repo.AwardTaskRewardsTx(tx, xp, coins, box)
+	if err != nil {
+		utils.Warnf("[GAMIFICATION] failed to award completion rewards for task %s: %v", taskID, err)
+		return nil
+	}
+
+	if err := tx.Commit(); err != nil {
+		utils.Warnf("[GAMIFICATION] failed to commit reward transaction for task %s: %v", taskID, err)
+		return nil
 	}
 
 	return &models.RewardPayload{

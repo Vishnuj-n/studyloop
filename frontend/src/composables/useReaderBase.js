@@ -25,7 +25,12 @@ export function cleanTopicTitle(raw) {
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
   let suffix = suffixWords.join(' ')
-  if (suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() || suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase()) {
+  if (
+    suffix.toLowerCase() === `chapter ${chNum}`.toLowerCase() ||
+    suffix.toLowerCase() === `chapter ${subParts[0]}`.toLowerCase() ||
+    suffix === chNum ||
+    suffix === subParts[0]
+  ) {
     return `Chapter ${chNum}`
   }
   if (suffix.startsWith(`${chNum} `)) {

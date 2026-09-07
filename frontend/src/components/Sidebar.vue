@@ -122,6 +122,7 @@ async function handleSync() {
   }
 }
 
+const pendingChestsCount = ref(0)
 const gamificationError = ref(false)
 
 async function loadGamification() {

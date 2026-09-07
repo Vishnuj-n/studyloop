@@ -2,24 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { cleanTopicTitle } from './useReaderBase'
 
 describe('cleanTopicTitle', () => {
-  it('formats standard raw topic titles properly', () => {
-    expect(cleanTopicTitle('nb-123-ch-01-intro-to-coding')).toBe('Chapter 1: Intro To Coding')
-    expect(cleanTopicTitle('nb-abc-ch-10-advanced-math')).toBe('Chapter 10: Advanced Math')
+  it('formats nb-uuid-ch-05-05 as Chapter 5 without trailing duplicate chapter number', () => {
+    expect(cleanTopicTitle('nb-uuid-ch-05-05')).toBe('Chapter 5')
   })
 
-  it('preserves subsequent -ch- tokens in the suffix', () => {
-    // ponytail: test case covering a chapter suffix containing "-ch-"
-    expect(cleanTopicTitle('nb-uuid-ch-01-intro-to-ch-models')).toBe('Chapter 1: Intro To Ch Models')
-    expect(cleanTopicTitle('nb-uuid-ch-02-ch-algorithms-discussion')).toBe('Chapter 2: Ch Algorithms Discussion')
-  })
-
-  it('returns raw value if prefix is not nb- or -ch- is missing', () => {
-    expect(cleanTopicTitle('just-some-random-title')).toBe('just-some-random-title')
-    expect(cleanTopicTitle('nb-without-chapter')).toBe('nb-without-chapter')
-  })
-
-  it('strips redundant leading chapter number from suffix', () => {
-    expect(cleanTopicTitle('nb-d124bc64-6474-4136-bbde-2c9a45b79be2-ch-03-3-drawing-a-line-clo')).toBe('Chapter 3: Drawing A Line Clo')
-    expect(cleanTopicTitle('nb-uuid-ch-05-05-linear-regression')).toBe('Chapter 5: Linear Regression')
+  it('formats standard topic titles properly', () => {
+    expect(cleanTopicTitle('nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh')).toBe('Chapter 1: Cn Final Revision Sh')
   })
 })

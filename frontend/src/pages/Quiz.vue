@@ -673,6 +673,11 @@ async function handleGoToExaminer() {
         result.value.flashcards_pending = false
         return
       } else {
+        if (genResult?.rewards) {
+          window.dispatchEvent(
+            new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+          )
+        }
         result.value.flashcards_generated = genResult?.cards_scheduled || 0
         result.value.flashcards_pending = false
       }

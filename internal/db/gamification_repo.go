@@ -98,22 +98,36 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 		coins = 0
 	}
 
-	prof, err := r.GetGamificationProfile()
+	tx, err := r.db.Begin()
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var totalXP, coinBalance int
+	var currentTitle string
+	var streakFreezes int
+	var unlockedCosmeticsJSON string
+	err = tx.QueryRow(`
+		SELECT total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json
+		FROM user_gamification
+		WHERE user_id = 1
+	`).Scan(&totalXP, &coinBalance, &currentTitle, &streakFreezes, &unlockedCosmeticsJSON)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to query gamification state: %w", err)
 	}
 
-	oldTitle := prof.CurrentTitle
-	newTotalXP := prof.TotalXP + xp
-	newCoins := prof.Coins + coins
-	newTitle, _, _, _ := ComputeTitleInfo(newTotalXP)
+	oldTitle := currentTitle
+	newTotalXP := totalXP + xp
+	newCoins := coinBalance + coins
+	newTitle, nextTitle, nextTitleXP, currentTitleMinXP := ComputeTitleInfo(newTotalXP)
 
 	var newTitleUnlocked string
-	if newTitle != oldTitle && newTotalXP >= prof.NextTitleXP {
+	if newTitle != oldTitle {
 		newTitleUnlocked = newTitle
 	}
 
-	_, err = r.db.Exec(`
+	_, err = tx.Exec(`
 		UPDATE user_gamification
 		SET total_xp = ?, coins = ?, current_title = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = 1
@@ -122,9 +136,19 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 		return nil, "", fmt.Errorf("failed to update gamification profile: %w", err)
 	}
 
-	updatedProf, err := r.GetGamificationProfile()
-	if err != nil {
-		return nil, "", err
+	if err := tx.Commit(); err != nil {
+		return nil, "", fmt.Errorf("failed to commit gamification update: %w", err)
+	}
+
+	updatedProf := &models.GamificationProfile{
+		TotalXP:               newTotalXP,
+		Coins:                 newCoins,
+		CurrentTitle:          newTitle,
+		NextTitle:             nextTitle,
+		NextTitleXP:           nextTitleXP,
+		CurrentTitleMinXP:     currentTitleMinXP,
+		StreakFreezesOwned:    streakFreezes,
+		UnlockedCosmeticsJSON: unlockedCosmeticsJSON,
 	}
 
 	return updatedProf, newTitleUnlocked, nil
@@ -144,6 +168,61 @@ func (r *Repository) CreatePendingLootBox(box models.PendingLootBox) error {
 		return fmt.Errorf("failed to insert pending loot box: %w", err)
 	}
 	return nil
+}
+
+// AwardTaskRewardsTx atomically updates XP/coins and persists any pending loot box in a single transaction.
+func (r *Repository) AwardTaskRewardsTx(tx *sql.Tx, xp, coins int, box *models.PendingLootBox) (string, error) {
+	if xp < 0 {
+		xp = 0
+	}
+	if coins < 0 {
+		coins = 0
+	}
+
+	var totalXP, coinBalance int
+	var currentTitle string
+	err := tx.QueryRow(`
+		SELECT total_xp, coins, current_title
+		FROM user_gamification
+		WHERE user_id = 1
+	`).Scan(&totalXP, &coinBalance, &currentTitle)
+	if err != nil {
+		return "", fmt.Errorf("failed to read user gamification: %w", err)
+	}
+
+	oldTitle := currentTitle
+	newTotalXP := totalXP + xp
+	newCoins := coinBalance + coins
+	newTitle, _, _, _ := ComputeTitleInfo(newTotalXP)
+
+	var newTitleUnlocked string
+	if newTitle != oldTitle {
+		newTitleUnlocked = newTitle
+	}
+
+	_, err = tx.Exec(`
+		UPDATE user_gamification
+		SET total_xp = ?, coins = ?, current_title = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1
+	`, newTotalXP, newCoins, newTitle)
+	if err != nil {
+		return "", fmt.Errorf("failed to update gamification profile: %w", err)
+	}
+
+	if box != nil {
+		if box.ID == "" {
+			return "", fmt.Errorf("loot box ID cannot be empty")
+		}
+		_, err = tx.Exec(`
+			INSERT INTO pending_loot_boxes (id, task_id, box_tier, reward_type, reward_amount, opened, created_at)
+			VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+		`, box.ID, box.TaskID, box.BoxTier, box.RewardType, box.RewardAmount)
+		if err != nil {
+			return "", fmt.Errorf("failed to insert pending loot box: %w", err)
+		}
+	}
+
+	return newTitleUnlocked, nil
 }
 
 // GetUnopenedLootBoxes returns all unclaimed mystery chests.
