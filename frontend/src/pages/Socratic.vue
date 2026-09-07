@@ -29,40 +29,15 @@
       </div>
 
       <div class="chat-header-row">
-        <div class="selector-pills">
-          <div class="selector-pill">
-            <span class="pill-icon">📖</span>
-            <select
-              id="notebook-select"
-              v-model="selectedNotebookID"
-              :disabled="isRescueMode"
-              @change="handleNotebookChange"
-            >
-              <option value="" disabled>Choose notebook</option>
-              <option v-for="notebook in notebooks" :key="notebook.id" :value="notebook.id">
-                {{ formatNotebookLabel(notebook) }}
-              </option>
-            </select>
-          </div>
-
-          <div class="selector-pill">
-            <span class="pill-icon">🎯</span>
-            <select
-              id="topic-select"
-              v-model="selectedTopicID"
-              :disabled="isRescueMode"
-              @change="handleTopicChange"
-            >
-              <option v-if="ragEntireNotebookEnabled" value="">
-                Entire book (No topic filter)
-              </option>
-              <option v-else value="" disabled>Choose topic</option>
-              <option v-for="topic in availableTopics" :key="topic.id" :value="topic.id">
-                {{ topic.title }}
-              </option>
-            </select>
-          </div>
-        </div>
+        <NotebookTopicSelector
+          v-model:notebook-id="selectedNotebookID"
+          v-model:topic-id="selectedTopicID"
+          :disabled="isRescueMode"
+          allow-entire-notebook
+          variant="pills"
+          @change-notebook="handleNotebookChange"
+          @change-topic="handleTopicChange"
+        />
 
         <button
           type="button"
@@ -237,10 +212,9 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import {
   askSocratic,
-  getAvailableTopics as fetchAvailableTopics,
-  getNotebooks as fetchNotebooks,
   getUserSettings,
   completeSocraticRescue,
   activateTask,
@@ -252,8 +226,6 @@ const route = useRoute()
 const router = useRouter()
 const ragEntireNotebookEnabled = ref(true)
 
-const availableTopics = ref([])
-const notebooks = ref([])
 const selectedTopicID = ref('')
 const selectedNotebookID = ref('')
 const inputQuestion = ref('')
@@ -270,20 +242,8 @@ const retryingMessageId = ref(null)
 const showCitationPopover = ref(null)
 let hideCitationPopoverTimer = null
 
-const selectedNotebook = computed(() =>
-  notebooks.value.find((notebook) => notebook.id === selectedNotebookID.value)
-)
-
 const effectiveTopicID = computed(() => {
-  if (selectedTopicID.value) {
-    return selectedTopicID.value
-  }
-
-  if (selectedNotebook.value && selectedNotebook.value.topic_id) {
-    return selectedNotebook.value.topic_id
-  }
-
-  return ''
+  return selectedTopicID.value || ''
 })
 
 const canSend = computed(() => {
@@ -321,24 +281,14 @@ const selectionHint = computed(() => {
     return 'Select a notebook to start the Tutor session.'
   }
 
-  if (
-    selectedNotebook.value &&
-    !selectedNotebook.value.topic_id &&
-    !selectedTopicID.value &&
-    !ragEntireNotebookEnabled.value
-  ) {
-    return 'Selected notebook has no linked topic yet. Choose a topic to run RAG.'
-  }
-
   if (!effectiveTopicID.value) {
     if (ragEntireNotebookEnabled.value) {
-      return `Current retrieval scope: Entire Book - ${selectedNotebook.value?.title || ''}`
+      return 'Current retrieval scope: Entire Book'
     }
     return 'Choose a topic to run RAG.'
   }
 
-  const topic = availableTopics.value.find((item) => item.id === effectiveTopicID.value)
-  return topic ? `Current retrieval scope: ${topic.title}` : ''
+  return 'Current retrieval scope: Selected Topic'
 })
 
 onMounted(async () => {
@@ -376,8 +326,6 @@ onMounted(async () => {
     globalError.value = `Failed to load settings: ${err.message}`
   }
 
-  await Promise.all([loadTopics(), loadNotebooks()])
-
   const nbParam = route.query.notebook_id || route.query.notebookId || ''
   const topicParam = route.query.topic_id || route.query.topicId || ''
 
@@ -389,45 +337,12 @@ onMounted(async () => {
   }
 })
 
-async function loadTopics() {
-  try {
-    const result = await fetchAvailableTopics()
-    const list = Array.isArray(result) ? result : Array.isArray(result?.topics) ? result.topics : []
-    availableTopics.value = list
-
-    if (
-      !selectedTopicID.value &&
-      availableTopics.value.length > 0 &&
-      !ragEntireNotebookEnabled.value
-    ) {
-      selectedTopicID.value = availableTopics.value[0].id
-    }
-  } catch (err) {
-    globalError.value = `Failed to load topics: ${err.message}`
-    availableTopics.value = []
-  }
-}
-
-async function loadNotebooks() {
-  try {
-    const result = await fetchNotebooks('')
-    notebooks.value = Array.isArray(result) ? result.filter((item) => !item.error) : []
-  } catch (err) {
-    globalError.value = `Failed to load notebooks: ${err.message}`
-    notebooks.value = []
-  }
-}
-
 function handleTopicChange() {
   globalError.value = ''
 }
 
 function handleNotebookChange() {
   globalError.value = ''
-  const notebook = selectedNotebook.value
-  if (notebook && notebook.topic_id) {
-    selectedTopicID.value = notebook.topic_id
-  }
 }
 
 function clearConversation() {
@@ -572,16 +487,6 @@ function handleComposerKeydown(event) {
 
   event.preventDefault()
   void submitQuestion()
-}
-
-function formatNotebookLabel(notebook) {
-  if (notebook.topic_id) {
-    const topic = availableTopics.value.find((item) => item.id === notebook.topic_id)
-    if (topic) {
-      return `${notebook.title} (${topic.title})`
-    }
-  }
-  return notebook.title
 }
 
 async function copyPromptToClipboard(text) {
@@ -747,49 +652,6 @@ h1 {
   gap: 12px;
   padding-bottom: 4px;
   flex-shrink: 0;
-}
-
-.selector-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.selector-pill {
-  display: inline-flex;
-  align-items: center;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: 20px;
-  padding: 4px 12px 4px 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  transition: all 0.2s ease;
-}
-
-.selector-pill:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(0, 91, 193, 0.1);
-}
-
-.pill-icon {
-  font-size: 14px;
-  margin-right: 6px;
-}
-
-.selector-pill select {
-  border: none;
-  background: transparent;
-  color: var(--on-surface);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  outline: none;
-  padding: 2px 4px;
-  cursor: pointer;
-  max-width: 260px;
-  text-overflow: ellipsis;
 }
 
 .clear-btn-slim {

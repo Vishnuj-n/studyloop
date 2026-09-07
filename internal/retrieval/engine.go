@@ -353,6 +353,7 @@ func (e *Engine) searchWithScope(
 
 func (e *Engine) lexicalSearch(query string, chunks []models.Chunk, k int) []SearchResult {
 	qVec := e.tfVector(query)
+	qMagnitude := vectorMagnitude(qVec)
 	var results []SearchResult
 
 	e.mu.RLock()
@@ -363,7 +364,7 @@ func (e *Engine) lexicalSearch(query string, chunks []models.Chunk, k int) []Sea
 		if !ok {
 			cVec = e.tfVector(c.Text)
 		}
-		score := cosineSimilarity(qVec, cVec)
+		score := cosineSimilarity(qVec, cVec, qMagnitude)
 		results = append(results, SearchResult{
 			ChunkID:         c.ID,
 			Text:            c.Text,
@@ -423,21 +424,25 @@ func tokenize(text string) []string {
 	return out
 }
 
-func cosineSimilarity(v1, v2 map[string]float64) float64 {
-	dot, mag1, mag2 := 0.0, 0.0, 0.0
+func cosineSimilarity(v1, v2 map[string]float64, mag1 float64) float64 {
+	dot, mag2 := 0.0, 0.0
 	for w, f2 := range v2 {
 		mag2 += f2 * f2
 		if f1, ok := v1[w]; ok {
 			dot += f1 * f2
 		}
 	}
-	for _, f1 := range v1 {
-		mag1 += f1 * f1
-	}
-	mag1 = math.Sqrt(mag1)
 	mag2 = math.Sqrt(mag2)
 	if mag1 == 0 || mag2 == 0 {
 		return 0
 	}
 	return dot / (mag1 * mag2)
+}
+
+func vectorMagnitude(vector map[string]float64) float64 {
+	var magnitude float64
+	for _, value := range vector {
+		magnitude += value * value
+	}
+	return math.Sqrt(magnitude)
 }

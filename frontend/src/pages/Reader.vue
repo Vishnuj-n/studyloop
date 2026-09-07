@@ -15,51 +15,15 @@
 
     <!-- Browse Mode: Notebook/Topic Selection -->
     <article v-if="!isTaskFlow" class="panel controls">
-      <label class="field">
-        <span>Notebook</span>
-        <select
-          v-model="reader.selectedNotebookID.value"
-          :disabled="
-            reader.loadingTree.value ||
-            reader.notebookTree.value.length === 0 ||
-            reader.loadingBundle.value
-          "
-          @change="onNotebookChange()"
-        >
-          <option disabled value="">Select notebook</option>
-          <option
-            v-for="notebook in reader.notebookTree.value"
-            :key="notebook.notebook_id"
-            :value="notebook.notebook_id"
-          >
-            {{ notebook.title }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Topic</span>
-        <select
-          v-model="reader.selectedTopicID.value"
-          :disabled="
-            reader.loadingTree.value ||
-            reader.availableTopics.value.length === 0 ||
-            reader.loadingBundle.value
-          "
-          @change="reader.loadBundle()"
-        >
-          <option disabled value="">
-            {{ reader.availableTopics.value.length === 0 ? 'No topics available' : 'Select topic' }}
-          </option>
-          <option
-            v-for="topic in reader.availableTopics.value"
-            :key="topic.topic_id"
-            :value="topic.topic_id"
-          >
-            {{ topic.title }}
-          </option>
-        </select>
-      </label>
+      <NotebookTopicSelector
+        v-model:notebook-id="reader.selectedNotebookID.value"
+        v-model:topic-id="reader.selectedTopicID.value"
+        :notebook-tree="reader.notebookTree.value"
+        :disabled="reader.loadingTree.value || reader.loadingBundle.value"
+        variant="fields"
+        @change-notebook="onNotebookChange"
+        @change-topic="reader.loadBundle"
+      />
     </article>
 
     <article v-if="reader.globalError.value" class="panel error fatal-error">
@@ -70,6 +34,11 @@
         <button class="primary" @click="reloadPage()">Retry</button>
       </div>
     </article>
+
+    <!-- Empty State: No Topic Chosen / Flashcards Notebook -->
+    <div v-else-if="!isTaskFlow && !reader.selectedTopicID.value" class="empty">
+      {{ reader.availableTopics.value.length === 0 && reader.selectedNotebookID.value ? 'This notebook has no reading chapters (e.g. Flashcards notebook).' : 'No chapter chosen.' }}
+    </div>
 
     <div v-else class="layout" :class="{ collapsed: chat.chatCollapsed.value }">
       <article class="panel stage">
@@ -277,6 +246,7 @@ import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
 import { useExtensions } from '../composables/useExtensions'
+import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
@@ -1137,30 +1107,6 @@ h3 {
 .sections {
   display: grid;
   gap: 8px;
-}
-
-.field {
-  display: grid;
-  gap: 5px;
-}
-
-.field span {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted-text);
-}
-
-select {
-  width: 100%;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
-  border-radius: 10px;
-  font: inherit;
-  padding: 10px;
-  outline: 0;
 }
 
 button {

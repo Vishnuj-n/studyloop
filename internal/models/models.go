@@ -227,8 +227,10 @@ type NotebookChunk struct {
 
 // NotebookTopicTreeTopic is one topic option nested under a notebook.
 type NotebookTopicTreeTopic struct {
-	TopicID string `json:"topic_id"`
-	Title   string `json:"title"`
+	TopicID   string `json:"topic_id"`
+	Title     string `json:"title"`
+	StartPage int    `json:"start_page,omitempty"`
+	EndPage   int    `json:"end_page,omitempty"`
 }
 
 // NotebookTopicTreeNode is the notebook-scoped topic tree returned to the UI.

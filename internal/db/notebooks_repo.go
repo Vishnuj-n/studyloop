@@ -840,7 +840,7 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 		query += ` WHERE (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
 		args = append(args, profileID)
 	}
-	query += ` ORDER BY n.uploaded_at DESC, t.title ASC, t.id ASC `
+	query += ` ORDER BY n.uploaded_at DESC, t.start_page ASC, t.title ASC, t.id ASC `
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -891,8 +891,10 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 		}
 
 		tree[idx].Topics = append(tree[idx].Topics, models.NotebookTopicTreeTopic{
-			TopicID: topicID,
-			Title:   cleanTitle,
+			TopicID:   topicID,
+			Title:     cleanTitle,
+			StartPage: startPage,
+			EndPage:   endPage,
 		})
 		seenTopics[notebookID][topicID] = struct{}{}
 	}

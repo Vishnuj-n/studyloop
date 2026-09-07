@@ -44,6 +44,19 @@ func TestHybridRRFScoring(t *testing.T) {
 	}
 }
 
+func TestCosineSimilarityUsesCachedQueryMagnitude(t *testing.T) {
+	query := map[string]float64{"go": 0.5, "queue": 0.5}
+	chunk := map[string]float64{"go": 0.5, "queue": 0.25}
+
+	score := cosineSimilarity(query, chunk, vectorMagnitude(query))
+	if score <= 0 || score > 1 {
+		t.Fatalf("expected normalized cosine score, got %v", score)
+	}
+	if cosineSimilarity(map[string]float64{}, chunk, vectorMagnitude(map[string]float64{})) != 0 {
+		t.Fatal("expected zero score for an empty query vector")
+	}
+}
+
 func TestHybridRRFCompounding(t *testing.T) {
 	chunks := []models.Chunk{
 		{ID: "c1", Text: "Go goroutines and channels concurrency"},
