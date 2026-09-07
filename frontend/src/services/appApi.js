@@ -148,8 +148,8 @@ export async function selectAnkiFile() {
   return await appBridge().SelectAnkiFile()
 }
 
-export async function importAnkiDeck(filePath, targetNotebookID = '', targetTopicID = '') {
-  return await appBridge().ImportAnkiDeck(filePath, targetNotebookID, targetTopicID)
+export async function importAnkiDeck(filePath, targetNotebookID = '', targetTopicID = '', preserveHistory = true) {
+  return await appBridge().ImportAnkiDeck(filePath, targetNotebookID, targetTopicID, preserveHistory)
 }
 
 export async function selectAndUploadDeepStructuredPDF(isPro = false) {

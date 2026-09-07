@@ -82,3 +82,53 @@ func TestImportAnkiDeckStandalone(t *testing.T) {
 		t.Fatalf("external file in user directory was wrongly deleted: %v", err)
 	}
 }
+
+func TestImportAnkiDeckPreserveHistory(t *testing.T) {
+	tempDB := filepath.Join(t.TempDir(), "studyloop-anki-history.db")
+	repo, err := db.Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("failed to init test db: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	targetDue := int64(1800000000)
+	cards := []models.Flashcard{
+		{ID: "card-mature", TopicID: "topic-anki-hist", Prompt: "Mature Prompt", Answer: "Mature Answer", DueAt: targetDue},
+		{ID: "card-new", TopicID: "topic-anki-hist", Prompt: "New Prompt", Answer: "New Answer", DueAt: 0},
+	}
+	states := map[string]models.FlashcardState{
+		"card-mature": {
+			Stability:  35.5,
+			Difficulty: 4.2,
+			Reps:       5,
+			Lapses:     1,
+			StateCode:  2,
+		},
+		"card-new": {
+			Stability:  2.0,
+			Difficulty: 5.0,
+			Reps:       0,
+			Lapses:     0,
+			StateCode:  0,
+		},
+	}
+
+	_ = repo.EnsureTopicWithStatus("topic-anki-hist", "History Deck", "completed")
+	createdCards, _, err := repo.GetOrCreateFlashcardsForTopic("topic-anki-hist", cards, states)
+	if err != nil {
+		t.Fatalf("GetOrCreateFlashcardsForTopic failed: %v", err)
+	}
+	if len(createdCards) != 2 {
+		t.Fatalf("expected 2 created cards, got %d", len(createdCards))
+	}
+
+	// Verify that the persisted FSRS state maintained stability and reps
+	stateMap, err := repo.GetFlashcardStatesByIDs([]string{"card-mature", "card-new"})
+	if err != nil {
+		t.Fatalf("GetFlashcardStatesByIDs failed: %v", err)
+	}
+	matureState, ok := stateMap["card-mature"]
+	if !ok || matureState.Stability != 35.5 || matureState.Reps != 5 {
+		t.Errorf("mature card state not preserved properly: %+v", matureState)
+	}
+}

@@ -432,13 +432,13 @@ async function uploadYouTube(url) {
   }
 }
 
-async function handleAnkiUpload({ filePath, targetNotebookID }) {
+async function handleAnkiUpload({ filePath, targetNotebookID, preserveHistory }) {
   uploadError.value = ''
   successMessage.value = ''
   ingestionStatusMessage.value = 'Parsing and importing Anki flashcards...'
   uploadProgress.value = 40
   try {
-    const res = await apiImportAnkiDeck(filePath, targetNotebookID)
+    const res = await apiImportAnkiDeck(filePath, targetNotebookID, '', preserveHistory ?? true)
     if (res?.error) {
       uploadError.value = res.error
       uploadProgress.value = 0

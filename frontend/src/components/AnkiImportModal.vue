@@ -79,6 +79,22 @@
           </div>
         </div>
 
+        <!-- Review History & FSRS Checkbox -->
+        <div class="form-group">
+          <label class="input-label">Scheduling & Retention</label>
+          <label class="checkbox-option">
+            <input
+              v-model="preserveHistory"
+              type="checkbox"
+              :disabled="isLoading"
+            />
+            <div class="checkbox-label-group">
+              <span class="checkbox-title">Import previous review history & scheduling</span>
+              <span class="checkbox-desc">Preserves intervals, due dates, and FSRS card stability from Anki</span>
+            </div>
+          </label>
+        </div>
+
         <div v-if="error || localError" class="error-box">
           {{ error || localError }}
         </div>
@@ -128,6 +144,7 @@ const selectedFilePath = ref('')
 const selectedFileName = ref('')
 const targetMode = ref('standalone')
 const selectedNotebookID = ref('')
+const preserveHistory = ref(true)
 const localError = ref('')
 
 const canSubmit = computed(() => {
@@ -144,6 +161,7 @@ watch(
       selectedFileName.value = ''
       targetMode.value = 'standalone'
       selectedNotebookID.value = ''
+      preserveHistory.value = true
       localError.value = ''
     }
   }
@@ -175,11 +193,43 @@ function handleSubmit() {
   emit('submit', {
     filePath: selectedFilePath.value,
     targetNotebookID: targetMode.value === 'existing' ? selectedNotebookID.value : '',
+    preserveHistory: preserveHistory.value,
   })
 }
 </script>
 
 <style scoped>
+.checkbox-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.checkbox-option:hover {
+  border-color: var(--primary);
+}
+
+.checkbox-label-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkbox-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.checkbox-desc {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+}
 .modal-backdrop {
   position: fixed;
   inset: 0;

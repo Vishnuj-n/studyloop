@@ -22,8 +22,14 @@ type ankiExtensionOutput struct {
 	DeckName   string `json:"deck_name"`
 	TotalCards int    `json:"total_cards"`
 	Cards      []struct {
-		Prompt string `json:"prompt"`
-		Answer string `json:"answer"`
+		Prompt     string  `json:"prompt"`
+		Answer     string  `json:"answer"`
+		DueAt      int64   `json:"due_at,omitempty"`
+		Stability  float64 `json:"stability,omitempty"`
+		Difficulty float64 `json:"difficulty,omitempty"`
+		Reps       int     `json:"reps,omitempty"`
+		Lapses     int     `json:"lapses,omitempty"`
+		StateCode  int     `json:"state_code,omitempty"`
 	} `json:"cards"`
 	Error string `json:"error,omitempty"`
 }
@@ -55,7 +61,7 @@ func (a *App) SelectAnkiFile() map[string]interface{} {
 }
 
 // ImportAnkiDeck imports an Anki deck (.apkg / .colpkg) either as a standalone notebook or into an existing notebook/topic.
-func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTopicID string) map[string]interface{} {
+func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTopicID string, preserveHistory bool) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -200,25 +206,56 @@ func (a *App) ImportAnkiDeck(filePath string, targetNotebookID string, targetTop
 	statesToInsert := make(map[string]models.FlashcardState, len(parsed.Cards))
 
 	for i, c := range parsed.Cards {
-		dayOffset := int64(i/dripRate) * secsPerDay // cards 0..dripRate-1 → today, next batch → tomorrow, etc.
 		cardID := uuid.NewString()
+		var cardDueAt int64
+		var cardState models.FlashcardState
+
+		if preserveHistory && c.DueAt > 0 {
+			cardDueAt = c.DueAt
+			stab := c.Stability
+			if stab <= 0 {
+				stab = 2.0
+			}
+			diff := c.Difficulty
+			if diff <= 0 {
+				diff = 5.0
+			}
+			stCode := c.StateCode
+			if stCode == 0 && c.Reps > 0 {
+				stCode = 2
+			}
+			cardState = models.FlashcardState{
+				Stability:     stab,
+				Difficulty:    diff,
+				ElapsedDays:   0,
+				ScheduledDays: 0,
+				Reps:          c.Reps,
+				Lapses:        c.Lapses,
+				StateCode:     stCode,
+			}
+		} else {
+			dayOffset := int64(i/dripRate) * secsPerDay // cards 0..dripRate-1 → today, next batch → tomorrow, etc.
+			cardDueAt = now + dayOffset
+			cardState = models.FlashcardState{
+				Stability:     2.0,
+				Difficulty:    5.0,
+				ElapsedDays:   0,
+				ScheduledDays: 0,
+				Reps:          0,
+				Lapses:        0,
+				StateCode:     2, // Review state
+			}
+		}
+
 		cardsToInsert = append(cardsToInsert, models.Flashcard{
 			ID:        cardID,
 			TopicID:   finalTopicID,
 			Prompt:    c.Prompt,
 			Answer:    c.Answer,
-			DueAt:     now + dayOffset,
+			DueAt:     cardDueAt,
 			Suspended: false,
 		})
-		statesToInsert[cardID] = models.FlashcardState{
-			Stability:     2.0,
-			Difficulty:    5.0,
-			ElapsedDays:   0,
-			ScheduledDays: 0,
-			Reps:          0,
-			Lapses:        0,
-			StateCode:     2, // Review state
-		}
+		statesToInsert[cardID] = cardState
 	}
 
 	fileHash, _ := utils.FileSHA256(filePath)
