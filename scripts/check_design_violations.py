@@ -147,6 +147,8 @@ def main():
     print(f"Summary: {RED}{error_count} Errors{RESET}, {YELLOW}{warning_count} Warnings{RESET}")
     print(f"{BOLD}{BLUE}=================================================={RESET}\n")
 
+    return 1 if error_count > 0 else 0
+
 def test_multiline_shadow():
     import tempfile
     test_content = """.card {

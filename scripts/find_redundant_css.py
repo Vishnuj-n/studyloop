@@ -269,6 +269,9 @@ def main():
                 
     print("-" * 80)
     print(f"Scan complete. Found {total_redundant} redundant CSS selector(s) across {files_checked} file(s).")
+    
+    if total_redundant > 0:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

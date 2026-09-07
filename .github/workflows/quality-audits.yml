@@ -1,0 +1,35 @@
+name: Code Quality & Design Audits
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-scripts:
+    name: Code Smells & UI Design Audits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check AI Slop & Code Smells
+        run: python scripts/find_code_smells.py
+
+      - name: Check Redundant CSS
+        run: python scripts/find_redundant_css.py
+
+      - name: Check UI Design & Token Violations
+        run: python scripts/check_design_violations.py
