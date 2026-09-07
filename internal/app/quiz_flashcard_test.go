@@ -953,3 +953,175 @@ func TestQuizPromptContainsStrictGroundingRules(t *testing.T) {
 	}
 }
 
+func TestMilestoneExamTriggers(t *testing.T) {
+	app := newTestApp(t)
+
+	notebookID := "nb-milestone-test"
+	topic1 := "topic-ms-ch1"
+	topic2 := "topic-ms-ch2"
+
+	if err := testRepo.EnsureTopic(topic1, "Chapter 1"); err != nil {
+		t.Fatalf("EnsureTopic ch1 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topic1, 1, 10); err != nil {
+		t.Fatalf("UpdateTopicPageBounds ch1 failed: %v", err)
+	}
+	if err := testRepo.EnsureTopic(topic2, "Chapter 2 Short"); err != nil {
+		t.Fatalf("EnsureTopic ch2 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topic2, 11, 15); err != nil {
+		t.Fatalf("UpdateTopicPageBounds ch2 failed: %v", err)
+	}
+
+	if err := testRepo.CreateNotebook(notebookID, "Milestone NB", "/tmp/ms.pdf", "pdf", topic1, "", 20, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if err := testRepo.LinkNotebookTopics(notebookID, []string{topic1, topic2}); err != nil {
+		t.Fatalf("LinkNotebookTopics failed: %v", err)
+	}
+
+	// Insert mock chunks so flashcard generation passes
+	for p := 1; p <= 15; p++ {
+		tID := topic1
+		if p > 10 {
+			tID = topic2
+		}
+		mustInsertMockChunk(t, notebookID, tID, fmt.Sprintf("chunk-ms-p%d", p), p)
+	}
+
+	// Scenario 1: Complete 3 quizzes in Chapter 1 ending at page 10 (EndPage = 10 == topicEndPage 10)
+	// First 2 quizzes
+	for i := 1; i <= 2; i++ {
+		taskID := fmt.Sprintf("task-ms-q%d", i)
+		task := models.StudyQueueTask{
+			ID:          taskID,
+			NotebookID:  notebookID,
+			TopicID:     topic1,
+			TaskType:    models.StudyTaskTypeQuiz,
+			Status:      models.StudyTaskStatusActive,
+			PayloadJSON: `{"questions":[{"id":"q1","prompt":"P1","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+			StartPage:   (i-1)*3 + 1,
+			EndPage:     i * 3,
+		}
+		if err := testRepo.InsertStudyTask(task); err != nil {
+			t.Fatalf("insert quiz task %d failed: %v", i, err)
+		}
+		_ = app.SubmitQuizAttempt(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+		_ = app.GenerateFlashcardsForQuizTask(taskID)
+	}
+
+	// Verify no milestone yet
+	msCount, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
+	if msCount != 0 {
+		t.Fatalf("expected 0 milestone exam tasks before chapter end, got %d", msCount)
+	}
+
+	// 3rd quiz finishes chapter (EndPage = 10 >= topicEndPage 10)
+	task3 := models.StudyQueueTask{
+		ID:          "task-ms-q3",
+		NotebookID:  notebookID,
+		TopicID:     topic1,
+		TaskType:    models.StudyTaskTypeQuiz,
+		Status:      models.StudyTaskStatusActive,
+		PayloadJSON: `{"questions":[{"id":"q1","prompt":"P1","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+		StartPage:   7,
+		EndPage:     10,
+	}
+	if err := testRepo.InsertStudyTask(task3); err != nil {
+		t.Fatalf("insert quiz task 3 failed: %v", err)
+	}
+	_ = app.SubmitQuizAttempt("task-ms-q3", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+	_ = app.GenerateFlashcardsForQuizTask("task-ms-q3")
+
+	// Verify milestone exam was inserted for Chapter 1
+	msTasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+	var foundMilestone bool
+	for _, tsk := range msTasks {
+		if tsk.TaskType == models.StudyTaskTypeMilestoneExam && tsk.NotebookID == notebookID {
+			foundMilestone = true
+			break
+		}
+	}
+	if !foundMilestone {
+		t.Fatalf("expected MILESTONE_EXAM task after finishing Chapter 1 with 3 quizzes")
+	}
+
+	// Scenario 2: Short Chapter (Chapter 2, 1 quiz ending at page 15) -> Should NOT trigger milestone (< 3 passed quizzes)
+	taskShort := models.StudyQueueTask{
+		ID:          "task-ms-short-q1",
+		NotebookID:  notebookID,
+		TopicID:     topic2,
+		TaskType:    models.StudyTaskTypeQuiz,
+		Status:      models.StudyTaskStatusActive,
+		PayloadJSON: `{"questions":[{"id":"q1","prompt":"P1","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+		StartPage:   11,
+		EndPage:     15,
+	}
+	if err := testRepo.InsertStudyTask(taskShort); err != nil {
+		t.Fatalf("insert short chapter quiz failed: %v", err)
+	}
+	_ = app.SubmitQuizAttempt("task-ms-short-q1", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+	_ = app.GenerateFlashcardsForQuizTask("task-ms-short-q1")
+
+	// Count milestones - should still be 1 (only the one from Chapter 1)
+	countAfterShort, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
+	if countAfterShort != 1 {
+		t.Fatalf("expected 1 milestone exam (short chapter should NOT create milestone), got %d", countAfterShort)
+	}
+
+	// Scenario 3: 3 quiz candidates where 1 has a corrupt payload -> no 2-quiz milestone exam created
+	topic3 := "topic-ms-ch3-corrupt"
+	if err := testRepo.EnsureTopic(topic3, "Chapter 3 Corrupt"); err != nil {
+		t.Fatalf("EnsureTopic ch3 failed: %v", err)
+	}
+	if err := testRepo.UpdateTopicPageBounds(topic3, 16, 25); err != nil {
+		t.Fatalf("UpdateTopicPageBounds ch3 failed: %v", err)
+	}
+	if err := testRepo.EnsureNotebookTopic(notebookID, topic3); err != nil {
+		t.Fatalf("EnsureNotebookTopic ch3 failed: %v", err)
+	}
+	for p := 16; p <= 25; p++ {
+		mustInsertMockChunk(t, notebookID, topic3, fmt.Sprintf("chunk-ms-p%d", p), p)
+	}
+
+	for i := 1; i <= 3; i++ {
+		taskID := fmt.Sprintf("task-ms-ch3-q%d", i)
+		startP := 16 + (i-1)*3
+		endP := startP + 2
+		if i == 3 {
+			endP = 25
+		}
+		task := models.StudyQueueTask{
+			ID:          taskID,
+			NotebookID:  notebookID,
+			TopicID:     topic3,
+			TaskType:    models.StudyTaskTypeQuiz,
+			Status:      models.StudyTaskStatusActive,
+			PayloadJSON: `{"questions":[{"id":"q1","prompt":"P1","options":["A","B"],"correct_answer":"A"}],"passing_score":70}`,
+			StartPage:   startP,
+			EndPage:     endP,
+		}
+		if err := testRepo.InsertStudyTask(task); err != nil {
+			t.Fatalf("insert ch3 task %d failed: %v", i, err)
+		}
+		_ = app.SubmitQuizAttempt(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+		if i == 2 {
+			// Corrupt the attempt's answers JSON so ComputeCorrectnessFlags fails
+			if _, err := testRepo.ExecForTest(`UPDATE quiz_attempts SET answers_json = 'corrupt-json' WHERE task_id = ?`, taskID); err != nil {
+				t.Fatalf("corrupt ch3 attempt 2 failed: %v", err)
+			}
+		}
+		_ = app.GenerateFlashcardsForQuizTask(taskID)
+	}
+
+	// Count milestones: still 1 because the corrupt attempt leaves only 2 valid quizzes (< 3)
+	countAfterCorrupt, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
+	if countAfterCorrupt != 1 {
+		t.Fatalf("expected milestone count to remain 1 after corrupt attempt dropped valid quizzes below 3, got %d", countAfterCorrupt)
+	}
+}
+
+

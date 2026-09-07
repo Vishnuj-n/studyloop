@@ -249,7 +249,7 @@ func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{
 		return map[string]interface{}{"error": "failed to complete transition: " + transitionErr.Error()}
 	}
 
-	checkAndInsertMilestoneExam(repo, task.NotebookID)
+	checkAndInsertMilestoneExam(repo, task)
 
 	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_generation_completed taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", transitionRes.CardsScheduled)
 	utils.Warnf("[DASHBOARD] dashboard_redirect_after_generation taskID=%s reviewTaskID=%s cardsScheduled=%d", taskID, "", transitionRes.CardsScheduled)
@@ -262,29 +262,34 @@ func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{
 	}
 }
 
-func checkAndInsertMilestoneExam(repo *db.Repository, notebookID string) {
-	count, countErr := repo.CountCompletedQuizzesByNotebook(notebookID)
-	if countErr != nil {
-		utils.Warnf("[MILESTONE_EXAM] quiz_count_failed notebookID=%s err=%v", notebookID, countErr)
-		return
-	}
-	if count <= 0 || count%10 != 0 {
+func checkAndInsertMilestoneExam(repo *db.Repository, task models.StudyQueueTask) {
+	if task.NotebookID == "" || task.TopicID == "" {
 		return
 	}
 
-	decadeAttempts, attemptsErr := repo.GetLastNQuizAttemptsWithCorrectness(notebookID, 10)
-	if attemptsErr != nil {
-		utils.Warnf("[MILESTONE_EXAM] passed_quizzes_fetch_failed notebookID=%s err=%v", notebookID, attemptsErr)
+	// Chapter Completion Trigger: only trigger at end of chapter if >= 3 passed quizzes exist
+	_, topicEnd, err := repo.GetTopicPageBounds(task.TopicID)
+	if err != nil || topicEnd <= 0 || task.EndPage < topicEnd {
 		return
 	}
-	if len(decadeAttempts) != 10 {
+
+	unexamined, err := repo.GetUnexaminedPassedQuizAttemptsByTopic(task.NotebookID, task.TopicID)
+	if err != nil || len(unexamined) < 3 {
+		return
+	}
+
+	insertMilestoneForAttempts(repo, task.NotebookID, unexamined)
+}
+
+func insertMilestoneForAttempts(repo *db.Repository, notebookID string, attempts []db.QuizAttemptWithPayload) {
+	if len(attempts) == 0 {
 		return
 	}
 
 	var representativeAttemptID string
-	quizzes := make(map[string][]int, len(decadeAttempts))
+	quizzes := make(map[string][]int, len(attempts))
 	passingScore := 70
-	for _, attempt := range decadeAttempts {
+	for _, attempt := range attempts {
 		flags, flagErr := studypkg.ComputeCorrectnessFlags(attempt.QuizPayload, attempt.AnswersJSON)
 		if flagErr != nil || flags == nil {
 			utils.Warnf("[MILESTONE_EXAM] skipped_corrupt_attempt notebookID=%s attemptID=%s err=%v", notebookID, attempt.ID, flagErr)
@@ -299,6 +304,10 @@ func checkAndInsertMilestoneExam(repo *db.Repository, notebookID string) {
 		}
 	}
 
+	if len(quizzes) < 3 || representativeAttemptID == "" {
+		return
+	}
+
 	payload := models.MilestoneExamPayload{
 		Quizzes:      quizzes,
 		PassingScore: passingScore,
@@ -311,6 +320,7 @@ func checkAndInsertMilestoneExam(repo *db.Repository, notebookID string) {
 		utils.Warnf("[MILESTONE_EXAM] inserted notebookID=%s quizCount=%d", notebookID, len(quizzes))
 	}
 }
+
 
 // ---------- Manual Mode endpoints ----------
 
