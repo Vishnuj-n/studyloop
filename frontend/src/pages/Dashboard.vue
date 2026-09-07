@@ -204,7 +204,10 @@
             :calendar-days="calendarDays"
             :month-label="currentMonthLabel"
           />
-          <ForecastChart :timeline-data="timelineData" :max-flashcards-limit="maxFlashcardsLimit" />
+          <ForecastChart
+            :timeline-data="timelineData"
+            :max-flashcards-limit="userSettings.max_flashcards_per_session"
+          />
         </div>
       </div>
     </template>
