@@ -153,20 +153,23 @@ func appendFailedQuestionsSection(promptText string, task models.StudyQueueTask)
 	}
 
 	if len(payload.FailedQuestions) > 0 {
-		promptText += "During my quiz, I failed the following questions:\n"
+		var builder strings.Builder
+		builder.WriteString(promptText)
+		builder.WriteString("During my quiz, I failed the following questions:\n")
 		for idx, q := range payload.FailedQuestions {
-			promptText += fmt.Sprintf("%d. Question: %s\n", idx+1, q.Prompt)
+			fmt.Fprintf(&builder, "%d. Question: %s\n", idx+1, q.Prompt)
 			if len(q.Options) > 0 {
-				promptText += fmt.Sprintf("   Options: %s\n", strings.Join(q.Options, ", "))
+				fmt.Fprintf(&builder, "   Options: %s\n", strings.Join(q.Options, ", "))
 			}
 			userAns := q.UserAnswer
 			if userAns == "" {
 				userAns = "(No answer)"
 			}
-			promptText += fmt.Sprintf("   My Answer: %s\n", userAns)
-			promptText += fmt.Sprintf("   Correct Answer: %s\n\n", q.CorrectAnswer)
+			fmt.Fprintf(&builder, "   My Answer: %s\n", userAns)
+			fmt.Fprintf(&builder, "   Correct Answer: %s\n\n", q.CorrectAnswer)
 		}
-		promptText += "Please focus on guiding me through the concepts behind these failed questions.\n\n"
+		builder.WriteString("Please focus on guiding me through the concepts behind these failed questions.\n\n")
+		return builder.String()
 	}
 	return promptText
 }

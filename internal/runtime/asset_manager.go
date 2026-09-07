@@ -301,7 +301,6 @@ func (am *AssetManager) AcquireAssets(progressCallback func(status string, perce
 	}
 
 	progressCallback("checking", 5, "Checking system compatibility...", "Checking OS and CPU specs")
-	time.Sleep(300 * time.Millisecond)
 
 	// Warn on non-primary platforms
 	if runtime.GOOS != "windows" {
@@ -519,7 +518,6 @@ func (am *AssetManager) AcquireAssets(progressCallback func(status string, perce
 
 	// Verify SHA-256 hashes against manifest
 	progressCallback("verifying", 90, "Verifying asset integrity...", "Checking SHA-256 checksums")
-	time.Sleep(400 * time.Millisecond)
 
 	verifyFiles := am.manifest.RequiredFiles
 	if len(verifyFiles) == 0 {
@@ -546,7 +544,6 @@ func (am *AssetManager) AcquireAssets(progressCallback func(status string, perce
 
 	// Stage native libraries
 	progressCallback("extracting", 95, "Staging native libraries...", "Setting up local runtime cache")
-	time.Sleep(300 * time.Millisecond)
 	if _, err := am.StageDLLs(); err != nil {
 		return fmt.Errorf("failed to stage native libraries during acquisition: %w", err)
 	}
@@ -562,7 +559,6 @@ func (am *AssetManager) AcquireAssets(progressCallback func(status string, perce
 	}
 
 	progressCallback("initializing", 98, "Initializing local AI engine...", "Preloading ONNX embedder")
-	time.Sleep(300 * time.Millisecond)
 
 	return nil
 }
