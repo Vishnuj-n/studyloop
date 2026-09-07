@@ -18,15 +18,12 @@ flowchart TD
             B3 --> B4["Run go test -race (always runs)"]
         end
 
-        subgraph Job_Frontend["Job 2: Frontend (Node Lint & Test)"]
-            F1["Setup Node 22 + npm ci"] --> F2["Run ESLint"]
-            F2 --> F3["Run Vitest (always runs)"]
-        end
-
-        subgraph Job_Wails["Job 3: Wails Build Verification"]
-            W1["Setup Go + Node 22"] --> W2["Install Wails CLI"]
-            W2 --> W3["wails generate module"]
-            W3 --> W4["npm run build (Vite Prod Bundle)"]
+        subgraph Job_Frontend["Job 2: Frontend (Node Lint, Test & Build)"]
+            F1["Setup Node 22 + Go"] --> F2["wails generate module"]
+            F2 --> F3["npm ci"]
+            F3 --> F4["Run ESLint"]
+            F4 --> F5["Run Vitest (always runs)"]
+            F5 --> F6["Run npm run build (always runs)"]
         end
     end
 
@@ -50,5 +47,5 @@ flowchart TD
 
     class Trigger trigger
     class CI,Quality workflow
-    class Job_Backend,Job_Frontend,Job_Wails,Job_Audits job
-    class B1,B2,B3,B4,F1,F2,F3,W1,W2,W3,W4,Q1,Q2,Q3,Q4 step
+    class Job_Backend,Job_Frontend,Job_Audits job
+    class B1,B2,B3,B4,F1,F2,F3,F4,F5,F6,Q1,Q2,Q3,Q4 step

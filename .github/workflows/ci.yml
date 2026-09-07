@@ -39,7 +39,7 @@ jobs:
         run: go test -v -count=1 -race ./...
 
   frontend:
-    name: Frontend (Node Lint & Test)
+    name: Frontend (Node Lint, Test & Build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,37 +80,7 @@ jobs:
         run: npm test
         working-directory: frontend
 
-  wails-build:
-    name: Wails & Frontend Build Verification
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Create dummy embedded files for Go embed
-        run: |
-          mkdir -p frontend/dist && touch frontend/dist/index.html
-          mkdir -p internal/app && touch internal/app/VERSION
-
-      - name: Generate Wails bindings
-        run: wails generate module
-
       - name: Build frontend production bundle
-        run: |
-          npm ci
-          npm run build
+        if: success() || failure()
+        run: npm run build
         working-directory: frontend
