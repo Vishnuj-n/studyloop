@@ -762,6 +762,7 @@ async function loadQueueSession(taskID, notebookID = '') {
   text-align: center;
   line-height: 1.6;
   max-width: 48ch;
+  white-space: pre-line;
 }
 .card-text :deep(img),
 .card-text img {

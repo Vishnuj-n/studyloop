@@ -360,7 +360,13 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
 		), 0) AS external_help_required,
 		COALESCE((SELECT MIN(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), 1) AS start_page,
-		COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page
+		COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page,
+		COALESCE((
+			SELECT COUNT(*)
+			FROM fsrs_cards fc
+			WHERE fc.topic_id = notebooks.topic_id
+			   OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
+		), 0) AS flashcard_count
 	FROM notebooks`
 	args := []interface{}{}
 	whereClause := ""
@@ -402,7 +408,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 		if err := rows.Scan(
 			&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 			&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-			&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
+			&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage, &nb.FlashcardCount,
 		); err != nil {
 			return nil, err
 		}
@@ -431,13 +437,19 @@ func (r *Repository) GetNotebookByID(notebookID string) (*models.Notebook, error
 				   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
 			), 0) AS external_help_required,
 			COALESCE((SELECT MIN(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), 1) AS start_page,
-			COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page
+			COALESCE((SELECT MAX(nc.page_num) FROM notebook_chunks nc WHERE nc.notebook_id = notebooks.id AND nc.page_num > 0), notebooks.page_count, 1) AS end_page,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM fsrs_cards fc
+				WHERE fc.topic_id = notebooks.topic_id
+				   OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
+			), 0) AS flashcard_count
 		FROM notebooks
 		WHERE id = ?
 	`, notebookID).Scan(
 		&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 		&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
-		&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage,
+		&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage, &nb.FlashcardCount,
 	)
 
 	if err == sql.ErrNoRows {

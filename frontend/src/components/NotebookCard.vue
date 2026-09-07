@@ -16,7 +16,8 @@
         <h3>{{ notebook.title }}</h3>
         <p class="meta">{{ notebook.file_type.toUpperCase() }}</p>
         <p v-if="notebook.page_count > 0" class="meta">{{ notebook.page_count }} pages</p>
-        <p class="meta">{{ notebook.chunk_count }} chunks</p>
+        <p v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta">🎴 {{ notebook.flashcard_count || 0 }} flashcards</p>
+        <p v-else class="meta">{{ notebook.chunk_count }} chunks</p>
         <p v-if="isDeepExtracted" class="meta deep-badge">⚡ Deep Extracted</p>
         <p v-if="variant === 'dormant'" class="meta">Status: {{ formattedStatus }}</p>
       </div>
