@@ -8,6 +8,11 @@
       <p>Loading your study rewards…</p>
     </div>
 
+    <div v-else-if="loadError" class="state-panel error-panel">
+      <p class="error-msg">{{ loadError }}</p>
+      <button class="retry-btn" type="button" @click="loadData">Retry</button>
+    </div>
+
     <div v-else class="rewards-grid">
       <!-- Title & XP Rank Card -->
       <div class="card floating-card rank-card">
@@ -63,6 +68,7 @@
         >
           {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
         </button>
+        <p v-if="buyError" class="buy-error-msg">{{ buyError }}</p>
       </div>
 
       <!-- Pending Loot Boxes -->
@@ -78,9 +84,10 @@
         </div>
 
         <div v-else class="chests-list">
-          <div
+          <button
             v-for="chest in chests"
             :key="chest.id"
+            type="button"
             class="chest-vault-item"
             :class="'tier-' + chest.box_tier.toLowerCase()"
             @click="openChest(chest)"
@@ -92,7 +99,7 @@
               <span class="chest-vault-tier">{{ chest.box_tier }} CHEST</span>
               <span class="chest-vault-tap">Click to open</span>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </div>
@@ -124,6 +131,8 @@ import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 const loading = ref(true)
 const buying = ref(false)
 const showFreezeModal = ref(false)
+const loadError = ref('')
+const buyError = ref('')
 const profile = ref({
   total_xp: 0,
   coins: 0,
@@ -162,6 +171,7 @@ function getChestEmoji(tier) {
 
 async function loadData() {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await getGamificationState()
     if (res && res.profile) {
@@ -172,6 +182,7 @@ async function loadData() {
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
+    loadError.value = err?.message || 'Failed to load rewards. Please try again.'
   } finally {
     loading.value = false
   }
@@ -188,6 +199,7 @@ async function onChestClaimed(claimedBox) {
 
 async function handleBuyStreakFreeze() {
   buying.value = true
+  buyError.value = ''
   try {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
@@ -197,6 +209,7 @@ async function handleBuyStreakFreeze() {
     }
   } catch (err) {
     console.error('Failed to buy streak freeze:', err)
+    buyError.value = err?.message || 'Failed to purchase streak freeze.'
   } finally {
     buying.value = false
   }
@@ -583,5 +596,31 @@ onMounted(() => {
   padding: 3rem 1rem;
   text-align: center;
   color: var(--muted-text);
+}
+
+.error-panel {
+  color: var(--danger, #ef4444);
+}
+
+.error-msg {
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.retry-btn {
+  padding: 0.5rem 1.25rem;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.buy-error-msg {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--danger, #ef4444);
+  font-weight: 600;
 }
 </style>

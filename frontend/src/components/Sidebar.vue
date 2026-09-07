@@ -10,8 +10,8 @@
 
       <!-- Compact Gamification Pill -->
       <RouterLink to="/rewards" class="gamification-sidebar-pill" title="View Rewards & Progression">
-        <span class="pill-title">{{ gamification.current_title }}</span>
-        <div class="pill-xp-bar">
+        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : gamification.current_title }}</span>
+        <div v-if="!gamificationError" class="pill-xp-bar">
           <div class="pill-xp-fill" :style="{ width: xpPercent + '%' }"></div>
         </div>
       </RouterLink>
@@ -122,13 +122,14 @@ async function handleSync() {
   }
 }
 
-const pendingChestsCount = ref(0)
+const gamificationError = ref(false)
 
 async function loadGamification() {
   try {
     const res = await getGamificationState()
     if (res?.profile) {
       gamification.value = res.profile
+      gamificationError.value = false
     }
     if (Array.isArray(res?.pending_chests)) {
       pendingChestsCount.value = res.pending_chests.length
@@ -137,6 +138,7 @@ async function loadGamification() {
     }
   } catch (err) {
     console.warn('[SIDEBAR] Failed to load gamification profile:', err)
+    gamificationError.value = true
   }
 }
 

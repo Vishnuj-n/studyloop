@@ -142,7 +142,6 @@ onMounted(async () => {
     notificationsEnabled.value = settings?.show_reward_notifications !== false
   } catch (err) {
     console.warn('[REWARD_TOAST] Failed to load notification preference:', err)
-    notificationsEnabled.value = true
   }
 
   if (notificationsEnabled.value) {

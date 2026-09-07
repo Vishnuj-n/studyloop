@@ -24,7 +24,12 @@
             </div>
           </div>
 
+          <div v-if="claimError" class="chest-error-banner">
+            {{ claimError }}
+          </div>
+
           <div v-if="opened" class="reward-reveal-text">
+
             <span class="reward-amount">+{{ chestRewardAmount }} {{ rewardLabel }}</span>
             <p v-if="newTitle" class="title-unlock-banner">
               🎉 New Title Unlocked: <strong>{{ newTitle }}</strong>!
@@ -76,6 +81,7 @@ const visible = ref(true)
 const opened = ref(false)
 const opening = ref(false)
 const isRattling = ref(false)
+const claimError = ref('')
 
 const chestTier = computed(() => (props.box?.box_tier || 'BRONZE').toUpperCase())
 const chestRewardType = computed(() => props.box?.reward_type || 'XP')
@@ -132,21 +138,23 @@ async function handleOpen() {
   if (opened.value || opening.value) return
   opening.value = true
   isRattling.value = true
+  claimError.value = ''
   playChestRattle()
 
   try {
     if (props.box?.id) {
       await claimLootBox(props.box.id)
     }
-  } catch (err) {
-    console.error('Failed to claim loot box:', err)
-  } finally {
-    opening.value = false
-    isRattling.value = false
     opened.value = true
     playChestOpenFanfare()
     emit('claimed', props.box)
     window.dispatchEvent(new Event('gamification-updated'))
+  } catch (err) {
+    console.error('Failed to claim loot box:', err)
+    claimError.value = err?.message || 'Failed to open chest. Please try again.'
+  } finally {
+    opening.value = false
+    isRattling.value = false
   }
 }
 
@@ -364,5 +372,17 @@ function closeModal() {
 .collect-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 50%, transparent);
+}
+
+.chest-error-banner {
+  margin-top: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: color-mix(in srgb, var(--danger, #ef4444) 15%, transparent);
+  color: var(--danger, #ef4444);
+  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 30%, transparent);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
 }
 </style>

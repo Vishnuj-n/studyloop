@@ -29,7 +29,9 @@ jobs:
         run: python scripts/find_code_smells.py
 
       - name: Check Redundant CSS
+        if: success() || failure()
         run: python scripts/find_redundant_css.py
 
       - name: Check UI Design & Token Violations
+        if: success() || failure()
         run: python scripts/check_design_violations.py

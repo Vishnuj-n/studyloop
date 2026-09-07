@@ -205,18 +205,15 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `MarkLLMKeyStored` | `internal\db\store.go:604` | `Repository` | `method` |
 | `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:276` | None | `function` |
 | `ParsePDFCPUBookmarkDraftFromJSON` | `internal\notebook\pdfcpu.go:75` | None | `function` |
-| `RollTaskRewards` | `internal\study\rewards.go:12` | None | `function` |
 | `RunSmokeTest` | `internal\extension\checker.go:92` | None | `function` |
 | `SaveAPIKey` | `internal\llm\keyring.go:21` | None | `function` |
 | `SeedDemoDataForTests` | `internal\db\testhelper.go:7` | `Repository` | `method` |
 | `SetupExtensionEnv` | `internal\extension\checker.go:125` | None | `function` |
 | `SplitMarkdownIntoChunks` | `internal\notebook\markdown_chunker.go:30` | None | `function` |
-| `TransitionTask` | `internal\study\queue_transition.go:53` | `StudyService` | `method` |
 | `Uninstall` | `internal\extension\installer.go:15` | `Manager` | `method` |
 | `activateReadingSessionTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `aggregateQueueTasks` | `internal\app\app_study.go:53` | None | `function` |
 | `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:145` | None | `function` |
-| `awardCompletionRewards` | `internal\study\queue_transition.go:253` | `StudyService` | `method` |
 | `bookmarkNodesToDraft` | `internal\notebook\pdfcpu.go:33` | None | `function` |
 | `buildInputValues` | `internal\embeddings\onnx.go:337` | `OnnxEmbedder` | `method` |
 | `buildPageSample` | `internal\notebook\syllabus.go:358` | None | `function` |
@@ -243,7 +240,6 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `firstInt` | `internal\notebook\pdfcpu.go:281` | None | `function` |
 | `firstN` | `internal\notebook\syllabus.go:398` | None | `function` |
 | `firstString` | `internal\notebook\pdfcpu.go:266` | None | `function` |
-| `generateLootBox` | `internal\study\rewards.go:54` | None | `function` |
 | `getAppVersion` | `internal\app\app_update.go:17` | None | `function` |
 | `getNotebookAndRepo` | `internal/app/app.go` | `App` | `AppHelper` |
 | `getStreakState` | `internal/app/app.go` | `App` | `AppHelper` |
