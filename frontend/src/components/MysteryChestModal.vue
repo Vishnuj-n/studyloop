@@ -178,7 +178,7 @@ function closeModal() {
   max-width: 400px;
   padding: 2.25rem 1.75rem;
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 30px rgba(0, 0, 0, 0.08);
   color: var(--on-surface);
   overflow: hidden;
 }
@@ -270,7 +270,7 @@ function closeModal() {
   border-radius: 24px;
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
-  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -280,7 +280,7 @@ function closeModal() {
 .chest-emoji,
 .reward-icon {
   font-size: 3.5rem;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.12));
 }
 
 .chest-icon-wrapper {

@@ -298,7 +298,7 @@ const topItems = [
   border-radius: 999px;
   background: rgba(251, 191, 36, 0.18);
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.4);
+  border: 1px solid var(--outline-variant);
   animation: chest-pulse 2.4s infinite ease-in-out;
   display: inline-flex;
   align-items: center;

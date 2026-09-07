@@ -103,7 +103,7 @@ function closeModal() {
   max-width: 440px;
   padding: 2rem 1.75rem;
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 35px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 35px rgba(56, 189, 248, 0.1);
   color: var(--on-surface);
   overflow: hidden;
   animation: card-appear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -159,7 +159,7 @@ function closeModal() {
   padding: 0.3rem 0.85rem;
   border-radius: 999px;
   margin-bottom: 0.75rem;
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  border: 1px solid var(--outline-variant);
   background: color-mix(in srgb, rgba(56, 189, 248, 0.12) 100%, transparent);
   color: #38bdf8;
 }
@@ -187,8 +187,8 @@ function closeModal() {
   height: 84px;
   border-radius: 22px;
   background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, var(--surface-container) 80%);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 20px rgba(56, 189, 248, 0.2);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 20px rgba(56, 189, 248, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;

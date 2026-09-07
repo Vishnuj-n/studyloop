@@ -700,7 +700,7 @@ function goToNotebooks() {
   border: 1px solid var(--outline-variant, #e0e0e0);
   border-radius: 14px;
   background: var(--surface-container-lowest, #ffffff);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
 }
 
 .profile-menu-item,

@@ -165,9 +165,9 @@ onUnmounted(() => {
   max-width: 380px;
   width: calc(100vw - 48px);
   background: var(--surface-container-low, #1e1e24);
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--outline-variant);
   border-radius: 16px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 0 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15), 0 0 20px rgba(0, 0, 0, 0.06);
   color: var(--on-surface, #e2e8f0);
   overflow: hidden;
   padding: 16px;
@@ -229,11 +229,11 @@ onUnmounted(() => {
   height: 44px;
   border-radius: 12px;
   background: var(--surface-container, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--outline-variant);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .chest-badge-icon {
@@ -267,7 +267,7 @@ onUnmounted(() => {
   letter-spacing: 0.08em;
   padding: 2px 7px;
   border-radius: 999px;
-  border: 1px solid currentColor;
+  border: 1px solid var(--outline-variant);
 }
 
 .tier-bronze .tier-tag {
@@ -306,19 +306,16 @@ onUnmounted(() => {
 .xp-pill {
   background: rgba(59, 130, 246, 0.15);
   color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .coin-pill {
   background: rgba(234, 179, 8, 0.15);
   color: #facc15;
-  border: 1px solid rgba(234, 179, 8, 0.3);
 }
 
 .title-pill {
   background: rgba(168, 85, 247, 0.15);
   color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .toast-desc {
@@ -345,7 +342,7 @@ onUnmounted(() => {
 .primary-btn {
   background: var(--primary, #6366f1);
   color: #fff;
-  border: 1px solid transparent;
+  border: none;
 }
 
 .primary-btn:hover {
@@ -356,7 +353,7 @@ onUnmounted(() => {
 .secondary-btn {
   background: var(--surface-container, rgba(255, 255, 255, 0.08));
   color: var(--muted-text, #cbd5e1);
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--outline-variant);
 }
 
 .secondary-btn:hover {

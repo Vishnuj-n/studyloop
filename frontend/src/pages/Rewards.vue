@@ -221,14 +221,14 @@ onMounted(() => {
   border: 1px solid var(--outline-variant);
   border-radius: 16px;
   padding: 1.5rem 1.75rem;
-  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.25), 0 4px 12px -2px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(12px);
   overflow: hidden;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
 }
 
 .floating-card:hover {
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.35), 0 6px 16px -2px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.15), 0 6px 16px -2px rgba(0, 0, 0, 0.08);
 }
 
 .card-glow {
@@ -496,7 +496,7 @@ onMounted(() => {
 .chest-vault-item:hover {
   transform: translateY(-4px);
   border-color: var(--primary);
-  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.3), 0 0 14px color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.15), 0 0 14px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .chest-pedestal {
@@ -576,7 +576,7 @@ onMounted(() => {
 .tier-mythic .chest-vault-tier { color: #c084fc; }
 
 .tier-mythic:hover {
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.35), 0 0 16px rgba(192, 132, 252, 0.3);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.15), 0 0 16px rgba(192, 132, 252, 0.3);
 }
 
 .state-panel {
