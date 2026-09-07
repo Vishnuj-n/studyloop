@@ -1017,6 +1017,7 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"study_status":    nb.StudyStatus,
 			"start_page":      nb.StartPage,
 			"end_page":        nb.EndPage,
+			"flashcard_count": nb.FlashcardCount,
 		})
 	}
 

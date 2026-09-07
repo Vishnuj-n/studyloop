@@ -303,7 +303,40 @@ onUnmounted(() => {
       <!-- Global study reminder banner -->
       <div v-if="banner.show" class="study-alert-banner">
         <div class="banner-content">
-          <span class="banner-icon">{{ banner.type === 'start' ? '⏰' : '⏳' }}</span>
+          <div class="banner-icon-badge">
+            <svg
+              v-if="banner.type === 'start'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <svg
+              v-else
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 22h14"></path>
+              <path d="M5 2h14"></path>
+              <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path>
+              <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path>
+            </svg>
+          </div>
           <div class="banner-text">
             <strong class="banner-title">{{ banner.title }}</strong>
             <p class="banner-desc">{{ banner.desc }}</p>
@@ -396,20 +429,18 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  background: var(--card-bg, rgba(30, 41, 59, 0.95));
+  background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
-  box-shadow:
-    0 10px 25px -5px rgba(0, 0, 0, 0.12),
-    0 8px 10px -6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 40px rgba(45, 51, 56, 0.06);
   backdrop-filter: blur(12px);
-  border-radius: 12px;
-  padding: 14px 20px;
+  border-radius: 16px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   width: 90%;
-  max-width: 600px;
+  max-width: 580px;
   animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -427,11 +458,19 @@ onUnmounted(() => {
 .banner-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
-.banner-icon {
-  font-size: 1.5rem;
+.banner-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-container);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .banner-text {
@@ -440,13 +479,15 @@ onUnmounted(() => {
 }
 
 .banner-title {
-  color: var(--text, #ffffff);
+  font-family: 'Manrope', sans-serif;
+  color: var(--on-surface);
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .banner-desc {
-  color: var(--text-muted, #94a3b8);
+  font-family: 'Inter', sans-serif;
+  color: var(--muted-text);
   font-size: 0.85rem;
   margin: 2px 0 0 0;
 }
@@ -459,32 +500,32 @@ onUnmounted(() => {
 
 .banner-btn {
   border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  border-radius: 0.75rem;
+  padding: 7px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .banner-btn.primary {
-  background: var(--accent, #4f46e5);
-  color: white;
+  background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
+  color: var(--on-primary);
 }
 
 .banner-btn.primary:hover {
-  background: var(--accent-hover, #4338ca);
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
 .banner-btn.secondary {
-  background: transparent;
-  color: var(--text-muted, #94a3b8);
-  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-highest);
+  color: var(--primary);
 }
 
 .banner-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text, #ffffff);
+  background: var(--surface-container);
 }
 
 @media (max-width: 960px) {

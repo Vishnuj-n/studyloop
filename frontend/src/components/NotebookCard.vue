@@ -16,7 +16,7 @@
         <h3>{{ notebook.title }}</h3>
         <p class="meta">{{ notebook.file_type.toUpperCase() }}</p>
         <p v-if="notebook.page_count > 0" class="meta">{{ notebook.page_count }} pages</p>
-        <p v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta">🎴 {{ notebook.flashcard_count || 0 }} flashcards</p>
+        <p v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta">{{ notebook.flashcard_count || 0 }} cards</p>
         <p v-else class="meta">{{ notebook.chunk_count }} chunks</p>
         <p v-if="isDeepExtracted" class="meta deep-badge">⚡ Deep Extracted</p>
         <p v-if="variant === 'dormant'" class="meta">Status: {{ formattedStatus }}</p>
@@ -162,7 +162,9 @@ const fileIcon = computed(() => FILE_ICONS[props.notebook.file_type] || '📄')
 
 const topicTitle = computed(() => {
   const topic = props.availableTopics.find((t) => t.id === props.notebook.topic_id)
-  return topic ? topic.title : 'No topic'
+  if (topic) return topic.title
+  if (props.notebook.file_type === 'anki') return props.notebook.title
+  return 'No topic'
 })
 
 const formattedStatus = computed(() => {

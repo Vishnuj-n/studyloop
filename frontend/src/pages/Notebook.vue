@@ -446,9 +446,8 @@ async function handleAnkiUpload({ filePath, targetNotebookID, preserveHistory })
       return
     }
     uploadProgress.value = 100
-    successMessage.value = res.message || `Anki deck imported: ${res.deck_name || 'Flashcards'}`
-    await loadNotebooks()
-    showToast(`🎴 Imported ${res.cards_count || 0} flashcards from Anki`)
+    await Promise.all([loadNotebooks(), loadTopics()])
+    showToast(`Imported ${res.cards_count || 0} flashcards from Anki`)
   } catch (err) {
     uploadError.value = err instanceof Error ? err.message : String(err)
   } finally {

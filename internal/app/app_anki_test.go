@@ -131,4 +131,27 @@ func TestImportAnkiDeckPreserveHistory(t *testing.T) {
 	if !ok || matureState.Stability != 35.5 || matureState.Reps != 5 {
 		t.Errorf("mature card state not preserved properly: %+v", matureState)
 	}
+
+	// Link to a notebook and verify GetNotebooks returns flashcard_count
+	err = repo.CreateNotebook("nb-anki-hist", "History Deck", "/tmp/hist.apkg", "anki", "topic-anki-hist", "hash456", 0, "")
+	if err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	app := &App{repo: repo}
+	nbs := app.GetNotebooks("", "")
+	if len(nbs) == 0 {
+		t.Fatalf("expected notebooks, got none")
+	}
+	found := false
+	for _, nb := range nbs {
+		if nb["id"] == "nb-anki-hist" {
+			found = true
+			if nb["flashcard_count"] != 2 {
+				t.Errorf("expected flashcard_count 2, got %v", nb["flashcard_count"])
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected nb-anki-hist in GetNotebooks")
+	}
 }
