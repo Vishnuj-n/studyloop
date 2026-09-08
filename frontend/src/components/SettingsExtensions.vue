@@ -50,10 +50,10 @@
           class="setting-select"
           :disabled="disabled"
         >
-          <option value="eli15">High School (ELI15 with analogies)</option>
-          <option value="eli10">Middle School (ELI10 simple phrasing)</option>
-          <option value="bullet">Executive Bullet Summary (Key takeaways)</option>
-          <option value="academic">Academic Precision (Rigorous terms intact)</option>
+          <option value="very_simple">Very Simple (Everyday language, short sentences &amp; analogies)</option>
+          <option value="simple">Simple (Clear, straightforward language with core terms)</option>
+          <option value="academic">Academic (Precise terminology, definitions &amp; distinctions)</option>
+          <option value="summary">Summary (Essential ideas, arguments &amp; key conclusions)</option>
         </select>
         <p class="hint">Rewrites dense textbooks to match your target comprehension level.</p>
       </div>
@@ -122,7 +122,7 @@ const audioSpeed = computed({
 })
 
 const simplifierLevel = computed({
-  get: () => extensionConfig.value?.text_simplifier?.level || 'eli15',
+  get: () => extensionConfig.value?.text_simplifier?.level || 'simple',
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
 })
 

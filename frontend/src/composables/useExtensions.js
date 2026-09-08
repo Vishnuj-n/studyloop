@@ -19,7 +19,7 @@ export const DEFAULT_EXTENSION_CONFIG = {
     speed: 1.0,
   },
   text_simplifier: {
-    level: 'eli15',
+    level: 'simple',
   },
   youtube: {
     auto_download: false,

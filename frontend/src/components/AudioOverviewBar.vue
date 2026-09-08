@@ -5,11 +5,11 @@
       <div class="audio-controls">
         <button
           class="play-btn"
-          :disabled="isLoading || (!isPlaying && chunks.length === 0)"
+          :disabled="chunks.length === 0 && isLoading"
           :title="isPlaying ? 'Pause' : 'Play'"
           @click="togglePlay"
         >
-          <span v-if="isLoading" class="spinner-icon">⏳</span>
+          <span v-if="isLoading && chunks.length === 0" class="spinner-icon">⏳</span>
           <span v-else-if="isPlaying">⏸</span>
           <span v-else>▶</span>
         </button>
@@ -25,7 +25,7 @@
 
         <button
           class="nav-btn"
-          :disabled="currentIndex >= chunks.length - 1 || chunks.length === 0"
+          :disabled="currentIndex >= (totalChunks > 0 ? totalChunks - 1 : chunks.length - 1) && currentIndex >= chunks.length - 1"
           title="Next sentence"
           @click="nextChunk"
         >
@@ -162,9 +162,22 @@ function initAudio() {
 }
 
 function playChunk(index) {
-  if (!audio || index < 0 || index >= chunks.value.length) return
+  if (!audio || index < 0) return
+  if (index >= chunks.value.length) {
+    if (!isFinished.value) {
+      isLoading.value = true
+    }
+    return
+  }
   const chunk = chunks.value[index]
-  if (!chunk || !chunk.audio_base64) return
+  if (!chunk || !chunk.audio_base64) {
+    // If this chunk has no audio, skip to next chunk if available
+    if (index + 1 < chunks.value.length) {
+      currentIndex.value++
+      playChunk(currentIndex.value)
+    }
+    return
+  }
 
   audio.src = `data:audio/mp3;base64,${chunk.audio_base64}`
   audio.playbackRate = playbackRate.value
@@ -181,17 +194,25 @@ function playChunk(index) {
 }
 
 function togglePlay() {
+  initAudio()
   if (!audio) return
   if (isPlaying.value) {
     audio.pause()
     isPlaying.value = false
   } else {
     if (chunks.value.length > 0) {
-      if (!audio.src || audio.ended) {
+      if (!audio.src || audio.ended || audio.src === '') {
         playChunk(currentIndex.value)
       } else {
-        audio.play()
-        isPlaying.value = true
+        audio
+          .play()
+          .then(() => {
+            isPlaying.value = true
+          })
+          .catch((err) => {
+            console.warn('[AudioOverview] Play failed:', err)
+            playChunk(currentIndex.value)
+          })
       }
     }
   }
@@ -208,6 +229,10 @@ function nextChunk() {
   if (currentIndex.value + 1 < chunks.value.length) {
     currentIndex.value++
     playChunk(currentIndex.value)
+  } else if (currentIndex.value + 1 < totalChunks.value) {
+    // Chunk still generating, increment and wait for incoming event
+    currentIndex.value++
+    isLoading.value = true
   }
 }
 

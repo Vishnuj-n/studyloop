@@ -124,7 +124,7 @@ async function generateSimplification() {
   errorMessage.value = ''
 
   try {
-    const level = getExtensionSetting('text_simplifier', 'level', 'eli15')
+    const level = getExtensionSetting('text_simplifier', 'level', 'simple')
     const res = await simplifyReadingContent(rawContent.value, level)
     if (res?.error) {
       errorMessage.value = res.error

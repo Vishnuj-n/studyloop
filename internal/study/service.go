@@ -1,6 +1,8 @@
 package study
 
 import (
+	"sync"
+
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
 	llmpkg "ai-tutor/internal/llm"
@@ -28,6 +30,8 @@ type StudyService struct {
 	fastLLMProvider  LLMProvider
 	heavyLLMProvider LLMProvider
 	retrievalEngine  *retrieval.Engine
+	audioCacheMu     sync.RWMutex
+	audioScriptCache map[string][]string
 }
 
 // NewStudyService constructs a StudyService from injected dependencies.
@@ -40,6 +44,7 @@ func NewStudyService(cfg Config) *StudyService {
 		fastLLMProvider:  cfg.FastLLMProvider,
 		heavyLLMProvider: cfg.HeavyLLMProvider,
 		retrievalEngine:  cfg.RetrievalEngine,
+		audioScriptCache: make(map[string][]string),
 	}
 }
 
