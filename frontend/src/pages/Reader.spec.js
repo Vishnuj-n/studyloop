@@ -45,6 +45,16 @@ vi.mock('vue-pdf-embed', () => ({
   },
 }))
 
+// Mock PdfViewer component (used by Reader.vue instead of raw vue-pdf-embed)
+vi.mock('../components/PdfViewer.vue', () => ({
+  default: {
+    name: 'PdfViewer',
+    template: '<div class="mock-pdf-embed">Mock PDF Content</div>',
+    props: ['source', 'pageCount', 'initialPage', 'zoomScale'],
+    emits: ['update:currentPage', 'load-error', 'rendered'],
+  },
+}))
+
 // Mock vue-router hooks
 vi.mock('vue-router', () => ({
   useRoute: () => ({
