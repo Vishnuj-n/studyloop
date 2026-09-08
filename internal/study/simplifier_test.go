@@ -10,12 +10,15 @@ func TestSimplifierLevelDirectives(t *testing.T) {
 		level    string
 		expected string
 	}{
-		{"eli10", "5th-grade"},
-		{"bullet", "executive summary"},
-		{"academic", "rigorous"},
-		{"eli15", "high school"},
-		{"unknown", "high school"},
-		{"", "high school"},
+		{"very_simple", "everyday language"},
+		{"eli10", "everyday language"},
+		{"summary", "essential ideas"},
+		{"bullet", "essential ideas"},
+		{"academic", "precise academic"},
+		{"simple", "straightforward"},
+		{"eli15", "straightforward"},
+		{"unknown", "straightforward"},
+		{"", "straightforward"},
 	}
 
 	for _, tt := range tests {

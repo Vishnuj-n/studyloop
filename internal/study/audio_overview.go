@@ -155,37 +155,54 @@ func (s *StudyService) GenerateAudioOverview(
 		return fmt.Errorf("no topic text found to generate audio overview")
 	}
 
-	// Prioritize heavy LLM for rich script overview, fallback to fast LLM
-	llmProvider := s.heavyLLMProvider
-	if llmProvider == nil {
-		llmProvider, _ = s.selectLLM(topicContent)
-	}
-	if llmProvider == nil {
-		return fmt.Errorf("no LLM provider available")
-	}
+	// Check if sentences are already cached for this topic (e.g. when user changes voice)
+	s.audioCacheMu.RLock()
+	cachedSentences, found := s.audioScriptCache[topicID]
+	s.audioCacheMu.RUnlock()
 
-	limits := llmProvider.GetLimits()
-	templatePrompt := BuildAudioOverviewPrompt(bundle.TopicTitle, "")
-	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
-	if err != nil {
-		return err
-	}
+	var sentences []string
+	if found && len(cachedSentences) > 0 {
+		sentences = cachedSentences
+	} else {
+		// Prioritize heavy LLM for rich script overview, fallback to fast LLM
+		llmProvider := s.heavyLLMProvider
+		if llmProvider == nil {
+			llmProvider, _ = s.selectLLM(topicContent)
+		}
+		if llmProvider == nil {
+			return fmt.Errorf("no LLM provider available")
+		}
 
-	truncatedContent, err := embeddings.TruncateToTokens(topicContent, availableBudget)
-	if err != nil {
-		return fmt.Errorf("failed to budget topic content tokens: %w", err)
-	}
-	topicContent = truncatedContent
+		limits := llmProvider.GetLimits()
+		templatePrompt := BuildAudioOverviewPrompt(bundle.TopicTitle, "")
+		availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
+		if err != nil {
+			return err
+		}
 
-	prompt := BuildAudioOverviewPrompt(bundle.TopicTitle, topicContent)
-	script, err := llmProvider.GenerateAnswer(prompt)
-	if err != nil {
-		return fmt.Errorf("failed to generate audio script: %w", err)
-	}
+		truncatedContent, err := embeddings.TruncateToTokens(topicContent, availableBudget)
+		if err != nil {
+			return fmt.Errorf("failed to budget topic content tokens: %w", err)
+		}
+		topicContent = truncatedContent
 
-	sentences := SplitIntoSentences(script)
-	if len(sentences) == 0 {
-		return fmt.Errorf("failed to extract sentences from audio script")
+		prompt := BuildAudioOverviewPrompt(bundle.TopicTitle, topicContent)
+		script, err := llmProvider.GenerateAnswer(prompt)
+		if err != nil {
+			return fmt.Errorf("failed to generate audio script: %w", err)
+		}
+
+		sentences = SplitIntoSentences(script)
+		if len(sentences) == 0 {
+			return fmt.Errorf("failed to extract sentences from audio script")
+		}
+
+		s.audioCacheMu.Lock()
+		if s.audioScriptCache == nil {
+			s.audioScriptCache = make(map[string][]string)
+		}
+		s.audioScriptCache[topicID] = sentences
+		s.audioCacheMu.Unlock()
 	}
 
 	extDir := extension.ResolveExtensionsDir("")

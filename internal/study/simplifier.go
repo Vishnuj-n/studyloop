@@ -14,42 +14,69 @@ import (
 // getSimplifierLevelDirective returns the prompt instruction for a given style level.
 func getSimplifierLevelDirective(level string) string {
 	switch strings.ToLower(strings.TrimSpace(level)) {
-	case "eli10":
-		return "Explain using simple 5th-grade vocabulary, short sentences, and crystal-clear everyday analogies."
-	case "bullet":
-		return "Provide an ultra-concise executive summary with high-impact bullet points and key takeaways."
+	case "very_simple", "eli10":
+		return "Very Simple:\nUse everyday language and short sentences. Explain necessary technical terms simply and use intuitive analogies when helpful."
 	case "academic":
-		return "Maintain rigorous academic precision, definitions, formulas, and domain terminology intact while clarifying logical flow."
-	default: // "eli15" or fallback
-		return "Explain for a high school student using intuitive real-world analogies without losing core technical concepts or accuracy."
+		return "Academic:\nUse precise academic and technical language. Preserve terminology, definitions, distinctions, and technical details. Simplify only unnecessarily complicated wording."
+	case "summary", "bullet":
+		return "Summary:\nFocus on the essential ideas, arguments, definitions, and conclusions. Be substantially shorter than the source while preserving the information needed to understand the topic."
+	default: // "simple", "eli15", or default
+		return "Simple:\nUse clear, straightforward language. Explain difficult terminology, but retain the important technical vocabulary and detail."
 	}
 }
 
 // buildSimplifierPrompt formats the prompt given a template, material content, and comprehension style.
 func buildSimplifierPrompt(promptTemplate, content, styleDirective string) string {
 	if styleDirective == "" {
-		styleDirective = getSimplifierLevelDirective("eli15")
+		styleDirective = getSimplifierLevelDirective("simple")
 	}
 
 	if promptTemplate != "" {
-		tmpl := strings.ReplaceAll(promptTemplate, "{{style}}", styleDirective)
+		tmpl := strings.ReplaceAll(promptTemplate, "{{COMPREHENSION_LEVEL}}", styleDirective)
+		tmpl = strings.ReplaceAll(tmpl, "{{style}}", styleDirective)
 		if strings.Contains(tmpl, "{{content}}") {
 			return strings.ReplaceAll(tmpl, "{{content}}", content)
 		}
 		return tmpl + "\n\nReading Material:\n\"\"\"\n" + content + "\n\"\"\"\n"
 	}
 
-	return fmt.Sprintf(`You are an expert tutor and text clarifier.
-Your goal is to rewrite and simplify the following reading material so that it is intuitive, crystal clear, and easy to understand, WITHOUT LOSING any technical accuracy, formulas, key definitions, or essential details.
+	return fmt.Sprintf(`You are an AI Text Simplifier.
 
-Audience & Comprehension Style:
+Transform the provided reading material into clear, well-structured Markdown notes that are easier to understand while preserving the original meaning and important information.
+
+The user's selected comprehension level is:
+
 %s
 
-Format your output in clean Markdown with:
-1. **TL;DR Overview**: 1-2 sentence core intuition.
-2. **Key Concepts Explained Simply**: Clear, intuitive explanations using real-world analogies where helpful.
-3. **Step-by-Step Breakdown**: Detailed, structured explanation with all core facts intact.
-4. **Quick Summary / Key Takeaways**: Bullet points of what to remember.
+Adapt the explanation strictly to this level.
+
+## Core Requirements
+
+- Preserve the author's meaning, important facts, definitions, arguments, formulas, examples, and necessary technical details.
+- Simplify wording and sentence structure according to the selected comprehension level.
+- Explain difficult terminology when necessary for understanding.
+- Do not remove important information simply because it is difficult.
+- Do not invent facts, examples, arguments, or conclusions.
+- Do not add opinions, motivation, or unrelated information.
+- Do not turn the material into a lecture or a conversation.
+- Remove unnecessary repetition and filler.
+- Keep technical terminology when precision requires it.
+- Use natural Markdown structure: headings, subheadings, paragraphs, bullets, numbered steps, and equations where appropriate.
+- Use tables only when they genuinely improve understanding.
+- Follow the logical flow of the source material.
+- Use analogies or brief clarifications when they genuinely make a difficult concept easier to understand.
+
+## Output
+
+Create a concise but sufficiently detailed explanation of the provided material.
+
+Start with a short overview of the main topic.
+
+Then organize the explanation into natural sections based on the material. Do not force the content into a fixed template.
+
+End with a short **Key Takeaways** section containing the most important ideas.
+
+The result should feel like a clearer and better-organized version of the original reading, not a separate interpretation or lesson about it.
 
 Reading Material:
 """
