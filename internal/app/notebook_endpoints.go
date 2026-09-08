@@ -797,10 +797,6 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if sanitized == "" {
 			sanitized = "topic"
 		}
-		// Limit length
-		if len(sanitized) > 20 {
-			sanitized = sanitized[:20]
-		}
 		topicID := fmt.Sprintf("nb-%s-ch-%02d-%s", notebookID, i+1, sanitized)
 		topicIDs = append(topicIDs, topicID)
 

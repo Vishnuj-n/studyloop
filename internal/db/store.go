@@ -206,8 +206,13 @@ func (r *Repository) queryDueReviewCardsHelper(dueCondition string, dueArgs ...i
 		SELECT COUNT(DISTINCT fc.id)
 		FROM fsrs_cards fc
 		JOIN topics t ON t.id = fc.topic_id
-		LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
-		LEFT JOIN notebooks n ON n.id = nt.notebook_id
+		JOIN notebooks n ON (
+			n.topic_id = t.id
+			OR EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = n.id AND nt.topic_id = t.id
+			)
+		)
 		WHERE fc.suspended = 0
 		  AND fc.due_at IS NOT NULL
 		  ` + dueCondition + `
@@ -275,18 +280,15 @@ func (r *Repository) QueryDueReviewCardsTimeline(endOfToday int64) ([]int, error
 			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END)
 		FROM fsrs_cards fc
 		JOIN topics t ON t.id = fc.topic_id
-		LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
-		LEFT JOIN notebooks n ON n.id = nt.notebook_id
+		JOIN notebooks n ON (
+			n.topic_id = t.id
+			OR EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = n.id AND nt.topic_id = t.id
+			)
+		)
 		WHERE fc.suspended = 0
 		  AND fc.due_at IS NOT NULL
-		  AND NOT EXISTS (
-			SELECT 1
-			FROM review_task_cards rtc
-			JOIN study_queue sq ON sq.id = rtc.task_id
-			WHERE rtc.card_id = fc.id
-			  AND sq.task_type = 'FLASHCARD_REVIEW'
-			  AND sq.status IN ('PENDING', 'ACTIVE')
-		  )
 	`
 	args := []interface{}{
 		endOfToday,

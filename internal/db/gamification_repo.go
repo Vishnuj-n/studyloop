@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"ai-tutor/internal/models"
@@ -50,7 +51,7 @@ func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextT
 // GetGamificationProfile retrieves the persistent gamification profile for the user.
 func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, error) {
 	row := r.db.QueryRow(`
-		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json, updated_at
+		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, updated_at
 		FROM user_gamification
 		WHERE user_id = 1
 	`)
@@ -62,14 +63,15 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		&prof.Coins,
 		&prof.CurrentTitle,
 		&prof.StreakFreezesOwned,
+		&prof.FrozenDatesJSON,
 		&prof.UnlockedCosmeticsJSON,
 		&prof.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		// Auto-initialize if row was missing
 		_, insErr := r.db.Exec(`
-			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json)
-			VALUES (1, 0, 0, 'The Apprentice', 1, '[]')
+			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json)
+			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '[]')
 			ON CONFLICT(user_id) DO NOTHING
 		`)
 		if insErr != nil {
@@ -107,12 +109,12 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 	var totalXP, coinBalance int
 	var currentTitle string
 	var streakFreezes int
-	var unlockedCosmeticsJSON string
+	var frozenDatesJSON, unlockedCosmeticsJSON string
 	err = tx.QueryRow(`
-		SELECT total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json
+		SELECT total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json
 		FROM user_gamification
 		WHERE user_id = 1
-	`).Scan(&totalXP, &coinBalance, &currentTitle, &streakFreezes, &unlockedCosmeticsJSON)
+	`).Scan(&totalXP, &coinBalance, &currentTitle, &streakFreezes, &frozenDatesJSON, &unlockedCosmeticsJSON)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to query gamification state: %w", err)
 	}
@@ -148,6 +150,7 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 		NextTitleXP:           nextTitleXP,
 		CurrentTitleMinXP:     currentTitleMinXP,
 		StreakFreezesOwned:    streakFreezes,
+		FrozenDatesJSON:       frozenDatesJSON,
 		UnlockedCosmeticsJSON: unlockedCosmeticsJSON,
 	}
 
@@ -355,23 +358,75 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 	return r.GetGamificationProfile()
 }
 
-// ConsumeStreakFreeze decrements streak_freezes_owned by 1 when saving an interrupted streak.
-func (r *Repository) ConsumeStreakFreeze() (*models.GamificationProfile, error) {
-	res, err := r.db.Exec(`
-		UPDATE user_gamification
-		SET streak_freezes_owned = streak_freezes_owned - 1, updated_at = CURRENT_TIMESTAMP
-		WHERE user_id = 1 AND streak_freezes_owned > 0
-	`)
+// GetStreakFreezeUsageDates returns all dates (YYYY-MM-DD) where a streak freeze was applied.
+func (r *Repository) GetStreakFreezeUsageDates() ([]string, error) {
+	prof, err := r.GetGamificationProfile()
 	if err != nil {
-		return nil, fmt.Errorf("failed to consume streak freeze: %w", err)
+		return nil, err
+	}
+	if prof.FrozenDatesJSON == "" || prof.FrozenDatesJSON == "[]" {
+		return []string{}, nil
+	}
+	var dates []string
+	if err := json.Unmarshal([]byte(prof.FrozenDatesJSON), &dates); err != nil {
+		return []string{}, nil
+	}
+	return dates, nil
+}
+
+// ConsumeStreakFreeze decrements streak_freezes_owned by 1 and records the protected date in frozen_dates_json.
+func (r *Repository) ConsumeStreakFreeze(dateStr string) (*models.GamificationProfile, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var freezes int
+	var frozenJSON string
+	err = tx.QueryRow(`
+		SELECT streak_freezes_owned, frozen_dates_json
+		FROM user_gamification
+		WHERE user_id = 1
+	`).Scan(&freezes, &frozenJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query gamification state: %w", err)
 	}
 
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify consumed streak freeze: %w", err)
-	}
-	if rows == 0 {
+	if freezes <= 0 {
 		return nil, fmt.Errorf("no streak freezes available to consume")
+	}
+
+	var dates []string
+	if frozenJSON != "" {
+		_ = json.Unmarshal([]byte(frozenJSON), &dates)
+	}
+	if dateStr != "" {
+		alreadyPresent := false
+		for _, d := range dates {
+			if d == dateStr {
+				alreadyPresent = true
+				break
+			}
+		}
+		if !alreadyPresent {
+			dates = append(dates, dateStr)
+		}
+	}
+	newJSONBytes, _ := json.Marshal(dates)
+	newJSON := string(newJSONBytes)
+
+	_, err = tx.Exec(`
+		UPDATE user_gamification
+		SET streak_freezes_owned = streak_freezes_owned - 1, frozen_dates_json = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1
+	`, newJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update gamification profile: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit streak freeze consumption: %w", err)
 	}
 
 	return r.GetGamificationProfile()

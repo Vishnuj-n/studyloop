@@ -509,7 +509,23 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		SELECT title, COALESCE(start_page, 0), COALESCE(end_page, 0)
 		FROM topics WHERE id = ?
 	`, topicID).Scan(&bundle.TopicTitle, &startPage, &endPage); err != nil {
-		return nil, err
+		if err == sql.ErrNoRows && selectedNotebookID != "" {
+			// Fallback: If topic slug drifted, match the notebook's primary topic
+			var fallbackTopicID string
+			if fbErr := r.db.QueryRow(`
+				SELECT t.id, t.title, COALESCE(t.start_page, 0), COALESCE(t.end_page, 0)
+				FROM topics t
+				JOIN notebook_topics nt ON nt.topic_id = t.id
+				WHERE nt.notebook_id = ?
+				ORDER BY t.start_page ASC LIMIT 1
+			`, selectedNotebookID).Scan(&fallbackTopicID, &bundle.TopicTitle, &startPage, &endPage); fbErr == nil {
+				bundle.TopicID = fallbackTopicID
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	// ponytail: ensure human-readable title for reader UI and session exports
 	bundle.TopicTitle = utils.CleanTopicTitle(bundle.TopicTitle)

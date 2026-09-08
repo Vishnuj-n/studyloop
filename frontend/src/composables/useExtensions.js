@@ -3,6 +3,7 @@ import { useClerkAuth } from '../services/clerkAuth'
 import { listExtensions, getExtensionConfig, saveExtensionConfig } from '../services/appApi'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
+const SETUP_COMPLETED_KEY = 'studyloop_extensions_setup_completed'
 
 // Built-in lightweight extensions are enabled by default; external/python tools require explicit setup & opt-in
 const DEFAULT_ENABLED_EXTENSIONS = {
@@ -45,6 +46,24 @@ function savePersistedState(state) {
   }
 }
 
+function loadSetupCompletedState() {
+  try {
+    const raw = localStorage.getItem(SETUP_COMPLETED_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveSetupCompletedState(state) {
+  try {
+    localStorage.setItem(SETUP_COMPLETED_KEY, JSON.stringify(state))
+  } catch {
+    // Ignore storage write errors
+  }
+}
+
+const setupCompletedMap = ref(loadSetupCompletedState())
 const enabledMap = ref(loadPersistedState())
 const extensionsMetadata = ref([])
 const extensionConfig = ref(JSON.parse(JSON.stringify(DEFAULT_EXTENSION_CONFIG)))
@@ -97,6 +116,18 @@ export function useExtensions() {
 
   function isEnabled(extensionId) {
     return Boolean(enabledMap.value[extensionId])
+  }
+
+  function hasCompletedSetup(extensionId) {
+    return Boolean(setupCompletedMap.value[extensionId])
+  }
+
+  function markSetupCompleted(extensionId, completed = true) {
+    setupCompletedMap.value = {
+      ...setupCompletedMap.value,
+      [extensionId]: Boolean(completed)
+    }
+    saveSetupCompletedState(setupCompletedMap.value)
   }
 
   function isExtensionActive(extensionId) {
@@ -162,6 +193,8 @@ export function useExtensions() {
     refreshExtensionConfig,
     setExtensionEnabled,
     toggleExtension,
+    hasCompletedSetup,
+    markSetupCompleted,
     getExtensionSetting,
     setExtensionSetting,
   }

@@ -70,15 +70,18 @@
             </div>
 
             <!-- Toggle Switch -->
-            <label class="switch" :title="isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension'">
-              <input
-                type="checkbox"
-                :checked="isExtensionEnabled(ext.id)"
-                :disabled="isSettingUp(ext.id)"
-                @click.prevent="handleToggle(ext)"
-              />
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="isExtensionEnabled(ext.id)"
+              class="switch"
+              :class="{ 'is-active': isExtensionEnabled(ext.id) }"
+              :title="isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension'"
+              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              @click.stop="handleToggle(ext)"
+            >
               <span class="slider"></span>
-            </label>
+            </button>
           </div>
 
           <p class="ext-desc">{{ ext.description || 'Local StudyLoop reader extension.' }}</p>
@@ -95,18 +98,31 @@
             <button
               v-else-if="ext.id === 'youtube' || ext.id === 'anki_importer'"
               class="action-btn primary-action"
-              :disabled="!isExtensionEnabled(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || isSettingUp(ext.id) || isChecking(ext.id)"
               @click="router.push('/notebooks')"
             >
-              Import in Notebooks ➔
+              <span v-if="isSettingUp(ext.id)">Setting up...</span>
+              <span v-else-if="isChecking(ext.id)">Checking environment...</span>
+              <span v-else>Import in Notebooks ➔</span>
             </button>
             <button
               v-else
               class="action-btn primary-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id) || isChecking(ext.id)"
               @click="handleRun(ext)"
             >
               {{ getActionButtonLabel(ext.id) }}
+            </button>
+
+            <!-- Re-verify / Setup details trigger for Python tools -->
+            <button
+              v-if="isPythonExtension(ext)"
+              class="config-icon-btn"
+              title="Verify or Reinstall Extension Environment"
+              :disabled="isSettingUp(ext.id)"
+              @click="triggerSetup(ext)"
+            >
+              🛠️
             </button>
 
             <button
@@ -173,15 +189,18 @@
             </div>
 
             <!-- Pro Toggle Switch -->
-            <label class="switch" :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Early Access'">
-              <input
-                type="checkbox"
-                :checked="isPro && isExtensionEnabled(ext.id)"
-                :disabled="isSettingUp(ext.id)"
-                @click.prevent="handleProToggle(ext)"
-              />
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="isPro && isExtensionEnabled(ext.id)"
+              class="switch"
+              :class="{ 'is-active': isPro && isExtensionEnabled(ext.id) }"
+              :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Early Access'"
+              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              @click.stop="handleProToggle(ext)"
+            >
               <span class="slider"></span>
-            </label>
+            </button>
           </div>
 
           <p class="ext-desc">{{ ext.description || 'Advanced StudyLoop integration.' }}</p>
@@ -190,15 +209,17 @@
             <button
               v-if="isPro && (ext.id === 'deep_pdf' || ext.id.includes('pdf'))"
               class="action-btn pro-action"
-              :disabled="!isExtensionEnabled(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || isSettingUp(ext.id) || isChecking(ext.id)"
               @click="router.push('/notebooks')"
             >
-              Import in Notebooks ➔
+              <span v-if="isSettingUp(ext.id)">Setting up...</span>
+              <span v-else-if="isChecking(ext.id)">Checking environment...</span>
+              <span v-else>Import in Notebooks ➔</span>
             </button>
             <button
               v-else-if="isPro"
               class="action-btn pro-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id) || isChecking(ext.id)"
               @click="handleRun(ext)"
             >
               {{ getActionButtonLabel(ext.id) }}
@@ -209,6 +230,17 @@
               @click="handleUpgrade"
             >
               ★ Support Dev &bull; Get Early Access
+            </button>
+
+            <!-- Re-verify / Setup details trigger for Python tools -->
+            <button
+              v-if="isPro && isPythonExtension(ext)"
+              class="config-icon-btn"
+              title="Verify or Reinstall Extension Environment"
+              :disabled="isSettingUp(ext.id)"
+              @click="triggerSetup(ext)"
+            >
+              🛠️
             </button>
 
             <button
@@ -262,7 +294,12 @@ import ExtensionSetupModal from '../components/ExtensionSetupModal.vue'
 const router = useRouter()
 const clerkAuth = useClerkAuth()
 const isPro = computed(() => clerkAuth.isPro.value)
-const { isEnabled: isExtensionEnabled, setExtensionEnabled } = useExtensions()
+const {
+  isEnabled: isExtensionEnabled,
+  setExtensionEnabled,
+  hasCompletedSetup,
+  markSetupCompleted
+} = useExtensions()
 
 const extensions = ref([])
 const runningId = ref(null)
@@ -285,49 +322,52 @@ const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
 
+const checkingMap = ref({})
+
 function isSettingUp(id) {
   return !!settingUpMap.value[id]
 }
 
+function isChecking(id) {
+  return !!checkingMap.value[id]
+}
+
 function getActionButtonLabel(extId) {
+  if (isChecking(extId)) return 'Checking environment...'
   if (isSettingUp(extId)) return 'Setting up...'
   if (runningId.value === extId) return 'Running...'
   return 'Run Extension'
 }
 
-async function handleToggle(ext) {
+function isPythonExtension(ext) {
+  const runtime = (ext?.runtime || '').toLowerCase()
+  return runtime === 'python' || runtime === 'py'
+}
+
+function handleToggle(ext) {
   if (isExtensionEnabled(ext.id)) {
-    // User is turning it off
+    // User is turning it off: instant disable with zero delay
     setExtensionEnabled(ext.id, false)
     return
   }
 
-  // User is turning it on: check runtime readiness
-  const runtime = (ext.runtime || '').toLowerCase()
-  if (runtime === 'python' || runtime === 'py') {
-    try {
-      const readiness = await checkExtensionReadiness(ext.id)
-      if (readiness && readiness.is_ready) {
-        setExtensionEnabled(ext.id, true)
-        return
-      }
-    } catch (e) {
-      console.warn('Readiness check returned error, initiating setup:', e)
-    }
-
-    // Needs setup: trigger setup popup modal
+  // User is turning it on:
+  // If it's a Python tool that hasn't completed first-time setup, show the UV setup modal
+  if (isPythonExtension(ext) && !hasCompletedSetup(ext.id)) {
     triggerSetup(ext)
-  } else {
-    setExtensionEnabled(ext.id, true)
+    return
   }
+
+  // Normal turn-on for already-setup or built-in extension: instant
+  setExtensionEnabled(ext.id, true)
 }
 
-async function handleProToggle(ext) {
+function handleProToggle(ext) {
   if (!isPro.value) {
     handleUpgrade()
     return
   }
-  await handleToggle(ext)
+  handleToggle(ext)
 }
 
 function triggerSetup(ext) {
@@ -343,6 +383,7 @@ function closeSetupModal() {
 
 function handleSetupSuccess(ext) {
   if (ext && ext.id) {
+    markSetupCompleted(ext.id, true)
     setExtensionEnabled(ext.id, true)
   }
 }
@@ -650,13 +691,16 @@ onMounted(async () => {
   height: 20px;
   flex-shrink: 0;
   margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
   cursor: pointer;
+  outline: none;
 }
 
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .slider {
@@ -664,7 +708,7 @@ onMounted(async () => {
   cursor: pointer;
   inset: 0;
   background-color: var(--surface-container-low);
-  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s ease, background-color 0.15s ease;
   border-radius: 20px;
 }
 
@@ -677,18 +721,22 @@ onMounted(async () => {
   bottom: 3px;
   background-color: var(--on-surface);
   opacity: 0.6;
-  transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.15s ease, background-color 0.15s ease;
   border-radius: 50%;
 }
 
-input:checked + .slider {
+.switch.is-active .slider {
   background-color: var(--primary);
 }
 
-input:checked + .slider:before {
+.switch.is-active .slider:before {
   transform: translateX(16px);
   background-color: #ffffff;
   opacity: 1;
+}
+
+.switch:active:not(:disabled) .slider:before {
+  width: 17px;
 }
 
 /* Descriptions */

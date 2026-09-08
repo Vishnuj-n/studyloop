@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
 	studypkg "ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
-
-	"github.com/google/uuid"
 )
 
 // CompleteMilestoneExam completes an active MILESTONE_EXAM task via Unified Transition Router.
@@ -408,19 +405,6 @@ func (a *App) SuspendFlashcard(taskID, cardID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true, "remaining": remaining}
 }
 
-func (a *App) ForceDueFlashcardsNow() map[string]interface{} {
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	profileID, _ := repo.GetActiveProfileID()
-	updated, err := repo.MakeAllFlashcardsDueNow(profileID)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"ok": true, "updated_cards": updated}
-}
-
 func (a *App) ScoreShortAnswer(questionID, userAnswer string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -448,92 +432,6 @@ func (a *App) CompleteSocraticRescue(taskID string) map[string]interface{} {
 		"quiz_task_id": res.NextTaskID,
 		"rewards":      res.Rewards,
 	}
-}
-
-// DevForceSocraticRescue forces a topic into the SOCRATIC_REMEDIAL queue task state.
-// Only accessible when APP_ENV = dev.
-func (a *App) DevForceSocraticRescue(notebookID, topicID string) map[string]interface{} {
-	if os.Getenv("APP_ENV") != "dev" {
-		return map[string]interface{}{"error": "forbidden: dev mode only"}
-	}
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-
-	tx, err := repo.Begin()
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Wipe FSRS flashcards for this topic to protect purity
-	if err := repo.DeleteFSRSCardsByTopicIDTx(tx, topicID); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	feedback := "Concept rescue activated. Complete the Socratic session to retry."
-	socraticTaskID := uuid.NewString()
-	socraticPayload, _ := json.Marshal(map[string]string{
-		"feedback": feedback,
-		"lane":     "socratic_rescue",
-		"mode":     "external_prompt",
-	})
-
-	// Note: the hardcoded start_page value of 1 and end_page value of 10 are placeholder bounds used only for this dev helper function.
-	socraticTask := models.StudyQueueTask{
-		ID:          socraticTaskID,
-		NotebookID:  notebookID,
-		TopicID:     topicID,
-		TaskType:    models.StudyTaskTypeSocraticRemedial,
-		Status:      models.StudyTaskStatusPending,
-		Priority:    0,
-		PayloadJSON: string(socraticPayload),
-		StartPage:   1,
-		EndPage:     10,
-	}
-	err = repo.InsertStudyTaskTx(tx, socraticTask)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	return map[string]interface{}{"ok": true, "task_id": socraticTaskID}
-}
-
-// DevForceFlashcardGenerate forces a FLASHCARD_GENERATE task into the pending queue.
-// Only accessible when APP_ENV = dev.
-func (a *App) DevForceFlashcardGenerate(notebookID string) map[string]interface{} {
-	if os.Getenv("APP_ENV") != "dev" {
-		return map[string]interface{}{"error": "forbidden: dev mode only"}
-	}
-	repo, errMap := requireRepo(a)
-	if errMap != nil {
-		return errMap
-	}
-	topics, err := repo.GetNotebookTopicsWithBounds(notebookID)
-	if err != nil || len(topics) == 0 {
-		if err := repo.EnsurePendingFlashcardGenerateTask(notebookID, "dev-dummy-topic", 1, 10, "Dev Dummy Topic"); err != nil {
-			return map[string]interface{}{"error": err.Error()}
-		}
-		return map[string]interface{}{"ok": true}
-	}
-	firstTopic := topics[0]
-	startPage := firstTopic.StartPage
-	if startPage <= 0 {
-		startPage = 1
-	}
-	endPage := firstTopic.EndPage
-	if endPage <= startPage {
-		endPage = startPage + 10
-	}
-	if err := repo.EnsurePendingFlashcardGenerateTask(notebookID, firstTopic.TopicID, startPage, endPage, firstTopic.Title); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"ok": true}
 }
 
 // RetryFlashcardGeneration retries generating flashcards for a failed FLASHCARD_GENERATE task.

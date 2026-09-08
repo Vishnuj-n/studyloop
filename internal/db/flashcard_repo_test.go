@@ -137,6 +137,9 @@ func TestQueryDueReviewCardsIgnoresSuspendedCards(t *testing.T) {
 	if err := testRepo.EnsureTopic(topicID, "Suspend Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
+	if err := testRepo.CreateNotebook("nb-suspend", "Suspend Notebook", "/tmp/s.pdf", "pdf", topicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
 
 	err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
 		{ID: "active-due", TopicID: topicID, Prompt: "Q1", Answer: "A1", DueAt: 100, Suspended: false},
@@ -169,6 +172,12 @@ func TestQueryDueReviewCardsIgnoresOrphanedCards(t *testing.T) {
 	if err := testRepo.EnsureTopic(orphanTopicID, "Orphan Topic"); err != nil {
 		t.Fatalf("EnsureTopic orphan failed: %v", err)
 	}
+	if err := testRepo.CreateNotebook("nb-orphan-active", "Active Notebook", "/tmp/o.pdf", "pdf", topicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook active failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook("nb-orphan-del", "Orphan Notebook", "/tmp/od.pdf", "pdf", orphanTopicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook orphan failed: %v", err)
+	}
 
 	// Create flashcards for both topics, both due
 	err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
@@ -198,9 +207,9 @@ func TestQueryDueReviewCardsIgnoresOrphanedCards(t *testing.T) {
 		t.Fatalf("expected 2 due cards before deletion, got %d", countBefore)
 	}
 
-	// Delete the orphan topic
-	if _, err := testRepo.db.Exec(`DELETE FROM topics WHERE id = ?`, orphanTopicID); err != nil {
-		t.Fatalf("failed to delete orphan topic: %v", err)
+	// Delete the orphan notebook
+	if err := testRepo.DeleteNotebook("nb-orphan-del"); err != nil {
+		t.Fatalf("failed to delete orphan notebook: %v", err)
 	}
 
 	// Verify orphaned card is no longer counted
@@ -254,12 +263,12 @@ func TestGetNextDueReviewNotebookUsesPriorityAndLegacyTopicLink(t *testing.T) {
 		t.Fatalf("CreateFlashcards high failed: %v", err)
 	}
 
-	notebookID, dueCount, err := testRepo.GetNextDueReviewNotebook(200)
+	notebookID, dueCount, err := testRepo.GetNextDueReviewNotebook(150)
 	if err != nil {
 		t.Fatalf("GetNextDueReviewNotebook failed: %v", err)
 	}
 	if notebookID != "nb-high" {
-		t.Fatalf("expected higher-priority notebook selected on tie, got %s", notebookID)
+		t.Fatalf("expected nb-high, got %s", notebookID)
 	}
 	if dueCount != 2 {
 		t.Fatalf("expected dueCount=2, got %d", dueCount)
@@ -272,6 +281,9 @@ func TestQueryDueReviewCardsForRange(t *testing.T) {
 	topicID := "topic-range"
 	if err := testRepo.EnsureTopic(topicID, "Range Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook("nb-range", "Range Notebook", "/tmp/r.pdf", "pdf", topicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
 	err := testRepo.CreateFlashcards(topicID, []models.Flashcard{
@@ -351,6 +363,9 @@ func TestQueryDueReviewCardsTimeline(t *testing.T) {
 	topicID := "topic-timeline"
 	if err := testRepo.EnsureTopic(topicID, "Timeline Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook("nb-timeline", "Timeline Notebook", "/tmp/t.pdf", "pdf", topicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
 	}
 
 	baseEndOfToday := int64(100000)

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"ai-tutor/internal/models"
 )
@@ -502,26 +501,6 @@ func (r *Repository) SuspendFlashcardTx(tx *sql.Tx, cardID string) error {
 		return fmt.Errorf("flashcard %s was not updated, potentially due to a concurrent update or missing row", cardID)
 	}
 	return nil
-}
-
-func (r *Repository) MakeAllFlashcardsDueNow(profileID string) (int64, error) {
-	profileID = strings.TrimSpace(profileID)
-	query := `UPDATE fsrs_cards SET due_at = ? WHERE suspended = 0`
-	args := []interface{}{time.Now().Unix() - 3600}
-	if profileID != "" {
-		query += ` AND topic_id IN (
-			SELECT nt.topic_id
-			FROM notebook_topics nt
-			JOIN notebooks n ON n.id = nt.notebook_id
-			WHERE n.profile_id = ?
-		)`
-		args = append(args, profileID)
-	}
-	res, err := r.db.Exec(query, args...)
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
 }
 
 func boolToInt(b bool) int {

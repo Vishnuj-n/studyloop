@@ -83,7 +83,14 @@
           Retry Setup
         </button>
         <button
-          v-if="status !== 'running'"
+          v-if="status === 'success'"
+          class="modal-action-btn done-btn"
+          @click="emitClose"
+        >
+          Done
+        </button>
+        <button
+          v-if="status === 'error'"
           class="modal-close-btn"
           @click="emitClose"
         >
@@ -160,12 +167,6 @@ async function startSetup() {
       currentStep.value = 3
       status.value = 'success'
       emit('success', props.extension)
-
-      setTimeout(() => {
-        if (props.isOpen && status.value === 'success') {
-          emitClose()
-        }
-      }, 1200)
     } else if (res && res.canceled) {
       logs.value = res?.logs || []
       // Do not emit error when setup is canceled by user
@@ -409,7 +410,8 @@ watch(
   gap: 10px;
 }
 
-.modal-action-btn.retry-btn {
+.modal-action-btn.retry-btn,
+.modal-action-btn.done-btn {
   padding: 8px 18px;
   border-radius: 10px;
   background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);

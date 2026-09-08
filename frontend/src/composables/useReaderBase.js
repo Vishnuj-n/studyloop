@@ -267,6 +267,15 @@ export function useReaderBase(taskID) {
           sections: Array.isArray(result.bundle.sections) ? result.bundle.sections : [],
         }
       }
+      console.log('[useReaderBase] initializeSession raw result:', {
+        bundleExists: !!bundle,
+        bundlePageCount: bundle?.page_count,
+        bundleFileType: bundle?.file_type,
+        bundleNotebookUrl: bundle?.notebook_url,
+        pageBounds: result.page_bounds,
+        navigationCurrentPage: result.page_bounds?.current_page,
+        resultKeys: Object.keys(result),
+      })
       globalError.value = '' // clear globalError
 
       // Apply initialized state

@@ -8,6 +8,9 @@
         </div>
         <div class="forecast-legend">
           <span class="legend-item"><span class="legend-dot due-dot"></span>Due Cards</span>
+          <span v-if="maxFlashcardsLimit > 0" class="legend-item">
+            <span class="legend-line limit-dot"></span>Limit ({{ maxFlashcardsLimit }})
+          </span>
         </div>
       </div>
 
@@ -24,6 +27,16 @@
           <!-- Axis Lines -->
           <line x1="30" y1="50" x2="30" y2="250" class="axis-line" />
           <line x1="30" y1="250" x2="370" y2="250" class="axis-line" />
+
+          <!-- Target Limit Reference Line -->
+          <line
+            v-if="limitLineY !== null"
+            x1="30"
+            :y1="limitLineY"
+            x2="370"
+            :y2="limitLineY"
+            class="limit-reference-line"
+          />
 
           <!-- Y Axis Labels & Grid Lines -->
           <g v-for="tick in yTicks" :key="tick.value" class="chart-y-tick">
@@ -55,7 +68,7 @@
           />
 
           <!-- Data Points (interactive dots) -->
-          <g v-for="(pt, idx) in chartPoints" :key="idx">
+          <g v-for="(pt, idx) in chartPoints" :key="'dot-' + idx">
             <circle
               :cx="pt.x"
               :cy="pt.y"
@@ -64,6 +77,16 @@
               @mouseenter="hoveredPoint = pt"
               @mouseleave="hoveredPoint = null"
             />
+          </g>
+
+          <!-- X Axis Day Labels & Count Values -->
+          <g v-for="(pt, idx) in chartPoints" :key="'xlabel-' + idx">
+            <text :x="pt.x" y="270" class="x-axis-label" text-anchor="middle">
+              {{ pt.dayLabel }}
+            </text>
+            <text :x="pt.x" y="288" class="x-axis-sublabel" text-anchor="middle">
+              {{ pt.count }}
+            </text>
           </g>
         </svg>
 
@@ -77,19 +100,6 @@
           <div class="tooltip-value">
             <strong>{{ hoveredPoint.count }}</strong> due cards
           </div>
-        </div>
-      </div>
-
-      <!-- X Axis Labels -->
-      <div class="chart-x-axis">
-        <div
-          v-for="(pt, idx) in chartPoints"
-          :key="idx"
-          class="x-label-container"
-          :style="{ left: pt.percentX + '%' }"
-        >
-          <span class="x-label">{{ pt.dayLabel }}</span>
-          <span class="x-sublabel">{{ pt.count }}</span>
         </div>
       </div>
     </div>
@@ -128,6 +138,13 @@ const yTicks = computed(() => {
   })
 })
 
+const limitLineY = computed(() => {
+  if (!props.maxFlashcardsLimit || props.maxFlashcardsLimit <= 0) return null
+  const maxVal = yAxisMax.value
+  if (props.maxFlashcardsLimit > maxVal) return null
+  return 250 - (props.maxFlashcardsLimit / maxVal) * 200
+})
+
 const chartPoints = computed(() => {
   if (!props.timelineData || props.timelineData.length === 0) return []
   const maxVal = yAxisMax.value
@@ -138,7 +155,8 @@ const chartPoints = computed(() => {
     const x = len === 1 ? 200 : 30 + (i / (len - 1)) * 340
     const y = 250 - (d.card_count / maxVal) * 200
     const exceeds = d.card_count > props.maxFlashcardsLimit
-    const px = len === 1 ? 50 : 7 + (i / (len - 1)) * 86
+    const px = (x / 400) * 100
+    const dayLabel = d.day_label === 'Tomorrow' ? 'Tmrw' : d.day_label
     return {
       x,
       y,
@@ -146,7 +164,8 @@ const chartPoints = computed(() => {
       tooltipX: px,
       tooltipY: y,
       percentY: (y / 300) * 100,
-      dayLabel: d.day_label,
+      dayLabel,
+      fullDayLabel: d.day_label,
       date: d.date,
       count: d.card_count,
       exceeds,
@@ -230,6 +249,20 @@ const areaPathData = computed(() => {
   background: var(--primary);
 }
 
+.legend-line.limit-dot {
+  width: 14px;
+  height: 2px;
+  background: var(--tertiary, #e0a82e);
+  border-radius: 1px;
+}
+
+.limit-reference-line {
+  stroke: var(--tertiary, #e0a82e);
+  stroke-width: 1.5px;
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.8;
+}
+
 .chart-container {
   position: relative;
   width: 100%;
@@ -262,6 +295,20 @@ const areaPathData = computed(() => {
   font-size: 10px;
   font-weight: 600;
   fill: var(--muted-text);
+  font-family: inherit;
+}
+
+.x-axis-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--muted-text);
+  font-family: inherit;
+}
+
+.x-axis-sublabel {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--on-surface);
   font-family: inherit;
 }
 
@@ -309,35 +356,5 @@ const areaPathData = computed(() => {
 .tooltip-value {
   font-size: 13px;
   color: var(--on-surface);
-}
-
-/* X Axis */
-.chart-x-axis {
-  position: relative;
-  height: 36px;
-  margin-top: 4px;
-  width: 100%;
-}
-
-.x-label-container {
-  position: absolute;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.x-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted-text);
-}
-
-.x-sublabel {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--on-surface);
-  margin-top: 2px;
 }
 </style>

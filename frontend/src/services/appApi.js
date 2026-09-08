@@ -128,10 +128,6 @@ export function suspendFlashcard(taskID, cardID) {
   return appBridge().SuspendFlashcard(taskID, cardID)
 }
 
-export function forceDueFlashcardsNow() {
-  return appBridge().ForceDueFlashcardsNow()
-}
-
 export function getNotebooks(topicID = '', profileID = '') {
   return appBridge().GetNotebooks(topicID, profileID)
 }
@@ -299,14 +295,6 @@ export function getCloudConfig() {
 
 export function getTopicSectionsContent(topicID, notebookID) {
   return appBridge().GetTopicSectionsContent(topicID, notebookID)
-}
-
-export function devForceSocraticRescue(notebookID, topicID) {
-  return appBridge().DevForceSocraticRescue(notebookID, topicID)
-}
-
-export function devForceFlashcardGenerate(notebookID) {
-  return appBridge().DevForceFlashcardGenerate(notebookID)
 }
 
 export function checkForUpdates() {

@@ -159,9 +159,6 @@ Returns joined text of all sections in a topic (used by SocraticRescue).
 ### CompleteSocraticRescue
 Completes rescue session via `TransitionTask(EventCompleteSocraticRescue)`, inserts fresh QUIZ task with `"source": "socratic_rescue_requiz"`. Queue unblocks.
 
-### DevForceSocraticRescue
-Dev-only: forces topic into SOCRATIC_REMEDIAL state. Requires `APP_ENV=dev`.
-
 ---
 
 ## Settings API

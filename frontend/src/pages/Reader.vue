@@ -130,50 +130,21 @@
         <div v-else-if="!reader.pdfVisible.value" class="empty">
           Document not available for selected notebook/topic.
         </div>
-        <div
+        <PdfViewer
           v-else
-          ref="pdfViewportRef"
-          class="pdf-viewport"
-          tabindex="0"
-          :style="{
-            opacity:
-              (scrollState.status !== 'initializing' && scrollState.status !== 'loading') ||
-              pdfLoadError
-                ? 1
-                : 0,
-            transition: 'opacity 0.2s ease',
-          }"
-        >
-          <div v-if="pdfLoadError" class="empty error">{{ pdfLoadError }}</div>
-          <div
-            v-else
-            ref="pdfScalerRef"
-            class="pdf-scaler"
-            :style="{ width: `${Math.round(BASE_PAGE_WIDTH * zoomScale)}px`, margin: '0 auto' }"
-          >
-            <div
-              v-for="pageNum in reader.pageCount.value"
-              :key="pageNum"
-              :data-page="pageNum"
-              class="pdf-page-wrapper"
-            >
-              <vue-pdf-embed
-                v-if="renderedPages[pageNum]"
-                :source="reader.notebookUrl.value"
-                :page="pageNum"
-                :text-layer="true"
-                :annotation-layer="false"
-                @rendered="() => onPageRendered(pageNum)"
-                @loading-failed="handlePDFLoadFailed"
-                @rendering-failed="handlePDFLoadFailed"
-              />
-            </div>
-          </div>
-        </div>
+          ref="pdfViewerRef"
+          :source="reader.notebookUrl.value"
+          :page-count="reader.pageCount.value"
+          :initial-page="reader.currentPage.value"
+          :zoom-scale="zoomScale"
+          @update:current-page="reader.updateCurrentPage"
+          @load-error="handlePDFLoadFailed"
+          @rendered="onPdfRendered"
+        />
 
         <!-- Right-edge PDF Controls -->
         <div
-          v-if="reader.pdfVisible.value && !reader.loadingBundle.value && !pdfLoadError"
+          v-if="reader.pdfVisible.value && !reader.loadingBundle.value"
           class="pdf-edge-controls"
         >
           <button
@@ -233,7 +204,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
+import { computed, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   completeReading,
@@ -251,9 +222,7 @@ import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
-import VuePdfEmbed from 'vue-pdf-embed'
-import 'vue-pdf-embed/dist/styles/annotationLayer.css'
-import 'vue-pdf-embed/dist/styles/textLayer.css'
+import PdfViewer from '../components/PdfViewer.vue'
 
 const { isExtensionActive } = useExtensions()
 const showAudioOverview = ref(false)
@@ -394,129 +363,9 @@ watch([resolvedTaskID, () => reader.selectedTopicID.value], (next, prev) => {
   console.warn('[READER_STATE] task/topic changed', { previous: prev, next })
 })
 
-// Custom PDF Viewer Refs
-const pdfViewportRef = ref(null)
-const pdfScalerRef = ref(null)
-const pdfLoadError = ref('')
-
-// Custom PDF Viewer Zoom & View Modes
-const BASE_PAGE_WIDTH = 800
-const zoomScale = ref(1.0)
-
-// scrollState status transitions are managed by setScrollStatus to include safety timeout fallbacks.
-const scrollState = ref({
-  status: 'initializing', // 'initializing' | 'loading' | 'scrolling' | 'ready'
-  targetPage: null,
-})
-let scrollTimeoutId = null
-
-// Track currently centered page in the viewport
-const currentVisiblePage = ref(1)
-
-// Append-only page rendering visibility flags
-const renderedPages = ref({})
-let intersectionObserver = null
-
-// isProgrammaticScroll: true while a programmatic scrollIntoView is in flight.
-// The scroll handler ignores events while this is set to prevent cascade.
-let isProgrammaticScroll = false
-let scrollDebounceId = null
-let programmaticScrollTimeoutId = null
-
-function logScroll(event, data = {}) {
-  const payload = {
-    status: scrollState.value.status,
-    target: scrollState.value.targetPage,
-    visible: currentVisiblePage.value,
-    isProgrammatic: isProgrammaticScroll,
-    ...data,
-  }
-  console.log(`[SCROLL:${event}]`, payload)
-}
-
-function scrollToPage(page) {
-  const wrapper = pdfViewportRef.value?.querySelector(`[data-page="${page}"]`)
-  if (wrapper) {
-    logScroll('scrollToPage_start', { page })
-    isProgrammaticScroll = true
-    wrapper.scrollIntoView({ behavior: 'auto', block: 'start' })
-    if (programmaticScrollTimeoutId) {
-      clearTimeout(programmaticScrollTimeoutId)
-    }
-    programmaticScrollTimeoutId = setTimeout(() => {
-      isProgrammaticScroll = false
-      programmaticScrollTimeoutId = null
-      logScroll('scrollToPage_completed', { page })
-    }, 300)
-    return true
-  }
-  return false
-}
-
-function setScrollStatus(status, targetPage = null) {
-  logScroll('setScrollStatus', { transitioningTo: status, transitionTarget: targetPage })
-  scrollState.value.status = status
-  scrollState.value.targetPage = targetPage
-
-  if (targetPage !== null) {
-    currentVisiblePage.value = targetPage
-  }
-
-  if (scrollTimeoutId) {
-    clearTimeout(scrollTimeoutId)
-    scrollTimeoutId = null
-  }
-
-  // Safety fallback to prevent getting stuck in 'loading' or 'scrolling'.
-  // Extended to 10s to handle slow PDF renders. Attempts a scroll before clearing.
-  if (status === 'loading' || status === 'scrolling') {
-    scrollTimeoutId = setTimeout(() => {
-      const stuckTarget = scrollState.value.targetPage
-      logScroll('safetyTimeoutFired', { stuckTarget, stuckStatus: scrollState.value.status })
-      if (stuckTarget) {
-        scrollToPage(stuckTarget)
-      }
-      scrollState.value.status = 'ready'
-      scrollState.value.targetPage = null
-    }, 10000)
-  }
-}
-
-const containerWidth = ref(800)
-
-// Virtualization constants removed for native-scroll aspect-ratio pattern
-
-// Synchronize programmatic changes of reader.currentPage back to our refs
-watch(
-  () => reader.currentPage.value,
-  (newVal) => {
-    logScroll('watchCurrentPage_triggered', { newVal })
-    if (scrollState.value.status !== 'ready') {
-      return
-    }
-    if (newVal !== currentVisiblePage.value) {
-      logScroll('watchCurrentPage_programmatic_change', {
-        from: currentVisiblePage.value,
-        to: newVal,
-      })
-      setScrollStatus('scrolling', newVal)
-
-      // Attempt scroll immediately in case the page wrapper is already rendered
-      nextTick(() => {
-        const scrolled = scrollToPage(newVal)
-        if (scrolled) {
-          logScroll('watchCurrentPage_synchronous_scroll', { page: newVal })
-          setTimeout(() => {
-            setScrollStatus('ready')
-            logScroll('watchCurrentPage_scroll_done')
-          }, 150)
-        } else {
-          logScroll('watchCurrentPage_wait_render', { page: newVal })
-        }
-      })
-    }
-  }
-)
+// PDF Viewer ref and zoom
+const pdfViewerRef = ref(null)
+const zoomScale = ref(0.7)
 
 const isTaskFlow = computed(() => {
   // Once context is settled, read mode from the context object.
@@ -528,24 +377,6 @@ const isTaskFlow = computed(() => {
 
 // Trust-based completion: user decides when reading is complete.
 // Page navigation is for UI only and does not gate completion.
-
-function onPageRendered(pageNum) {
-  logScroll('onPageRendered', { pageNum })
-  if (scrollState.value.status === 'loading' || scrollState.value.status === 'scrolling') {
-    const targetPage = scrollState.value.targetPage || reader.currentPage.value
-    if (pageNum === targetPage) {
-      nextTick(() => {
-        const scrolled = scrollToPage(targetPage)
-        if (scrolled) {
-          setTimeout(() => {
-            setScrollStatus('ready')
-            logScroll('onPageRendered_scroll_complete', { targetPage })
-          }, 150)
-        }
-      })
-    }
-  }
-}
 
 // ─── RAG settings ────────────────────────────────────────────────────────────
 
@@ -569,32 +400,37 @@ async function loadRagSettings() {
 // ─── Entry-path resolvers ─────────────────────────────────────────────────────
 
 async function resolveTaskContext(taskQuery) {
-  logScroll('resolveTaskContext_start', { taskQuery })
-  setScrollStatus('loading')
   const init = await reader.initializeSession(taskQuery)
-  logScroll('resolveTaskContext_initialized', { success: !!init, page: reader.currentPage.value })
+  console.log('[Reader] resolveTaskContext result:', {
+    initOk: !!init,
+    bundle: init?.bundle ? {
+      page_count: init.bundle.page_count,
+      file_type: init.bundle.file_type,
+      notebook_url: init.bundle.notebook_url,
+      topic_title: init.bundle.topic_title,
+      sections_count: init.bundle.sections?.length,
+    } : 'NULL_BUNDLE',
+    readerState: {
+      notebookUrl: reader.notebookUrl.value,
+      fileType: reader.fileType.value,
+      pageCount: reader.pageCount.value,
+      currentPage: reader.currentPage.value,
+      isPdf: reader.isPdf.value,
+      pdfVisible: reader.pdfVisible.value,
+      isMarkdown: reader.isMarkdown.value,
+      isYouTube: reader.isYouTube.value,
+      navigationMin: reader.navigationMinPage.value,
+      navigationMax: reader.navigationMaxPage.value,
+    },
+  })
   if (init) {
     sessionTask.value = init.task
-    const targetPage = reader.currentPage.value
-    setScrollStatus('loading', targetPage)
-    logScroll('resolveTaskContext_start_scroll', { targetPage })
-    await nextTick()
-    const scrolled = scrollToPage(targetPage)
-    if (scrolled) {
-      logScroll('resolveTaskContext_immediate_scroll_success', { targetPage })
-      setTimeout(() => setScrollStatus('ready'), 150)
-    } else {
-      logScroll('resolveTaskContext_scroll_deferred', { targetPage })
-    }
-  } else {
-    setScrollStatus('ready')
   }
 }
 
 async function resolveBrowseContext() {
   console.log('[Reader] Browse mode — resolveBrowseContext')
   await reader.loadNotebookTree()
-  setScrollStatus('ready')
 }
 
 // ─── Mounted ──────────────────────────────────────────────────────────────────
@@ -621,111 +457,9 @@ onMounted(async () => {
   }
 })
 
-watch(
-  () => reader.notebookUrl.value,
-  async (newUrl) => {
-    logScroll('watchNotebookUrl_triggered', { newUrl, page: reader.currentPage.value })
-    pdfLoadError.value = ''
-    if (scrollState.value.status !== 'initializing') {
-      const targetPage = reader.currentPage.value
-      setScrollStatus('loading', targetPage)
-      // Immediately attempt scroll for cached PDFs where @rendered never re-fires
-      await nextTick()
-      const scrolled = scrollToPage(targetPage)
-      if (scrolled) {
-        logScroll('watchNotebookUrl_immediate_scroll_success', { targetPage })
-        setTimeout(() => {
-          setScrollStatus('ready')
-        }, 150)
-      } else {
-        logScroll('watchNotebookUrl_wait_render', { targetPage })
-      }
-    }
-  }
-)
-
 function reloadPage() {
   window.location.reload()
 }
-
-// ResizeObserver and Gesture Controller Setup
-let resizeObserver = null
-
-// Watch viewport ref to set up ResizeObserver and Event Listeners dynamically
-watch(pdfViewportRef, (el, oldEl, onCleanup) => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
-  }
-
-  if (el) {
-    containerWidth.value = el.clientWidth || 800
-
-    let initialFitDone = false
-    resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        containerWidth.value = entry.contentRect.width
-        if (!initialFitDone && containerWidth.value > 0) {
-          if (containerWidth.value < 800) {
-            zoomScale.value = Math.max(0.5, Math.round((containerWidth.value / 800) * 100) / 100)
-          }
-          initialFitDone = true
-        }
-      }
-    })
-    resizeObserver.observe(el)
-
-    el.addEventListener('scroll', handleViewportScroll, { passive: true })
-
-    onCleanup(() => {
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-        resizeObserver = null
-      }
-      el.removeEventListener('scroll', handleViewportScroll)
-    })
-  }
-})
-
-function setupIntersectionObserver(viewportEl) {
-  if (intersectionObserver) {
-    intersectionObserver.disconnect()
-  }
-
-  intersectionObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        const page = Number.parseInt(entry.target.dataset.page)
-        if (Number.isNaN(page)) return
-        if (entry.isIntersecting) {
-          renderedPages.value[page] = true
-        }
-      })
-    },
-    {
-      root: viewportEl,
-      rootMargin: '1000px 0px 1000px 0px', // preload pages 1000px before/after they enter viewport
-      threshold: 0.01,
-    }
-  )
-
-  const wrappers = viewportEl.querySelectorAll('.pdf-page-wrapper')
-  wrappers.forEach((w) => intersectionObserver.observe(w))
-}
-
-// Watch pageCount, notebookUrl, and the viewport ref to dynamically update the intersection observer target elements
-watch(
-  [() => reader.pageCount.value, () => reader.notebookUrl.value, pdfViewportRef],
-  () => {
-    nextTick(() => {
-      const el = pdfViewportRef.value
-      if (el) {
-        setupIntersectionObserver(el)
-      }
-    })
-  },
-  { immediate: true }
-)
 
 function zoomIn() {
   zoomScale.value = Math.min(2.5, Math.round((zoomScale.value + 0.1) * 100) / 100)
@@ -735,57 +469,8 @@ function zoomOut() {
   zoomScale.value = Math.max(0.5, Math.round((zoomScale.value - 0.1) * 100) / 100)
 }
 
-
-onUnmounted(() => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
-  }
-  if (intersectionObserver) {
-    intersectionObserver.disconnect()
-    intersectionObserver = null
-  }
-  if (scrollDebounceId) clearTimeout(scrollDebounceId)
-  if (programmaticScrollTimeoutId) clearTimeout(programmaticScrollTimeoutId)
-})
-
-// ─── Scroll-based page tracking ───────────────────────────────────────────────
-// Works alongside the IntersectionObserver. Reads geometry directly on scroll
-// to determine the primary active visible page, while the IntersectionObserver
-// manages lazy-loading/rendering of adjacent pages.
-
-function getVisiblePageFromScroll() {
-  const viewport = pdfViewportRef.value
-  if (!viewport) return null
-  const viewTop = viewport.scrollTop
-  const viewBottom = viewTop + viewport.clientHeight
-  const wrappers = viewport.querySelectorAll('.pdf-page-wrapper')
-  let bestPage = null
-  let bestOverlap = 0
-  for (const el of wrappers) {
-    const elTop = el.offsetTop
-    const elBottom = elTop + el.offsetHeight
-    const overlap = Math.min(viewBottom, elBottom) - Math.max(viewTop, elTop)
-    if (overlap > bestOverlap) {
-      bestOverlap = overlap
-      bestPage = Number.parseInt(el.dataset.page)
-    }
-  }
-  return bestPage
-}
-
-function handleViewportScroll() {
-  if (isProgrammaticScroll) return
-  if (scrollState.value.status !== 'ready') return
-  if (scrollDebounceId) clearTimeout(scrollDebounceId)
-  scrollDebounceId = setTimeout(() => {
-    const page = getVisiblePageFromScroll()
-    if (!page) return
-    if (page !== currentVisiblePage.value) {
-      currentVisiblePage.value = page
-      reader.updateCurrentPage(page)
-    }
-  }, 80)
+function onPdfRendered(pageNum) {
+  // ponytail: no-op hook for future telemetry if needed
 }
 
 function handlePDFLoadFailed(err) {
@@ -794,9 +479,7 @@ function handlePDFLoadFailed(err) {
     typeof err === 'string'
       ? err
       : err?.message || (err && JSON.stringify(err)) || 'Failed to load PDF document.'
-  pdfLoadError.value = errMsg
   logFrontendEvent('error', 'ReaderPDF', 'pdf_load_failed', { error: errMsg })
-  setScrollStatus('ready')
 }
 
 async function retryGetUserSettings() {
@@ -1042,61 +725,7 @@ h3 {
   white-space: nowrap;
 }
 
-.pdf-page-wrapper {
-  display: block;
-  margin: 0 auto;
-  margin-bottom: 20px;
-  width: 100%;
-  aspect-ratio: 8.5 / 11;
-  background: var(--surface-container-lowest, #ffffff);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--outline-variant);
-  border-radius: 4px;
-}
 
-.pdf-viewport {
-  width: 100%;
-  height: calc(100vh - 160px);
-  overflow-y: auto;
-  /* ponytail: native browser layout width scaling & overflow-x centers small pages and enables horizontal scroll when zoomed */
-  overflow-x: auto;
-  background: var(--background);
-  border: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border-radius: 10px;
-}
-
-.pdf-viewport :deep(.vue-pdf-embed) {
-  display: block;
-  margin: 0 auto !important;
-  padding: 0 !important;
-  border: none !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.pdf-viewport :deep(.vue-pdf-embed__page) {
-  display: block;
-  margin: 0 auto !important;
-  padding: 0 !important;
-  width: 100% !important;
-  height: auto !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.pdf-viewport :deep(.vue-pdf-embed__page canvas) {
-  width: 100% !important;
-  height: auto !important;
-  display: block !important;
-  margin: 0 auto !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-  border: none !important;
-  max-width: none !important;
-  will-change: filter;
-}
 
 .completion-message {
   margin: 0;
@@ -1183,30 +812,8 @@ button:disabled {
   font-size: 14px;
 }
 
-.fatal-error {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-}
 
-.fatal-error h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #b42318;
-}
 
-.fatal-error p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.error-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
 
 @media (max-width: 1180px) {
   .layout,

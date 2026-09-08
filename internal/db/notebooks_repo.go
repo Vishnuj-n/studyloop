@@ -766,28 +766,24 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			}
 		}
 
-		_, err = tx.Exec("DELETE FROM notebooks WHERE id = ?", notebookID)
-		if err != nil {
-			return err
-		}
-
+		// Gather all associated topic IDs for this notebook (via notebook_topics and generated IDs)
 		topicRows, err := tx.Query(`
-			SELECT id
-			FROM topics
-			WHERE id LIKE ?
-		`, "nb-"+notebookID+"-%")
+			SELECT topic_id FROM notebook_topics WHERE notebook_id = ?
+			UNION
+			SELECT id FROM topics WHERE id LIKE ?
+		`, notebookID, "nb-"+notebookID+"-%")
 		if err != nil {
 			return err
 		}
 
-		autoTopicIDs := make([]string, 0)
+		associatedTopicIDs := make([]string, 0)
 		for topicRows.Next() {
-			var topicID string
-			if scanErr := topicRows.Scan(&topicID); scanErr != nil {
+			var tID string
+			if scanErr := topicRows.Scan(&tID); scanErr != nil {
 				_ = topicRows.Close()
 				return scanErr
 			}
-			autoTopicIDs = append(autoTopicIDs, topicID)
+			associatedTopicIDs = append(associatedTopicIDs, tID)
 		}
 		if rowsErr := topicRows.Err(); rowsErr != nil {
 			_ = topicRows.Close()
@@ -795,7 +791,38 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 		}
 		_ = topicRows.Close()
 
-		for _, topicID := range autoTopicIDs {
+		// Delete review cards and logs for these topics
+		if len(associatedTopicIDs) > 0 {
+			tPlaceholders := make([]string, len(associatedTopicIDs))
+			tArgs := make([]interface{}, len(associatedTopicIDs))
+			for i, tID := range associatedTopicIDs {
+				tPlaceholders[i] = "?"
+				tArgs[i] = tID
+			}
+			tList := strings.Join(tPlaceholders, ",")
+
+			if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM fsrs_review_log WHERE topic_id IN (%s)`, tList), tArgs...); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM fsrs_cards WHERE topic_id IN (%s)`, tList), tArgs...); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM topic_progress WHERE topic_id IN (%s)`, tList), tArgs...); err != nil {
+				return err
+			}
+		}
+
+		// Delete notebook_topics links
+		if _, err := tx.Exec(`DELETE FROM notebook_topics WHERE notebook_id = ?`, notebookID); err != nil {
+			return err
+		}
+
+		_, err = tx.Exec("DELETE FROM notebooks WHERE id = ?", notebookID)
+		if err != nil {
+			return err
+		}
+
+		for _, topicID := range associatedTopicIDs {
 			var chunkCount int
 			if chunkCountErr := tx.QueryRow(`
 				SELECT COUNT(*) FROM chunks WHERE topic_id = ?
@@ -804,11 +831,6 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			}
 
 			if chunkCount == 0 {
-				if _, delProgressErr := tx.Exec(`
-					DELETE FROM topic_progress WHERE topic_id = ?
-				`, topicID); delProgressErr != nil {
-					return delProgressErr
-				}
 				if _, delTopicErr := tx.Exec(`
 					DELETE FROM topics WHERE id = ?
 				`, topicID); delTopicErr != nil {
