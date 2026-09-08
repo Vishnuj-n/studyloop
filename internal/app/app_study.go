@@ -82,34 +82,6 @@ func aggregateQueueTasks(repo *db.Repository, active, pending []models.StudyQueu
 	return queueTasks, activeTopics, learningMinutes, actionCounts
 }
 
-// calculateStreak computes current and longest streaks from a set of completion timestamps.
-// timezoneOffsetMinutes is the JS-style offset (UTC+5:30 → -330).
-func calculateStreak(times []time.Time, timezoneOffsetMinutes int) (currentStreak, longestStreak int, activeDates []string) {
-	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
-	nowClient := time.Now().In(loc)
-
-	dateSet := make(map[string]bool)
-	for _, t := range times {
-		dateSet[t.In(loc).Format(dateFormatYYYYMMDD)] = true
-	}
-
-	sortedDates := make([]string, 0, len(dateSet))
-	for d := range dateSet {
-		sortedDates = append(sortedDates, d)
-	}
-	sort.Strings(sortedDates)
-	activeDates = sortedDates
-
-	if len(sortedDates) == 0 {
-		return 0, 0, activeDates
-	}
-
-	longestStreak = computeLongestStreak(sortedDates, loc)
-	currentStreak = computeCurrentStreak(nowClient, dateSet)
-
-	return currentStreak, longestStreak, activeDates
-}
-
 func computeLongestStreak(sortedDates []string, loc *time.Location) int {
 	longestStreak := 0
 	streakTemp := 0

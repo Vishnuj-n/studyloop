@@ -510,7 +510,7 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 		FROM topics WHERE id = ?
 	`, topicID).Scan(&bundle.TopicTitle, &startPage, &endPage); err != nil {
 		if err == sql.ErrNoRows && selectedNotebookID != "" {
-			// Fallback: If topic slug drifted, match the notebook's primary topic or fallback to notebook title
+			// Fallback: If topic slug drifted, match the notebook's primary topic
 			var fallbackTopicID string
 			if fbErr := r.db.QueryRow(`
 				SELECT t.id, t.title, COALESCE(t.start_page, 0), COALESCE(t.end_page, 0)
@@ -521,8 +521,7 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 			`, selectedNotebookID).Scan(&fallbackTopicID, &bundle.TopicTitle, &startPage, &endPage); fbErr == nil {
 				bundle.TopicID = fallbackTopicID
 			} else {
-				// Second fallback: query notebook title directly
-				_ = r.db.QueryRow(`SELECT title FROM notebooks WHERE id = ?`, selectedNotebookID).Scan(&bundle.TopicTitle)
+				return nil, err
 			}
 		} else {
 			return nil, err

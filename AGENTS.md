@@ -39,3 +39,5 @@
 **Rules for Documentation:**
 **DO:** Update SSoT docs when code changes. Keep `SCHEMA.md` matching `schema.go`.
 **DON'T:** Let docs drift. Duplicate info across multiple `.md` files. Create new monolithic documents.
+**DO NOT MANUALLY EDIT GENERATED FILES**: Files like `doc/api_dependency_report.md` are auto-generated artifacts produced by scripts (`scripts/analyze_api_dependency_graph.py`). Never edit them manually; re-run the generator script instead.
+
