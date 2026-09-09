@@ -47,7 +47,11 @@ func RollTaskRewards(taskType models.StudyTaskType, quizScore int, isAce bool) (
 		tier = "BRONZE"
 	}
 
-	box := generateLootBox(tier)
+	// ponytail: 100% chest drop on achievements & milestones; 30% random drop on routine study tasks
+	var box *models.PendingLootBox
+	if isAce || quizScore >= 100 || taskType == models.StudyTaskTypeMilestoneExam || taskType == models.StudyTaskTypeSocraticRemedial || rand.Intn(100) < 30 {
+		box = generateLootBox(tier)
+	}
 	return baseXP, baseCoins, box
 }
 
