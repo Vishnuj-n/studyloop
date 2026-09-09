@@ -253,6 +253,18 @@
             <button
               v-if="pomoMusicPath"
               type="button"
+              class="action-mini-btn"
+              :class="{ 'active-mode-btn': pomoIsShuffle }"
+              :disabled="disabled"
+              :title="pomoIsShuffle ? 'Shuffle is ON (Click to switch to loop mode)' : 'Shuffle is OFF (Click to turn Shuffle ON)'"
+              @click="handleToggleShuffle"
+            >
+              <span>Shuffle: {{ pomoIsShuffle ? 'ON' : 'OFF' }}</span>
+              <span v-if="!isPro && !pomoIsShuffle" class="pro-tag">PRO</span>
+            </button>
+            <button
+              v-if="pomoMusicPath"
+              type="button"
               class="action-mini-btn clear-btn"
               :disabled="disabled"
               title="Clear audio"
@@ -263,7 +275,7 @@
             </button>
           </div>
           <p class="hint">
-            {{ pomoIsShuffle ? 'Shuffling all tracks in selected folder.' : 'Looping single audio track during focus.' }}
+            {{ pomoIsShuffle ? 'Shuffling all tracks in selected folder.' : 'Looping audio continuously during focus.' }}
           </p>
         </div>
 
@@ -440,6 +452,15 @@ async function handlePickMusicFolder() {
   }
 }
 
+async function handleToggleShuffle() {
+  if (!pomoProfile.value.shuffle && !isPro.value) {
+    openBilling()
+    return
+  }
+  pomoProfile.value.shuffle = !pomoProfile.value.shuffle
+  await onSavePomoProfile()
+}
+
 async function handleClearMusic() {
   pomoProfile.value.musicPath = ''
   pomoProfile.value.shuffle = false
@@ -530,6 +551,12 @@ function downloadICS() {
   background: var(--surface-container-highest);
   color: var(--primary);
   border-color: var(--primary);
+}
+
+.action-mini-btn.active-mode-btn {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .action-mini-btn.clear-btn {
