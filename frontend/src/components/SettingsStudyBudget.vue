@@ -158,6 +158,13 @@
       />
 
       <SettingsToggle
+        v-model="soundEnabled"
+        :disabled="disabled"
+        title="Interactive Sound Effects"
+        hint="Play procedural audio chimes and feedback when answering quizzes, reviewing cards, and unlocking mystery chests."
+      />
+
+      <SettingsToggle
         v-model="settings.show_reward_notifications"
         :disabled="disabled"
         title="Show study reward notifications"
@@ -294,9 +301,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import TimeRangeInput from './TimeRangeInput.vue'
+import { isAudioMuted, setAudioMuted } from '../utils/audioJuice'
 import {
   playStudyChime,
   getGoogleCalendarUrl,
@@ -321,6 +329,12 @@ const props = defineProps({
   studyDuration: { type: String, default: '' },
   maxInputTokens: { type: Number, default: 4000 },
   disabled: { type: Boolean, default: false },
+})
+
+const soundEnabled = ref(!isAudioMuted())
+
+watch(soundEnabled, (enabled) => {
+  setAudioMuted(!enabled)
 })
 
 // Pomodoro state

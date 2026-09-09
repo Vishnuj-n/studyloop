@@ -10,13 +10,14 @@ Restructured `frontend/src/pages/Settings.vue` into a solid, full-height seconda
 - **Solid Category Rail**: Fixed dark panel (`260px` width) directly flanking the main app sidebar, with header, active indicators, and cloud sync status.
 - **Full-Width Workspace Viewport**: Eliminated artificial centering constraints (`100%` width), seamlessly expanding the configuration panels to fill the available desk space.
 - **Categorized Panes**:
-  - **Study & Routine**: Session budgets (max flashcards, word targets), daily study schedule range presets, calendar routine export, in-app chime tests, and quiz rescue remediation tracks.
+  - **Study & Routine**: Session budgets (max flashcards, word targets), daily study schedule range presets, calendar routine export, in-app chime tests, interactive sound effects toggle, and quiz rescue remediation tracks.
   - **AI & Retrieval**: Fast & Heavy LLM provider selections, endpoints, API keys, and local RAG retrieval configuration.
   - **Profiles & Notebooks**: Study profile creation, active goal switching, deadline management, and notebook-to-profile bindings.
   - **System & Account**: Visual workspace themes, Clerk / School account status, and software update checks.
 
 ### 2. Typographic Polish & Clean UI
 - Removed all unnecessary emojis across `Settings.vue`, `SettingsStudyBudget.vue`, `SettingsAccount.vue`, and `SettingsUpdate.vue` in favor of clean typography and consistent badge/pill components.
+- Consolidated all audio feedback toggles (routine chimes + interactive sound effects) under the **In-App Notifications** card in `SettingsStudyBudget.vue`.
 - Responsive breakpoints collapse the rail cleanly on mobile/small viewports.
 
 ### 3. Zero Backend Regressions
@@ -25,5 +26,6 @@ Restructured `frontend/src/pages/Settings.vue` into a solid, full-height seconda
 ## Modified Files
 - `frontend/src/pages/Settings.vue`
 - `frontend/src/components/SettingsStudyBudget.vue`
+- `frontend/src/components/SettingsTheme.vue`
 - `frontend/src/components/SettingsAccount.vue`
 - `frontend/src/components/SettingsUpdate.vue`
