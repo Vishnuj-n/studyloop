@@ -181,4 +181,4 @@ wails build -tags sqlite_extension
 
 - Keep the system simple and implementation-ready
 - Avoid unnecessary abstraction and premature optimization
-- Do not use LangChain, agent orchestration, or chatbot-style memory
+- Do not use LangChain, agent orchestration, or chatbot-style memory
