@@ -18,6 +18,7 @@ import (
 	"ai-tutor/internal/scheduler"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
+	pomodoroapp "ai-tutor/internal/pomodoro/app"
 
 	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -56,6 +57,7 @@ type App struct {
 	audioOverviewCancel context.CancelFunc
 	extSetupMu          sync.Mutex
 	extSetupCancel      context.CancelFunc
+	pomoApp             *pomodoroapp.App
 }
 
 func NewApp() *App {
@@ -69,6 +71,7 @@ func NewApp() *App {
 		extManager:   mgr,
 		extRunner:    extension.NewRunner(),
 		extInitError: extInitErr,
+		pomoApp:      pomodoroapp.New(nil), // ponytail: runtime chime synthesis or optional mp3
 	}
 }
 
@@ -151,6 +154,10 @@ func (a *App) startup(ctx context.Context) {
 	a.aiInitError = boot.AiInitError
 
 	a.initIndexQueue(ctx, boot.Repo)
+
+	if a.pomoApp != nil {
+		a.pomoApp.Startup(ctx)
+	}
 }
 
 // Shutdown is called when the Wails application is shutting down.
@@ -159,6 +166,10 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	if a.pomoApp != nil {
+		a.pomoApp.StopAudio()
+		a.pomoApp.StopTimer()
+	}
 	a.StopTopicAudioOverview()
 	if a.indexQueue != nil {
 		a.indexQueue.Stop()

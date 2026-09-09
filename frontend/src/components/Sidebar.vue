@@ -32,6 +32,9 @@
     </div>
 
     <div class="bottom-actions">
+      <!-- Lightweight Pomodoro Focus Widget -->
+      <PomodoroWidget />
+
       <button
         v-if="isCloudAccount"
         class="sync-link"
@@ -52,6 +55,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { triggerCloudSync, getUserSettings, getGamificationState } from '../services/appApi'
+import PomodoroWidget from './PomodoroWidget.vue'
 
 const gamification = ref({
   current_title: 'The Apprentice',
