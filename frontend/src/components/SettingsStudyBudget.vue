@@ -165,6 +165,115 @@
       />
     </div>
 
+    <!-- Pomodoro & Focus Music Section -->
+    <div class="notification-card">
+      <div class="notification-header">
+        <div>
+          <h3>Pomodoro &amp; Focus Audio</h3>
+          <p class="hint">
+            Run a lightweight background focus timer and loop study music or lo-fi folders during study sessions.
+          </p>
+        </div>
+      </div>
+
+      <SettingsToggle
+        v-model="pomoSettings.enabled"
+        :disabled="disabled"
+        title="Enable Pomodoro Focus Timer Widget"
+        hint="Display the compact Pomodoro timer in your sidebar navigation."
+        @update:model-value="onSavePomoSettings"
+      />
+
+      <div v-if="pomoSettings.enabled" class="pomo-settings-grid">
+        <div class="settings-row-pair">
+          <div class="form-group field-half">
+            <label for="pomo-work-min">Focus Duration (Minutes)</label>
+            <input
+              id="pomo-work-min"
+              v-model.number="pomoDurationMinutes"
+              type="number"
+              min="1"
+              max="120"
+              step="1"
+              :disabled="disabled"
+              @change="onSavePomoProfile"
+            />
+          </div>
+          <div class="form-group field-half">
+            <label for="pomo-break-min">Break Duration (Minutes)</label>
+            <input
+              id="pomo-break-min"
+              v-model.number="pomoBreakMinutes"
+              type="number"
+              min="0"
+              max="60"
+              step="1"
+              :disabled="disabled"
+              @change="onSavePomoProfile"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Focus Study Music (MP3 File or Lo-Fi Folder)</label>
+          <div class="music-path-row">
+            <input
+              v-model="pomoMusicPath"
+              type="text"
+              placeholder="No audio track configured"
+              readonly
+              class="music-path-input"
+            />
+            <button
+              type="button"
+              class="action-mini-btn"
+              :disabled="disabled"
+              title="Select single MP3 audio track"
+              @click="handlePickMusicFile"
+            >
+              🎵 Pick File
+            </button>
+            <button
+              type="button"
+              class="action-mini-btn"
+              :disabled="disabled"
+              title="Select folder with MP3 tracks (shuffle lo-fi)"
+              @click="handlePickMusicFolder"
+            >
+              📁 Pick Folder <span v-if="!isPro" class="pro-tag">PRO</span>
+            </button>
+            <button
+              v-if="pomoMusicPath"
+              type="button"
+              class="action-mini-btn clear-btn"
+              :disabled="disabled"
+              title="Clear audio"
+              @click="handleClearMusic"
+            >
+              ✕
+            </button>
+          </div>
+          <p class="hint">
+            {{ pomoIsShuffle ? 'Shuffling all tracks in selected folder.' : 'Looping single audio track during focus.' }}
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label for="pomo-volume">Music Volume ({{ pomoSettings.defaultVolume ?? 70 }}%)</label>
+          <input
+            id="pomo-volume"
+            v-model.number="pomoSettings.defaultVolume"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            :disabled="disabled"
+            @change="onSavePomoSettings"
+          />
+        </div>
+      </div>
+    </div>
+
     <SettingsToggle
       v-model="settings.analytics_enabled"
       :disabled="disabled"
@@ -182,7 +291,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import TimeRangeInput from './TimeRangeInput.vue'
 import {
@@ -192,12 +301,136 @@ import {
   downloadRoutineICS,
 } from '../services/calendarService'
 import { openURLInBrowser } from '../services/appApi'
+import {
+  getPomodoroSettings,
+  savePomodoroSettings,
+  loadPomodoroProfiles,
+  savePomodoroProfile,
+  pickPomodoroMusicFile,
+  pickPomodoroMusicFolder,
+} from '../services/pomodoroApi'
+import { useClerkAuth } from '../services/clerkAuth'
+
+const { isPro, openBilling } = useClerkAuth()
 
 const props = defineProps({
   settings: { type: Object, required: true },
   studyDuration: { type: String, default: '' },
   maxInputTokens: { type: Number, default: 4000 },
   disabled: { type: Boolean, default: false },
+})
+
+// Pomodoro state
+const pomoSettings = ref({
+  enabled: true,
+  defaultVolume: 70,
+  autoStartAudio: true,
+})
+const pomoProfile = ref({
+  id: 'default',
+  name: 'Standard Focus',
+  durationSec: 25 * 60,
+  breakDurationSec: 5 * 60,
+  musicPath: '',
+  shuffle: false,
+  isDefault: true,
+})
+
+const pomoDurationMinutes = computed({
+  get: () => Math.round((pomoProfile.value.durationSec || 25 * 60) / 60),
+  set: (val) => {
+    pomoProfile.value.durationSec = Math.max(1, Number(val) || 25) * 60
+  },
+})
+
+const pomoBreakMinutes = computed({
+  get: () => Math.round((pomoProfile.value.breakDurationSec || 5 * 60) / 60),
+  set: (val) => {
+    pomoProfile.value.breakDurationSec = Math.max(0, Number(val) || 0) * 60
+  },
+})
+
+const pomoMusicPath = computed(() => pomoProfile.value.musicPath || '')
+const pomoIsShuffle = computed(() => !!pomoProfile.value.shuffle)
+
+async function loadPomoData() {
+  try {
+    const s = await getPomodoroSettings()
+    if (s) {
+      pomoSettings.value = { ...pomoSettings.value, ...s }
+      if (typeof s.enabled === 'undefined') {
+        pomoSettings.value.enabled = true
+      }
+    }
+    const profiles = await loadPomodoroProfiles()
+    if (Array.isArray(profiles) && profiles.length > 0) {
+      pomoProfile.value = profiles.find((p) => p.isDefault) || profiles[0]
+    }
+  } catch (err) {
+    console.warn('[POMODORO_SETTINGS] Error loading config:', err)
+  }
+}
+
+async function onSavePomoSettings() {
+  try {
+    await savePomodoroSettings({
+      ...pomoSettings.value,
+      enabled: pomoSettings.value.enabled !== false,
+      defaultVolume: Number(pomoSettings.value.defaultVolume) || 70,
+    })
+    window.dispatchEvent(new CustomEvent('pomodoro-settings-updated'))
+  } catch (err) {
+    console.error('[POMODORO_SETTINGS] Error saving settings:', err)
+  }
+}
+
+async function onSavePomoProfile() {
+  try {
+    await savePomodoroProfile(pomoProfile.value)
+    window.dispatchEvent(new CustomEvent('pomodoro-settings-updated'))
+  } catch (err) {
+    console.error('[POMODORO_SETTINGS] Error saving profile:', err)
+  }
+}
+
+async function handlePickMusicFile() {
+  try {
+    const path = await pickPomodoroMusicFile()
+    if (path) {
+      pomoProfile.value.musicPath = path
+      pomoProfile.value.shuffle = false
+      await onSavePomoProfile()
+    }
+  } catch (err) {
+    console.warn('[POMODORO_SETTINGS] Error picking music file:', err)
+  }
+}
+
+async function handlePickMusicFolder() {
+  if (!isPro.value) {
+    openBilling()
+    return
+  }
+  try {
+    const path = await pickPomodoroMusicFolder()
+    if (path) {
+      pomoProfile.value.musicPath = path
+      pomoProfile.value.shuffle = true
+      await onSavePomoProfile()
+    }
+  } catch (err) {
+    console.warn('[POMODORO_SETTINGS] Error picking music folder:', err)
+  }
+}
+
+async function handleClearMusic() {
+  pomoProfile.value.musicPath = ''
+  pomoProfile.value.shuffle = false
+  await onSavePomoProfile()
+}
+
+onMounted(() => {
+  loadPomoData()
 })
 
 const hasTokenWarning = computed(() => {
@@ -245,6 +478,64 @@ function downloadICS() {
 </script>
 
 <style scoped>
+.pomo-settings-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.music-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.music-path-input {
+  flex: 1;
+}
+
+.action-mini-btn {
+  padding: 10px 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.action-mini-btn:hover:not(:disabled) {
+  background: var(--surface-container-highest);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.action-mini-btn.clear-btn {
+  padding: 10px 12px;
+  color: #ef4444;
+}
+
+.action-mini-btn.clear-btn:hover:not(:disabled) {
+  border-color: #ef4444;
+}
+
+.pro-tag {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #fff;
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 label {
   font-weight: 600;
   font-size: 14px;
