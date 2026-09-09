@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"ai-tutor/internal/pomodoro/domain"
 )
 
@@ -58,6 +60,9 @@ func (a *App) PomodoroPlayLooping(filePath string) {
 }
 
 func (a *App) PomodoroPlayShuffleFolder(folder string) {
+	if !a.IsProUser() {
+		return
+	}
 	if a.pomoApp != nil {
 		a.pomoApp.PlayShuffleFolder(folder)
 	}
@@ -154,6 +159,9 @@ func (a *App) PomodoroPickMusicFile() (string, error) {
 }
 
 func (a *App) PomodoroPickMusicFolder() (string, error) {
+	if !a.IsProUser() {
+		return "", fmt.Errorf("folder shuffle requires a Pro subscription")
+	}
 	if a.pomoApp != nil {
 		return a.pomoApp.PickMusicFolder()
 	}

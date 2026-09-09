@@ -37,7 +37,7 @@ Integrated the native **FocusPlay** Pomodoro timer, ambient audio streaming engi
 
 ### 3. Free vs. Pro Feature Entitlement
 - **Free Tier**: Single Pomodoro timer (configurable work/break minutes), background ticking, completion chimes, and single MP3 looping.
-- **Pro Tier**: Lo-Fi Folder Shuffling across full study music directories, guarded by `isPro` check with `requirePro()` modal trigger.
+- **Pro Tier**: Lo-Fi Folder Shuffling across full study music directories, guarded by both client-side modal trigger (`openBilling()`) and authoritative backend session checks (`a.IsProUser()`) on `PomodoroPickMusicFolder` and `PomodoroPlayShuffleFolder`.
 
 ---
 
