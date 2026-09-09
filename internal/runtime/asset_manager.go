@@ -126,22 +126,31 @@ func NewAssetManager(ctx context.Context) (*AssetManager, error) {
 
 // ResolveAssetDir resolves the user cache directory where assets should reside.
 func ResolveAssetDir() (string, error) {
+	loadEnv()
+	// In dev mode or when local asset folder exists with required assets, use ./asset directly
+	if os.Getenv("APP_ENV") == "dev" {
+		if absAsset, err := filepath.Abs("asset"); err == nil {
+			return absAsset, nil
+		}
+		return "./asset", nil
+	}
+
 	// 1. Try LOCALAPPDATA environment variable on Windows
 	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData != "" {
-		return filepath.Join(localAppData, "ai-tutor", "assets"), nil
+		return filepath.Join(localAppData, "Studyloop", "assets"), nil
 	}
 
 	// 2. Fallback to standard UserCacheDir
 	cacheDir, err := os.UserCacheDir()
 	if err == nil {
-		return filepath.Join(cacheDir, "ai-tutor", "assets"), nil
+		return filepath.Join(cacheDir, "Studyloop", "assets"), nil
 	}
 
 	// 3. Fallback to UserHomeDir
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
-		return filepath.Join(homeDir, ".ai-tutor", "assets"), nil
+		return filepath.Join(homeDir, ".Studyloop", "assets"), nil
 	}
 
 	// 4. Default fallback to current working directory

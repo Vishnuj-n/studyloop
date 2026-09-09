@@ -97,29 +97,132 @@ func (a *App) PomodoroPlayChime() {
 
 // ── Pomodoro Profile & Settings methods (bound to Wails JS) ────────────────────
 
+// ── Pomodoro Profile & Settings methods (bound to Wails JS) ────────────────────
+
 func (a *App) PomodoroLoadProfiles() []domain.Profile {
-	return []domain.Profile{
-		{
+	repo := a.getRepo()
+	if repo == nil {
+		return []domain.Profile{
+			{
+				ID:               "default",
+				Name:             "Standard Focus",
+				DurationSec:      25 * 60,
+				BreakDurationSec: 5 * 60,
+				IsDefault:        true,
+			},
+		}
+	}
+
+	settings, _ := repo.GetUserSettings()
+	activeID := ""
+	if settings != nil {
+		activeID = settings.ActiveProfileID
+	}
+
+	profiles, err := repo.GetProfiles()
+	if err != nil || len(profiles) == 0 {
+		return []domain.Profile{
+			{
+				ID:               "default",
+				Name:             "Standard Focus",
+				DurationSec:      25 * 60,
+				BreakDurationSec: 5 * 60,
+				IsDefault:        true,
+			},
+		}
+	}
+
+	res := make([]domain.Profile, 0, len(profiles))
+	for _, p := range profiles {
+		dur := p.PomoDurationSec
+		if dur <= 0 {
+			dur = 25 * 60
+		}
+		brk := p.PomoBreakSec
+		if brk < 0 {
+			brk = 5 * 60
+		}
+		isDef := p.ID == activeID
+		res = append(res, domain.Profile{
+			ID:               p.ID,
+			Name:             p.Name,
+			DurationSec:      dur,
+			BreakDurationSec: brk,
+			MusicPath:        p.PomoMusicPath,
+			Shuffle:          p.PomoShuffle,
+			IsDefault:        isDef,
+		})
+	}
+	// If no profile matched activeID, mark the first one as default
+	if len(res) > 0 {
+		hasDefault := false
+		for _, r := range res {
+			if r.IsDefault {
+				hasDefault = true
+				break
+			}
+		}
+		if !hasDefault {
+			res[0].IsDefault = true
+		}
+	}
+	return res
+}
+
+func (a *App) PomodoroSaveProfile(p domain.Profile) error {
+	repo := a.getRepo()
+	if repo == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	if p.ID == "" || p.ID == "default" {
+		// Fallback to active profile if ID is 'default' or empty
+		settings, err := repo.GetUserSettings()
+		if err == nil && settings != nil && settings.ActiveProfileID != "" {
+			p.ID = settings.ActiveProfileID
+		} else {
+			profiles, err := repo.GetProfiles()
+			if err == nil && len(profiles) > 0 {
+				p.ID = profiles[0].ID
+			}
+		}
+	}
+	if p.ID == "" || p.ID == "default" {
+		return nil
+	}
+	return repo.UpdateProfilePomoSettings(p.ID, p.DurationSec, p.BreakDurationSec, p.MusicPath, p.Shuffle)
+}
+
+func (a *App) PomodoroGetProfileByID(id string) *domain.Profile {
+	repo := a.getRepo()
+	if repo == nil {
+		p := domain.Profile{
 			ID:               "default",
 			Name:             "Standard Focus",
 			DurationSec:      25 * 60,
 			BreakDurationSec: 5 * 60,
 			IsDefault:        true,
-		},
+		}
+		return &p
 	}
-}
-
-func (a *App) PomodoroSaveProfile(p domain.Profile) error {
-	return nil
-}
-
-func (a *App) PomodoroGetProfileByID(id string) *domain.Profile {
+	prof, err := repo.GetProfileByID(id)
+	if err != nil || prof == nil {
+		return nil
+	}
+	dur := prof.PomoDurationSec
+	if dur <= 0 {
+		dur = 25 * 60
+	}
+	brk := prof.PomoBreakSec
+	if brk < 0 {
+		brk = 5 * 60
+	}
 	p := domain.Profile{
-		ID:               "default",
-		Name:             "Standard Focus",
-		DurationSec:      25 * 60,
-		BreakDurationSec: 5 * 60,
-		IsDefault:        true,
+		ID:               prof.ID,
+		Name:             prof.Name,
+		DurationSec:      dur,
+		BreakDurationSec: brk,
+		MusicPath:        prof.PomoMusicPath,
+		Shuffle:          prof.PomoShuffle,
 	}
 	return &p
 }

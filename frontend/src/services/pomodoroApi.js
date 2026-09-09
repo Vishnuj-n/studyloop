@@ -61,27 +61,102 @@ export function playPomodoroChime() {
   return appBridge().PomodoroPlayChime()
 }
 
-// ── Profiles & Settings ─────────────────────────────────────────────────────
+// ── Profiles & Settings (Client + Bridge Fallback) ──────────────────────────
+
+const LOCAL_STORAGE_PROFILES_KEY = 'studyloop_pomodoro_profiles'
+const LOCAL_STORAGE_SETTINGS_KEY = 'studyloop_pomodoro_settings'
+
+const DEFAULT_POMO_SETTINGS = {
+  enabled: true,
+  defaultVolume: 70,
+  autoStartAudio: true,
+  notifyOnComplete: true,
+  autoStartNextTimer: false,
+  playSoundOnComplete: true,
+  theme: 'dark',
+}
+
+const DEFAULT_POMO_PROFILES = [
+  {
+    id: 'default',
+    name: 'Standard Focus',
+    durationSec: 25 * 60,
+    breakDurationSec: 5 * 60,
+    musicPath: '',
+    shuffle: false,
+    breakMusicPath: '',
+    breakShuffle: false,
+    isDefault: true,
+  },
+]
 
 export function loadPomodoroProfiles() {
-  return appBridge().PomodoroLoadProfiles()
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return Promise.resolve(parsed)
+      }
+    }
+  } catch (_) {}
+  return Promise.resolve(DEFAULT_POMO_PROFILES)
 }
 
 export function savePomodoroProfile(profile) {
-  return appBridge().PomodoroSaveProfile(profile)
+  try {
+    let profiles = []
+    const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
+    if (raw) {
+      profiles = JSON.parse(raw) || []
+    }
+    const idx = profiles.findIndex((p) => p.id === profile.id)
+    if (idx >= 0) {
+      profiles[idx] = { ...profiles[idx], ...profile }
+    } else {
+      profiles.push(profile)
+    }
+    localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
+  } catch (_) {}
+  return Promise.resolve(null)
 }
 
 export function deletePomodoroProfile(id) {
-  return appBridge().PomodoroDeleteProfile(id)
+  try {
+    let profiles = []
+    const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
+    if (raw) {
+      profiles = JSON.parse(raw) || []
+    }
+    profiles = profiles.filter((p) => p.id !== id)
+    localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
+  } catch (_) {}
+  return Promise.resolve(null)
 }
 
 export function getPomodoroSettings() {
-  return appBridge().PomodoroGetSettings()
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        return Promise.resolve({ ...DEFAULT_POMO_SETTINGS, ...parsed })
+      }
+    }
+  } catch (_) {}
+  return Promise.resolve(DEFAULT_POMO_SETTINGS)
 }
 
 export function savePomodoroSettings(settings) {
-  return appBridge().PomodoroSaveSettings(settings)
+  try {
+    const current = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY)
+    const parsed = current ? JSON.parse(current) : {}
+    const updated = { ...DEFAULT_POMO_SETTINGS, ...parsed, ...settings }
+    localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(updated))
+  } catch (_) {}
+  return Promise.resolve(null)
 }
+
 
 export function getPomodoroStats() {
   return appBridge().PomodoroGetStats()

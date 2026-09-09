@@ -18,7 +18,7 @@
 
 <script setup>
 defineProps({
-  modelValue: { type: Boolean, required: true },
+  modelValue: { type: Boolean, default: false },
   title: { type: String, required: true },
   hint: { type: String, default: '' },
   disabled: { type: Boolean, default: false },

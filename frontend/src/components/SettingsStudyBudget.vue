@@ -313,7 +313,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import TimeRangeInput from './TimeRangeInput.vue'
 import { isAudioMuted, setAudioMuted } from '../utils/audioJuice'
@@ -469,6 +469,11 @@ async function handleClearMusic() {
 
 onMounted(() => {
   loadPomoData()
+  window.addEventListener('profile-switched', loadPomoData)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('profile-switched', loadPomoData)
 })
 
 const hasTokenWarning = computed(() => {

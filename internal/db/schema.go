@@ -20,7 +20,11 @@ func InitSchema(tx *sql.Tx) error {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			classroom_code TEXT DEFAULT '',
 			student_username TEXT DEFAULT '',
-			cloud_api_token TEXT DEFAULT ''
+			cloud_api_token TEXT DEFAULT '',
+			pomo_duration_sec INTEGER NOT NULL DEFAULT 1500,
+			pomo_break_sec INTEGER NOT NULL DEFAULT 300,
+			pomo_music_path TEXT DEFAULT '',
+			pomo_shuffle BOOLEAN DEFAULT 0
 		)`,
 
 		// Core tables
@@ -444,6 +448,10 @@ var alterStatements = []struct {
 	{"study_profiles", "classroom_code", "ALTER TABLE study_profiles ADD COLUMN classroom_code TEXT DEFAULT ''"},
 	{"study_profiles", "student_username", "ALTER TABLE study_profiles ADD COLUMN student_username TEXT DEFAULT ''"},
 	{"study_profiles", "cloud_api_token", "ALTER TABLE study_profiles ADD COLUMN cloud_api_token TEXT DEFAULT ''"},
+	{"study_profiles", "pomo_duration_sec", "ALTER TABLE study_profiles ADD COLUMN pomo_duration_sec INTEGER NOT NULL DEFAULT 1500"},
+	{"study_profiles", "pomo_break_sec", "ALTER TABLE study_profiles ADD COLUMN pomo_break_sec INTEGER NOT NULL DEFAULT 300"},
+	{"study_profiles", "pomo_music_path", "ALTER TABLE study_profiles ADD COLUMN pomo_music_path TEXT DEFAULT ''"},
+	{"study_profiles", "pomo_shuffle", "ALTER TABLE study_profiles ADD COLUMN pomo_shuffle BOOLEAN DEFAULT 0"},
 	{"llm_settings", "max_input_tokens", "ALTER TABLE llm_settings ADD COLUMN max_input_tokens INTEGER NOT NULL DEFAULT 4000"},
 	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 1000"},
 }

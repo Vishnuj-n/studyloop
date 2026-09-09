@@ -302,6 +302,7 @@ onMounted(async () => {
   }
 
   window.addEventListener('pomodoro-settings-updated', loadConfiguration)
+  window.addEventListener('profile-switched', loadConfiguration)
 })
 
 onUnmounted(() => {
@@ -309,6 +310,7 @@ onUnmounted(() => {
     try { fn() } catch (_) {}
   })
   window.removeEventListener('pomodoro-settings-updated', loadConfiguration)
+  window.removeEventListener('profile-switched', loadConfiguration)
 })
 </script>
 

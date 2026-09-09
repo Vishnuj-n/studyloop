@@ -423,6 +423,10 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 | `classroom_code` | TEXT DEFAULT '' | Classroom code associated with profile |
 | `student_username` | TEXT DEFAULT '' | Student username associated with profile |
 | `cloud_api_token` | TEXT DEFAULT '' | Cloud authentication token associated with profile |
+| `pomo_duration_sec` | INTEGER NOT NULL DEFAULT 1500 | Focus session length in seconds (e.g. 25 min) |
+| `pomo_break_sec` | INTEGER NOT NULL DEFAULT 300 | Break session length in seconds (e.g. 5 min) |
+| `pomo_music_path` | TEXT DEFAULT '' | Focus audio track path or lo-fi folder path |
+| `pomo_shuffle` | BOOLEAN DEFAULT 0 | Whether to shuffle folder playback |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time |
 
 **Referenced by:** `user_settings.active_profile_id` (FK → `id` ON DELETE SET NULL), `notebooks.profile_id` (FK → `id` ON DELETE SET NULL).

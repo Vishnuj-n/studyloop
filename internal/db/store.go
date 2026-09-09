@@ -729,7 +729,8 @@ func sameLLMConfig(a, b models.LLMTierSettings) bool {
 // GetProfiles retrieves all study profiles.
 func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	rows, err := r.db.Query(`
-		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
+		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
+		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0)
 		FROM study_profiles
 		ORDER BY created_at DESC
 	`)
@@ -745,7 +746,8 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	profiles := make([]models.StudyProfile, 0)
 	for rows.Next() {
 		var p models.StudyProfile
-		if err := rows.Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
+			&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle); err != nil {
 			return nil, err
 		}
 		profiles = append(profiles, p)
@@ -760,10 +762,12 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	var p models.StudyProfile
 	err := r.db.QueryRow(`
-		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
+		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
+		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0)
 		FROM study_profiles
 		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken)
+	`, id).Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
+		&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -775,10 +779,18 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 
 // CreateProfile creates a new study profile.
 func (r *Repository) CreateProfile(p models.StudyProfile) error {
+	dur := p.PomoDurationSec
+	if dur <= 0 {
+		dur = 1500
+	}
+	brk := p.PomoBreakSec
+	if brk <= 0 {
+		brk = 300
+	}
 	_, err := r.db.Exec(`
-		INSERT INTO study_profiles (id, name, deadline_at, classroom_code, student_username, cloud_api_token)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken)
+		INSERT INTO study_profiles (id, name, deadline_at, classroom_code, student_username, cloud_api_token, pomo_duration_sec, pomo_break_sec, pomo_music_path, pomo_shuffle)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken, dur, brk, p.PomoMusicPath, p.PomoShuffle)
 	return err
 }
 
@@ -789,6 +801,22 @@ func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 		SET name = ?, deadline_at = ?
 		WHERE id = ?
 	`, p.Name, p.DeadlineAt, p.ID)
+	return err
+}
+
+// UpdateProfilePomoSettings updates the Pomodoro focus and audio settings for a profile.
+func (r *Repository) UpdateProfilePomoSettings(profileID string, durationSec, breakSec int, musicPath string, shuffle bool) error {
+	if durationSec <= 0 {
+		durationSec = 1500
+	}
+	if breakSec < 0 {
+		breakSec = 300
+	}
+	_, err := r.db.Exec(`
+		UPDATE study_profiles
+		SET pomo_duration_sec = ?, pomo_break_sec = ?, pomo_music_path = ?, pomo_shuffle = ?
+		WHERE id = ?
+	`, durationSec, breakSec, musicPath, shuffle, profileID)
 	return err
 }
 

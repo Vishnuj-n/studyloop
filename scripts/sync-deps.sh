@@ -51,9 +51,9 @@ echo "Step 3: Validating and acquiring RAG assets..."
 # Resolve OS-specific asset cache directory
 OS_TYPE="$(uname -s)"
 if [ "$OS_TYPE" = "Darwin" ]; then
-    TARGET_DIR="$HOME/Library/Caches/ai-tutor/assets"
+    TARGET_DIR="$HOME/Library/Caches/Studyloop/assets"
 else
-    TARGET_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ai-tutor/assets"
+    TARGET_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/Studyloop/assets"
 fi
 
 # Resolve app version — read from VERSION file if present, otherwise default to v1.0.0
