@@ -41,6 +41,22 @@ func (a *App) SetSession(userID, email string, isPro bool) {
 	a.sessionVerifiedAt = time.Now().Unix()
 }
 
+// RestoreSession allows frontend to re-hydrate offline session on launch within grace period.
+func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
+	const tenDaysSec = 10 * 24 * 60 * 60
+	now := time.Now().Unix()
+	if isPro && verifiedAt > 0 && (now-verifiedAt) > tenDaysSec {
+		isPro = false
+	}
+	a.sessionMu.Lock()
+	defer a.sessionMu.Unlock()
+	a.sessionUserID = userID
+	a.sessionEmail = email
+	a.sessionIsPro = isPro
+	a.sessionVerifiedAt = verifiedAt
+	return isPro
+}
+
 // ClearSession clears the current in-memory session.
 func (a *App) ClearSession() {
 	a.sessionMu.Lock()
