@@ -99,7 +99,9 @@ export function loadPomodoroProfiles() {
         return Promise.resolve(parsed)
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[POMODORO_API] Failed to parse stored profiles:', err)
+  }
   return Promise.resolve(DEFAULT_POMO_PROFILES)
 }
 
@@ -117,7 +119,9 @@ export function savePomodoroProfile(profile) {
       profiles.push(profile)
     }
     localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
-  } catch (_) {}
+  } catch (err) {
+    console.error('[POMODORO_API] Failed to save profile:', err)
+  }
   return Promise.resolve(null)
 }
 
@@ -130,7 +134,9 @@ export function deletePomodoroProfile(id) {
     }
     profiles = profiles.filter((p) => p.id !== id)
     localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
-  } catch (_) {}
+  } catch (err) {
+    console.error('[POMODORO_API] Failed to delete profile:', err)
+  }
   return Promise.resolve(null)
 }
 
@@ -143,7 +149,9 @@ export function getPomodoroSettings() {
         return Promise.resolve({ ...DEFAULT_POMO_SETTINGS, ...parsed })
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[POMODORO_API] Failed to parse stored settings:', err)
+  }
   return Promise.resolve(DEFAULT_POMO_SETTINGS)
 }
 
@@ -153,7 +161,9 @@ export function savePomodoroSettings(settings) {
     const parsed = current ? JSON.parse(current) : {}
     const updated = { ...DEFAULT_POMO_SETTINGS, ...parsed, ...settings }
     localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(updated))
-  } catch (_) {}
+  } catch (err) {
+    console.error('[POMODORO_API] Failed to save settings:', err)
+  }
   return Promise.resolve(null)
 }
 

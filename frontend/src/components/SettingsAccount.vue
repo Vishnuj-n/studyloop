@@ -486,53 +486,6 @@ h2 {
   white-space: nowrap;
 }
 
-.dev-section {
-  border-top: 1px solid var(--outline-variant);
-  padding-top: 16px;
-}
-
-.dev-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted-text);
-  display: block;
-  margin-bottom: 8px;
-}
-
-.dev-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.dev-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13.5px;
-}
-
-.dev-toggle-btn {
-  padding: 6px 14px;
-  border-radius: 8px;
-  background: var(--surface-container-highest);
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.dev-toggle-btn.active {
-  background: #f59e0b;
-  color: #2d3338;
-  font-weight: 700;
-}
-
 /* School & Classroom Section */
 .school-section {
   border-top: 1px solid var(--outline-variant);

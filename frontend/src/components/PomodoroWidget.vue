@@ -40,7 +40,7 @@
       <button
         type="button"
         class="glyph-btn primary-glyph"
-        :title="isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start Focus'"
+        :title="playPauseTitle"
         :aria-label="isRunning ? 'Pause timer' : 'Start timer'"
         @click.stop="handlePlayPause"
       >
@@ -132,6 +132,12 @@ const formattedTime = computed(() => {
 const progressPercent = computed(() => {
   if (totalSec.value <= 0) return 0
   return Math.min(100, Math.max(0, ((totalSec.value - remainSec.value) / totalSec.value) * 100))
+})
+
+const playPauseTitle = computed(() => {
+  if (isRunning.value) return 'Pause'
+  if (isPaused.value) return 'Resume'
+  return 'Start Focus'
 })
 
 async function loadConfiguration() {
@@ -272,7 +278,9 @@ onMounted(async () => {
       if (sessionType.value === 'work') {
         try {
           await recordPomodoroSessionComplete()
-        } catch (_) {}
+        } catch (err) {
+          console.error('[POMODORO] Failed to record session complete:', err)
+        }
 
         if (currentProfile.value && currentProfile.value.breakDurationSec > 0) {
           sessionType.value = 'break'
@@ -307,7 +315,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unsubs.forEach((fn) => {
-    try { fn() } catch (_) {}
+    try {
+      fn()
+    } catch (err) {
+      console.warn('[POMODORO] Failed to unsubscribe:', err)
+    }
   })
   window.removeEventListener('pomodoro-settings-updated', loadConfiguration)
   window.removeEventListener('profile-switched', loadConfiguration)
