@@ -248,7 +248,7 @@
               @click="handlePickMusicFolder"
             >
               <span>Pick Folder</span>
-              <span v-if="!isPro" class="pro-tag">PRO</span>
+              <span v-if="!isPro" class="pro-tag">#PRO</span>
             </button>
             <button
               v-if="pomoMusicPath"
@@ -260,7 +260,7 @@
               @click="handleToggleShuffle"
             >
               <span>Shuffle: {{ pomoIsShuffle ? 'ON' : 'OFF' }}</span>
-              <span v-if="!isPro && !pomoIsShuffle" class="pro-tag">PRO</span>
+              <span v-if="!isPro && !pomoIsShuffle" class="pro-tag">#PRO</span>
             </button>
             <button
               v-if="pomoMusicPath"
@@ -574,15 +574,18 @@ function downloadICS() {
 }
 
 .pro-tag {
-  font-size: 9px;
-  font-weight: 800;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #a855f7, #ec4899);
-  color: #fff;
-  margin-left: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  margin-left: 6px;
+  letter-spacing: 0.03em;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1.2;
 }
 
 label {

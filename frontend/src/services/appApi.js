@@ -376,3 +376,20 @@ export function claimLootBox(boxID) {
 export function buyStreakFreeze() {
   return appBridge().BuyStreakFreeze()
 }
+
+export function restoreSession(userID, email, isPro, verifiedAt) {
+  try {
+    return appBridge().RestoreSession(userID || '', email || '', !!isPro, verifiedAt || 0)
+  } catch (err) {
+    console.warn('[AUTH] RestoreSession bridge error:', err)
+    return false
+  }
+}
+
+export function clearSession() {
+  try {
+    return appBridge().ClearSession()
+  } catch (err) {
+    console.warn('[AUTH] ClearSession bridge error:', err)
+  }
+}
