@@ -22,6 +22,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+
       - name: Create dummy embedded files for Go embed
         run: |
           mkdir -p frontend/dist && touch frontend/dist/index.html
@@ -56,6 +61,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
@@ -66,10 +80,6 @@ jobs:
 
       - name: Generate Wails bindings
         run: wails generate module
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: frontend
 
       - name: Lint frontend
         run: npm run lint
