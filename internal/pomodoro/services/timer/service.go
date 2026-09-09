@@ -7,14 +7,12 @@ import (
 
 	"ai-tutor/internal/pomodoro/domain"
 	"ai-tutor/internal/pomodoro/infra/events"
-	"ai-tutor/internal/pomodoro/services/persistence"
 )
 
 // Service manages the countdown timer and emits Wails events via an Emitter.
 type Service struct {
-	mu          sync.Mutex
-	persistence *persistence.Service
-	emitter     events.Emitter
+	mu      sync.Mutex
+	emitter events.Emitter
 
 	totalSec  int
 	remainSec int
@@ -24,10 +22,9 @@ type Service struct {
 }
 
 // New creates a Service. Call SetEmitter after the Wails context is available.
-func New(ps *persistence.Service) *Service {
+func New() *Service {
 	return &Service{
-		persistence: ps,
-		emitter:     events.Noop{},
+		emitter: events.Noop{},
 	}
 }
 
@@ -83,7 +80,7 @@ func (s *Service) Pause() {
 	s.running = false
 }
 
-// Stop halts the timer and clears persisted state.
+// Stop halts the timer and clears state.
 func (s *Service) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -93,7 +90,6 @@ func (s *Service) Stop() {
 	}
 	s.running = false
 	s.remainSec = s.totalSec
-	s.persistence.Clear()
 }
 
 // GetState returns a current snapshot safe to send to the frontend.
@@ -112,23 +108,12 @@ func (s *Service) GetState() map[string]interface{} {
 
 func (s *Service) run(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
-	autosave := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
-	defer autosave.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-
-		case <-autosave.C:
-			s.mu.Lock()
-			_ = s.persistence.Save(domain.SessionState{
-				ProfileID:    s.profileID,
-				TotalSec:     s.totalSec,
-				RemainingSec: s.remainSec,
-			})
-			s.mu.Unlock()
 
 		case <-ticker.C:
 			s.mu.Lock()
@@ -145,7 +130,6 @@ func (s *Service) run(ctx context.Context) {
 				s.running = false
 				profileID := s.profileID
 				s.mu.Unlock()
-				s.persistence.Clear()
 				s.emitter.Emit("timerCompleted", map[string]interface{}{
 					"profileId": profileID,
 				})
@@ -154,3 +138,4 @@ func (s *Service) run(ctx context.Context) {
 		}
 	}
 }
+

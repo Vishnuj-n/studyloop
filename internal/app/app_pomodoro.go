@@ -2,39 +2,44 @@ package app
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"ai-tutor/internal/pomodoro/domain"
+	"ai-tutor/internal/runtime"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // ── Pomodoro Timer methods (bound to Wails JS) ──────────────────────────────────
 
 func (a *App) PomodoroStartTimer(profileID string, durationSec int) {
-	if a.pomoApp != nil {
-		a.pomoApp.StartTimer(profileID, durationSec)
+	if a.pomoTimer != nil {
+		a.pomoTimer.Start(profileID, durationSec)
 	}
 }
 
 func (a *App) PomodoroResumeTimer(state domain.SessionState) {
-	if a.pomoApp != nil {
-		a.pomoApp.ResumeTimer(state)
+	if a.pomoTimer != nil {
+		a.pomoTimer.Resume(state)
 	}
 }
 
 func (a *App) PomodoroPauseTimer() {
-	if a.pomoApp != nil {
-		a.pomoApp.PauseTimer()
+	if a.pomoTimer != nil {
+		a.pomoTimer.Pause()
 	}
 }
 
 func (a *App) PomodoroStopTimer() {
-	if a.pomoApp != nil {
-		a.pomoApp.StopTimer()
+	if a.pomoTimer != nil {
+		a.pomoTimer.Stop()
 	}
 }
 
 func (a *App) PomodoroGetTimerState() map[string]interface{} {
-	if a.pomoApp != nil {
-		return a.pomoApp.GetTimerState()
+	if a.pomoTimer != nil {
+		return a.pomoTimer.GetState()
 	}
 	return map[string]interface{}{
 		"running":      false,
@@ -45,17 +50,14 @@ func (a *App) PomodoroGetTimerState() map[string]interface{} {
 }
 
 func (a *App) PomodoroCheckResumeSession() *domain.SessionState {
-	if a.pomoApp != nil {
-		return a.pomoApp.CheckResumeSession()
-	}
 	return nil
 }
 
 // ── Pomodoro Audio methods (bound to Wails JS) ──────────────────────────────────
 
 func (a *App) PomodoroPlayLooping(filePath string) {
-	if a.pomoApp != nil {
-		a.pomoApp.PlayLooping(filePath)
+	if a.pomoAudio != nil {
+		a.pomoAudio.PlayLooping(filePath)
 	}
 }
 
@@ -63,107 +65,141 @@ func (a *App) PomodoroPlayShuffleFolder(folder string) {
 	if !a.IsProUser() {
 		return
 	}
-	if a.pomoApp != nil {
-		a.pomoApp.PlayShuffleFolder(folder)
+	if a.pomoAudio != nil {
+		a.pomoAudio.PlayShuffleFolder(folder)
 	}
 }
 
 func (a *App) PomodoroStopAudio() {
-	if a.pomoApp != nil {
-		a.pomoApp.StopAudio()
+	if a.pomoAudio != nil {
+		a.pomoAudio.Stop()
 	}
 }
 
 func (a *App) PomodoroSetVolume(v int) {
-	if a.pomoApp != nil {
-		a.pomoApp.SetVolume(v)
+	if a.pomoAudio != nil {
+		a.pomoAudio.SetVolume(v)
 	}
 }
 
 func (a *App) PomodoroGetAudioState() domain.AudioStatePayload {
-	if a.pomoApp != nil {
-		return a.pomoApp.GetAudioState()
+	if a.pomoAudio != nil {
+		return a.pomoAudio.GetState()
 	}
 	return domain.AudioStatePayload{State: domain.AudioIdle}
 }
 
 func (a *App) PomodoroPlayChime() {
-	if a.pomoApp != nil {
-		a.pomoApp.PlayChime()
+	if a.pomoAudio != nil {
+		a.pomoAudio.PlayChime()
 	}
 }
 
 // ── Pomodoro Profile & Settings methods (bound to Wails JS) ────────────────────
 
 func (a *App) PomodoroLoadProfiles() []domain.Profile {
-	if a.pomoApp != nil {
-		return a.pomoApp.LoadProfiles()
+	return []domain.Profile{
+		{
+			ID:               "default",
+			Name:             "Standard Focus",
+			DurationSec:      25 * 60,
+			BreakDurationSec: 5 * 60,
+			IsDefault:        true,
+		},
 	}
-	return nil
 }
 
 func (a *App) PomodoroSaveProfile(p domain.Profile) error {
-	if a.pomoApp != nil {
-		return a.pomoApp.SaveProfile(p)
-	}
 	return nil
 }
 
 func (a *App) PomodoroGetProfileByID(id string) *domain.Profile {
-	if a.pomoApp != nil {
-		return a.pomoApp.GetProfileByID(id)
+	p := domain.Profile{
+		ID:               "default",
+		Name:             "Standard Focus",
+		DurationSec:      25 * 60,
+		BreakDurationSec: 5 * 60,
+		IsDefault:        true,
 	}
-	return nil
+	return &p
 }
 
 func (a *App) PomodoroDeleteProfile(id string) error {
-	if a.pomoApp != nil {
-		return a.pomoApp.DeleteProfile(id)
-	}
 	return nil
 }
 
 func (a *App) PomodoroGetSettings() domain.Settings {
-	if a.pomoApp != nil {
-		return a.pomoApp.GetSettings()
-	}
 	return domain.DefaultSettings()
 }
 
 func (a *App) PomodoroSaveSettings(s domain.Settings) error {
-	if a.pomoApp != nil {
-		return a.pomoApp.SaveSettings(s)
-	}
 	return nil
 }
 
 func (a *App) PomodoroGetStats() domain.StatsData {
-	if a.pomoApp != nil {
-		return a.pomoApp.GetStats()
-	}
 	return domain.StatsData{}
 }
 
 func (a *App) PomodoroRecordSessionComplete() domain.StatsData {
-	if a.pomoApp != nil {
-		return a.pomoApp.RecordSessionComplete()
-	}
 	return domain.StatsData{}
 }
 
 func (a *App) PomodoroPickMusicFile() (string, error) {
-	if a.pomoApp != nil {
-		return a.pomoApp.PickMusicFile()
+	if a.ctx == nil {
+		return "", fmt.Errorf("app context unavailable")
 	}
-	return "", nil
+	srcPath, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title:   "Select MP3 file",
+		Filters: []wailsruntime.FileFilter{{DisplayName: "MP3 Audio (*.mp3)", Pattern: "*.mp3"}},
+	})
+	if err != nil || srcPath == "" {
+		return srcPath, err
+	}
+
+	appDir, err := runtime.ResolveAppDir()
+	if err != nil {
+		return srcPath, nil
+	}
+	audioDir := filepath.Join(appDir, "audio")
+	_ = os.MkdirAll(audioDir, 0755)
+
+	destPath := filepath.Join(audioDir, filepath.Base(srcPath))
+	if err := copyPomoFile(srcPath, destPath); err != nil {
+		return srcPath, nil // fallback to original path
+	}
+	return destPath, nil
 }
 
 func (a *App) PomodoroPickMusicFolder() (string, error) {
 	if !a.IsProUser() {
 		return "", fmt.Errorf("folder shuffle requires a Pro subscription")
 	}
-	if a.pomoApp != nil {
-		return a.pomoApp.PickMusicFolder()
+	if a.ctx == nil {
+		return "", fmt.Errorf("app context unavailable")
 	}
-	return "", nil
+	path, err := wailsruntime.OpenDirectoryDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select music folder",
+	})
+	if err != nil {
+		return "", err
+	}
+	return path, nil
 }
+
+func copyPomoFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+

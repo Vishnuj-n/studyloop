@@ -5,15 +5,13 @@ import (
 	"time"
 
 	"ai-tutor/internal/pomodoro/domain"
-	"ai-tutor/internal/pomodoro/services/persistence"
 )
 
 func newTestTimer(t *testing.T) *Service {
 	t.Helper()
-	// persistence.New accepts any dataDir — use a temp dir so tests are isolated
-	ps := persistence.New(t.TempDir())
-	return New(ps) // emitter defaults to events.Noop
+	return New() // emitter defaults to events.Noop
 }
+
 
 func TestTimerStart(t *testing.T) {
 	svc := newTestTimer(t)
