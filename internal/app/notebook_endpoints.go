@@ -60,7 +60,7 @@ func (a *App) UploadNotebook(fileData []byte, fileName string) map[string]interf
 
 // SelectAndUploadDeepStructuredPDF opens a native OS file picker and initiates background deep structured PDF extraction.
 // This is zero-copy and instant on desktop without browser DOM file array serialization.
-func (a *App) SelectAndUploadDeepStructuredPDF(isPro bool) map[string]interface{} {
+func (a *App) SelectAndUploadDeepStructuredPDF() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -72,7 +72,7 @@ func (a *App) SelectAndUploadDeepStructuredPDF(isPro bool) map[string]interface{
 	var ext *extension.Extension
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("deep_pdf")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !a.IsProUser() {
 			return map[string]interface{}{
 				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
 				"requires_pro": true,
@@ -262,7 +262,7 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 }
 
 // UploadYouTubeNotebook handles YouTube video URL ingestion, extracting metadata and chapters via the YouTube extension.
-func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]interface{} {
+func (a *App) UploadYouTubeNotebook(videoURL string) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -281,7 +281,7 @@ func (a *App) UploadYouTubeNotebook(videoURL string, isPro bool) map[string]inte
 	var ext *extension.Extension
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("youtube")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !isPro {
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !a.IsProUser() {
 			return map[string]interface{}{
 				"error":        "YouTube Ingestion is a Pro feature. Please upgrade your plan to unlock.",
 				"requires_pro": true,

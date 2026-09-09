@@ -146,7 +146,7 @@
           title="Play sample in-app chime"
           @click="playStudyChime"
         >
-          🔔 Test Chime
+          Test Chime
         </button>
       </div>
 
@@ -231,11 +231,6 @@
               title="Select single MP3 audio track"
               @click="handlePickMusicFile"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 18V5l12-2v13"></path>
-                <circle cx="6" cy="18" r="3"></circle>
-                <circle cx="18" cy="16" r="3"></circle>
-              </svg>
               <span>Pick File</span>
             </button>
             <button
@@ -245,9 +240,6 @@
               title="Select folder with MP3 tracks (shuffle lo-fi)"
               @click="handlePickMusicFolder"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-              </svg>
               <span>Pick Folder</span>
               <span v-if="!isPro" class="pro-tag">PRO</span>
             </button>
@@ -260,10 +252,7 @@
               aria-label="Clear audio"
               @click="handleClearMusic"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
+              <span>Clear</span>
             </button>
           </div>
           <p class="hint">
@@ -556,6 +545,7 @@ label {
   color: var(--on-surface);
 }
 
+input[type='text'],
 input[type='number'],
 input[type='url'],
 select {
@@ -573,6 +563,7 @@ select {
   box-sizing: border-box;
 }
 
+input[type='text']:focus,
 input[type='number']:focus,
 input[type='url']:focus,
 select:focus {

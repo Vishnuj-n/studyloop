@@ -58,6 +58,11 @@ type App struct {
 	extSetupMu          sync.Mutex
 	extSetupCancel      context.CancelFunc
 	pomoApp             *pomodoroapp.App
+	sessionMu           sync.RWMutex
+	sessionUserID       string
+	sessionEmail        string
+	sessionIsPro        bool
+	sessionVerifiedAt   int64
 }
 
 func NewApp() *App {

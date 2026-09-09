@@ -136,8 +136,8 @@ export function getNotebookTopicTree() {
   return appBridge().GetNotebookTopicTree()
 }
 
-export function uploadYouTubeNotebook(videoURL, isPro = false) {
-  return appBridge().UploadYouTubeNotebook(videoURL, isPro)
+export function uploadYouTubeNotebook(videoURL) {
+  return appBridge().UploadYouTubeNotebook(videoURL)
 }
 
 export async function selectAnkiFile() {
@@ -148,8 +148,8 @@ export async function importAnkiDeck(filePath, targetNotebookID = '', targetTopi
   return await appBridge().ImportAnkiDeck(filePath, targetNotebookID, targetTopicID, preserveHistory)
 }
 
-export async function selectAndUploadDeepStructuredPDF(isPro = false) {
-  return await appBridge().SelectAndUploadDeepStructuredPDF(isPro)
+export async function selectAndUploadDeepStructuredPDF() {
+  return await appBridge().SelectAndUploadDeepStructuredPDF()
 }
 
 export async function upgradeNotebookToDeepPDF(notebookID) {
@@ -341,8 +341,8 @@ export function cancelExtensionSetup() {
   return appBridge().CancelExtensionSetup()
 }
 
-export function runExtension(id, input = '', isPro = false) {
-  return appBridge().RunExtension(id, input, !!isPro)
+export function runExtension(id, input = '') {
+  return appBridge().RunExtension(id, input)
 }
 
 export function simplifyReadingContent(content, level = '') {

@@ -45,6 +45,9 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 249, G: 249, B: 251, A: 255},
 		OnStartup:        a.Startup,
 		OnShutdown:       a.Shutdown,
+		Debug: options.Debug{
+			OpenInspectorOnStartup: false,
+		},
 		Bind: []interface{}{
 			a,
 		},

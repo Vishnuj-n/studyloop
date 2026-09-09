@@ -409,7 +409,7 @@ async function uploadYouTube(url) {
   ingestionStatusMessage.value = 'Fetching video transcript and chapters...'
   uploadProgress.value = 30
   try {
-    const res = await apiUploadYouTubeNotebook(url, isPro.value)
+    const res = await apiUploadYouTubeNotebook(url)
     if (res?.error) {
       uploadError.value = res.error
       uploadProgress.value = 0
@@ -462,7 +462,7 @@ async function handleDeepStructuredUpload() {
   uploadError.value = ''
   successMessage.value = ''
   try {
-    const result = await selectAndUploadDeepStructuredPDF(isPro.value)
+    const result = await selectAndUploadDeepStructuredPDF()
     if (result?.canceled) {
       return
     }

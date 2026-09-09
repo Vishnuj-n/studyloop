@@ -43,3 +43,32 @@ func TestListExtensions_WithManager(t *testing.T) {
 		t.Fatalf("expected 0 extensions, got %d", len(exts))
 	}
 }
+
+func TestRunExtension_ProEntitlementEnforced(t *testing.T) {
+	a := &App{}
+	// When not pro, uninitialized check or Pro check stops unauthorized calls
+	res := a.RunExtension("unknown_ext", "test")
+	if res["error"] == nil {
+		t.Fatal("expected error when running extension without initialization")
+	}
+
+	// Verify session Pro tracking
+	if a.IsProUser() {
+		t.Fatal("expected IsProUser to be false by default")
+	}
+
+	a.SetSession("user_123", "pro@studyloop.dev", true)
+	if !a.IsProUser() {
+		t.Fatal("expected IsProUser to be true after SetSession")
+	}
+
+	session := a.GetUserSession()
+	if session["userId"] != "user_123" || session["isPro"] != true {
+		t.Fatalf("unexpected session state: %#v", session)
+	}
+
+	a.ClearSession()
+	if a.IsProUser() {
+		t.Fatal("expected IsProUser to be false after ClearSession")
+	}
+}

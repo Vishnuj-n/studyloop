@@ -402,7 +402,7 @@ async function handleRun(ext) {
   errorMessage.value = ''
   runningId.value = ext.id
   try {
-    const res = await runExtension(ext.id, '', isPro.value)
+    const res = await runExtension(ext.id, '')
     if (res?.error) {
       errorMessage.value = res.error
     } else {
