@@ -19,6 +19,9 @@ func TestDefaultValues(t *testing.T) {
 	svc := newSvc(t)
 	got := svc.Get()
 
+	if !got.Enabled {
+		t.Error("Enabled should default to true")
+	}
 	if got.DefaultVolume != 70 {
 		t.Errorf("DefaultVolume: want 70, got %d", got.DefaultVolume)
 	}
@@ -36,6 +39,7 @@ func TestDefaultValues(t *testing.T) {
 func TestSaveAndGet(t *testing.T) {
 	svc := newSvc(t)
 	modified := domain.Settings{
+		Enabled:            false,
 		DefaultVolume:      85,
 		AutoStartAudio:     false,
 		NotifyOnComplete:   false,
@@ -46,6 +50,9 @@ func TestSaveAndGet(t *testing.T) {
 	}
 
 	got := svc.Get()
+	if got.Enabled {
+		t.Error("Enabled should be false")
+	}
 	if got.DefaultVolume != 85 {
 		t.Errorf("DefaultVolume: want 85, got %d", got.DefaultVolume)
 	}

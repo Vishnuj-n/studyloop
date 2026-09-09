@@ -378,7 +378,7 @@ async function onSavePomoSettings() {
   try {
     await savePomodoroSettings({
       ...pomoSettings.value,
-      enabled: pomoSettings.value.enabled !== false,
+      enabled: Boolean(pomoSettings.value.enabled),
       defaultVolume: Number(pomoSettings.value.defaultVolume) || 70,
     })
     window.dispatchEvent(new CustomEvent('pomodoro-settings-updated'))
