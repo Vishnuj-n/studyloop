@@ -707,9 +707,9 @@ func defaultBaseURLForProvider(provider string) string {
 	case "groq":
 		return "https://api.groq.com/openai/v1"
 	case "openai":
-		return "https://api.openai.com"
+		return "https://api.openai.com/v1"
 	case "openrouter":
-		return "https://openrouter.ai/api"
+		return "https://openrouter.ai/api/v1"
 	default:
 		return ""
 	}

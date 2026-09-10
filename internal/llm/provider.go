@@ -319,6 +319,10 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	baseURL := strings.TrimSuffix(p.config.BaseURL, "/")
 	if strings.EqualFold(baseURL, "https://api.groq.com/openai") {
 		baseURL = "https://api.groq.com/openai/v1"
+	} else if strings.EqualFold(baseURL, "https://openrouter.ai/api") {
+		baseURL = "https://openrouter.ai/api/v1"
+	} else if strings.EqualFold(baseURL, "https://api.openai.com") {
+		baseURL = "https://api.openai.com/v1"
 	}
 	var url string
 	if strings.HasSuffix(baseURL, "/chat/completions") {

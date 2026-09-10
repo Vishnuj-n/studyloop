@@ -171,13 +171,13 @@ func (a *App) GetLLMProviderPreset(provider string) map[string]interface{} {
 	case "openai":
 		return map[string]interface{}{
 			"provider": "openai",
-			"base_url": "https://api.openai.com",
+			"base_url": "https://api.openai.com/v1",
 			"model":    "gpt-4.1-mini",
 		}
 	case "openrouter":
 		return map[string]interface{}{
 			"provider": "openrouter",
-			"base_url": "https://openrouter.ai/api",
+			"base_url": "https://openrouter.ai/api/v1",
 			"model":    "openai/gpt-4.1-mini",
 		}
 	default:
