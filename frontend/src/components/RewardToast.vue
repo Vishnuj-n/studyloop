@@ -19,7 +19,7 @@
           <div class="toast-details">
             <div class="toast-header-row">
               <span class="toast-title">Task Complete!</span>
-              <span class="tier-tag">{{ chestTier }} CHEST</span>
+              <span v-if="chestTier" class="tier-tag">{{ chestTier }} CHEST</span>
             </div>
 
             <div class="toast-pills-row">
@@ -77,10 +77,13 @@ const xpEarned = computed(() => props.rewards?.xp_earned || 0)
 const coinsEarned = computed(() => props.rewards?.coins_earned || 0)
 const newTitle = computed(() => props.rewards?.new_title_unlocked || '')
 
-const chestTier = computed(() => (box.value?.box_tier || 'BRONZE').toUpperCase())
-const tierClass = computed(() => `tier-${chestTier.value.toLowerCase()}`)
+const chestTier = computed(() => (box.value?.box_tier ? box.value.box_tier.toUpperCase() : ''))
+const tierClass = computed(() => (chestTier.value ? `tier-${chestTier.value.toLowerCase()}` : 'tier-xp'))
 
 const chestEmoji = computed(() => {
+  if (!box.value) {
+    return '⚡'
+  }
   switch (chestTier.value) {
     case 'SILVER':
       return '🥈'
@@ -88,6 +91,7 @@ const chestEmoji = computed(() => {
       return '🎁'
     case 'MYTHIC':
       return '👑'
+    case 'BRONZE':
     default:
       return '📦'
   }
@@ -183,6 +187,9 @@ onUnmounted(() => {
   background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
 }
 
+.tier-xp .toast-glow {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 70%);
+}
 .tier-bronze .toast-glow {
   background: radial-gradient(circle, rgba(217, 119, 6, 0.2) 0%, transparent 70%);
 }

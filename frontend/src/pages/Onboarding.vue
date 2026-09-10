@@ -451,14 +451,66 @@
           <button
             type="button"
             class="theme-card"
-            :class="{ active: selectedTheme === 'light-classic' }"
-            @click="selectTheme('light-classic')"
+            :class="{ active: selectedTheme === 'dark-gruvbox' }"
+            @click="selectTheme('dark-gruvbox')"
           >
-            <div class="theme-preview light-classic">
+            <div class="theme-preview dark-gruvbox">
               <span class="preview-dot primary"></span>
               <span class="preview-dot surface"></span>
             </div>
-            <span class="theme-label">Light Classic</span>
+            <span class="theme-label">Gruvbox Dark</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
+            :class="{ active: selectedTheme === 'dark-obsidian' }"
+            @click="selectTheme('dark-obsidian')"
+          >
+            <div class="theme-preview dark-obsidian">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Obsidian Black</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
+            :class="{ active: selectedTheme === 'dark-indigo' }"
+            @click="selectTheme('dark-indigo')"
+          >
+            <div class="theme-preview dark-indigo">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Deep Indigo</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
+            :class="{ active: selectedTheme === 'dark-emerald' }"
+            @click="selectTheme('dark-emerald')"
+          >
+            <div class="theme-preview dark-emerald">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Forest Emerald</span>
+          </button>
+
+          <button
+            type="button"
+            class="theme-card"
+            :class="{ active: selectedTheme === 'light-monochrome' }"
+            @click="selectTheme('light-monochrome')"
+          >
+            <div class="theme-preview light-monochrome">
+              <span class="preview-dot primary"></span>
+              <span class="preview-dot surface"></span>
+            </div>
+            <span class="theme-label">Monochrome Paper</span>
           </button>
 
           <button
@@ -490,40 +542,14 @@
           <button
             type="button"
             class="theme-card"
-            :class="{ active: selectedTheme === 'dark-gruvbox' }"
-            @click="selectTheme('dark-gruvbox')"
+            :class="{ active: selectedTheme === 'light-classic' }"
+            @click="selectTheme('light-classic')"
           >
-            <div class="theme-preview dark-gruvbox">
+            <div class="theme-preview light-classic">
               <span class="preview-dot primary"></span>
               <span class="preview-dot surface"></span>
             </div>
-            <span class="theme-label">Gruvbox Dark</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-indigo' }"
-            @click="selectTheme('dark-indigo')"
-          >
-            <div class="theme-preview dark-indigo">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Deep Indigo</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-emerald' }"
-            @click="selectTheme('dark-emerald')"
-          >
-            <div class="theme-preview dark-emerald">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Forest Emerald</span>
+            <span class="theme-label">Light Classic</span>
           </button>
         </div>
 
@@ -628,7 +654,7 @@ const remindersEnabled = ref(true)
 const analyticsEnabled = ref(false)
 const cloudSyncURL = ref('')
 const apiToken = ref('')
-const selectedTheme = ref('light-classic')
+const selectedTheme = ref('dark-gruvbox')
 // Theme selection states (background handled automatically via css custom variables)
 const llmSaving = ref(false)
 const presetLoading = ref(false)
@@ -1336,6 +1362,26 @@ select:focus {
 }
 .theme-preview.dark-emerald .preview-dot.surface {
   background: #152219;
+}
+
+.theme-preview.dark-obsidian {
+  background: #09090b;
+}
+.theme-preview.dark-obsidian .preview-dot.primary {
+  background: #f4f4f5;
+}
+.theme-preview.dark-obsidian .preview-dot.surface {
+  background: #18181b;
+}
+
+.theme-preview.light-monochrome {
+  background: #f8f8f9;
+}
+.theme-preview.light-monochrome .preview-dot.primary {
+  background: #18181b;
+}
+.theme-preview.light-monochrome .preview-dot.surface {
+  background: #e8e8ec;
 }
 
 /* RAG Options Stylings */
