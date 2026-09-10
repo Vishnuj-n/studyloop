@@ -10,6 +10,9 @@
     >
       <span class="status-dot"></span>
       <span class="pill-text">{{ feasibilityPillText }}</span>
+      <svg class="pill-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
     </button>
 
     <!-- Progress Pill -->
@@ -126,6 +129,18 @@ function formatDaysRemainingShort(days) {
 /* Feasibility Pill */
 .feasibility-pill {
   cursor: pointer;
+}
+
+.pill-chevron {
+  opacity: 0.55;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.feasibility-pill:hover .pill-chevron {
+  opacity: 0.9;
+  transform: translateX(1.5px);
 }
 
 .feasibility-pill .status-dot {

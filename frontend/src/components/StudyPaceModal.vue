@@ -80,7 +80,18 @@
                 <input v-model="slot.end" type="time" class="slot-time-input" required @change="persistSlots" />
               </div>
               <span class="slot-duration">{{ computeSlotDuration(slot.start, slot.end) }}</span>
-              <button type="button" class="slot-delete-btn" title="Remove" @click="removeSlot(idx)">✕</button>
+              <button
+                type="button"
+                class="slot-delete-btn"
+                title="Remove study window"
+                aria-label="Remove study window"
+                @click="removeSlot(idx)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -181,7 +192,11 @@ const statusExplanation = computed(() => {
   }
   if (s === 'BEHIND') {
     const needed = props.pace?.extra_sessions_needed || 0.5
-    return `Add ~${needed} session/day (or extend your daily study time by 20–30 mins) to finish before your exam.`
+    const sessText = needed === 1 ? '1 session/day' : `${needed} sessions/day`
+    if (needed >= 2) {
+      return `Add ~${sessText} (or consider spacing out your target exam date) to complete your remaining curriculum on time.`
+    }
+    return `Add ~${sessText} (or extend your daily study window) to finish before your exam.`
   }
   return 'Complete 2 to 3 study sessions so StudyLoop can estimate your personalized reading velocity.'
 })
@@ -358,8 +373,25 @@ function openOutlook() {
 .slot-time-input { border: 1px solid var(--outline-variant); border-radius: 6px; background: var(--surface-container-lowest); color: var(--on-surface); padding: 4px 6px; font-size: 12px; font-family: inherit; }
 .time-arrow { color: var(--muted-text); font-size: 11px; }
 .slot-duration { font-size: 11px; font-weight: 600; color: var(--muted-text); min-width: 44px; text-align: right; }
-.slot-delete-btn { background: none; border: none; color: var(--muted-text); cursor: pointer; padding: 3px 6px; border-radius: 4px; }
-.slot-delete-btn:hover { color: #eb5e55; }
+.slot-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted-text);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.slot-delete-btn:hover {
+  background: rgba(235, 94, 85, 0.12);
+  border-color: rgba(235, 94, 85, 0.25);
+  color: #eb5e55;
+}
 .add-slot-btn { background: none; border: 1px dashed var(--outline-variant); color: var(--primary); font-size: 12px; font-weight: 600; padding: 8px; border-radius: 8px; cursor: pointer; width: 100%; }
 .add-slot-btn:hover { border-color: var(--primary); }
 .templates-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
