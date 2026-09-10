@@ -62,7 +62,7 @@ func LoadConfigFromEnvForPrefix(prefix string) *Config {
 		config.APIKey = "sk-test"
 	}
 
-	config.Limits = getModelLimits(config.Model)
+	config.Limits = getModelLimits()
 	applyEnvLimitsOverride(prefix, &config.Limits)
 
 	return config
@@ -90,7 +90,7 @@ func LoadConfigFromSettingsForPrefix(prefix string, settings models.LLMTierSetti
 	if config.TimeoutMs <= 0 {
 		config.TimeoutMs = 30000
 	}
-	config.Limits = getModelLimits(config.Model)
+	config.Limits = getModelLimits()
 	if settings.MaxInputTokens > 0 {
 		config.Limits.MaxInputTokens = settings.MaxInputTokens
 	}
@@ -142,7 +142,7 @@ func defaultModelForProvider(provider string) string {
 }
 
 // getModelLimits returns token limits with safe conservative defaults.
-func getModelLimits(model string) ModelLimits {
+func getModelLimits() ModelLimits {
 	return ModelLimits{
 		MaxInputTokens:  4000,
 		MaxOutputTokens: 1000,

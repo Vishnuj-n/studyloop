@@ -12,19 +12,13 @@ import (
 )
 
 // Helper to create an extension with an executable mock script
-func createMockYouTubeExt(t *testing.T, outputJSON string, exitCode int) (*extension.Extension, string) {
+func createMockYouTubeExt(t *testing.T, outputJSON string) *extension.Extension {
 	t.Helper()
 	dir := t.TempDir()
-	var scriptName string
-	var scriptContent string
 
-	// Create a python script that outputs JSON or exits with code
-	scriptName = "ingest.py"
-	if exitCode != 0 {
-		scriptContent = fmt.Sprintf("import sys\nsys.stderr.write(%q)\nsys.exit(%d)\n", outputJSON, exitCode)
-	} else {
-		scriptContent = fmt.Sprintf("import sys\nsys.stdout.write(%q)\nsys.exit(0)\n", outputJSON)
-	}
+	// Create a python script that outputs JSON
+	scriptName := "ingest.py"
+	scriptContent := fmt.Sprintf("import sys\nsys.stdout.write(%q)\nsys.exit(0)\n", outputJSON)
 
 	scriptPath := filepath.Join(dir, scriptName)
 	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o755); err != nil {
@@ -41,12 +35,12 @@ func createMockYouTubeExt(t *testing.T, outputJSON string, exitCode int) (*exten
 		Dir: dir,
 	}
 
-	pyExe, err := extension.FindPythonExecutable()
+	_, err := extension.FindPythonExecutable()
 	if err != nil {
 		t.Skip("skipping YouTube extension test: python executable not found")
 	}
 
-	return ext, pyExe
+	return ext
 }
 
 func TestIngestYouTubeVideo_EmptyURL(t *testing.T) {
@@ -93,7 +87,7 @@ func TestIngestYouTubeVideo_Success(t *testing.T) {
 		t.Fatalf("failed to marshal mock result: %v", err)
 	}
 
-	ext, _ := createMockYouTubeExt(t, string(rawJSON), 0)
+	ext := createMockYouTubeExt(t, string(rawJSON))
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
@@ -133,7 +127,7 @@ func TestIngestYouTubeVideo_ExtensionErrorPayload(t *testing.T) {
 	}
 	rawJSON, _ := json.Marshal(mockResult)
 
-	ext, _ := createMockYouTubeExt(t, string(rawJSON), 0)
+	ext := createMockYouTubeExt(t, string(rawJSON))
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
@@ -144,7 +138,7 @@ func TestIngestYouTubeVideo_ExtensionErrorPayload(t *testing.T) {
 }
 
 func TestIngestYouTubeVideo_MalformedJSON(t *testing.T) {
-	ext, _ := createMockYouTubeExt(t, "invalid json output", 0)
+	ext := createMockYouTubeExt(t, "invalid json output")
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 
@@ -161,7 +155,7 @@ func TestIngestYouTubeVideo_EmptyChapters(t *testing.T) {
 	}
 	rawJSON, _ := json.Marshal(mockResult)
 
-	ext, _ := createMockYouTubeExt(t, string(rawJSON), 0)
+	ext := createMockYouTubeExt(t, string(rawJSON))
 	svc := NewService(t.TempDir())
 	runner := extension.NewRunner()
 

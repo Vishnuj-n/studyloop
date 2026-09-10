@@ -265,18 +265,24 @@ func (a *App) PomodoroPickMusicFolder() (string, error) {
 	return path, nil
 }
 
-func copyPomoFile(src, dst string) error {
+func copyPomoFile(src, dst string) (err error) {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		_ = in.Close() // read-only file descriptor
+	}()
 
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+	}()
 
 	_, err = io.Copy(out, in)
 	return err

@@ -30,4 +30,5 @@ doc/ORIGINAL_NOTES/
 __pycache__/
 bin/
 cloud-dashboard/dist/
-/extensions/
+/extensions/
+.tmp-go-cache/

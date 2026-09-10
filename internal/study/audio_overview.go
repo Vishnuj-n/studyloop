@@ -212,7 +212,7 @@ func (s *StudyService) GenerateAudioOverview(
 	}
 	pythonPath, err := extension.FindExtensionPython(audioExt)
 	if err != nil {
-		return fmt.Errorf("Python executable not found for Audio Overview: %w", err)
+		return fmt.Errorf("python executable not found for Audio Overview: %w", err)
 	}
 
 	// Resolve edge_tts_stream.py script path

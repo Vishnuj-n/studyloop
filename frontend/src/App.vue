@@ -54,49 +54,76 @@ function parseTime(timeStr, baseDate) {
   return d
 }
 
-// Calculate delay in ms and event type for next closest start or end time
-function getNextEventTimeout(startTimeStr, endTimeStr) {
-  if (!startTimeStr || !endTimeStr) return null
+// Calculate delay in ms and event type for next closest start or end time across all configured slots
+function getNextEventTimeout(settings) {
+  if (!settings) return null
   const now = new Date()
   const events = []
 
-  // Start time event
-  const startToday = parseTime(startTimeStr, now)
-  if (startToday > now) {
-    events.push({ type: 'start', time: startToday })
-  } else {
-    const startTomorrow = parseTime(startTimeStr, new Date(now.getTime() + 86400000))
-    events.push({ type: 'start', time: startTomorrow })
+  let slots = []
+  if (settings.study_slots_json) {
+    try {
+      const parsed = JSON.parse(settings.study_slots_json)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        slots = parsed
+      }
+    } catch {
+      // Fallback
+    }
   }
 
-  // End time event
-  const endToday = parseTime(endTimeStr, now)
-  if (endToday > now) {
-    events.push({ type: 'end', time: endToday })
-  } else {
-    const endTomorrow = parseTime(endTimeStr, new Date(now.getTime() + 86400000))
-    events.push({ type: 'end', time: endTomorrow })
+  // Fallback to legacy single window if no multi-slots configured
+  if (slots.length === 0 && settings.study_start_time && settings.study_end_time) {
+    slots = [{ name: 'Study Window', start: settings.study_start_time, end: settings.study_end_time }]
   }
+
+  if (slots.length === 0) return null
+
+  slots.forEach((slot) => {
+    if (!slot.start || !slot.end) return
+    const slotName = slot.name || 'Study Window'
+
+    // Start time event
+    const startToday = parseTime(slot.start, now)
+    if (startToday > now) {
+      events.push({ type: 'start', time: startToday, name: slotName })
+    } else {
+      const startTomorrow = parseTime(slot.start, new Date(now.getTime() + 86400000))
+      events.push({ type: 'start', time: startTomorrow, name: slotName })
+    }
+
+    // End time event
+    const endToday = parseTime(slot.end, now)
+    if (endToday > now) {
+      events.push({ type: 'end', time: endToday, name: slotName })
+    } else {
+      const endTomorrow = parseTime(slot.end, new Date(now.getTime() + 86400000))
+      events.push({ type: 'end', time: endTomorrow, name: slotName })
+    }
+  })
+
+  if (events.length === 0) return null
 
   // Sort events to find the closest upcoming one
   events.sort((a, b) => a.time - b.time)
   const next = events[0]
   return {
     type: next.type,
+    name: next.name,
     delay: next.time.getTime() - now.getTime(),
   }
 }
 
 // Fire audio chime and in-app banner based on event type
-async function fireEvent(type) {
+async function fireEvent(type, slotName = 'Study Window') {
   playStudyChime()
 
   if (type === 'start') {
     banner.value = {
       show: true,
       type: 'start',
-      title: 'Study Time Started!',
-      desc: 'Your study window has started. Time to work on your queue!',
+      title: `${slotName} Started!`,
+      desc: 'Your scheduled study window has started. Time to work on your queue!',
       unfinishedCount: 0,
     }
   } else if (type === 'end') {
@@ -114,7 +141,7 @@ async function fireEvent(type) {
       banner.value = {
         show: true,
         type: 'end',
-        title: 'Study Time is Up!',
+        title: `${slotName} is Up!`,
         desc: `You still have ${unfinishedCount} unfinished study tasks remaining today.`,
         unfinishedCount,
       }
@@ -122,8 +149,8 @@ async function fireEvent(type) {
       banner.value = {
         show: true,
         type: 'end',
-        title: 'Study Time is Up!',
-        desc: 'Great job! You finished all your study tasks for today.',
+        title: `${slotName} is Up!`,
+        desc: 'Great job! You finished all your study tasks for this session.',
         unfinishedCount: 0,
       }
     }
@@ -149,12 +176,12 @@ async function syncScheduler() {
 
     if (!settings.reminders_enabled) return
 
-    const next = getNextEventTimeout(settings.study_start_time, settings.study_end_time)
+    const next = getNextEventTimeout(settings)
     if (!next) return
 
     // Schedule next timeout
     schedulerTimeout = setTimeout(async () => {
-      await fireEvent(next.type)
+      await fireEvent(next.type, next.name)
       syncScheduler() // Queue up the next event
     }, next.delay)
   } catch (err) {

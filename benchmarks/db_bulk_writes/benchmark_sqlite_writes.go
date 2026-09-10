@@ -65,7 +65,7 @@ func setupTempDB(walMode bool) (*sql.DB, string, error) {
 	CREATE INDEX idx_chunks_doc ON chunks(doc_id, chunk_index);
 	`
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 
@@ -99,7 +99,7 @@ func benchmarkSingleTxPrepared(db *sql.DB, records []ChunkRecord) (time.Duration
 		_ = tx.Rollback()
 		return 0, err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, r := range records {
 		if _, err := stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt); err != nil {
@@ -135,12 +135,12 @@ func benchmarkChunkedTx(db *sql.DB, records []ChunkRecord, batchSize int) (time.
 		}
 		for _, r := range slice {
 			if _, err := stmt.Exec(r.ID, r.DocID, r.ChunkIdx, r.Content, r.PageNum, r.CreatedAt); err != nil {
-				stmt.Close()
+				_ = stmt.Close()
 				_ = tx.Rollback()
 				return 0, err
 			}
 		}
-		stmt.Close()
+		_ = stmt.Close()
 		if err := tx.Commit(); err != nil {
 			return 0, err
 		}
@@ -214,8 +214,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkIndividualAutoCommit(db, records[:autoCommitSample])
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 1 error: %v\n", err)
 			return
@@ -241,8 +241,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkSingleTxPrepared(db, records)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 2 error: %v\n", err)
 			return
@@ -267,8 +267,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkSingleTxPrepared(db, records)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 3 error: %v\n", err)
 			return
@@ -293,8 +293,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkChunkedTx(db, records, 500)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 4 error: %v\n", err)
 			return
@@ -319,8 +319,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkMultiRowValues(db, records, 250)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 5 error: %v\n", err)
 			return

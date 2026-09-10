@@ -231,7 +231,7 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 // REVIEW SESSION TESTS
 // ============================================================================
 
-func setupReviewTestNotebook(t *testing.T, prefix string) (string, string) {
+func setupReviewTestNotebook(t *testing.T, prefix string) string {
 	t.Helper()
 	topicID := prefix + "-topic"
 	notebookID := prefix + "-nb"
@@ -253,12 +253,12 @@ func setupReviewTestNotebook(t *testing.T, prefix string) (string, string) {
 	}); err != nil {
 		t.Fatalf("CreateFlashcards failed: %v", err)
 	}
-	return topicID, notebookID
+	return notebookID
 }
 
 func TestReviewSessionEndpointsSupportGenerationRecoveryAndCompletion(t *testing.T) {
 	app := newTestApp(t)
-	_, notebookID := setupReviewTestNotebook(t, "queue-review")
+	notebookID := setupReviewTestNotebook(t, "queue-review")
 
 	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
 	if err != nil {
@@ -352,7 +352,7 @@ func TestGetReviewSessionNoDueCards(t *testing.T) {
 
 func TestSyntheticReviewTaskAutoActivatesAndPersistsReviewsWithoutManualActivation(t *testing.T) {
 	app := newTestApp(t)
-	_, notebookID := setupReviewTestNotebook(t, "auto-act")
+	notebookID := setupReviewTestNotebook(t, "auto-act")
 
 	reviewTask, _, err := testRepo.CreateReviewSession(notebookID)
 	if err != nil {

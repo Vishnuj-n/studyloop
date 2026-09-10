@@ -723,11 +723,9 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 		}
 		_ = chunkRows.Close()
 
-		hasChunkVectors := false
-		if exists, tableErr := doesTableExistTxRepo(tx, "chunk_vectors"); tableErr != nil {
+		hasChunkVectors, tableErr := doesTableExistTxRepo(tx, "chunk_vectors")
+		if tableErr != nil {
 			return tableErr
-		} else {
-			hasChunkVectors = exists
 		}
 
 		if hasChunkVectors {

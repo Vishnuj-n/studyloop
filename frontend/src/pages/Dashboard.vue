@@ -117,6 +117,7 @@
           :pace="activeProfilePace"
           :profile-name="activeProfileName"
           :completed-sessions="completedSessionsToday"
+          @open-pace-modal="showPaceModal = true"
         />
 
         <!-- Escape Hatch Quick Toggle Button -->
@@ -211,6 +212,17 @@
         </div>
       </div>
     </template>
+
+    <!-- Study Pace & Schedule Modal -->
+    <StudyPaceModal
+      v-model="showPaceModal"
+      :pace="activeProfilePace"
+      :profile-name="activeProfileName"
+      :study-slots-json="userSettings.study_slots_json"
+      :study-start-time="userSettings.study_start_time"
+      :study-end-time="userSettings.study_end_time"
+      @save-slots="handleSaveStudySlots"
+    />
   </section>
 </template>
 
@@ -234,6 +246,7 @@ import OnboardingCard from '../components/OnboardingCard.vue'
 import TelemetryWidget from '../components/TelemetryWidget.vue'
 import StreakCalendar from '../components/StreakCalendar.vue'
 import ForecastChart from '../components/ForecastChart.vue'
+import StudyPaceModal from '../components/StudyPaceModal.vue'
 
 
 const router = useRouter()
@@ -269,6 +282,25 @@ const userSettings = ref({
 })
 const activeProfilePace = ref(null)
 const lastPersistedProfile = ref('')
+const showPaceModal = ref(false)
+
+async function handleSaveStudySlots(newSlotsJson) {
+  try {
+    userSettings.value.study_slots_json = newSlotsJson
+    const res = await updateUserSettings({
+      ...userSettings.value,
+      study_slots_json: newSlotsJson,
+    })
+    if (res && res.error) {
+      actionError.value = res.error
+      return
+    }
+    window.dispatchEvent(new CustomEvent('settings-updated'))
+    await loadAgenda()
+  } catch (err) {
+    actionError.value = 'Failed to save study schedule'
+  }
+}
 
 const timelineData = ref([])
 

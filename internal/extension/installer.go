@@ -47,7 +47,7 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open zip file: %w", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	// 1. Locate and parse manifest.json within the archive
 	var manifestData []byte
@@ -61,7 +61,7 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 				return nil, fmt.Errorf("failed to read manifest from zip: %w", err)
 			}
 			manifestData, err = io.ReadAll(rc)
-			rc.Close()
+			_ = rc.Close()
 			if err != nil {
 				return nil, fmt.Errorf("failed to read manifest content: %w", err)
 			}
@@ -88,7 +88,7 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 	}
 
 	stagingDir := filepath.Join(m.extensionsDir, fmt.Sprintf(".staging_%s_%d", manifest.ID, time.Now().UnixNano()))
-	defer os.RemoveAll(stagingDir)
+	defer func() { _ = os.RemoveAll(stagingDir) }()
 
 	if err := os.MkdirAll(stagingDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create staging directory: %w", err)
@@ -130,13 +130,15 @@ func (m *Manager) InstallZip(zipPath string) (*Extension, error) {
 
 		rc, err := f.Open()
 		if err != nil {
-			destFile.Close()
+			_ = destFile.Close()
 			return nil, fmt.Errorf("failed to read zip entry %s: %w", f.Name, err)
 		}
 
 		_, copyErr := io.Copy(destFile, rc)
-		rc.Close()
-		destFile.Close()
+		_ = rc.Close() // read-only zip reader
+		if closeErr := destFile.Close(); closeErr != nil && copyErr == nil {
+			copyErr = fmt.Errorf("failed to flush/close destination file %s: %w", f.Name, closeErr)
+		}
 		if copyErr != nil {
 			return nil, fmt.Errorf("failed to extract file %s: %w", f.Name, copyErr)
 		}
