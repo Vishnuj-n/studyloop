@@ -24,6 +24,7 @@ export function useSettings(errorRef, successRef) {
     classroom_code: '',
     analytics_enabled: false,
     target_session_words: 3000,
+    min_session_words: 0,
     max_active_notebooks: 4,
     quiz_question_count: 8,
     quiz_passing_score: 70,

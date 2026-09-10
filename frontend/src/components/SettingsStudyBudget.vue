@@ -85,6 +85,22 @@
       </p>
     </div>
 
+    <div class="form-group">
+      <label for="min-session-words">Minimum Reading Session Words</label>
+      <input
+        id="min-session-words"
+        v-model.number="settings.min_session_words"
+        type="number"
+        min="0"
+        :max="settings.target_session_words || 20000"
+        step="500"
+        :disabled="disabled"
+      />
+      <p class="hint">
+        Minimum word threshold before ending a slice (set to 0 for automatic default).
+      </p>
+    </div>
+
     <TimeRangeInput
       :start-value="settings.study_start_time"
       :end-value="settings.study_end_time"

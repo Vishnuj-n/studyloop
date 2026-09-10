@@ -550,6 +550,7 @@ type UserSettings struct {
 	StudentUsername         string `json:"student_username"`
 	LastSyncedAt            int64  `json:"last_synced_at"`
 	TargetSessionWords      int    `json:"target_session_words"`
+	MinSessionWords         int    `json:"min_session_words"`
 	MaxActiveNotebooks      int    `json:"max_active_notebooks"`
 	QuizQuestionCount       int    `json:"quiz_question_count"`
 	QuizPassingScore        int    `json:"quiz_passing_score"`

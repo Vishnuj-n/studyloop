@@ -573,7 +573,7 @@ func (r *Repository) ResolveFlashcardGenerateTasksForTopic(topicID string) error
 }
 
 // EnsurePendingReadingTaskForNotebook ensures at least one PENDING/ACTIVE READING task exists in study_queue for an active notebook.
-func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targetSessionWords int) error {
+func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targetSessionWords int, maxSessionWords ...int) error {
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
 		return fmt.Errorf("notebook id is required")
@@ -581,6 +581,11 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 
 	if targetSessionWords <= 0 {
 		return fmt.Errorf("targetSessionWords must be greater than 0, got %d", targetSessionWords)
+	}
+
+	maxWordsCeiling := 0
+	if len(maxSessionWords) > 0 && maxSessionWords[0] > 0 {
+		maxWordsCeiling = maxSessionWords[0]
 	}
 
 	return r.withTx(func(tx *sql.Tx) error {
@@ -685,7 +690,10 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			// Semantic extension: check up to +3 additional pages
 			const maxExtensionPages = 3
 			const minSimilarityThreshold = 0.85
-			maxTotalWords := targetSessionWords + int(float64(targetSessionWords)*0.3)
+			maxTotalWords := maxWordsCeiling
+			if maxTotalWords < targetSessionWords {
+				maxTotalWords = targetSessionWords + int(float64(targetSessionWords)*0.5)
+			}
 
 			baseEndPage := endPage
 			stopReason := "max_pages"
@@ -723,9 +731,9 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			}
 
 			if endPage > baseEndPage {
-				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, stopReason)
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=%d topicID=%q range=%d-%d words=%d maxCeiling=%d reason=%s", endPage-baseEndPage, topicID, startPage, endPage, currentWords, maxTotalWords, stopReason)
 			} else {
-				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d reason=%s", topicID, baseEndPage, currentWords, stopReason)
+				utils.Warnf("[SEMANTIC_EXTENSION] absorbed=0 topicID=%q endPage=%d words=%d maxCeiling=%d reason=%s", topicID, baseEndPage, currentWords, maxTotalWords, stopReason)
 			}
 		}
 
@@ -759,6 +767,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 		return fmt.Errorf("invalid target_session_words in user settings")
 	}
 	targetWords := settings.TargetSessionWords
+	minWords := settings.MinSessionWords
 
 	rows, err := r.db.Query(`
 		SELECT n.id FROM notebooks n
@@ -789,7 +798,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 	}
 
 	for _, nID := range notebookIDs {
-		if err := r.EnsurePendingReadingTaskForNotebook(nID, targetWords); err != nil {
+		if err := r.EnsurePendingReadingTaskForNotebook(nID, targetWords, minWords); err != nil {
 			utils.Warnf("[QUEUE] failed to ensure reading task for active notebook %s: %v", nID, err)
 		}
 	}

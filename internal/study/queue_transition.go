@@ -102,12 +102,14 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 
 		// ponytail: seed next reading task for active notebook inside unified transition
 		settings, err := s.repo.GetUserSettings()
-		targetWords := 1500
+		targetWords := 3000
+		minWords := 0
 		if err == nil && settings != nil && settings.TargetSessionWords > 0 {
 			targetWords = settings.TargetSessionWords
+			minWords = settings.MinSessionWords
 		}
 		if req.NotebookID != "" {
-			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(req.NotebookID, targetWords); ensureErr != nil {
+			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(req.NotebookID, targetWords, minWords); ensureErr != nil {
 				utils.Warnf("[QUEUE_TRANSITION] failed to seed next reading task for notebook %s: %v", req.NotebookID, ensureErr)
 			}
 		}
