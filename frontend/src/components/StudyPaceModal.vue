@@ -86,23 +86,11 @@
           </div>
 
           <button type="button" class="edit-settings-btn" @click="goToSettingsRoutine">
-            <span>⚙ Configure Routine in Settings</span>
+            <span>⚙ Manage Schedule &amp; Calendar Sync in Settings</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
-        </section>
-
-        <!-- Calendar Export -->
-        <section class="drawer-section">
-          <div class="section-label-row">
-            <span class="section-badge">CALENDAR ROUTINE SYNC</span>
-          </div>
-          <div class="calendar-btn-row">
-            <button type="button" class="cal-btn ics-btn" @click="downloadICS">Download .ics</button>
-            <button type="button" class="cal-btn" @click="openGoogle">Google Calendar</button>
-            <button type="button" class="cal-btn" @click="openOutlook">Outlook Web</button>
-          </div>
         </section>
       </div>
     </div>
@@ -112,12 +100,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  downloadRoutineICS,
-  getGoogleCalendarUrl,
-  getOutlookCalendarUrl,
-} from '../services/calendarService'
-import { openURLInBrowser } from '../services/appApi'
 
 const router = useRouter()
 
@@ -236,28 +218,6 @@ function formatDate(dateStr) {
 function formatNumber(num) {
   return num ? Number(num).toLocaleString() : '0'
 }
-
-async function openExternal(url) {
-  try {
-    await openURLInBrowser(url)
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-}
-
-function downloadICS() {
-  downloadRoutineICS(localSlots.value)
-}
-
-function openGoogle() {
-  const first = localSlots.value[0] || { start: '17:00', end: '18:00' }
-  openExternal(getGoogleCalendarUrl(first.start, first.end))
-}
-
-function openOutlook() {
-  const first = localSlots.value[0] || { start: '17:00', end: '18:00' }
-  openExternal(getOutlookCalendarUrl(first.start, first.end))
-}
 </script>
 
 <style scoped>
@@ -366,8 +326,4 @@ function openOutlook() {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
   border-color: var(--primary);
 }
-.calendar-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.cal-btn { flex: 1; min-width: 120px; padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--outline-variant); cursor: pointer; background: var(--surface-container-highest); color: var(--on-surface); }
-.cal-btn.ics-btn { border-color: color-mix(in srgb, var(--primary) 30%, transparent); background: color-mix(in srgb, var(--primary) 8%, var(--surface-container-highest)); color: var(--primary); }
-.cal-btn:hover { border-color: var(--primary); }
 </style>
