@@ -132,6 +132,7 @@ func InitSchema(tx *sql.Tx) error {
 			student_username TEXT DEFAULT '',
 			last_synced_at INTEGER DEFAULT 0,
 			target_session_words INTEGER NOT NULL DEFAULT 3000,
+			min_session_words INTEGER NOT NULL DEFAULT 0,
 			max_active_notebooks INTEGER NOT NULL DEFAULT 4,
 			quiz_question_count INTEGER NOT NULL DEFAULT 8,
 			quiz_passing_score INTEGER NOT NULL DEFAULT 70,
@@ -403,11 +404,20 @@ func InitSchema(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
 		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
 		VALUES
-			('fast', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
-			('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
+			('fast', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
+			('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
 		ON CONFLICT(tier) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
+	}
+
+	// Upgrade any previously seeded groq base_url that missed /v1
+	if _, err := tx.Exec(`
+		UPDATE llm_settings
+		SET base_url = 'https://api.groq.com/openai/v1'
+		WHERE provider = 'groq' AND (base_url = 'https://api.groq.com/openai' OR base_url = 'https://api.groq.com/openai/')
+	`); err != nil {
+		return fmt.Errorf("failed to update legacy groq base_url: %w", err)
 	}
 
 	// Initialize default gamification state
@@ -441,6 +451,7 @@ var alterStatements = []struct {
 	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
 	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
 	{"user_settings", "target_session_words", "ALTER TABLE user_settings ADD COLUMN target_session_words INTEGER NOT NULL DEFAULT 3000"},
+	{"user_settings", "min_session_words", "ALTER TABLE user_settings ADD COLUMN min_session_words INTEGER NOT NULL DEFAULT 0"},
 	{"user_settings", "max_active_notebooks", "ALTER TABLE user_settings ADD COLUMN max_active_notebooks INTEGER NOT NULL DEFAULT 4"},
 	{"user_settings", "quiz_question_count", "ALTER TABLE user_settings ADD COLUMN quiz_question_count INTEGER NOT NULL DEFAULT 8"},
 	{"user_settings", "quiz_passing_score", "ALTER TABLE user_settings ADD COLUMN quiz_passing_score INTEGER NOT NULL DEFAULT 70"},

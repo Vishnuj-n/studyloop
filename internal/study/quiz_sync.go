@@ -688,11 +688,13 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 			utils.LogQuizResult(task.ID, scoreRes.score, false, "")
 			utils.Warnf("[QUIZ] quiz_failed_requiz_failed notebookID=%s topicID=%s — external help marked", task.NotebookID, task.TopicID)
 			settings, sErr := s.repo.GetUserSettings()
-			targetWords := 1500
+			targetWords := 3000
+			minWords := 0
 			if sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
 				targetWords = settings.TargetSessionWords
+				minWords = settings.MinSessionWords
 			}
-			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords); ensureErr != nil {
+			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords, minWords); ensureErr != nil {
 				utils.Warnf("[QUIZ] failed to seed next reading task after failed requiz notebookID=%s: %v", task.NotebookID, ensureErr)
 			}
 		} else if socraticTaskID != "" {

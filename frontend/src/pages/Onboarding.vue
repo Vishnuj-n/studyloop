@@ -222,7 +222,7 @@
             id="llm-base-url"
             v-model="llmFast.base_url"
             type="url"
-            placeholder="https://api.groq.com/openai"
+            placeholder="https://api.groq.com/openai/v1"
           />
         </div>
 
@@ -280,7 +280,7 @@
               id="heavy-base-url"
               v-model="llmHeavy.base_url"
               type="url"
-              placeholder="https://api.groq.com/openai"
+              placeholder="https://api.groq.com/openai/v1"
             />
           </div>
           <div class="form-group">
@@ -665,7 +665,7 @@ const llmHeavyKey = ref('')
 const llmFast = ref({
   tier: 'fast',
   provider: 'groq',
-  base_url: 'https://api.groq.com/openai',
+  base_url: 'https://api.groq.com/openai/v1',
   model: 'openai/gpt-oss-120b',
   timeout_ms: 60000,
   api_key_source: 'keyring',
@@ -674,7 +674,7 @@ const llmFast = ref({
 const llmHeavy = ref({
   tier: 'heavy',
   provider: 'groq',
-  base_url: 'https://api.groq.com/openai',
+  base_url: 'https://api.groq.com/openai/v1',
   model: 'openai/gpt-oss-120b',
   timeout_ms: 90000,
   api_key_source: 'keyring',

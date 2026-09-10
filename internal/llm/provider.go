@@ -15,8 +15,6 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-const minTimeoutMs = 1
-
 // ModelLimits defines token limits for specific models.
 type ModelLimits struct {
 	MaxInputTokens  int
@@ -116,11 +114,11 @@ func defaultBaseURLForProvider(provider string) string {
 	case "gemini":
 		return "https://generativelanguage.googleapis.com/v1beta/openai"
 	case "groq":
-		return "https://api.groq.com/openai"
+		return "https://api.groq.com/openai/v1"
 	case "openai":
-		return "https://api.openai.com"
+		return "https://api.openai.com/v1"
 	case "openrouter":
-		return "https://openrouter.ai/api"
+		return "https://openrouter.ai/api/v1"
 	default:
 		return ""
 	}
@@ -153,11 +151,32 @@ func applyEnvLimitsOverride(prefix string, limits *ModelLimits) {
 	maxInputKeys := prefixedKeys(prefix, "LLM_MAX_INPUT_TOKENS", "MAX_INPUT_TOKENS")
 	maxOutputKeys := prefixedKeys(prefix, "LLM_MAX_OUTPUT_TOKENS", "MAX_OUTPUT_TOKENS")
 
-	if envMaxInput := firstEnvInt(0, maxInputKeys...); envMaxInput > 0 {
-		limits.MaxInputTokens = envMaxInput
+	for _, key := range maxInputKeys {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			utils.Warnf("[LLM_CONFIG] ignoring invalid %s=%q", key, raw)
+			continue
+		}
+		limits.MaxInputTokens = value
+		break
 	}
-	if envMaxOutput := firstEnvInt(0, maxOutputKeys...); envMaxOutput > 0 {
-		limits.MaxOutputTokens = envMaxOutput
+
+	for _, key := range maxOutputKeys {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			utils.Warnf("[LLM_CONFIG] ignoring invalid %s=%q", key, raw)
+			continue
+		}
+		limits.MaxOutputTokens = value
+		break
 	}
 }
 
@@ -255,7 +274,7 @@ type openAIResponse struct {
 
 // GenerateAnswer calls the LLM to generate an answer.
 func (p *Provider) GenerateAnswer(prompt string) (string, error) {
-	if p.config == nil || p.config.BaseURL == "" {
+	if p == nil || p.config == nil || p.config.BaseURL == "" {
 		return "", fmt.Errorf("LLM config not configured")
 	}
 	if strings.TrimSpace(p.config.APIKey) == "" {
@@ -298,13 +317,18 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	baseURL := strings.TrimSuffix(p.config.BaseURL, "/")
+	if strings.EqualFold(baseURL, "https://api.groq.com/openai") {
+		baseURL = "https://api.groq.com/openai/v1"
+	} else if strings.EqualFold(baseURL, "https://openrouter.ai/api") {
+		baseURL = "https://openrouter.ai/api/v1"
+	} else if strings.EqualFold(baseURL, "https://api.openai.com") {
+		baseURL = "https://api.openai.com/v1"
+	}
 	var url string
 	if strings.HasSuffix(baseURL, "/chat/completions") {
 		url = baseURL
-	} else if strings.HasSuffix(baseURL, "/v1") {
-		url = baseURL + "/chat/completions"
 	} else {
-		url = baseURL + "/v1/chat/completions"
+		url = baseURL + "/chat/completions"
 	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
@@ -314,12 +338,9 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.config.APIKey)
 
-	effectiveTimeoutMs := firstEnvInt(30000, "LLM_TIMEOUT_MS", "OPENAI_TIMEOUT_MS", "TIMEOUT_MS")
-	if p.config.TimeoutMs > 0 {
-		effectiveTimeoutMs = p.config.TimeoutMs
-	}
+	effectiveTimeoutMs := p.config.TimeoutMs
 	if effectiveTimeoutMs <= 0 {
-		effectiveTimeoutMs = minTimeoutMs
+		effectiveTimeoutMs = 30000
 	}
 	client := &http.Client{
 		Timeout: time.Duration(effectiveTimeoutMs) * time.Millisecond,

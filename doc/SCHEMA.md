@@ -369,6 +369,7 @@ Singleton table for global preferences.
 | `student_username` | TEXT DEFAULT '' | Student username for cloud sync authentication |
 | `last_synced_at` | INTEGER DEFAULT 0 | Timestamp of last successful cloud sync |
 | `target_session_words` | INTEGER NOT NULL DEFAULT 3000 | Target word count per reading session |
+| `min_session_words` | INTEGER NOT NULL DEFAULT 0 | Minimum word count per reading session (0 = auto) |
 | `max_active_notebooks` | INTEGER NOT NULL DEFAULT 4 | Maximum active textbooks/decks per profile simultaneously (0 = unlimited) |
 | `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
@@ -407,8 +408,8 @@ LLM provider config per performance tier.
 **Bootstrap:** Two rows inserted on initial schema creation:
 
 ```
-('fast',  'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 'keyring', 0)
-('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
+('fast',  'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 'keyring', 0)
+('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
 ```
 
 ### `study_profiles`

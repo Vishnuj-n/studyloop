@@ -8,7 +8,17 @@
             Pacing forecast for <strong>{{ profileName }}</strong>
           </p>
         </div>
-        <button type="button" class="icon-close-btn" aria-label="Close" @click="close">✕</button>
+        <button
+          type="button"
+          class="icon-close-btn"
+          aria-label="Close"
+          @click="close"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
 
       <div class="drawer-body">
@@ -58,7 +68,7 @@
           </div>
         </section>
 
-        <!-- Daily Study Times (Alarms & Calendar) -->
+        <!-- Daily Study Times (Read-Only Display + Link to Settings) -->
         <section class="drawer-section">
           <div class="section-label-row">
             <span class="section-badge">DAILY STUDY WINDOWS</span>
@@ -66,46 +76,21 @@
           </div>
 
           <div class="slots-list">
-            <div v-for="(slot, idx) in localSlots" :key="idx" class="slot-row">
-              <input
-                v-model="slot.name"
-                type="text"
-                placeholder="Session label"
-                class="slot-name-input"
-                @change="persistSlots"
-              />
-              <div class="slot-times-group">
-                <input v-model="slot.start" type="time" class="slot-time-input" required @change="persistSlots" />
-                <span class="time-arrow">→</span>
-                <input v-model="slot.end" type="time" class="slot-time-input" required @change="persistSlots" />
+            <div v-for="(slot, idx) in localSlots" :key="idx" class="slot-display-row">
+              <div class="slot-display-info">
+                <span class="slot-display-name">{{ slot.name || 'Study Session' }}</span>
+                <span class="slot-display-time">{{ slot.start }} – {{ slot.end }}</span>
               </div>
-              <span class="slot-duration">{{ computeSlotDuration(slot.start, slot.end) }}</span>
-              <button type="button" class="slot-delete-btn" title="Remove" @click="removeSlot(idx)">✕</button>
+              <span class="slot-display-badge">{{ computeSlotDuration(slot.start, slot.end) }}</span>
             </div>
           </div>
 
-          <button v-if="localSlots.length < 4" type="button" class="add-slot-btn" @click="addSlot">
-            + Add Study Window
+          <button type="button" class="edit-settings-btn" @click="goToSettingsRoutine">
+            <span>⚙ Manage Schedule &amp; Calendar Sync in Settings</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </button>
-
-          <div class="templates-strip">
-            <span class="templates-label">Presets:</span>
-            <button type="button" class="template-pill" @click="applyTemplate('morning_evening')">Morning + Evening</button>
-            <button type="button" class="template-pill" @click="applyTemplate('split_shift')">College Split</button>
-            <button type="button" class="template-pill" @click="applyTemplate('deep_work')">Power Hour</button>
-          </div>
-        </section>
-
-        <!-- Calendar Export -->
-        <section class="drawer-section">
-          <div class="section-label-row">
-            <span class="section-badge">CALENDAR ROUTINE SYNC</span>
-          </div>
-          <div class="calendar-btn-row">
-            <button type="button" class="cal-btn ics-btn" @click="downloadICS">Download .ics</button>
-            <button type="button" class="cal-btn" @click="openGoogle">Google Calendar</button>
-            <button type="button" class="cal-btn" @click="openOutlook">Outlook Web</button>
-          </div>
         </section>
       </div>
     </div>
@@ -114,12 +99,9 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import {
-  downloadRoutineICS,
-  getGoogleCalendarUrl,
-  getOutlookCalendarUrl,
-} from '../services/calendarService'
-import { openURLInBrowser } from '../services/appApi'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -130,7 +112,7 @@ const props = defineProps({
   studyEndTime: { type: String, default: '18:00' },
 })
 
-const emit = defineEmits(['update:modelValue', 'save-slots'])
+const emit = defineEmits(['update:modelValue'])
 const localSlots = ref([])
 
 function parseSlots() {
@@ -163,6 +145,11 @@ watch(
   { immediate: true }
 )
 
+function goToSettingsRoutine() {
+  close()
+  router.push({ path: '/settings', query: { category: 'study' } })
+}
+
 const statusHeadline = computed(() => {
   const s = props.pace?.feasibility_status
   if (s === 'AHEAD') return `On track — finishing ${props.pace.days_gap} days early`
@@ -181,7 +168,11 @@ const statusExplanation = computed(() => {
   }
   if (s === 'BEHIND') {
     const needed = props.pace?.extra_sessions_needed || 0.5
-    return `Add ~${needed} session/day (or extend your daily study time by 20–30 mins) to finish before your exam.`
+    const sessText = needed === 1 ? '1 session/day' : `${needed} sessions/day`
+    if (needed >= 2) {
+      return `Add ~${sessText} (or consider spacing out your target exam date) to complete your remaining curriculum on time.`
+    }
+    return `Add ~${sessText} (or extend your daily study window) to finish before your exam.`
   }
   return 'Complete 2 to 3 study sessions so StudyLoop can estimate your personalized reading velocity.'
 })
@@ -217,52 +208,6 @@ function computeSlotDuration(start, end) {
   return m >= 60 ? `${(m / 60).toFixed(1).replace('.0', '')} hr` : `${m} min`
 }
 
-function addSlot() {
-  if (localSlots.value.length >= 4) return
-  localSlots.value.push({
-    name: `Study Slot ${localSlots.value.length + 1}`,
-    start: '19:00',
-    end: '20:00',
-  })
-  persistSlots()
-}
-
-function removeSlot(index) {
-  if (localSlots.value.length <= 1) {
-    localSlots.value[0] = { name: 'Daily Study Session', start: '17:00', end: '18:00' }
-  } else {
-    localSlots.value.splice(index, 1)
-  }
-  persistSlots()
-}
-
-function applyTemplate(type) {
-  if (type === 'morning_evening') {
-    localSlots.value = [
-      { name: 'Morning Focus', start: '07:30', end: '08:30' },
-      { name: 'Evening Review', start: '20:00', end: '21:00' },
-    ]
-  } else if (type === 'split_shift') {
-    localSlots.value = [
-      { name: 'Pre-Class Reading', start: '07:00', end: '08:00' },
-      { name: 'Night Practice', start: '21:00', end: '22:15' },
-    ]
-  } else if (type === 'deep_work') {
-    localSlots.value = [{ name: 'Deep Study Window', start: '18:00', end: '19:30' }]
-  }
-  persistSlots()
-}
-
-function persistSlots() {
-  const jsonStr = JSON.stringify(localSlots.value)
-  const first = localSlots.value[0] || { start: '17:00', end: '18:00' }
-  emit('save-slots', {
-    study_slots_json: jsonStr,
-    study_start_time: first.start,
-    study_end_time: first.end,
-  })
-}
-
 function close() {
   emit('update:modelValue', false)
 }
@@ -278,28 +223,6 @@ function formatDate(dateStr) {
 
 function formatNumber(num) {
   return num ? Number(num).toLocaleString() : '0'
-}
-
-async function openExternal(url) {
-  try {
-    await openURLInBrowser(url)
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-}
-
-function downloadICS() {
-  downloadRoutineICS(localSlots.value)
-}
-
-function openGoogle() {
-  const first = localSlots.value[0] || { start: '17:00', end: '18:00' }
-  openExternal(getGoogleCalendarUrl(first.start, first.end))
-}
-
-function openOutlook() {
-  const first = localSlots.value[0] || { start: '17:00', end: '18:00' }
-  openExternal(getOutlookCalendarUrl(first.start, first.end))
 }
 </script>
 
@@ -357,23 +280,56 @@ function openOutlook() {
 .metric-value { font-size: 15px; font-weight: 700; color: var(--on-surface); }
 .metric-subtext { font-size: 11px; color: var(--muted-text); margin-top: 3px; }
 .slots-list { display: flex; flex-direction: column; gap: 8px; }
-.slot-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--outline-variant); background: var(--surface-container-highest); }
-.slot-name-input { flex: 1; font-size: 13px; font-weight: 600; border: none; background: transparent; color: var(--on-surface); }
-.slot-name-input:focus { outline: none; }
-.slot-times-group { display: flex; align-items: center; gap: 4px; }
-.slot-time-input { border: 1px solid var(--outline-variant); border-radius: 6px; background: var(--surface-container-lowest); color: var(--on-surface); padding: 4px 6px; font-size: 12px; font-family: inherit; }
-.time-arrow { color: var(--muted-text); font-size: 11px; }
-.slot-duration { font-size: 11px; font-weight: 600; color: var(--muted-text); min-width: 44px; text-align: right; }
-.slot-delete-btn { background: none; border: none; color: var(--muted-text); cursor: pointer; padding: 3px 6px; border-radius: 4px; }
-.slot-delete-btn:hover { color: #eb5e55; }
-.add-slot-btn { background: none; border: 1px dashed var(--outline-variant); color: var(--primary); font-size: 12px; font-weight: 600; padding: 8px; border-radius: 8px; cursor: pointer; width: 100%; }
-.add-slot-btn:hover { border-color: var(--primary); }
-.templates-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-.templates-label { font-size: 11px; color: var(--muted-text); font-weight: 600; }
-.template-pill { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 9999px; border: 1px solid var(--outline-variant); background: var(--surface-container-low); color: var(--on-surface); cursor: pointer; }
-.template-pill:hover { border-color: var(--primary); color: var(--primary); }
-.calendar-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.cal-btn { flex: 1; min-width: 120px; padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--outline-variant); cursor: pointer; background: var(--surface-container-highest); color: var(--on-surface); }
-.cal-btn.ics-btn { border-color: color-mix(in srgb, var(--primary) 30%, transparent); background: color-mix(in srgb, var(--primary) 8%, var(--surface-container-highest)); color: var(--primary); }
-.cal-btn:hover { border-color: var(--primary); }
+.slot-display-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-highest);
+}
+.slot-display-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.slot-display-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+.slot-display-time {
+  font-size: 12px;
+  color: var(--muted-text);
+  font-variant-numeric: tabular-nums;
+}
+.slot-display-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-highest));
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.edit-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px dashed var(--outline-variant);
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+}
+.edit-settings-btn:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--primary);
+}
 </style>

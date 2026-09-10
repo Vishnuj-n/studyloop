@@ -99,5 +99,3 @@ func TestDefaultBaseURLAndModelForGemini(t *testing.T) {
 		t.Fatalf("unexpected Gemini model: %s", got)
 	}
 }
-
-

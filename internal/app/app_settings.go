@@ -50,6 +50,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"analytics_enabled":          s.AnalyticsEnabled,
 		"anonymous_user_id":          s.AnonymousUserID,
 		"target_session_words":       s.TargetSessionWords,
+		"min_session_words":          s.MinSessionWords,
 		"max_active_notebooks":       s.MaxActiveNotebooks,
 	}
 }
@@ -71,6 +72,16 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 		}
 	} else {
 		s.TargetSessionWords = 3000
+	}
+	if s.MinSessionWords > 0 {
+		if s.MinSessionWords > s.TargetSessionWords {
+			return map[string]interface{}{"error": "min session words cannot exceed target session words"}
+		}
+		if s.MinSessionWords < 500 || s.MinSessionWords%500 != 0 {
+			return map[string]interface{}{"error": "min session words must be at least 500 and a multiple of 500"}
+		}
+	} else {
+		s.MinSessionWords = 0
 	}
 	if s.StudyStartTime != "" {
 		if _, err := time.Parse("15:04", s.StudyStartTime); err != nil {
@@ -154,19 +165,19 @@ func (a *App) GetLLMProviderPreset(provider string) map[string]interface{} {
 	case "groq":
 		return map[string]interface{}{
 			"provider": "groq",
-			"base_url": "https://api.groq.com/openai",
+			"base_url": "https://api.groq.com/openai/v1",
 			"model":    "openai/gpt-oss-120b",
 		}
 	case "openai":
 		return map[string]interface{}{
 			"provider": "openai",
-			"base_url": "https://api.openai.com",
+			"base_url": "https://api.openai.com/v1",
 			"model":    "gpt-4.1-mini",
 		}
 	case "openrouter":
 		return map[string]interface{}{
 			"provider": "openrouter",
-			"base_url": "https://openrouter.ai/api",
+			"base_url": "https://openrouter.ai/api/v1",
 			"model":    "openai/gpt-4.1-mini",
 		}
 	default:

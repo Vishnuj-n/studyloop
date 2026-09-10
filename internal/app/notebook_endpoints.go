@@ -967,14 +967,16 @@ func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, pr
 	// Seed initial READING task into study_queue if active
 	if isActivated {
 		settings, err := repo.GetUserSettings()
-		targetWords := 1500
+		targetWords := 3000
+		minWords := 0
 		if err != nil {
 			utils.Warnf("[INGESTION] failed to load user settings for notebook %s, using default: %v", notebookID, err)
 		} else if settings != nil && settings.TargetSessionWords > 0 {
 			targetWords = settings.TargetSessionWords
+			minWords = settings.MinSessionWords
 		}
 
-		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
+		if err := repo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords, minWords); err != nil {
 			utils.Warnf("[INGESTION] failed to ensure initial reading task for %s: %v", notebookID, err)
 		}
 	}

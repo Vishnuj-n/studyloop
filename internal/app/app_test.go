@@ -69,7 +69,7 @@ func initTestProvider(t *testing.T) *llm.Provider {
 	t.Helper()
 
 	mockLLM := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/chat/completions" {
+		if r.URL.Path != "/v1/chat/completions" && r.URL.Path != "/chat/completions" {
 			http.NotFound(w, r)
 			return
 		}

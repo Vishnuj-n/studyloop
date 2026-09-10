@@ -85,13 +85,32 @@
       </p>
     </div>
 
+    <div class="form-group">
+      <label for="min-session-words">Minimum Reading Session Words</label>
+      <input
+        id="min-session-words"
+        v-model.number="settings.min_session_words"
+        type="number"
+        min="0"
+        :max="settings.target_session_words || 20000"
+        step="500"
+        :disabled="disabled"
+      />
+      <p class="hint">
+        Minimum word threshold before ending a slice (set to 0 for automatic default).
+      </p>
+    </div>
+
     <TimeRangeInput
       :start-value="settings.study_start_time"
       :end-value="settings.study_end_time"
+      :slots-json="settings.study_slots_json"
       :duration="studyDuration"
       :disabled="disabled"
       @update:start-value="settings.study_start_time = $event"
       @update:end-value="settings.study_end_time = $event"
+      @update:slots-json="onUpdateSlotsJson"
+      @slots-changed="onSlotsChanged"
       @apply-preset="applyDurationPreset"
     />
 
@@ -101,33 +120,53 @@
         <div>
           <h3>Calendar Routine Sync</h3>
           <p class="hint">
-            Export your daily study routine to your calendar. Your phone and laptop will remind you every day with alarms even when StudyLoop is closed.
+            Export your daily study routine to your calendar. The .ics file imports all study sessions at once. You can also add individual sessions directly to Google or Outlook.
           </p>
         </div>
-      </div>
-
-      <div class="calendar-actions">
         <button
           type="button"
-          class="calendar-btn google-btn"
-          @click="openGoogle"
-        >
-          Add to Google Calendar
-        </button>
-        <button
-          type="button"
-          class="calendar-btn outlook-btn"
-          @click="openOutlook"
-        >
-          Add to Outlook Web
-        </button>
-        <button
-          type="button"
-          class="calendar-btn ics-btn"
+          class="calendar-btn ics-btn main-ics-btn"
           @click="downloadICS"
         >
-          Download .ics (Apple / Windows)
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Download All Sessions (.ics)</span>
         </button>
+      </div>
+
+      <!-- Multi-slot Web Calendar Direct Links -->
+      <div class="slots-calendar-list">
+        <div
+          v-for="(slot, idx) in getActiveSlots()"
+          :key="idx"
+          class="slot-cal-row"
+        >
+          <div class="slot-cal-info">
+            <span class="slot-cal-name">{{ slot.name || `Study Session ${idx + 1}` }}</span>
+            <span class="slot-cal-time">{{ slot.start }} – {{ slot.end }}</span>
+          </div>
+          <div class="slot-cal-actions">
+            <button
+              type="button"
+              class="cal-mini-link-btn"
+              title="Add this session to Google Calendar"
+              @click="openGoogleForSlot(slot)"
+            >
+              + Google Calendar
+            </button>
+            <button
+              type="button"
+              class="cal-mini-link-btn"
+              title="Add this session to Outlook Web"
+              @click="openOutlookForSlot(slot)"
+            >
+              + Outlook Web
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -521,27 +560,74 @@ async function openExternalLink(url) {
   }
 }
 
-function openGoogle() {
-  const url = getGoogleCalendarUrl(
-    props.settings?.study_start_time,
-    props.settings?.study_end_time
-  )
+const localSlots = ref([])
+
+function onSlotsChanged(newSlots) {
+  localSlots.value = Array.isArray(newSlots) ? JSON.parse(JSON.stringify(newSlots)) : []
+}
+
+function onUpdateSlotsJson(json) {
+  props.settings.study_slots_json = json
+  try {
+    const parsed = JSON.parse(json)
+    if (Array.isArray(parsed)) {
+      localSlots.value = parsed
+    }
+  } catch {
+    // Ignore
+  }
+}
+
+function getActiveSlots() {
+  if (localSlots.value && localSlots.value.length > 0) {
+    return localSlots.value
+  }
+  if (props.settings?.study_slots_json) {
+    try {
+      const parsed = JSON.parse(props.settings.study_slots_json)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return [
+    {
+      name: 'Daily Study Session',
+      start: props.settings?.study_start_time || '17:00',
+      end: props.settings?.study_end_time || '18:00',
+    },
+  ]
+}
+
+function openGoogleForSlot(slot) {
+  if (!slot) return
+  const url = getGoogleCalendarUrl(slot.start || '17:00', slot.end || '18:00')
   openExternalLink(url)
+}
+
+function openOutlookForSlot(slot) {
+  if (!slot) return
+  const url = getOutlookCalendarUrl(slot.start || '17:00', slot.end || '18:00', slot.name || 'Study Session')
+  openExternalLink(url)
+}
+
+function openGoogle() {
+  const slots = getActiveSlots()
+  const first = slots[0] || { start: '17:00', end: '18:00' }
+  openGoogleForSlot(first)
 }
 
 function openOutlook() {
-  const url = getOutlookCalendarUrl(
-    props.settings?.study_start_time,
-    props.settings?.study_end_time
-  )
-  openExternalLink(url)
+  const slots = getActiveSlots()
+  const first = slots[0] || { start: '17:00', end: '18:00' }
+  openOutlookForSlot(first)
 }
 
 function downloadICS() {
-  downloadRoutineICS(
-    props.settings?.study_start_time,
-    props.settings?.study_end_time
-  )
+  const slots = getActiveSlots()
+  downloadRoutineICS(slots)
 }
 </script>
 
@@ -836,12 +922,6 @@ h2 {
   transform: translateY(-1px);
 }
 
-.calendar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .calendar-btn {
   flex: 1;
   min-width: 180px;
@@ -866,5 +946,81 @@ h2 {
   color: var(--on-primary-container, #131b2e);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.main-ics-btn {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.main-ics-btn:hover {
+  background: color-mix(in srgb, var(--primary) 85%, black);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.slots-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.slot-cal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.slot-cal-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slot-cal-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.slot-cal-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-text);
+  background: var(--surface-container-high);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.slot-cal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cal-mini-link-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cal-mini-link-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--surface-container-highest);
 }
 </style>
