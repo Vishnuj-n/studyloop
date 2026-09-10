@@ -86,22 +86,35 @@ const DEFAULT_POMO_PROFILES = [
   },
 ]
 
-export function loadPomodoroProfiles() {
+export async function loadPomodoroProfiles() {
+  const bridge = window?.go?.app?.App || window?.go?.main?.App
+  if (bridge?.PomodoroLoadProfiles) {
+    try {
+      const backendProfiles = await bridge.PomodoroLoadProfiles()
+      if (Array.isArray(backendProfiles) && backendProfiles.length > 0) {
+        localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(backendProfiles))
+        return backendProfiles
+      }
+    } catch (err) {
+      console.warn('[POMODORO_API] Backend load profiles failed, falling back to local:', err)
+    }
+  }
+
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return Promise.resolve(parsed)
+        return parsed
       }
     }
   } catch (err) {
     console.warn('[POMODORO_API] Failed to parse stored profiles:', err)
   }
-  return Promise.resolve(DEFAULT_POMO_PROFILES)
+  return DEFAULT_POMO_PROFILES
 }
 
-export function savePomodoroProfile(profile) {
+export async function savePomodoroProfile(profile) {
   try {
     let profiles = []
     const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
@@ -116,9 +129,18 @@ export function savePomodoroProfile(profile) {
     }
     localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
   } catch (err) {
-    console.error('[POMODORO_API] Failed to save profile:', err)
+    console.error('[POMODORO_API] Failed to save profile locally:', err)
   }
-  return Promise.resolve(null)
+
+  const bridge = window?.go?.app?.App || window?.go?.main?.App
+  if (bridge?.PomodoroSaveProfile) {
+    try {
+      await bridge.PomodoroSaveProfile(profile)
+    } catch (err) {
+      console.warn('[POMODORO_API] Backend save profile failed:', err)
+    }
+  }
+  return null
 }
 
 export function deletePomodoroProfile(id) {
