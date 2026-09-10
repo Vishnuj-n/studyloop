@@ -134,15 +134,15 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 	} else if existingNb != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
-			"id":            existingNb.ID,
-			"file_name":     existingNb.Title,
-			"file_type":     existingNb.FileType,
-			"page_count":    existingNb.PageCount,
-			"chunk_count":   existingNb.ChunkCount,
-			"status":        existingNb.Status,
-			"duplicate":     true,
-			"existing_id":   existingNb.ID,
-			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+			"id":          existingNb.ID,
+			"file_name":   existingNb.Title,
+			"file_type":   existingNb.FileType,
+			"page_count":  existingNb.PageCount,
+			"chunk_count": existingNb.ChunkCount,
+			"status":      existingNb.Status,
+			"duplicate":   true,
+			"existing_id": existingNb.ID,
+			"message":     fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
 		}
 	}
 
@@ -440,15 +440,15 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 	} else if existingNb != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
-			"id":            existingNb.ID,
-			"file_name":     existingNb.Title,
-			"file_type":     existingNb.FileType,
-			"page_count":    existingNb.PageCount,
-			"chunk_count":   existingNb.ChunkCount,
-			"status":        existingNb.Status,
-			"duplicate":     true,
-			"existing_id":   existingNb.ID,
-			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+			"id":          existingNb.ID,
+			"file_name":   existingNb.Title,
+			"file_type":   existingNb.FileType,
+			"page_count":  existingNb.PageCount,
+			"chunk_count": existingNb.ChunkCount,
+			"status":      existingNb.Status,
+			"duplicate":   true,
+			"existing_id": existingNb.ID,
+			"message":     fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
 		}
 	}
 
@@ -797,7 +797,12 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if sanitized == "" {
 			sanitized = "topic"
 		}
-		topicID := fmt.Sprintf("nb-%s-ch-%02d-%s", notebookID, i+1, sanitized)
+		// Keep topic identity stable when a user renames a chapter. Titles are
+		// mutable metadata; queue tasks and chunks must not lose their lineage.
+		topicID := fmt.Sprintf("nb-%s-ch-%02d", notebookID, i+1)
+		if i < len(existingTopics) && strings.TrimSpace(existingTopics[i].TopicID) != "" {
+			topicID = existingTopics[i].TopicID
+		}
 		topicIDs = append(topicIDs, topicID)
 
 		topicItems = append(topicItems, db.TopicBatchItem{
@@ -890,6 +895,10 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		// Cleanup: delete newly created topic rows (cascades to chunks, cards, etc.) to avoid orphaned records
 		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "failed to link notebook topics: " + err.Error()}
+	}
+	if err := repo.ReconcileReadingTasksForNotebook(notebookID); err != nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "failed")
+		return map[string]interface{}{"error": "failed to reconcile reading tasks: " + err.Error()}
 	}
 
 	// Delete old orphaned topics that are no longer part of the new syllabus
@@ -1204,7 +1213,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 
 	// Fetch historical completed reading stats from past 7 days
 	wordsPast7Days, sessionsPast7Days, _ := repo.GetProfileCompletedReadingStatsPastNDays(profileID, 7)
-	
+
 	// Feasibility status evaluation: NO_DATA, AHEAD, ON_TRACK, BEHIND
 	feasibilityStatus := "NO_DATA"
 	projectedFinishStr := ""
@@ -1256,22 +1265,22 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"has_deadline":                true,
-		"deadline":                    deadlineTime.Format(dateFormatYYYYMMDD),
-		"daily_pace":                  dailyPace,
-		"remaining_words":             remainingWords,
-		"remaining_sessions":          math.Round(remainingSessions*10) / 10,
-		"target_session_words":        targetWords,
-		"days_remaining":              daysRemaining,
-		"sessions_per_day":            math.Round(requiredDailySessions*10) / 10,
-		"required_daily_sessions":     math.Round(requiredDailySessions*10) / 10,
-		"current_daily_sessions":      math.Round(currentDailySessions*10) / 10,
-		"extra_sessions_needed":       extraDailySessionsNeeded,
-		"feasibility_status":          feasibilityStatus,
-		"projected_finish":            projectedFinishStr,
-		"days_gap":                    daysGap,
-		"pace_label":                  paceLabel,
-		"study_slots_json":            settings.StudySlotsJSON,
+		"has_deadline":            true,
+		"deadline":                deadlineTime.Format(dateFormatYYYYMMDD),
+		"daily_pace":              dailyPace,
+		"remaining_words":         remainingWords,
+		"remaining_sessions":      math.Round(remainingSessions*10) / 10,
+		"target_session_words":    targetWords,
+		"days_remaining":          daysRemaining,
+		"sessions_per_day":        math.Round(requiredDailySessions*10) / 10,
+		"required_daily_sessions": math.Round(requiredDailySessions*10) / 10,
+		"current_daily_sessions":  math.Round(currentDailySessions*10) / 10,
+		"extra_sessions_needed":   extraDailySessionsNeeded,
+		"feasibility_status":      feasibilityStatus,
+		"projected_finish":        projectedFinishStr,
+		"days_gap":                daysGap,
+		"pace_label":              paceLabel,
+		"study_slots_json":        settings.StudySlotsJSON,
 	}
 }
 
@@ -1307,4 +1316,3 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		"status":      "processing",
 	}
 }
-

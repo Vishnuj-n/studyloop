@@ -135,7 +135,7 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 			PageNum: 1,
 		})
 	} else {
-		for i, sec := range sections {
+		for _, sec := range sections {
 			docSections = append(docSections, ExtractedSection{
 				Heading: sec.Heading,
 				Text:    sec.Text,

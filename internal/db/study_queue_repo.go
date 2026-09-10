@@ -757,6 +757,46 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 	})
 }
 
+// ReconcileReadingTasksForNotebook refreshes cached topic/page metadata after
+// syllabus confirmation. Pending orphan tasks are removed so the normal queue
+// seeding path can create tasks from the new bookmark-defined syllabus.
+func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return fmt.Errorf("notebook id is required")
+	}
+	return r.withTx(func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`
+			UPDATE study_queue
+			SET topic_id = (
+				SELECT nt.topic_id FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+				LIMIT 1
+			),
+			start_page = COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), start_page),
+			end_page = COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), end_page)
+			WHERE notebook_id = ?
+			  AND task_type IN ('READING', 'REREAD')
+			  AND status IN ('PENDING', 'ACTIVE')
+		`, notebookID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`
+			DELETE FROM study_queue
+			WHERE notebook_id = ?
+			  AND task_type IN ('READING', 'REREAD')
+			  AND status = 'PENDING'
+			  AND NOT EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+			  )
+		`, notebookID)
+		return err
+	})
+}
+
 // EnsurePendingReadingTasksForActiveNotebooks ensures all active notebooks for a profile have at least one PENDING/ACTIVE task.
 func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID string) error {
 	settings, err := r.GetUserSettings()
