@@ -106,7 +106,6 @@ import {
   playPomodoroShuffleFolder,
   stopPomodoroAudio,
   setPomodoroVolume,
-  recordPomodoroSessionComplete,
 } from '../services/pomodoroApi'
 import { playStudyChime } from '../services/calendarService'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
@@ -276,12 +275,6 @@ onMounted(async () => {
       playStudyChime()
 
       if (sessionType.value === 'work') {
-        try {
-          await recordPomodoroSessionComplete()
-        } catch (err) {
-          console.error('[POMODORO] Failed to record session complete:', err)
-        }
-
         if (currentProfile.value && currentProfile.value.breakDurationSec > 0) {
           sessionType.value = 'break'
           totalSec.value = currentProfile.value.breakDurationSec

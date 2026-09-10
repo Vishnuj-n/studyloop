@@ -49,10 +49,6 @@ func (a *App) PomodoroGetTimerState() map[string]interface{} {
 	}
 }
 
-func (a *App) PomodoroCheckResumeSession() *domain.SessionState {
-	return nil
-}
-
 // ── Pomodoro Audio methods (bound to Wails JS) ──────────────────────────────────
 
 func (a *App) PomodoroPlayLooping(filePath string) {
@@ -225,26 +221,6 @@ func (a *App) PomodoroGetProfileByID(id string) *domain.Profile {
 		Shuffle:          prof.PomoShuffle,
 	}
 	return &p
-}
-
-func (a *App) PomodoroDeleteProfile(id string) error {
-	return nil
-}
-
-func (a *App) PomodoroGetSettings() domain.Settings {
-	return domain.DefaultSettings()
-}
-
-func (a *App) PomodoroSaveSettings(s domain.Settings) error {
-	return nil
-}
-
-func (a *App) PomodoroGetStats() domain.StatsData {
-	return domain.StatsData{}
-}
-
-func (a *App) PomodoroRecordSessionComplete() domain.StatsData {
-	return domain.StatsData{}
 }
 
 func (a *App) PomodoroPickMusicFile() (string, error) {

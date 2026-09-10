@@ -31,10 +31,6 @@ export function getPomodoroTimerState() {
   return appBridge().PomodoroGetTimerState()
 }
 
-export function checkResumePomodoroSession() {
-  return appBridge().PomodoroCheckResumeSession()
-}
-
 // ── Audio ───────────────────────────────────────────────────────────────────
 
 export function playPomodoroLooping(filePath) {
@@ -167,14 +163,6 @@ export function savePomodoroSettings(settings) {
   return Promise.resolve(null)
 }
 
-
-export function getPomodoroStats() {
-  return appBridge().PomodoroGetStats()
-}
-
-export function recordPomodoroSessionComplete() {
-  return appBridge().PomodoroRecordSessionComplete()
-}
 
 export function pickPomodoroMusicFile() {
   return appBridge().PomodoroPickMusicFile()
