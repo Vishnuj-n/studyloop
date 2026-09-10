@@ -183,7 +183,7 @@ func (s *Service) playChimeAsync() {
 	if err != nil {
 		return // silent fail
 	}
-	defer streamer.Close()
+	defer func() { _ = streamer.Close() }()
 
 	_ = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 
@@ -219,13 +219,13 @@ func (s *Service) playFile(path string, stopCh chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	streamer, format, err := mp3.Decode(f)
 	if err != nil {
 		return err
 	}
-	defer streamer.Close()
+	defer func() { _ = streamer.Close() }()
 
 	_ = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 

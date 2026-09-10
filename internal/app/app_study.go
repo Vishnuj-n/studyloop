@@ -570,11 +570,9 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	dayNames := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	for i := 1; i < 7; i++ {
 		targetDay := midnight.Add(time.Duration(i*24) * time.Hour)
-		dayLabel := ""
+		dayLabel := dayNames[targetDay.Weekday()]
 		if i == 1 {
 			dayLabel = "Tomorrow"
-		} else {
-			dayLabel = dayNames[targetDay.Weekday()]
 		}
 
 		timeline[i] = FlashcardDuePoint{

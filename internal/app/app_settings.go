@@ -530,7 +530,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 			}
 			resp, err := client.Do(req)
 			if err == nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusOK {
 					if json.NewDecoder(resp.Body).Decode(&loginResp) == nil && loginResp.SessionToken != "" {
 						authenticated = true
@@ -565,7 +565,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 			}
 			resp, err := client.Do(req)
 			if err == nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				bodyBytes, _ := io.ReadAll(resp.Body)
 				if resp.StatusCode == http.StatusOK {
 					if json.Unmarshal(bodyBytes, &loginResp) == nil && loginResp.SessionToken != "" {
@@ -606,7 +606,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 									}
 									sessReq.Header.Set("Prefer", "return=representation")
 									if sessRes, sDoErr := client.Do(sessReq); sDoErr == nil {
-										defer sessRes.Body.Close()
+										defer func() { _ = sessRes.Body.Close() }()
 										if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
 											var createdSess []map[string]interface{}
 											if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
@@ -728,7 +728,7 @@ func (a *App) SignUpStudent(username, password, classroomCode string) map[string
 			req.Header.Set("Content-Type", "application/json")
 			resp, err := client.Do(req)
 			if err == nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 				if resp.StatusCode == http.StatusOK {
 					signedUp = true
 				}
@@ -775,7 +775,7 @@ func (a *App) SignUpStudent(username, password, classroomCode string) map[string
 		if err != nil {
 			return map[string]interface{}{"error": "network error: " + err.Error()}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode >= 400 {
 			bodyBytes, _ := io.ReadAll(resp.Body)

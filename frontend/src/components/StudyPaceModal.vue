@@ -190,7 +190,13 @@ const totalScheduledTime = computed(() => {
   if (totalMinutes === 0) return '0 min'
   const h = Math.floor(totalMinutes / 60)
   const remM = totalMinutes % 60
-  return h > 0 && remM > 0 ? `${h}h ${remM}m` : h > 0 ? `${h}h` : `${remM}m`
+  if (h > 0 && remM > 0) {
+    return `${h}h ${remM}m`
+  }
+  if (h > 0) {
+    return `${h}h`
+  }
+  return `${remM}m`
 })
 
 function computeSlotDuration(start, end) {

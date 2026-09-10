@@ -198,7 +198,7 @@ func (r *Repository) GetTokensPerPageMap(topicID string, startPage int, endPage 
 			return nil, err
 		}
 
-		pageTotal := 0
+		var pageTotal int
 		if tokenCount > 0 {
 			pageTotal = tokenCount
 		} else {

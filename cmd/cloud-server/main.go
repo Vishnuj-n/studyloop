@@ -115,7 +115,9 @@ func extractSessionToken(r *http.Request) string {
 	return strings.TrimSpace(tok)
 }
 
-func validateSession(r *http.Request, reqClassroomCode string, requiredRole string) bool {
+// validateTeacherSession validates active teacher session and classroom code.
+func validateSession(r *http.Request, reqClassroomCode string) bool {
+	const requiredRole = "teacher"
 	token := extractSessionToken(r)
 	if token == "" || supabaseURL == "" || supabaseKey == "" {
 		return false
@@ -133,7 +135,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 	if err != nil || sRes.StatusCode != http.StatusOK {
 		return false
 	}
-	defer sRes.Body.Close()
+	defer func() { _ = sRes.Body.Close() }()
 
 	sBody, _ := io.ReadAll(sRes.Body)
 	var sessions []map[string]interface{}
@@ -170,7 +172,7 @@ func validateSession(r *http.Request, reqClassroomCode string, requiredRole stri
 	if err != nil || uRes.StatusCode != http.StatusOK {
 		return false
 	}
-	defer uRes.Body.Close()
+	defer func() { _ = uRes.Body.Close() }()
 
 	uBody, _ := io.ReadAll(uRes.Body)
 	var users []map[string]interface{}
@@ -269,7 +271,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, "Failed to connect to authentication backend")
 		return
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	respBody, _ := io.ReadAll(res.Body)
 	if res.StatusCode != http.StatusOK {
@@ -352,7 +354,7 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 	cReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 	cRes, cErr := httpClient.Do(cReq)
 	if cErr == nil {
-		defer cRes.Body.Close()
+		defer func() { _ = cRes.Body.Close() }()
 		cBody, _ := io.ReadAll(cRes.Body)
 		var existing []map[string]interface{}
 		if json.Unmarshal(cBody, &existing) == nil && len(existing) > 0 {
@@ -393,7 +395,7 @@ func handleSignup(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, "Failed to connect to authentication backend")
 		return
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	respBody, _ := io.ReadAll(res.Body)
 	if res.StatusCode >= 400 {
@@ -450,7 +452,7 @@ func createActiveSession(uname, role string) string {
 		sessReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		sessReq.Header.Set("Prefer", preferRepresentation)
 		if sessRes, sDoErr := httpClient.Do(sessReq); sDoErr == nil {
-			defer sessRes.Body.Close()
+			defer func() { _ = sessRes.Body.Close() }()
 			if sessBody, sReadErr := io.ReadAll(sessRes.Body); sReadErr == nil && sessRes.StatusCode < 400 {
 				var createdSess []map[string]interface{}
 				if json.Unmarshal(sessBody, &createdSess) == nil && len(createdSess) > 0 {
@@ -488,7 +490,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !validateSession(r, classroomCode, "teacher") {
+	if !validateSession(r, classroomCode) {
 		log.Printf("[WARN] Dashboard unauthorized or invalid session for classroom %s", classroomCode)
 		jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 		return
@@ -512,7 +514,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		uReq.Header.Set("apikey", supabaseKey)
 		uReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		if uRes, err := httpClient.Do(uReq); err == nil && uRes.StatusCode == http.StatusOK {
-			defer uRes.Body.Close()
+			defer func() { _ = uRes.Body.Close() }()
 			uBody, _ := io.ReadAll(uRes.Body)
 			var rawUsers []map[string]interface{}
 			if json.Unmarshal(uBody, &rawUsers) == nil {
@@ -541,7 +543,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("Dashboard fetch failed: %v", err))
 		return
 	}
-	defer nbRes.Body.Close()
+	defer func() { _ = nbRes.Body.Close() }()
 
 	nbBody, _ := io.ReadAll(nbRes.Body)
 	var rawNbs []map[string]interface{}
@@ -566,7 +568,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		lReq.Header.Set("apikey", supabaseKey)
 		lReq.Header.Set("Authorization", bearerPrefix+supabaseKey)
 		if lRes, err := httpClient.Do(lReq); err == nil && lRes.StatusCode == http.StatusOK {
-			defer lRes.Body.Close()
+			defer func() { _ = lRes.Body.Close() }()
 			lBody, _ := io.ReadAll(lRes.Body)
 			var rawLogs []map[string]interface{}
 			if json.Unmarshal(lBody, &rawLogs) == nil {
@@ -621,7 +623,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusBadRequest, "Classroom code required")
 			return
 		}
-		if !validateSession(r, classroomCode, "teacher") {
+		if !validateSession(r, classroomCode) {
 			jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 			return
 		}
@@ -640,7 +642,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		respBody, _ := io.ReadAll(res.Body)
 		var list interface{}
@@ -663,7 +665,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusBadRequest, "Invalid JSON payload")
 			return
 		}
-		if !validateSession(r, req.ClassroomCode, "teacher") {
+		if !validateSession(r, req.ClassroomCode) {
 			jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 			return
 		}
@@ -700,7 +702,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		if res.StatusCode >= 400 {
 			respBody, _ := io.ReadAll(res.Body)
@@ -716,7 +718,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		classroomCode := r.URL.Query().Get("classroom_code")
-		if classroomCode != "" && !validateSession(r, classroomCode, "teacher") {
+		if classroomCode != "" && !validateSession(r, classroomCode) {
 			jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 			return
 		}
@@ -735,7 +737,7 @@ func handleAssignments(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		jsonResponse(w, http.StatusOK, map[string]bool{"success": true})
 
@@ -763,7 +765,7 @@ func handleSync(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "Classroom code is required")
 		return
 	}
-	if !validateSession(r, classCode, "teacher") {
+	if !validateSession(r, classCode) {
 		jsonError(w, http.StatusUnauthorized, "Unauthorized: invalid or expired teacher session")
 		return
 	}
@@ -787,7 +789,7 @@ func handleSync(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadGateway, "Failed to query upstream sync endpoint")
 		return
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	respBody, _ := io.ReadAll(res.Body)
 	var assignments []interface{}

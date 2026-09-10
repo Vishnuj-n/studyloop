@@ -100,11 +100,11 @@ func (nfs noDirListingFS) Open(name string) (http.File, error) {
 	}
 	stat, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close() // read-only file handle being aborted
 		return nil, err
 	}
 	if stat.IsDir() {
-		file.Close()
+		_ = file.Close() // prevent directory listing
 		return nil, os.ErrPermission
 	}
 	return file, nil
