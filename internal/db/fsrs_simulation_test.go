@@ -37,8 +37,8 @@ func computeNextState(state models.FlashcardState, rating int, now time.Time, du
 	return updatedState, nil
 }
 
-// reviewCard performs one FSRS review with the given rating, persists it, and returns the new due_at.
-func reviewCard(t *testing.T, repo *db.Repository, cardID, topicID string, rating fsrs.Rating, simNow time.Time, currentDueAt int64) int64 {
+// reviewCard performs one FSRS review with the given rating and persists it.
+func reviewCard(t *testing.T, repo *db.Repository, cardID, topicID string, rating fsrs.Rating, simNow time.Time, currentDueAt int64) {
 	t.Helper()
 
 	card, state, err := repo.GetFlashcardByID(cardID)
@@ -79,8 +79,6 @@ func reviewCard(t *testing.T, repo *db.Repository, cardID, topicID string, ratin
 	if err := repo.UpdateFlashcardReview(cardID, newDueAt, currentDueAt, string(stateBeforeJSON), newState, reviewLog); err != nil {
 		t.Fatalf("UpdateFlashcardReview failed: %v", err)
 	}
-
-	return newDueAt
 }
 
 // TestFSRS365DaySimulation runs a 365-day time-travel simulation of the FSRS

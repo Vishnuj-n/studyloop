@@ -44,7 +44,7 @@ func extractSequentialSingleReader(filePath string, startPage, endPage int) (str
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	total := reader.NumPage()
 	minP := 1
@@ -85,7 +85,7 @@ func extractSequentialStream(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	plainReader, err := reader.GetPlainText()
 	if err != nil {
@@ -108,7 +108,7 @@ func extractParallelSharedReader(filePath string, startPage, endPage, numWorkers
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	total := reader.NumPage()
 	minP := 1
@@ -188,7 +188,10 @@ func extractParallelIndependentHandles(filePath string, startPage, endPage, numW
 		return "", err
 	}
 	total := initReader.NumPage()
-	initFile.Close()
+	// Read-only PDF handle for metadata probe; error logged if any
+	if err := initFile.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: closing read-only PDF handle: %v\n", err)
+	}
 
 	minP := 1
 	if startPage > 0 {
@@ -226,7 +229,7 @@ func extractParallelIndependentHandles(filePath string, startPage, endPage, numW
 				errOnce.Do(func() { workerErr = err })
 				return
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			for t := range tasks {
 				page := r.Page(t.pageNum)
@@ -516,7 +519,7 @@ func main() {
 		os.Exit(1)
 	}
 	totalDocPages := r.NumPage()
-	f.Close()
+	_ = f.Close()
 
 	minP := *startPage
 	if minP <= 0 {

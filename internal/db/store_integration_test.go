@@ -1157,7 +1157,7 @@ func TestInitOnLegacyDatabaseAddsMissingColumns(t *testing.T) {
 	}
 	tempDBPath := tempDB.Name()
 	_ = tempDB.Close()
-	defer os.Remove(tempDBPath)
+	defer func() { _ = os.Remove(tempDBPath) }()
 
 	// Pre-create llm_settings table with legacy schema (missing max_input_tokens and max_output_tokens)
 	sqlDB, err := sql.Open("sqlite3", tempDBPath)
@@ -1186,7 +1186,7 @@ func TestInitOnLegacyDatabaseAddsMissingColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Init failed on legacy database: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	settings, err := repo.GetLLMSettings()
 	if err != nil {

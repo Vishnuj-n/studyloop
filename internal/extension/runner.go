@@ -100,7 +100,7 @@ func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable 
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		stdinPipe.Close()
+		_ = stdinPipe.Close()
 		return fmt.Errorf("failed to open stdout pipe: %w", err)
 	}
 
@@ -108,14 +108,14 @@ func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable 
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
-		stdinPipe.Close()
-		stdoutPipe.Close()
+		_ = stdinPipe.Close()
+		_ = stdoutPipe.Close()
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
 	writeErrCh := make(chan error, 1)
 	go func() {
-		defer stdinPipe.Close()
+		defer func() { _ = stdinPipe.Close() }()
 		if len(input) > 0 {
 			n, err := stdinPipe.Write(input)
 			if err != nil {

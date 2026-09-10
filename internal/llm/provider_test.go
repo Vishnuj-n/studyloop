@@ -51,7 +51,7 @@ func TestLoadConfigFromEnvForPrefixFallsBackToLegacyVars(t *testing.T) {
 }
 
 func TestGetModelLimitsDefault(t *testing.T) {
-	limits := getModelLimits("any-model")
+	limits := getModelLimits()
 	if limits.MaxInputTokens != 4000 {
 		t.Errorf("expected default MaxInputTokens to be 4000, got %d", limits.MaxInputTokens)
 	}

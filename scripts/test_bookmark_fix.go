@@ -109,8 +109,11 @@ func main() {
 		return
 	}
 	tmpPath := tmpFile.Name()
-	tmpFile.Close()
-	defer os.Remove(tmpPath)
+	if err := tmpFile.Close(); err != nil {
+		fmt.Printf("Error closing temp file: %v\n", err)
+		return
+	}
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "pdfcpu", "bookmarks", "export", absPath, tmpPath)
@@ -137,7 +140,7 @@ func main() {
 	fmt.Printf("Prompt Token Reduction: %.1f%%\n\n", (1.0-float64(len(compactJSON))/float64(len(rawJSON)))*100)
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Extracted %d Bookmark Nodes from %s:\n", len(chapters), filepath.Base(absPath)))
+	fmt.Fprintf(&sb, "Extracted %d Bookmark Nodes from %s:\n", len(chapters), filepath.Base(absPath))
 	sb.WriteString(strings.Repeat("-", 60) + "\n")
 
 	fmt.Println("Extracted Bookmark Nodes:")

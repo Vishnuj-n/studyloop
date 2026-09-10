@@ -387,15 +387,14 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 	task models.StudyQueueTask,
 	attempt *models.QuizAttemptRecord,
 	failedQuestions []models.FailedQuestionDetail,
-) (string, string, models.StudyTaskStatus, bool, models.StudyQueueTask, error) {
+) (string, string, bool, models.StudyQueueTask, error) {
 	feedback := "Concept rescue activated. Complete the Socratic session to retry."
 	attempt.Feedback = feedback
-	completionStatus := models.StudyTaskStatusCompleted
 	manualReviewRecommended := true
 
 	// Safety transaction: Delete FSRS cards to protect purity from rote clutter
 	if err := s.repo.DeleteFSRSCardsByTopicIDTx(tx, task.TopicID); err != nil {
-		return "", "", models.StudyTaskStatusCompleted, false, models.StudyQueueTask{}, fmt.Errorf("failed to delete FSRS cards: %w", err)
+		return "", "", false, models.StudyQueueTask{}, fmt.Errorf("failed to delete FSRS cards: %w", err)
 	}
 
 	// Shift session into Socratic Rescue Lane by generating a SOCRATIC_REMEDIAL task
@@ -418,7 +417,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 		EndPage:     task.EndPage,
 	}
 
-	return socraticTaskID, feedback, completionStatus, manualReviewRecommended, followUp, nil
+	return socraticTaskID, feedback, manualReviewRecommended, followUp, nil
 }
 
 type quizScoringResult struct {
@@ -622,7 +621,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		} else {
 			if strategy == "FAST" {
 				var followUp models.StudyQueueTask
-				socraticTaskID, feedback, completionStatus, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
+				socraticTaskID, feedback, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
 				if err != nil {
 					return models.QuizResult{}, err
 				}
@@ -649,7 +648,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 				} else {
 					// Strike 3: SOCRATIC_REMEDIAL rescue
 					var followUp models.StudyQueueTask
-					socraticTaskID, feedback, completionStatus, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
+					socraticTaskID, feedback, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
 					if err != nil {
 						return models.QuizResult{}, err
 					}
