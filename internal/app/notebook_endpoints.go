@@ -1200,13 +1200,13 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	// Workload in sessions (e.g. 42,000 words / 3,000 words per session = 14 sessions)
 	remainingSessions := 0.0
 	if remainingWords > 0 && targetWords > 0 {
-		remainingSessions = float64(remainingWords) / float64(targetWords)
+		remainingSessions = math.Ceil(float64(remainingWords) / float64(targetWords))
 	}
 
 	// Calculate required daily sessions
 	requiredDailySessions := 0.0
 	if daysRemaining > 0 && remainingSessions > 0 {
-		requiredDailySessions = remainingSessions / float64(daysRemaining)
+		requiredDailySessions = math.Ceil(remainingSessions / float64(daysRemaining))
 	} else if remainingSessions > 0 {
 		requiredDailySessions = remainingSessions
 	}
@@ -1245,7 +1245,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 				feasibilityStatus = "BEHIND"
 				diff := requiredDailySessions - currentDailySessions
 				if diff > 0 {
-					extraDailySessionsNeeded = math.Round(diff*10) / 10
+					extraDailySessionsNeeded = math.Ceil(diff)
 				}
 			}
 		}

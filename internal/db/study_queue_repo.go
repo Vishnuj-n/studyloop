@@ -690,6 +690,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			// Semantic extension: check up to +3 additional pages
 			const maxExtensionPages = 3
 			const minSimilarityThreshold = 0.85
+			const minExtensionPageWords = 50
 			maxTotalWords := maxWordsCeiling
 			if maxTotalWords < targetSessionWords {
 				maxTotalWords = targetSessionWords + int(float64(targetSessionWords)*0.5)
@@ -708,6 +709,10 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 				nextPageWords := wordMap[nextPage]
 				if nextPageWords <= 0 {
 					nextPageWords = FallbackWordsPerPage
+				}
+				if wordMap[nextPage] > 0 && wordMap[nextPage] < minExtensionPageWords {
+					stopReason = "sparse_page"
+					break
 				}
 
 				if currentWords+nextPageWords > maxTotalWords {

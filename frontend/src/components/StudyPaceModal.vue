@@ -42,7 +42,7 @@
           <div class="metrics-grid">
             <div class="metric-item">
               <span class="metric-label">Remaining Workload</span>
-              <span class="metric-value">~{{ pace?.remaining_sessions ?? 0 }} sessions</span>
+              <span class="metric-value">~{{ pace?.remaining_sessions ? Math.ceil(pace.remaining_sessions) : 0 }} sessions</span>
               <span class="metric-subtext">1 session ≈ {{ formatNumber(pace?.target_session_words || 3000) }} words</span>
             </div>
 
@@ -54,7 +54,7 @@
 
             <div class="metric-item">
               <span class="metric-label">Target Pace</span>
-              <span class="metric-value">{{ pace?.required_daily_sessions ? `${pace.required_daily_sessions} sess/day` : '—' }}</span>
+              <span class="metric-value">{{ pace?.required_daily_sessions ? `${Math.ceil(pace.required_daily_sessions)} sess/day` : '—' }}</span>
               <span class="metric-subtext">Needed for exam deadline</span>
             </div>
 
@@ -164,10 +164,10 @@ const statusExplanation = computed(() => {
     return `At your current velocity of ${props.pace?.current_daily_sessions || 1} sessions/day, you'll comfortably finish on ${formatDate(props.pace?.projected_finish)}.`
   }
   if (s === 'ON_TRACK') {
-    return `Your reading pace matches the required ${props.pace?.required_daily_sessions || 1} sessions/day to complete on schedule.`
+    return `Your reading pace matches the required ${Math.ceil(props.pace?.required_daily_sessions || 1)} sessions/day to complete on schedule.`
   }
   if (s === 'BEHIND') {
-    const needed = props.pace?.extra_sessions_needed || 0.5
+    const needed = Math.ceil(props.pace?.extra_sessions_needed || 1)
     const sessText = needed === 1 ? '1 session/day' : `${needed} sessions/day`
     if (needed >= 2) {
       return `Add ~${sessText} (or consider spacing out your target exam date) to complete your remaining curriculum on time.`

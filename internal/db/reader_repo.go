@@ -783,7 +783,7 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 const (
 	FallbackWordsPerPage = 500
 	MaxPageScanLimit     = 100
-	ClampWindowPages     = 4
+	ClampWindowPages     = 8
 )
 
 // ResolvePageWindow resolves the start and end page window for a reading topic cursor based on token budget.

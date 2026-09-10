@@ -592,6 +592,13 @@ func TestCreateReviewSessionDueCardBatchingAndDuplicatePrevention(t *testing.T) 
 	if linkedCount != 23 {
 		t.Fatalf("expected 23 linked review cards, got %d", linkedCount)
 	}
+	// A new card becomes due while the existing task is still pending. It must
+	// join that book's pending session instead of creating a later one-card task.
+	if err := testRepo.CreateFlashcards("topic-review-a", []models.Flashcard{{
+		ID: "late-due-card", TopicID: "topic-review-a", Prompt: "late", Answer: "late", DueAt: time.Now().Unix(),
+	}}, map[string]models.FlashcardState{"late-due-card": {}}); err != nil {
+		t.Fatalf("CreateFlashcards late due card failed: %v", err)
+	}
 
 	task2, existing2, err := testRepo.CreateReviewSession("nb-review")
 	if err != nil {
@@ -603,6 +610,7 @@ func TestCreateReviewSessionDueCardBatchingAndDuplicatePrevention(t *testing.T) 
 	if task2 == nil || task2.ID != task.ID {
 		t.Fatalf("expected duplicate prevention to return task %s, got %#v", task.ID, task2)
 	}
+	assertCountEquals(t, `SELECT COUNT(*) FROM review_task_cards WHERE task_id = ?`, task.ID, 24)
 	assertCountEquals(t, `SELECT COUNT(*) FROM study_queue WHERE notebook_id = ? AND task_type = 'FLASHCARD_REVIEW'`, "nb-review", 1)
 }
 
@@ -1701,4 +1709,3 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 		t.Fatalf("unexpected unexamined attempts: %#v", topicAttemptsAfter)
 	}
 }
-
