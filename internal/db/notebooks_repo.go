@@ -728,7 +728,10 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			return tableErr
 		}
 
-		if hasChunkVectors {
+		// Vector cleanup is optional. A notebook without chunks cannot have
+		// vectors, and an unavailable vec0 extension must not block deleting
+		// the notebook's ordinary relational data.
+		if hasChunkVectors && len(chunkIDs) > 0 {
 			if _, delVecErr := tx.Exec(`
 				DELETE FROM chunk_vectors
 				WHERE rowid IN (
@@ -737,7 +740,7 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 					JOIN notebook_chunks nc ON nc.chunk_id = c.id
 					WHERE nc.notebook_id = ?
 				)
-			`, notebookID); delVecErr != nil {
+			`, notebookID); delVecErr != nil && !isVectorUnavailableError(delVecErr) {
 				return delVecErr
 			}
 		}
@@ -1331,6 +1334,5 @@ func (r *Repository) PersistAnkiDeckImport(input AnkiDeckImportInput) ([]models.
 	}
 	return createdCards, nil
 }
-
 
 
