@@ -1216,11 +1216,15 @@ func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
 	if settings.MaxActiveNotebooks != 4 {
 		t.Fatalf("expected default MaxActiveNotebooks 4, got %d", settings.MaxActiveNotebooks)
 	}
+	if settings.StudySlotsJSON != "[]" {
+		t.Fatalf("expected default StudySlotsJSON '[]', got %q", settings.StudySlotsJSON)
+	}
 
 	settings.QuizQuestionCount = 5
 	settings.QuizPassingScore = 80
 	settings.TutorStyle = "direct"
 	settings.MaxActiveNotebooks = 10
+	settings.StudySlotsJSON = `[{"start":"09:00","end":"10:00"}]`
 
 	if err := testRepo.UpdateUserSettings(*settings); err != nil {
 		t.Fatalf("UpdateUserSettings failed: %v", err)
@@ -1241,5 +1245,8 @@ func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
 	}
 	if updated.MaxActiveNotebooks != 10 {
 		t.Fatalf("expected updated MaxActiveNotebooks 10, got %d", updated.MaxActiveNotebooks)
+	}
+	if updated.StudySlotsJSON != `[{"start":"09:00","end":"10:00"}]` {
+		t.Fatalf("expected updated StudySlotsJSON '[{\"start\":\"09:00\",\"end\":\"10:00\"}]', got %q", updated.StudySlotsJSON)
 	}
 }
