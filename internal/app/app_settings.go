@@ -165,7 +165,7 @@ func (a *App) GetLLMProviderPreset(provider string) map[string]interface{} {
 	case "groq":
 		return map[string]interface{}{
 			"provider": "groq",
-			"base_url": "https://api.groq.com/openai",
+			"base_url": "https://api.groq.com/openai/v1",
 			"model":    "openai/gpt-oss-120b",
 		}
 	case "openai":

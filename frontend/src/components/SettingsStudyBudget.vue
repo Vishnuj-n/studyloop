@@ -922,12 +922,6 @@ h2 {
   transform: translateY(-1px);
 }
 
-.calendar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .calendar-btn {
   flex: 1;
   min-width: 180px;

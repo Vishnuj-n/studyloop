@@ -18,7 +18,7 @@ export function useLLM(loading, errorRef, successRef) {
     fast: {
       tier: 'fast',
       provider: 'groq',
-      base_url: 'https://api.groq.com/openai',
+      base_url: 'https://api.groq.com/openai/v1',
       model: 'openai/gpt-oss-120b',
       timeout_ms: 60000,
       max_input_tokens: 4000,
@@ -29,7 +29,7 @@ export function useLLM(loading, errorRef, successRef) {
     heavy: {
       tier: 'heavy',
       provider: 'groq',
-      base_url: 'https://api.groq.com/openai',
+      base_url: 'https://api.groq.com/openai/v1',
       model: 'openai/gpt-oss-120b',
       timeout_ms: 90000,
       max_input_tokens: 4000,

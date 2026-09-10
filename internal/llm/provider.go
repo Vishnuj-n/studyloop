@@ -317,6 +317,9 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	baseURL := strings.TrimSuffix(p.config.BaseURL, "/")
+	if strings.EqualFold(baseURL, "https://api.groq.com/openai") {
+		baseURL = "https://api.groq.com/openai/v1"
+	}
 	var url string
 	if strings.HasSuffix(baseURL, "/chat/completions") {
 		url = baseURL

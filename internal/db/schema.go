@@ -404,11 +404,20 @@ func InitSchema(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
 		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
 		VALUES
-			('fast', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
-			('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
+			('fast', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
+			('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
 		ON CONFLICT(tier) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
+	}
+
+	// Upgrade any previously seeded groq base_url that missed /v1
+	if _, err := tx.Exec(`
+		UPDATE llm_settings
+		SET base_url = 'https://api.groq.com/openai/v1'
+		WHERE provider = 'groq' AND (base_url = 'https://api.groq.com/openai' OR base_url = 'https://api.groq.com/openai/')
+	`); err != nil {
+		return fmt.Errorf("failed to update legacy groq base_url: %w", err)
 	}
 
 	// Initialize default gamification state

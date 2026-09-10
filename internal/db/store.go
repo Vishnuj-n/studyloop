@@ -647,7 +647,7 @@ func defaultLLMTier(tier string) models.LLMTierSettings {
 	return models.LLMTierSettings{
 		Tier:            tier,
 		Provider:        "groq",
-		BaseURL:         "https://api.groq.com/openai",
+		BaseURL:         "https://api.groq.com/openai/v1",
 		Model:           "openai/gpt-oss-120b",
 		TimeoutMs:       timeout,
 		MaxInputTokens:  4000,
@@ -705,7 +705,7 @@ func defaultBaseURLForProvider(provider string) string {
 	case "gemini":
 		return "https://generativelanguage.googleapis.com/v1beta/openai"
 	case "groq":
-		return "https://api.groq.com/openai"
+		return "https://api.groq.com/openai/v1"
 	case "openai":
 		return "https://api.openai.com"
 	case "openrouter":

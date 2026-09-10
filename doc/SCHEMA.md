@@ -408,8 +408,8 @@ LLM provider config per performance tier.
 **Bootstrap:** Two rows inserted on initial schema creation:
 
 ```
-('fast',  'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 60000, 'keyring', 0)
-('heavy', 'groq', 'https://api.groq.com/openai', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
+('fast',  'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 'keyring', 0)
+('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
 ```
 
 ### `study_profiles`
