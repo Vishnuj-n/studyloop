@@ -236,26 +236,24 @@
             <label for="pomo-work-min">Focus Duration (Minutes)</label>
             <input
               id="pomo-work-min"
-              v-model.number="pomoDurationMinutes"
+              v-model.number="workMinutes"
               type="number"
               min="1"
               max="120"
               step="1"
               :disabled="disabled"
-              @change="onSavePomoProfile"
             />
           </div>
           <div class="form-group field-half">
             <label for="pomo-break-min">Break Duration (Minutes)</label>
             <input
               id="pomo-break-min"
-              v-model.number="pomoBreakMinutes"
+              v-model.number="breakMinutes"
               type="number"
               min="0"
               max="60"
               step="1"
               :disabled="disabled"
-              @change="onSavePomoProfile"
             />
           </div>
         </div>
@@ -329,6 +327,9 @@
             step="5"
             :disabled="disabled"
             class="volume-slider"
+            :style="{
+              background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${pomoSettings.defaultVolume ?? 70}%, var(--surface-container-highest) ${pomoSettings.defaultVolume ?? 70}%, var(--surface-container-highest) 100%)`
+            }"
             @change="onSavePomoSettings"
           />
         </div>
@@ -404,22 +405,13 @@ const pomoProfile = ref({
   isDefault: true,
 })
 
-const pomoDurationMinutes = computed({
-  get: () => Math.round((pomoProfile.value.durationSec || 25 * 60) / 60),
-  set: (val) => {
-    pomoProfile.value.durationSec = Math.max(1, Number(val) || 25) * 60
-  },
-})
-
-const pomoBreakMinutes = computed({
-  get: () => Math.round((pomoProfile.value.breakDurationSec || 5 * 60) / 60),
-  set: (val) => {
-    pomoProfile.value.breakDurationSec = Math.max(0, Number(val) || 0) * 60
-  },
-})
+const workMinutes = ref(25)
+const breakMinutes = ref(5)
 
 const pomoMusicPath = computed(() => pomoProfile.value.musicPath || '')
 const pomoIsShuffle = computed(() => !!pomoProfile.value.shuffle)
+
+let isInternalUpdate = false
 
 async function loadPomoData() {
   try {
@@ -432,7 +424,14 @@ async function loadPomoData() {
     }
     const profiles = await loadPomodoroProfiles()
     if (Array.isArray(profiles) && profiles.length > 0) {
-      pomoProfile.value = profiles.find((p) => p.isDefault) || profiles[0]
+      const def = profiles.find((p) => p.isDefault) || profiles[0]
+      pomoProfile.value = def
+      isInternalUpdate = true
+      workMinutes.value = Math.round((def.durationSec || 25 * 60) / 60)
+      breakMinutes.value = Math.round((def.breakDurationSec ?? 5 * 60) / 60)
+      setTimeout(() => {
+        isInternalUpdate = false
+      }, 50)
     }
   } catch (err) {
     console.warn('[POMODORO_SETTINGS] Error loading config:', err)
@@ -452,7 +451,33 @@ async function onSavePomoSettings() {
   }
 }
 
+let pomoSaveTimer = null
+
+watch([workMinutes, breakMinutes], ([newWork, newBreak]) => {
+  if (isInternalUpdate) return
+
+  if (pomoSaveTimer) clearTimeout(pomoSaveTimer)
+  pomoSaveTimer = setTimeout(async () => {
+    const w = typeof newWork === 'number' && newWork > 0 ? newWork : 25
+    const b = typeof newBreak === 'number' && newBreak >= 0 ? newBreak : 0
+
+    pomoProfile.value.durationSec = w * 60
+    pomoProfile.value.breakDurationSec = b * 60
+
+    try {
+      await savePomodoroProfile(pomoProfile.value)
+      window.dispatchEvent(new CustomEvent('pomodoro-settings-updated'))
+    } catch (err) {
+      console.error('[POMODORO_SETTINGS] Error saving profile:', err)
+    }
+  }, 350)
+})
+
 async function onSavePomoProfile() {
+  if (pomoSaveTimer) {
+    clearTimeout(pomoSaveTimer)
+    pomoSaveTimer = null
+  }
   try {
     await savePomodoroProfile(pomoProfile.value)
     window.dispatchEvent(new CustomEvent('pomodoro-settings-updated'))
@@ -705,6 +730,82 @@ select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 15%, transparent);
   outline: none;
+}
+
+.volume-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+  margin: 10px 0 6px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.volume-slider:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface-container-lowest);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--on-surface) 25%, transparent);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.volume-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.volume-slider::-moz-range-track {
+  height: 6px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 9999px;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface-container-lowest);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--on-surface) 25%, transparent);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.volume-slider::-moz-range-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.volume-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .settings-row-pair {

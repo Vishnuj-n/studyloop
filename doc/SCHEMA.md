@@ -359,7 +359,7 @@ Singleton table for global preferences.
 | `skip_to_reading_active` | BOOLEAN DEFAULT 0 | Skip dashboard to active reading |
 | `cloud_sync_url` | TEXT DEFAULT '' | Remote sync endpoint URL |
 | `cloud_api_token` | TEXT DEFAULT '' | Remote sync auth token |
-| `theme` | TEXT DEFAULT 'light-classic' | UI theme selector |
+| `theme` | TEXT DEFAULT 'dark-gruvbox' | UI theme selector |
 | `rag_enabled` | BOOLEAN DEFAULT 0 | Master RAG toggle |
 | `rag_notebook_chapter` | BOOLEAN DEFAULT 1 | RAG over notebook chapters |
 | `rag_entire_notebook` | BOOLEAN DEFAULT 1 | RAG over entire notebook |
