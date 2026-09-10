@@ -380,6 +380,19 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+// SkipReadingTask marks a READING task as SKIPPED and advances the topic cursor
+// so the same session is not re-seeded by EnsurePendingReadingTaskForNotebook.
+func (a *App) SkipReadingTask(taskID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.SkipReadingTask(taskID); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
 func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {

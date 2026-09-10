@@ -209,6 +209,43 @@ func (r *Repository) CompleteTask(taskID string, result models.CompletionResult)
 	return nil
 }
 
+// SkipReadingTask marks a READING task as SKIPPED and advances the topic's
+// current_page_cursor to task.EndPage so EnsurePendingReadingTaskForNotebook
+// does not re-seed the identical session on the next queue replenishment.
+func (r *Repository) SkipReadingTask(taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
+	}
+	return r.withTx(func(tx *sql.Tx) error {
+		var topicID string
+		var endPage int
+		err := tx.QueryRow(`
+			SELECT COALESCE(topic_id,''), COALESCE(end_page,0)
+			FROM study_queue WHERE id = ?
+		`, taskID).Scan(&topicID, &endPage)
+		if err != nil {
+			return fmt.Errorf("SkipReadingTask: task not found: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE study_queue SET status = 'SKIPPED', completed_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND status IN ('PENDING','ACTIVE')
+		`, taskID); err != nil {
+			return fmt.Errorf("SkipReadingTask: status update failed: %w", err)
+		}
+		if topicID != "" && endPage > 0 {
+			if _, err := tx.Exec(`
+				UPDATE topics SET current_page_cursor = MAX(COALESCE(current_page_cursor,0), ?)
+				WHERE id = ?
+			`, endPage, topicID); err != nil {
+				return fmt.Errorf("SkipReadingTask: cursor advance failed: %w", err)
+			}
+		}
+		utils.Warnf("[QUEUE] SkipReadingTask taskID=%s topicID=%s cursorAdvancedTo=%d", taskID, topicID, endPage)
+		return nil
+	})
+}
+
 // PersistReadingProgress persists page progress directly to topics.current_page_cursor.
 // Used in trust-based completion model where user decides when reading is complete.
 func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool, error) {

@@ -91,12 +91,36 @@
               {{ copyError }}
             </span>
           </div>
-          <div v-if="isTaskFlow && reader.hasNavigationBounds.value" class="stage-head-right">
-            <span class="reading-window-info">
+          <div v-if="isTaskFlow" class="stage-head-right">
+            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info">
               Reading Window: Pages {{ reader.navigationMinPage.value }}-{{
                 reader.navigationMaxPage.value
               }}
             </span>
+            <button
+              class="secondary skip-session-btn"
+              :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+              title="Skip this session — pages marked as read, no quiz generated"
+              @click="skipSession"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="trash-icon"
+              >
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -212,11 +236,13 @@ import {
   logFrontendEvent,
   trackAnalyticsEvent,
   getTopicSectionsContent,
+  skipReadingTask,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
 import { useExtensions } from '../composables/useExtensions'
+import { useDialog } from '../composables/useDialog'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import ReaderChat from '../components/ReaderChat.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
@@ -225,6 +251,7 @@ import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import PdfViewer from '../components/PdfViewer.vue'
 
 const { isExtensionActive } = useExtensions()
+const { confirm } = useDialog()
 const showAudioOverview = ref(false)
 const simplifying = ref(false)
 
@@ -547,6 +574,28 @@ async function completeSession() {
   }
 }
 
+async function skipSession() {
+  if (!resolvedTaskID.value) return
+  const confirmed = await confirm({
+    title: 'Skip this session?',
+    message: 'These pages will be marked as read. No quiz will be generated for this session.',
+    confirmText: 'Skip Session',
+    cancelText: 'Keep Reading',
+    type: 'warning',
+  })
+  if (!confirmed) return
+  try {
+    const res = await skipReadingTask(resolvedTaskID.value)
+    if (res?.error) {
+      showError(res.error, 'Skip Failed')
+      return
+    }
+    await router.push('/dashboard')
+  } catch (err) {
+    showError(err?.message || 'Failed to skip session', 'Skip Failed')
+  }
+}
+
 // ponytail: clean structured markdown clipboard export
 const copiedSession = ref(false)
 const copyError = ref('')
@@ -706,6 +755,36 @@ h3 {
   gap: 8px;
   font-size: 13px;
   color: var(--muted-text);
+}
+
+.skip-session-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 9px;
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 12%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, #ef4444 28%, transparent);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skip-session-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #ef4444 24%, var(--surface-container-low));
+  color: #dc2626;
+  border-color: color-mix(in srgb, #ef4444 45%, transparent);
+  transform: translateY(-1px);
+}
+
+.skip-session-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.skip-session-btn .trash-icon {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
 }
 
 .stage-head-right {
