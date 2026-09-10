@@ -1186,33 +1186,90 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 	targetWords := settings.TargetSessionWords
 
-	sessionsPerDay := 0.0
-	if dailyPace > 0 {
-		sessionsPerDay = float64(dailyPace) / float64(targetWords)
+	// Workload in sessions (e.g. 42,000 words / 3,000 words per session = 14 sessions)
+	remainingSessions := 0.0
+	if remainingWords > 0 && targetWords > 0 {
+		remainingSessions = float64(remainingWords) / float64(targetWords)
 	}
 
-	n := int(math.Ceil(sessionsPerDay))
-	paceLabel := ""
-	if n > 0 {
-		if n == 1 {
-			paceLabel = "On track — 1 session/day"
-		} else if n <= 2 {
-			paceLabel = "Moderate pace"
-		} else if n <= 4 {
-			paceLabel = "Tight schedule"
-		} else {
-			paceLabel = "Consider adding more books or extending deadline"
+	// Calculate required daily sessions
+	requiredDailySessions := 0.0
+	if daysRemaining > 0 && remainingSessions > 0 {
+		requiredDailySessions = remainingSessions / float64(daysRemaining)
+	} else if remainingSessions > 0 {
+		requiredDailySessions = remainingSessions
+	}
+
+	// Fetch historical completed reading stats from past 7 days
+	wordsPast7Days, sessionsPast7Days, _ := repo.GetProfileCompletedReadingStatsPastNDays(profileID, 7)
+	
+	// Feasibility status evaluation: NO_DATA, AHEAD, ON_TRACK, BEHIND
+	feasibilityStatus := "NO_DATA"
+	projectedFinishStr := ""
+	daysGap := 0
+	currentDailySessions := 0.0
+	extraDailySessionsNeeded := 0.0
+
+	if sessionsPast7Days < 2 {
+		// Not enough history to establish a reliable pace baseline
+		feasibilityStatus = "NO_DATA"
+	} else {
+		// Actual velocity in sessions per day
+		currentDailySessions = float64(sessionsPast7Days) / 7.0
+		if currentDailySessions <= 0 && wordsPast7Days > 0 {
+			currentDailySessions = (float64(wordsPast7Days) / float64(targetWords)) / 7.0
+		}
+
+		if currentDailySessions > 0 {
+			daysToFinish := int(math.Ceil(remainingSessions / currentDailySessions))
+			projectedFinishDate := today.AddDate(0, 0, daysToFinish)
+			projectedFinishStr = projectedFinishDate.Format(dateFormatYYYYMMDD)
+			daysGap = daysRemaining - daysToFinish // positive: buffer before exam; negative: late
+
+			if daysGap >= 2 {
+				feasibilityStatus = "AHEAD"
+			} else if daysGap >= 0 {
+				feasibilityStatus = "ON_TRACK"
+			} else {
+				feasibilityStatus = "BEHIND"
+				diff := requiredDailySessions - currentDailySessions
+				if diff > 0 {
+					extraDailySessionsNeeded = math.Round(diff*10) / 10
+				}
+			}
 		}
 	}
 
+	// Friendly human pace label
+	paceLabel := ""
+	switch feasibilityStatus {
+	case "NO_DATA":
+		paceLabel = "Estimating pace"
+	case "AHEAD":
+		paceLabel = fmt.Sprintf("On track — %d days ahead", daysGap)
+	case "ON_TRACK":
+		paceLabel = "On track for deadline"
+	case "BEHIND":
+		paceLabel = fmt.Sprintf("Behind pace — %d days late", -daysGap)
+	}
+
 	return map[string]interface{}{
-		"has_deadline":     true,
-		"deadline":         deadlineTime.Format(dateFormatYYYYMMDD),
-		"daily_pace":       dailyPace,
-		"remaining_words":  remainingWords,
-		"days_remaining":   daysRemaining,
-		"sessions_per_day": sessionsPerDay,
-		"pace_label":       paceLabel,
+		"has_deadline":                true,
+		"deadline":                    deadlineTime.Format(dateFormatYYYYMMDD),
+		"daily_pace":                  dailyPace,
+		"remaining_words":             remainingWords,
+		"remaining_sessions":          math.Round(remainingSessions*10) / 10,
+		"target_session_words":        targetWords,
+		"days_remaining":              daysRemaining,
+		"sessions_per_day":            math.Round(requiredDailySessions*10) / 10,
+		"required_daily_sessions":     math.Round(requiredDailySessions*10) / 10,
+		"current_daily_sessions":      math.Round(currentDailySessions*10) / 10,
+		"extra_sessions_needed":       extraDailySessionsNeeded,
+		"feasibility_status":          feasibilityStatus,
+		"projected_finish":            projectedFinishStr,
+		"days_gap":                    daysGap,
+		"pace_label":                  paceLabel,
+		"study_slots_json":            settings.StudySlotsJSON,
 	}
 }
 

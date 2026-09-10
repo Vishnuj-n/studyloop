@@ -125,11 +125,23 @@ export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00') {
 
 /**
  * Generates raw iCalendar (.ics) string with daily recurrence and alarms.
+ * Supports either an array of study slots [{ name, start, end }] or a single startTime/endTime fallback.
  */
-export function generateRoutineICS(startTime = '17:00', endTime = '19:00') {
-  const { dtStart, dtEnd, y, m, d } = getEventDates(startTime, endTime)
-  const title = '📖 StudyLoop Daily Study Session'
+export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '19:00') {
+  let slots = []
+  if (Array.isArray(slotsOrStart) && slotsOrStart.length > 0) {
+    slots = slotsOrStart
+  } else if (typeof slotsOrStart === 'string') {
+    slots = [{ name: 'Daily Study Session', start: slotsOrStart, end: maybeEnd }]
+  } else {
+    slots = [{ name: 'Daily Study Session', start: '17:00', end: '19:00' }]
+  }
+
   const details = escapeICSText(DEFAULT_STUDY_DESCRIPTION)
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
 
   const icsLines = [
     'BEGIN:VCALENDAR',
@@ -137,38 +149,48 @@ export function generateRoutineICS(startTime = '17:00', endTime = '19:00') {
     'PRODID:-//StudyLoop//Daily Study Routine//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:studyloop-daily-${Date.now()}@studyloop.app`,
-    `DTSTAMP:${y}${m}${d}T000000Z`,
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
-    'RRULE:FREQ=DAILY',
-    `SUMMARY:${title}`,
-    `DESCRIPTION:${details}`,
-    'STATUS:CONFIRMED',
-    'BEGIN:VALARM',
-    'TRIGGER:-PT10M',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:StudyLoop reminder: 10 minutes until study session begins!',
-    'END:VALARM',
-    'BEGIN:VALARM',
-    'TRIGGER:PT0M',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:StudyLoop: Time to start your daily study routine!',
-    'END:VALARM',
-    'END:VEVENT',
-    'END:VCALENDAR',
   ]
 
+  slots.forEach((slot, idx) => {
+    const slotStart = slot.start || '17:00'
+    const slotEnd = slot.end || '18:00'
+    const { dtStart, dtEnd } = getEventDates(slotStart, slotEnd)
+    const slotName = slot.name ? `📖 StudyLoop: ${slot.name}` : '📖 StudyLoop Daily Study Session'
+
+    icsLines.push(
+      'BEGIN:VEVENT',
+      `UID:studyloop-slot-${idx}-${Date.now()}@studyloop.app`,
+      `DTSTAMP:${y}${m}${d}T000000Z`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      'RRULE:FREQ=DAILY',
+      `SUMMARY:${escapeICSText(slotName)}`,
+      `DESCRIPTION:${details}`,
+      'STATUS:CONFIRMED',
+      'BEGIN:VALARM',
+      'TRIGGER:-PT10M',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:StudyLoop reminder: 10 minutes until ${escapeICSText(slot.name || 'study session')} begins!`,
+      'END:VALARM',
+      'BEGIN:VALARM',
+      'TRIGGER:PT0M',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:StudyLoop: Time for your ${escapeICSText(slot.name || 'study session')}!`,
+      'END:VALARM',
+      'END:VEVENT'
+    )
+  })
+
+  icsLines.push('END:VCALENDAR')
   return icsLines.join('\r\n')
 }
 
 /**
  * Returns a direct URL to compose an event on Outlook Web / Live.
  */
-export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00') {
+export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00', titleName = '') {
   const { isoStart, isoEnd } = getEventDates(startTime, endTime)
-  const title = '📖 StudyLoop Daily Study Session'
+  const title = titleName ? `📖 StudyLoop: ${titleName}` : '📖 StudyLoop Daily Study Session'
 
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
@@ -184,10 +206,10 @@ export function getOutlookCalendarUrl(startTime = '17:00', endTime = '19:00') {
 
 /**
  * Generates and triggers download of a standard RFC 5545 .ics file
- * with daily recurrence (RRULE:FREQ=DAILY) and 10-minute + 0-minute audio alarms.
+ * with daily recurrence (RRULE:FREQ=DAILY) for all configured study slots.
  */
-export function downloadRoutineICS(startTime = '17:00', endTime = '19:00') {
-  const icsContent = generateRoutineICS(startTime, endTime)
+export function downloadRoutineICS(slotsOrStart = '17:00', maybeEnd = '19:00') {
+  const icsContent = generateRoutineICS(slotsOrStart, maybeEnd)
   const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(icsBlob)
   const link = document.createElement('a')
@@ -198,3 +220,4 @@ export function downloadRoutineICS(startTime = '17:00', endTime = '19:00') {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+

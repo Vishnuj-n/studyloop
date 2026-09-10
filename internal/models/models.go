@@ -533,6 +533,7 @@ type UserSettings struct {
 	MaxFlashcardsPerSession int    `json:"max_flashcards_per_session"`
 	StudyStartTime          string `json:"study_start_time"`
 	StudyEndTime            string `json:"study_end_time"`
+	StudySlotsJSON          string `json:"study_slots_json"`
 	RemindersEnabled        bool   `json:"reminders_enabled"`
 	ShowRewardNotifications bool   `json:"show_reward_notifications"`
 	ActiveProfileID         string `json:"active_profile_id"`

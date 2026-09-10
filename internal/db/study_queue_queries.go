@@ -629,6 +629,68 @@ func (r *Repository) GetCompletedTaskTimes() ([]time.Time, error) {
 	return times, nil
 }
 
+// GetProfileCompletedReadingStatsPastNDays returns the completed reading word count and session count in the last N days for a profile.
+func (r *Repository) GetProfileCompletedReadingStatsPastNDays(profileID string, days int) (int, int, error) {
+	if days <= 0 {
+		days = 7
+	}
+	cutoff := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
+
+	rows, err := r.db.Query(`
+		SELECT sq.id, sq.start_page, sq.end_page, sq.topic_id
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		WHERE sq.status = 'COMPLETED'
+		  AND sq.task_type IN ('READING', 'REREAD')
+		  AND sq.completed_at >= ?
+		  AND ( ? = '' OR n.profile_id = ? )
+	`, cutoff, profileID, profileID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("GetProfileCompletedReadingStatsPastNDays query error: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	type taskItem struct {
+		id        string
+		startPage int
+		endPage   int
+		topicID   string
+	}
+	var completedTasks []taskItem
+	for rows.Next() {
+		var item taskItem
+		if err := rows.Scan(&item.id, &item.startPage, &item.endPage, &item.topicID); err != nil {
+			return 0, 0, err
+		}
+		completedTasks = append(completedTasks, item)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, 0, err
+	}
+
+	sessionCount := len(completedTasks)
+	totalWords := 0
+
+	for _, task := range completedTasks {
+		if task.topicID != "" && task.startPage > 0 && task.endPage >= task.startPage {
+			var wordsOnPages int
+			err := r.db.QueryRow(`
+				SELECT COALESCE(SUM(LENGTH(chunk_text) - LENGTH(REPLACE(chunk_text, ' ', '')) + 1), 0)
+				FROM chunks
+				WHERE topic_id = ? AND page_num BETWEEN ? AND ?
+			`, task.topicID, task.startPage, task.endPage).Scan(&wordsOnPages)
+			if err == nil && wordsOnPages > 0 {
+				totalWords += wordsOnPages
+				continue
+			}
+		}
+		// Fallback if chunks were not linked to topic pages: default to 2500 per completed reading task
+		totalWords += 2500
+	}
+
+	return totalWords, sessionCount, nil
+}
+
 // GetLatestQuizAttemptDetailsByTopic retrieves the payload and answers for the latest quiz attempt of a topic.
 func (r *Repository) GetLatestQuizAttemptDetailsByTopic(topicID string) (string, string, error) {
 	var payloadJSON, answersJSON string
