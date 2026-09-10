@@ -53,13 +53,12 @@
         </svg>
       </button>
 
-      <!-- Skip / Next Session Button -->
+      <!-- Skip / Switch Session Button -->
       <button
-        v-if="isRunning || isPaused"
         type="button"
         class="glyph-btn"
-        :title="sessionType === 'work' ? 'Skip to Break' : 'Skip to Focus'"
-        aria-label="Skip session"
+        :title="sessionType === 'work' ? 'Switch to Break' : 'Switch to Focus'"
+        :aria-label="sessionType === 'work' ? 'Switch to Break' : 'Switch to Focus'"
         @click.stop="handleSkip"
       >
         <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
@@ -108,7 +107,10 @@ import {
   setPomodoroVolume,
 } from '../services/pomodoroApi'
 import { playStudyChime } from '../services/calendarService'
+import { useToast } from '../composables/useToast'
 import { EventsOn } from '../../wailsjs/runtime/runtime'
+
+const { showNotice } = useToast()
 
 const enabled = ref(true)
 const isRunning = ref(false)
@@ -153,8 +155,11 @@ async function loadConfiguration() {
       const def = profiles.find((p) => p.isDefault) || profiles[0]
       currentProfile.value = def
       if (!isRunning.value && !isPaused.value) {
-        totalSec.value = def.durationSec || 25 * 60
-        remainSec.value = totalSec.value
+        const sec = sessionType.value === 'break'
+          ? (typeof def.breakDurationSec === 'number' ? def.breakDurationSec : 5 * 60)
+          : (def.durationSec || 25 * 60)
+        totalSec.value = sec
+        remainSec.value = sec
       }
     }
   } catch (err) {
@@ -164,11 +169,13 @@ async function loadConfiguration() {
 
 async function startAudioForCurrentSession() {
   if (isMuted.value || !currentProfile.value) return
+  // ponytail: mute study beats on break so break is restful
+  if (sessionType.value === 'break') {
+    await stopPomodoroAudio().catch(() => {})
+    return
+  }
   const prof = currentProfile.value
-
-  const musicPath = sessionType.value === 'break'
-    ? (prof.breakMusicPath === '__none__' ? '' : prof.breakMusicPath || prof.musicPath)
-    : prof.musicPath
+  const musicPath = prof.musicPath
   const shuffle = sessionType.value === 'break'
     ? (prof.breakMusicPath ? prof.breakShuffle : prof.shuffle)
     : prof.shuffle
@@ -207,10 +214,13 @@ async function handlePlayPause() {
   } else {
     isPaused.value = false
     isRunning.value = true
-    sessionType.value = 'work'
-    totalSec.value = currentProfile.value?.durationSec || 25 * 60
+    const isBreak = sessionType.value === 'break'
+    totalSec.value = isBreak
+      ? (typeof currentProfile.value?.breakDurationSec === 'number' ? currentProfile.value.breakDurationSec : 5 * 60)
+      : (currentProfile.value?.durationSec || 25 * 60)
     remainSec.value = totalSec.value
-    await startPomodoroTimer(currentProfile.value?.id || 'default', totalSec.value).catch(() => {})
+    const timerId = (currentProfile.value?.id || 'default') + (isBreak ? '-break' : '')
+    await startPomodoroTimer(timerId, totalSec.value).catch(() => {})
     await startAudioForCurrentSession()
   }
 }
@@ -275,6 +285,9 @@ onMounted(async () => {
       playStudyChime()
 
       if (sessionType.value === 'work') {
+        const breakMin = Math.round((currentProfile.value?.breakDurationSec || 300) / 60)
+        showNotice(`Focus session done! Take a ${breakMin}m break.`, 'Break Time')
+
         if (currentProfile.value && currentProfile.value.breakDurationSec > 0) {
           sessionType.value = 'break'
           totalSec.value = currentProfile.value.breakDurationSec
@@ -285,6 +298,7 @@ onMounted(async () => {
           return
         }
       } else {
+        showNotice('Break is over! Ready for another focus session?', 'Focus Time')
         sessionType.value = 'work'
         totalSec.value = currentProfile.value ? currentProfile.value.durationSec : 25 * 60
         remainSec.value = totalSec.value
