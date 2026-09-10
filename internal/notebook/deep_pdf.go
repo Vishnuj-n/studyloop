@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"ai-tutor/internal/extension"
 )
+
+var deepPDFPageMarker = regexp.MustCompile(`(?m)^<!--\s*page:\s*(\d+)\s*-->\s*$`)
 
 // DeepPDFIngestResult holds the output from extensions/deep_pdf/ingest.py (PyMuPDF4LLM).
 type DeepPDFIngestResult struct {
@@ -122,7 +125,7 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 		return nil, nil, fmt.Errorf("deep_pdf extracted no readable content")
 	}
 
-	sections := splitMarkdownByHeadings(res.Markdown)
+	sections := splitDeepPDFMarkdown(res.Markdown)
 	docSections := make([]ExtractedSection, 0, len(sections))
 
 	if len(sections) == 0 {
@@ -136,7 +139,7 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 			docSections = append(docSections, ExtractedSection{
 				Heading: sec.Heading,
 				Text:    sec.Text,
-				PageNum: i + 1,
+				PageNum: sec.PageNum,
 			})
 		}
 	}
@@ -160,4 +163,40 @@ func (s *Service) IngestDeepPDFWithProgress(ctx context.Context, filePath string
 	}
 
 	return doc, &res, nil
+}
+
+func splitDeepPDFMarkdown(content string) []ExtractedSection {
+	matches := deepPDFPageMarker.FindAllStringSubmatchIndex(content, -1)
+	if len(matches) == 0 {
+		fallback := splitMarkdownByHeadings(content)
+		sections := make([]ExtractedSection, 0, len(fallback))
+		for i, sec := range fallback {
+			sections = append(sections, ExtractedSection{Heading: sec.Heading, Text: stripMarkdownHeadings(sec.Text), PageNum: i + 1})
+		}
+		return sections
+	}
+	sections := make([]ExtractedSection, 0, len(matches))
+	for i, match := range matches {
+		end := len(content)
+		if i+1 < len(matches) {
+			end = matches[i+1][0]
+		}
+		page := 0
+		_, _ = fmt.Sscanf(content[match[2]:match[3]], "%d", &page)
+		sections = append(sections, ExtractedSection{Text: stripMarkdownHeadings(strings.TrimSpace(content[match[1]:end])), PageNum: page})
+	}
+	return sections
+}
+
+func stripMarkdownHeadings(content string) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "# ") || strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "### ") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
 }

@@ -165,6 +165,13 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 			return map[string]interface{}{"error": err.Error()}
 		}
 	}
+	if len(chunks) == 0 && task.NotebookID != "" {
+		utils.Warnf("[COMPLETE_SESSION] topic lookup empty; resolving by notebook/page range notebookID=%q", task.NotebookID)
+		chunks, err = repo.GetChunksForNotebookPageRange(task.NotebookID, task.StartPage, task.EndPage)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+	}
 	utils.Warnf("[COMPLETE_SESSION] CompleteReading chunk lookup result: got %d chunks for topicID=%q", len(chunks), task.TopicID)
 
 	if len(chunks) == 0 {

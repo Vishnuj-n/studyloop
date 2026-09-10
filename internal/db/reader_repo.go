@@ -104,6 +104,26 @@ func (r *Repository) GetChunksForNotebook(notebookID string) ([]models.Chunk, er
 	return scanChunks(rows)
 }
 
+// GetChunksForNotebookPageRange resolves content by notebook ownership and PDF
+// page coordinates. It is used when an older queue task carries a stale topic
+// ID after syllabus confirmation regenerated topic IDs.
+func (r *Repository) GetChunksForNotebookPageRange(notebookID string, startPage, endPage int) ([]models.Chunk, error) {
+	if strings.TrimSpace(notebookID) == "" {
+		return nil, fmt.Errorf("notebook id is required")
+	}
+	if startPage <= 0 || endPage <= 0 {
+		return r.GetChunksForNotebook(notebookID)
+	}
+	if startPage > endPage {
+		startPage, endPage = endPage, startPage
+	}
+	return r.queryChunks(`WHERE id IN (
+		SELECT c.id FROM chunks c
+		JOIN notebook_chunks nc ON nc.chunk_id = c.id
+		WHERE nc.notebook_id = ? AND nc.page_num BETWEEN ? AND ?
+	)`, notebookID, startPage, endPage)
+}
+
 // GetChunksForTopics batches chunk loading for multiple topics.
 func (r *Repository) GetChunksForTopics(topicIDs []string) (map[string][]models.Chunk, error) {
 	if len(topicIDs) == 0 {
@@ -830,4 +850,3 @@ func ResolvePageWindow(
 
 	return startPage, endPage, true, tokenMap
 }
-
