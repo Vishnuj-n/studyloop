@@ -79,25 +79,6 @@
       </div>
     </div>
 
-    <!-- Local Dev / Testing Helper -->
-    <div v-if="isDev" class="dev-section">
-      <label class="dev-label">
-        Developer Testing
-        <span class="dev-badge">DEV</span>
-      </label>
-      <div class="dev-toggle-row">
-        <span>Simulate Pro Subscription:</span>
-        <button
-          type="button"
-          class="dev-toggle-btn"
-          :class="{ active: clerkAuth.isPro.value }"
-          @click="onToggleProClick"
-        >
-          {{ clerkAuth.isPro.value ? 'Pro Simulated (Active)' : 'Free Mode (Click to Toggle)' }}
-        </button>
-      </div>
-    </div>
-
     <!-- School & Classroom Cloud Sync Section (Hidden under expandable button) -->
     <div class="school-section">
       <!-- Case 1: Already connected to a school/classroom account -->
@@ -309,11 +290,6 @@ function onSignOutClick() {
   clerkAuth.signOut()
 }
 
-function onToggleProClick() {
-  console.log('[SETTINGS_ACCOUNT] Toggle Dev Pro clicked, current isPro:', clerkAuth.isPro.value)
-  clerkAuth.setMockPro(!clerkAuth.isPro.value)
-}
-
 onMounted(() => {
   console.log('[SETTINGS_ACCOUNT] Mounted: isSignedIn =', clerkAuth.isSignedIn.value, 'isPro =', clerkAuth.isPro.value)
 })
@@ -508,53 +484,6 @@ h2 {
   font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
-}
-
-.dev-section {
-  border-top: 1px solid var(--outline-variant);
-  padding-top: 16px;
-}
-
-.dev-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted-text);
-  display: block;
-  margin-bottom: 8px;
-}
-
-.dev-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.dev-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13.5px;
-}
-
-.dev-toggle-btn {
-  padding: 6px 14px;
-  border-radius: 8px;
-  background: var(--surface-container-highest);
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.dev-toggle-btn.active {
-  background: #f59e0b;
-  color: #2d3338;
-  font-weight: 700;
 }
 
 /* School & Classroom Section */

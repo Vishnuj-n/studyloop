@@ -53,8 +53,8 @@ func (a *App) ListExtensions() ([]ExtensionDTO, error) {
 }
 
 // RunExtension executes an extension by ID.
-// If the extension is marked "pro" and isPro is false, it returns an entitlement error.
-func (a *App) RunExtension(id string, input string, isPro bool) map[string]interface{} {
+// If the extension is marked "pro" and active session is not Pro, it returns an entitlement error.
+func (a *App) RunExtension(id string, input string) map[string]interface{} {
 	if a.extManager == nil || a.extRunner == nil {
 		if a.extInitError != "" {
 			return map[string]interface{}{"error": fmt.Sprintf("extension system not initialized: %s", a.extInitError)}
@@ -71,8 +71,8 @@ func (a *App) RunExtension(id string, input string, isPro bool) map[string]inter
 	}
 
 	effectiveTier := extension.GetEffectiveTier(ext)
-	// Authoritative security guard for pro extensions
-	if effectiveTier == "pro" && !isPro {
+	// Authoritative security guard for pro extensions using backend session check
+	if effectiveTier == "pro" && !a.IsProUser() {
 		return map[string]interface{}{
 			"error":           fmt.Sprintf("extension %q requires a Pro subscription", ext.Name()),
 			"is_pro_required": true,

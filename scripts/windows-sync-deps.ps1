@@ -92,7 +92,7 @@ $releaseTag = $appVersion
 $downloadUrl = "https://github.com/Vishnuj-n/studyloop/releases/download/$releaseTag/$zipFilename"
 Write-Host "Asset version: $appVersion  Archive: $zipFilename"
 
-$appDataDir = Join-Path $env:LOCALAPPDATA "ai-tutor\assets"
+$appDataDir = Join-Path $env:LOCALAPPDATA "Studyloop\assets"
 $zipPath = Join-Path $appDataDir $zipFilename
 $localAssetDir = ".\asset"
 $assetVersionFile = "VERSION"

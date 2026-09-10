@@ -31,6 +31,61 @@ type authServerState struct {
 
 var activeAuthServer = &authServerState{}
 
+// SetSession sets the active session in memory.
+func (a *App) SetSession(userID, email string, isPro bool) {
+	a.sessionMu.Lock()
+	defer a.sessionMu.Unlock()
+	a.sessionUserID = userID
+	a.sessionEmail = email
+	a.sessionIsPro = isPro
+	a.sessionVerifiedAt = time.Now().Unix()
+}
+
+// RestoreSession allows frontend to re-hydrate offline session on launch within grace period.
+func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
+	const tenDaysSec = 10 * 24 * 60 * 60
+	now := time.Now().Unix()
+	if isPro && verifiedAt > 0 && (now-verifiedAt) > tenDaysSec {
+		isPro = false
+	}
+	a.sessionMu.Lock()
+	defer a.sessionMu.Unlock()
+	a.sessionUserID = userID
+	a.sessionEmail = email
+	a.sessionIsPro = isPro
+	a.sessionVerifiedAt = verifiedAt
+	return isPro
+}
+
+// ClearSession clears the current in-memory session.
+func (a *App) ClearSession() {
+	a.sessionMu.Lock()
+	defer a.sessionMu.Unlock()
+	a.sessionUserID = ""
+	a.sessionEmail = ""
+	a.sessionIsPro = false
+	a.sessionVerifiedAt = 0
+}
+
+// IsProUser returns true only if the active session is an authenticated Pro user.
+func (a *App) IsProUser() bool {
+	a.sessionMu.RLock()
+	defer a.sessionMu.RUnlock()
+	return a.sessionIsPro
+}
+
+// GetUserSession returns the current active session state.
+func (a *App) GetUserSession() map[string]interface{} {
+	a.sessionMu.RLock()
+	defer a.sessionMu.RUnlock()
+	return map[string]interface{}{
+		"userId":     a.sessionUserID,
+		"email":      a.sessionEmail,
+		"isPro":      a.sessionIsPro,
+		"verifiedAt": a.sessionVerifiedAt,
+	}
+}
+
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.
 func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 	utils.Infof("[AUTH] StartBrowserAuth requested with mode: %s", mode)
@@ -92,6 +147,8 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		utils.Infof("[AUTH] Authoritative Clerk JS sync: user=%s email=%s plan=%s role=%s -> isPro=%v",
 			payload.UserID, payload.Email, payload.Plan, payload.Role, isPro)
 
+		a.SetSession(payload.UserID, payload.Email, isPro)
+
 		result := AuthCallbackResult{
 			Success: true,
 			UserID:  payload.UserID,
@@ -137,6 +194,8 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			userID = fmt.Sprintf("user_%d", time.Now().Unix())
 		}
 		utils.Infof("[AUTH] Received initial callback for user %s (%s), isPro: %v", userID, email, isPro)
+
+		a.SetSession(userID, email, isPro)
 
 		result := AuthCallbackResult{
 			Success: true,
@@ -362,11 +421,6 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
     <p>Your StudyLoop desktop workspace is now connected and ready.</p>
 
     <div class="action-badge">
-      <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M15 3h6v6"></path>
-        <path d="M10 14L21 3"></path>
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-      </svg>
       <span>Switch back to StudyLoop app</span>
     </div>
   </div>

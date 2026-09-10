@@ -19,6 +19,7 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `checkExtensionReadiness` | `CheckExtensionReadiness` | 1 | Active |
 | `checkForUpdates` | `CheckForUpdates` | 2 | Active |
 | `claimLootBox` | `ClaimLootBox` | 1 | Active |
+| `clearSession` | `ClearSession` | 1 | Active |
 | `completeMilestoneExam` | `CompleteMilestoneExam` | 1 | Active |
 | `completeReading` | `CompleteReading` | 1 | Active |
 | `completeReviewSession` | `CompleteReviewSession` | 1 | Active |
@@ -64,6 +65,7 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `openRepoURL` | `OpenRepoURL` | 2 | Active |
 | `openURLInBrowser` | `OpenURLInBrowser` | 5 | Active |
 | `recordCardReview` | `RecordCardReview` | 1 | Active |
+| `restoreSession` | `RestoreSession` | 1 | Active |
 | `retryFlashcardGeneration` | `RetryFlashcardGeneration` | 2 | Active |
 | `runExtension` | `RunExtension` | 1 | Active |
 | `saveExtensionConfig` | `SaveExtensionConfig` | 1 | Active |
@@ -107,6 +109,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `CheckExtensionReadiness` | Yes |
 | `CheckForUpdates` | Yes |
 | `ClaimLootBox` | Yes |
+| `ClearSession` | Yes |
 | `CompleteMilestoneExam` | Yes |
 | `CompleteReading` | Yes |
 | `CompleteReviewSession` | Yes |
@@ -142,18 +145,43 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `GetTaskContext` | Yes |
 | `GetTodayPlan` | Yes |
 | `GetTopicSectionsContent` | Yes |
+| `GetUserSession` | No (Unused API) |
 | `GetUserSettings` | Yes |
 | `ImportAnkiDeck` | Yes |
 | `InitializeRAG` | Yes |
 | `InitializeReadingSession` | Yes |
 | `IsOnboarded` | Yes |
+| `IsProUser` | No (Unused API) |
 | `ListExtensions` | Yes |
 | `LogFrontendEvent` | Yes |
 | `LoginStudent` | Yes |
 | `LogoutStudent` | Yes |
 | `OpenRepoURL` | Yes |
 | `OpenURLInBrowser` | Yes |
+| `PomodoroCheckResumeSession` | No (Unused API) |
+| `PomodoroDeleteProfile` | No (Unused API) |
+| `PomodoroGetAudioState` | No (Unused API) |
+| `PomodoroGetProfileByID` | No (Unused API) |
+| `PomodoroGetSettings` | No (Unused API) |
+| `PomodoroGetStats` | No (Unused API) |
+| `PomodoroGetTimerState` | No (Unused API) |
+| `PomodoroLoadProfiles` | No (Unused API) |
+| `PomodoroPauseTimer` | No (Unused API) |
+| `PomodoroPickMusicFile` | No (Unused API) |
+| `PomodoroPickMusicFolder` | No (Unused API) |
+| `PomodoroPlayChime` | No (Unused API) |
+| `PomodoroPlayLooping` | No (Unused API) |
+| `PomodoroPlayShuffleFolder` | No (Unused API) |
+| `PomodoroRecordSessionComplete` | No (Unused API) |
+| `PomodoroResumeTimer` | No (Unused API) |
+| `PomodoroSaveProfile` | No (Unused API) |
+| `PomodoroSaveSettings` | No (Unused API) |
+| `PomodoroSetVolume` | No (Unused API) |
+| `PomodoroStartTimer` | No (Unused API) |
+| `PomodoroStopAudio` | No (Unused API) |
+| `PomodoroStopTimer` | No (Unused API) |
 | `RecordCardReview` | Yes |
+| `RestoreSession` | Yes |
 | `RetryFlashcardGeneration` | Yes |
 | `RunExtension` | Yes |
 | `SaveExtensionConfig` | Yes |
@@ -161,6 +189,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `ScoreShortAnswer` | Yes |
 | `SelectAndUploadDeepStructuredPDF` | Yes |
 | `SelectAnkiFile` | Yes |
+| `SetSession` | No (Unused API) |
 | `SetupExtension` | Yes |
 | `SignUpStudent` | Yes |
 | `SimplifyReadingContent` | Yes |
@@ -190,6 +219,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `BuildTopicGroupsFromChapters` | `internal\notebook\ingestion.go:14` | None | `function` |
 | `CheckReadiness` | `internal\extension\checker.go:32` | None | `function` |
 | `CreateReviewSession` | `internal\db\review_session_repo.go:172` | `Repository` | `method` |
+| `DefaultSettings` | `internal\pomodoro\domain\settings.go:15` | None | `function` |
 | `DeleteAPIKey` | `internal\llm\keyring.go:37` | None | `function` |
 | `DownloadYouTubeVideo` | `internal\notebook\youtube.go:106` | `Service` | `method` |
 | `DraftSyllabusChapters` | `internal\notebook\syllabus.go:32` | `Service` | `method` |
@@ -204,10 +234,15 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `MarkLLMKeyStored` | `internal\db\store.go:606` | `Repository` | `method` |
 | `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:276` | None | `function` |
 | `ParsePDFCPUBookmarkDraftFromJSON` | `internal\notebook\pdfcpu.go:75` | None | `function` |
+| `PlayChime` | `internal\pomodoro\services\audio\service.go:168` | `Service` | `method` |
+| `PlayLooping` | `internal\pomodoro\services\audio\service.go:60` | `Service` | `method` |
+| `PlayShuffleFolder` | `internal\pomodoro\services\audio\service.go:86` | `Service` | `method` |
 | `RollTaskRewards` | `internal\study\rewards.go:12` | None | `function` |
 | `RunSmokeTest` | `internal\extension\checker.go:92` | None | `function` |
 | `SaveAPIKey` | `internal\llm\keyring.go:21` | None | `function` |
 | `SeedDemoDataForTests` | `internal\db\testhelper.go:7` | `Repository` | `method` |
+| `SetChimeData` | `internal\pomodoro\services\audio\service.go:46` | `Service` | `method` |
+| `SetVolume` | `internal\pomodoro\services\audio\service.go:141` | `Service` | `method` |
 | `SetupExtensionEnv` | `internal\extension\checker.go:125` | None | `function` |
 | `SplitMarkdownIntoChunks` | `internal\notebook\markdown_chunker.go:30` | None | `function` |
 | `TransitionTask` | `internal\study\queue_transition.go:53` | `StudyService` | `method` |
@@ -228,10 +263,12 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:265` | None | `function` |
 | `computeCurrentStreak` | `internal\app\app_study.go:115` | None | `function` |
 | `computeLongestStreak` | `internal\app\app_study.go:85` | None | `function` |
+| `copyPomoFile` | `internal\app\app_pomodoro.go:292` | None | `function` |
 | `destroyValues` | `internal\embeddings\onnx.go:536` | None | `function` |
 | `embedBatchInternal` | `internal\embeddings\onnx.go:210` | `OnnxEmbedder` | `method` |
 | `embedInternal` | `internal\embeddings\onnx.go:199` | `OnnxEmbedder` | `method` |
 | `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1038` | None | `function` |
+| `emitState` | `internal\pomodoro\services\audio\service.go:273` | `Service` | `method` |
 | `envHasLLMAPIKey` | `internal\app\app_settings.go:321` | None | `function` |
 | `extractBatchEmbedding` | `internal\embeddings\onnx.go:385` | None | `function` |
 | `extractIONames` | `internal\embeddings\onnx.go:496` | None | `function` |
@@ -241,13 +278,14 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `firstInt` | `internal\notebook\pdfcpu.go:281` | None | `function` |
 | `firstN` | `internal\notebook\syllabus.go:398` | None | `function` |
 | `firstString` | `internal\notebook\pdfcpu.go:266` | None | `function` |
-| `generateLootBox` | `internal\study\rewards.go:54` | None | `function` |
+| `generateLootBox` | `internal\study\rewards.go:58` | None | `function` |
 | `getAppVersion` | `internal\app\app_update.go:17` | None | `function` |
 | `getNotebookAndRepo` | `internal/app/app.go` | `App` | `AppHelper` |
 | `getStreakState` | `internal/app/app.go` | `App` | `AppHelper` |
 | `inferMaxSeqLen` | `internal\embeddings\onnx.go:524` | None | `function` |
 | `insertMilestoneForAttempts` | `internal\app\app_study_cards.go:284` | None | `function` |
 | `isTableRow` | `internal\notebook\markdown_chunker.go:190` | None | `function` |
+| `linearToLog` | `internal\pomodoro\services\audio\service.go:266` | None | `function` |
 | `mapTaskError` | `internal\app\app_study.go:138` | None | `function` |
 | `maxPage` | `internal\notebook\syllabus.go:390` | None | `function` |
 | `normalizeL2` | `internal\embeddings\onnx.go:477` | None | `function` |
@@ -257,6 +295,8 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `parseSyllabusDraft` | `internal\notebook\syllabus.go:257` | None | `function` |
 | `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:519` | None | `function` |
 | `pickInputSource` | `internal\embeddings\onnx.go:504` | None | `function` |
+| `playChimeAsync` | `internal\pomodoro\services\audio\service.go:172` | `Service` | `method` |
+| `playFile` | `internal\pomodoro\services\audio\service.go:210` | `Service` | `method` |
 | `queueTaskToScheduledTask` | `internal\app\app_study.go:285` | None | `function` |
 | `reconcileConfirmedNotebookTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `reloadLLMProviders` | `internal/app/app.go` | `App` | `AppHelper` |
@@ -267,6 +307,8 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `runDeepPDFExtraction` | `internal/app/app.go` | `App` | `AppHelper` |
 | `runPDFCPUBookmarksExport` | `internal\notebook\pdfcpu.go:117` | None | `function` |
 | `sameLLMSettingsForUI` | `internal\app\app_settings.go:335` | None | `function` |
+| `scanMP3s` | `internal\pomodoro\services\audio\service.go:282` | None | `function` |
+| `shuffleStrings` | `internal\pomodoro\services\audio\service.go:296` | None | `function` |
 | `tensorFromInputData` | `internal\embeddings\onnx.go:362` | None | `function` |
 | `validatePDFCPUInputFilePath` | `internal\notebook\pdfcpu.go:179` | None | `function` |
 | `walkBookmarkNode` | `internal\notebook\pdfcpu.go:44` | None | `function` |
@@ -285,11 +327,11 @@ flowchart TD
         F_checkExtensionReadiness[checkExtensionReadiness]
         F_checkForUpdates[checkForUpdates]
         F_claimLootBox[claimLootBox]
+        F_clearSession[clearSession]
         F_completeMilestoneExam[completeMilestoneExam]
         F_completeReading[completeReading]
         F_completeReviewSession[completeReviewSession]
         F_completeSocraticRescue[completeSocraticRescue]
-        F_confirmNotebookSyllabus[confirmNotebookSyllabus]
     end
     subgraph Go_Wails_Bridge
         G_AICleanupNotebookSyllabus[App.AICleanupNotebookSyllabus]
@@ -302,11 +344,11 @@ flowchart TD
         G_CheckExtensionReadiness[App.CheckExtensionReadiness]
         G_CheckForUpdates[App.CheckForUpdates]
         G_ClaimLootBox[App.ClaimLootBox]
+        G_ClearSession[App.ClearSession]
         G_CompleteMilestoneExam[App.CompleteMilestoneExam]
         G_CompleteReading[App.CompleteReading]
         G_CompleteReviewSession[App.CompleteReviewSession]
         G_CompleteSocraticRescue[App.CompleteSocraticRescue]
-        G_ConfirmNotebookSyllabus[App.ConfirmNotebookSyllabus]
     end
         F_activateTask --> G_ActivateTask
         F_aiCleanupNotebookSyllabus --> G_AICleanupNotebookSyllabus
@@ -318,11 +360,11 @@ flowchart TD
         F_checkExtensionReadiness --> G_CheckExtensionReadiness
         F_checkForUpdates --> G_CheckForUpdates
         F_claimLootBox --> G_ClaimLootBox
+        F_clearSession --> G_ClearSession
         F_completeMilestoneExam --> G_CompleteMilestoneExam
         F_completeReading --> G_CompleteReading
         F_completeReviewSession --> G_CompleteReviewSession
         F_completeSocraticRescue --> G_CompleteSocraticRescue
-        F_confirmNotebookSyllabus --> G_ConfirmNotebookSyllabus
 ```
 
 *Note: The Mermaid flowchart is capped to the first 15 active endpoints for visual clarity.*

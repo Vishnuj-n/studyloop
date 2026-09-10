@@ -18,6 +18,9 @@ import (
 	"ai-tutor/internal/scheduler"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
+	pomoevents "ai-tutor/internal/pomodoro/infra/events"
+	pomoaudio "ai-tutor/internal/pomodoro/services/audio"
+	pomotimer "ai-tutor/internal/pomodoro/services/timer"
 
 	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -56,6 +59,13 @@ type App struct {
 	audioOverviewCancel context.CancelFunc
 	extSetupMu          sync.Mutex
 	extSetupCancel      context.CancelFunc
+	pomoTimer           *pomotimer.Service
+	pomoAudio           *pomoaudio.Service
+	sessionMu           sync.RWMutex
+	sessionUserID       string
+	sessionEmail        string
+	sessionIsPro        bool
+	sessionVerifiedAt   int64
 }
 
 func NewApp() *App {
@@ -64,11 +74,14 @@ func NewApp() *App {
 	if _, err := mgr.Discover(); err != nil {
 		extInitErr = err.Error()
 	}
+	audioSvc := pomoaudio.New()
 	return &App{
 		readyChan:    make(chan struct{}),
 		extManager:   mgr,
 		extRunner:    extension.NewRunner(),
 		extInitError: extInitErr,
+		pomoTimer:    pomotimer.New(),
+		pomoAudio:    audioSvc,
 	}
 }
 
@@ -97,7 +110,8 @@ func initLogging() {
 }
 
 func (a *App) initIndexQueue(ctx context.Context, repo *db.Repository) {
-	if !a.aiReady || a.embedder == nil {
+	if a.embedder == nil {
+		utils.Warnf("embeddings unavailable, skipping vector index queue initialization")
 		return
 	}
 	a.indexQueue = retrieval.NewVectorIndexQueue(repo, a.embedder, ctx)
@@ -151,6 +165,16 @@ func (a *App) startup(ctx context.Context) {
 	a.aiInitError = boot.AiInitError
 
 	a.initIndexQueue(ctx, boot.Repo)
+
+	if ctx != nil {
+		emitter := pomoevents.NewWailsEmitter(ctx)
+		if a.pomoTimer != nil {
+			a.pomoTimer.SetEmitter(emitter)
+		}
+		if a.pomoAudio != nil {
+			a.pomoAudio.SetEmitter(emitter)
+		}
+	}
 }
 
 // Shutdown is called when the Wails application is shutting down.
@@ -159,6 +183,12 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 func (a *App) shutdown() {
+	if a.pomoAudio != nil {
+		a.pomoAudio.Stop()
+	}
+	if a.pomoTimer != nil {
+		a.pomoTimer.Stop()
+	}
 	a.StopTopicAudioOverview()
 	if a.indexQueue != nil {
 		a.indexQueue.Stop()

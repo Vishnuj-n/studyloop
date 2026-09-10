@@ -1,18 +1,33 @@
 import { ref, computed } from 'vue'
+import { startBrowserAuth, openURLInBrowser, restoreSession, clearSession } from './appApi'
 
 const isLoaded = ref(false)
 const user = ref(null)
 const isPro = ref(false)
 const authError = ref('')
-export async function initClerk() {
-  isLoaded.value = true
-  return null
-}
-
-import { startBrowserAuth, openURLInBrowser } from './appApi'
-
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
+
+function syncWithBackend() {
+  if (user.value) {
+    try {
+      restoreSession(
+        user.value.id || '',
+        user.value.email || '',
+        isPro.value,
+        Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
+      )
+    } catch (err) {
+      console.warn('[AUTH] Could not sync session with backend:', err)
+    }
+  }
+}
+
+export async function initClerk() {
+  isLoaded.value = true
+  syncWithBackend()
+  return null
+}
 
 // Listen for loopback authentication callback from Go backend
 if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
@@ -31,6 +46,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
         isPro: isPro.value,
         lastVerifiedAt: lastVerifiedAt.value,
       }))
+      syncWithBackend()
     }
   })
 }
@@ -52,6 +68,7 @@ try {
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || Date.now()
+      syncWithBackend()
     }
   }
 } catch (err) {
@@ -59,6 +76,9 @@ try {
 }
 
 export function useClerkAuth() {
+  // Ensure backend is in sync whenever composable is accessed
+  syncWithBackend()
+
   return {
     isLoaded: computed(() => isLoaded.value),
     isSignedIn: computed(() => !!user.value),
@@ -68,23 +88,6 @@ export function useClerkAuth() {
     authError: computed(() => authError.value),
     clearAuthError: () => {
       authError.value = ''
-    },
-    setMockPro: (val) => {
-      if (!import.meta.env.DEV) {
-        console.warn('[CLERK_AUTH] setMockPro is disabled in production builds.')
-        return
-      }
-      console.log('[CLERK_AUTH] setMockPro called, setting isPro to:', val)
-      isPro.value = !!val
-      if (user.value) {
-        localStorage.setItem(
-          'studyloop_user_session',
-          JSON.stringify({
-            user: user.value,
-            isPro: isPro.value,
-          })
-        )
-      }
     },
     signIn: async () => {
       console.log('[CLERK_AUTH] signIn() triggered, calling backend startBrowserAuth...')
@@ -112,6 +115,7 @@ export function useClerkAuth() {
       isPro.value = false
       authError.value = ''
       localStorage.removeItem('studyloop_user_session')
+      clearSession()
     },
     openBilling: () => {
       // ponytail: direct to pricing section for early access / pro support

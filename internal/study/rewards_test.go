@@ -7,13 +7,13 @@ import (
 )
 
 func TestRollTaskRewards(t *testing.T) {
-	// 1. Reading
+	// 1. Reading (guaranteed XP/coins, 30% chest drop chance)
 	xp, coins, box := RollTaskRewards(models.StudyTaskTypeReading, 0, false)
 	if xp != 20 || coins != 5 {
 		t.Fatalf("unexpected reading rewards: xp=%d coins=%d", xp, coins)
 	}
-	if box == nil || box.BoxTier != "BRONZE" || box.RewardAmount <= 0 {
-		t.Fatalf("unexpected bronze chest: %+v", box)
+	if box != nil && (box.BoxTier != "BRONZE" || box.RewardAmount <= 0) {
+		t.Fatalf("unexpected bronze chest when dropped: %+v", box)
 	}
 
 	// 2. Quiz Ace

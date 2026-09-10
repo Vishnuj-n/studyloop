@@ -522,6 +522,10 @@ type StudyProfile struct {
 	ClassroomCode   string `json:"classroom_code,omitempty"`
 	StudentUsername string `json:"student_username,omitempty"`
 	CloudAPIToken   string `json:"cloud_api_token,omitempty"`
+	PomoDurationSec int    `json:"pomo_duration_sec"`
+	PomoBreakSec    int    `json:"pomo_break_sec"`
+	PomoMusicPath   string `json:"pomo_music_path"`
+	PomoShuffle     bool   `json:"pomo_shuffle"`
 }
 
 // UserSettings represents the application settings.
