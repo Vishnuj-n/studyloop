@@ -119,17 +119,20 @@ func (s *Service) run(ctx context.Context) {
 			s.mu.Lock()
 			if s.remainSec > 0 {
 				s.remainSec--
-				remaining := s.remainSec
-				profileID := s.profileID
-				s.mu.Unlock()
-				s.emitter.Emit("timerTicked", map[string]interface{}{
-					"remainingSec": remaining,
-					"profileId":    profileID,
-				})
-			} else {
+			}
+			remaining := s.remainSec
+			profileID := s.profileID
+			isDone := s.remainSec == 0
+			if isDone {
 				s.running = false
-				profileID := s.profileID
-				s.mu.Unlock()
+			}
+			s.mu.Unlock()
+
+			s.emitter.Emit("timerTicked", map[string]interface{}{
+				"remainingSec": remaining,
+				"profileId":    profileID,
+			})
+			if isDone {
 				s.emitter.Emit("timerCompleted", map[string]interface{}{
 					"profileId": profileID,
 				})

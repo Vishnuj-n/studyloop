@@ -784,7 +784,7 @@ func (r *Repository) CreateProfile(p models.StudyProfile) error {
 		dur = 1500
 	}
 	brk := p.PomoBreakSec
-	if brk <= 0 {
+	if brk < 0 {
 		brk = 300
 	}
 	_, err := r.db.Exec(`
