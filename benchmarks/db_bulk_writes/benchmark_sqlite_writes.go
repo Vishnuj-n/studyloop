@@ -267,8 +267,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkSingleTxPrepared(db, records)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 3 error: %v\n", err)
 			return
@@ -293,8 +293,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkChunkedTx(db, records, 500)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 4 error: %v\n", err)
 			return
@@ -319,8 +319,8 @@ func main() {
 			return
 		}
 		dur, err := benchmarkMultiRowValues(db, records, 250)
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 		if err != nil {
 			fmt.Printf("Test 5 error: %v\n", err)
 			return

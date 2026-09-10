@@ -61,11 +61,11 @@ func setupRetrievalDB(chunks []VectorChunk) (*sql.DB, string, error) {
 	}
 
 	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 	if _, err := db.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 
@@ -76,32 +76,32 @@ func setupRetrievalDB(chunks []VectorChunk) (*sql.DB, string, error) {
 	);
 	`
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 	stmt, err := tx.Prepare("INSERT INTO chunks (id, content) VALUES (?, ?)")
 	if err != nil {
 		_ = tx.Rollback()
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, c := range chunks {
 		if _, err := stmt.Exec(c.ID, c.Content); err != nil {
 			_ = tx.Rollback()
-			db.Close()
+			_ = db.Close()
 			return nil, "", err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, "", err
 	}
 
@@ -257,8 +257,8 @@ func main() {
 		return
 	}
 	defer func() {
-		db.Close()
-		os.RemoveAll(tempDir)
+		_ = db.Close()
+		_ = os.RemoveAll(tempDir)
 	}()
 
 	invIdx := buildInvertedIndex(chunks)
