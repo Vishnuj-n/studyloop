@@ -221,7 +221,6 @@
       :study-slots-json="userSettings.study_slots_json"
       :study-start-time="userSettings.study_start_time"
       :study-end-time="userSettings.study_end_time"
-      @save-slots="handleSaveStudySlots"
     />
   </section>
 </template>
