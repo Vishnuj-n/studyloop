@@ -34,12 +34,14 @@ const props = defineProps({
 })
 
 const themes = [
-  { id: 'light-classic', label: 'Light Classic', bg: '#f9f9fb', primary: '#005bc1', surface: '#ebeef2' },
-  { id: 'light-warm', label: 'Warm Sepia', bg: '#fdfaf6', primary: '#c27d38', surface: '#f3eae1' },
-  { id: 'light-sage', label: 'Sage Garden', bg: '#f4f7f4', primary: '#2e7d32', surface: '#e2ebe2' },
   { id: 'dark-gruvbox', label: 'Gruvbox Dark', bg: '#1d2021', primary: '#d79921', surface: '#282828' },
+  { id: 'dark-obsidian', label: 'Obsidian Black', bg: '#09090b', primary: '#f4f4f5', surface: '#18181b' },
   { id: 'dark-indigo', label: 'Deep Indigo', bg: '#0b0d16', primary: '#6366f1', surface: '#171a2b' },
   { id: 'dark-emerald', label: 'Forest Emerald', bg: '#0a120d', primary: '#10b981', surface: '#152219' },
+  { id: 'light-monochrome', label: 'Monochrome Paper', bg: '#f8f8f9', primary: '#18181b', surface: '#e8e8ec' },
+  { id: 'light-warm', label: 'Warm Sepia', bg: '#fdfaf6', primary: '#c27d38', surface: '#f3eae1' },
+  { id: 'light-sage', label: 'Sage Garden', bg: '#f4f7f4', primary: '#2e7d32', surface: '#e2ebe2' },
+  { id: 'light-classic', label: 'Light Classic', bg: '#f9f9fb', primary: '#005bc1', surface: '#ebeef2' },
 ]
 
 function selectTheme(themeId) {

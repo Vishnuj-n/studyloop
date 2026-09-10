@@ -121,7 +121,7 @@ func InitSchema(tx *sql.Tx) error {
 			skip_to_reading_active BOOLEAN DEFAULT 0,
 			cloud_sync_url TEXT DEFAULT '',
 			cloud_api_token TEXT DEFAULT '',
-			theme TEXT DEFAULT 'light-classic',
+			theme TEXT DEFAULT 'dark-gruvbox',
 			rag_enabled BOOLEAN DEFAULT 0,
 			rag_notebook_chapter BOOLEAN DEFAULT 1,
 			rag_entire_notebook BOOLEAN DEFAULT 1,

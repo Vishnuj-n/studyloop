@@ -15,7 +15,7 @@ export function useSettings(errorRef, successRef) {
     skip_to_reading_active: false,
     cloud_sync_url: '',
     cloud_api_token: '',
-    theme: 'light-classic',
+    theme: 'dark-gruvbox',
     rag_enabled: false,
     rag_notebook_chapter: true,
     rag_entire_notebook: true,
