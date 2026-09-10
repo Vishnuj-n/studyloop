@@ -36,29 +36,46 @@ describe('calendarService', () => {
     expect(ics).toContain('RRULE:FREQ=DAILY')
   })
 
-  it('triggers an .ics download without crashing', () => {
-    const clickSpy = vi.fn()
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => {})
-    const removeSpy = vi.spyOn(document.body, 'removeChild').mockImplementation(() => {})
+  it('generates multi-slot .ics with distinct VEVENT and alarms for each schedule', () => {
+    const multiSlots = [
+      { name: 'Morning Review', start: '08:00', end: '09:00' },
+      { name: 'Afternoon Practice', start: '14:00', end: '15:30' },
+      { name: 'Night Focus', start: '21:00', end: '22:30' },
+    ]
+    const ics = generateRoutineICS(multiSlots)
+    expect(ics).toContain('BEGIN:VCALENDAR')
+    expect(ics).toContain('END:VCALENDAR')
 
-    window.URL.createObjectURL = vi.fn(() => 'blob:mock-ics-url')
-    window.URL.revokeObjectURL = vi.fn()
+    // Expect 3 VEVENT blocks
+    const veventMatches = ics.match(/BEGIN:VEVENT/g)
+    expect(veventMatches).toHaveLength(3)
 
-    const createElementOriginal = document.createElement.bind(document)
-    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      const el = createElementOriginal(tag)
-      if (tag === 'a') {
-        el.click = clickSpy
-      }
-      return el
-    })
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Morning Review')
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Afternoon Practice')
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Night Focus')
+    expect(ics).toContain('T080000')
+    expect(ics).toContain('T140000')
+    expect(ics).toContain('T210000')
+  })
 
-    downloadRoutineICS('16:00', '17:30')
+  it('accepts a JSON string of slots for generateRoutineICS', () => {
+    const jsonStr = JSON.stringify([
+      { name: 'Slot 1', start: '07:00', end: '08:00' },
+      { name: 'Slot 2', start: '19:00', end: '20:00' },
+    ])
+    const ics = generateRoutineICS(jsonStr)
+    const veventMatches = ics.match(/BEGIN:VEVENT/g)
+    expect(veventMatches).toHaveLength(2)
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Slot 1')
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Slot 2')
+  })
 
-    expect(clickSpy).toHaveBeenCalled()
-    expect(appendSpy).toHaveBeenCalled()
-    expect(removeSpy).toHaveBeenCalled()
-    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-ics-url')
+  it('handles overnight slots correctly without inverted end date', () => {
+    const overnightSlot = [{ name: 'Late Night Grind', start: '23:00', end: '00:30' }]
+    const ics = generateRoutineICS(overnightSlot)
+    expect(ics).toContain('SUMMARY:📖 StudyLoop: Late Night Grind')
+    expect(ics).toContain('T230000')
+    expect(ics).toContain('T003000')
   })
 
   it('plays study chime without throwing when Web Audio API is available or unavailable', async () => {

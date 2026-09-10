@@ -69,6 +69,10 @@ export async function playStudyChime() {
 /**
  * Formats start and end times into ISO strings and UTC date components.
  */
+/**
+ * Formats start and end times into ISO strings and UTC date components.
+ * Handles overnight schedules (where end time < start time) by rolling end date to next day.
+ */
 function getEventDates(startTime = '17:00', endTime = '19:00') {
   const [startH, startM] = (startTime || '17:00').split(':').map((s) => s.padStart(2, '0'))
   const [endH, endM] = (endTime || '19:00').split(':').map((s) => s.padStart(2, '0'))
@@ -79,11 +83,25 @@ function getEventDates(startTime = '17:00', endTime = '19:00') {
   const d = String(now.getDate()).padStart(2, '0')
 
   const dtStart = `${y}${m}${d}T${startH}${startM}00`
-  const dtEnd = `${y}${m}${d}T${endH}${endM}00`
+
+  // If end time is earlier than or equal to start time, it rolls over to the next day
+  const isOvernight = Number(endH) * 60 + Number(endM) <= Number(startH) * 60 + Number(startM)
+  let endY = y
+  let endMStr = m
+  let endD = d
+
+  if (isOvernight) {
+    const nextDay = new Date(now.getTime() + 86400000)
+    endY = nextDay.getFullYear()
+    endMStr = String(nextDay.getMonth() + 1).padStart(2, '0')
+    endD = String(nextDay.getDate()).padStart(2, '0')
+  }
+
+  const dtEnd = `${endY}${endMStr}${endD}T${endH}${endM}00`
 
   // ISO formats for Outlook
   const isoStart = `${y}-${m}-${d}T${startH}:${startM}:00`
-  const isoEnd = `${y}-${m}-${d}T${endH}:${endM}:00`
+  const isoEnd = `${endY}-${endMStr}-${endD}T${endH}:${endM}:00`
 
   return { dtStart, dtEnd, isoStart, isoEnd, y, m, d }
 }
@@ -125,16 +143,29 @@ export function getGoogleCalendarUrl(startTime = '17:00', endTime = '19:00') {
 
 /**
  * Generates raw iCalendar (.ics) string with daily recurrence and alarms.
- * Supports either an array of study slots [{ name, start, end }] or a single startTime/endTime fallback.
+ * Supports an array of study slots [{ name, start, end }], a JSON string, or single startTime/endTime fallback.
  */
-export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '19:00') {
+export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '18:00') {
   let slots = []
   if (Array.isArray(slotsOrStart) && slotsOrStart.length > 0) {
     slots = slotsOrStart
   } else if (typeof slotsOrStart === 'string') {
-    slots = [{ name: 'Daily Study Session', start: slotsOrStart, end: maybeEnd }]
-  } else {
-    slots = [{ name: 'Daily Study Session', start: '17:00', end: '19:00' }]
+    if (slotsOrStart.trim().startsWith('[') || slotsOrStart.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(slotsOrStart)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          slots = parsed
+        }
+      } catch {
+        slots = [{ name: 'Daily Study Session', start: slotsOrStart, end: maybeEnd }]
+      }
+    } else {
+      slots = [{ name: 'Daily Study Session', start: slotsOrStart, end: maybeEnd }]
+    }
+  }
+
+  if (slots.length === 0) {
+    slots = [{ name: 'Daily Study Session', start: '17:00', end: '18:00' }]
   }
 
   const details = escapeICSText(DEFAULT_STUDY_DESCRIPTION)
@@ -142,6 +173,8 @@ export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '19:00') {
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
   const d = String(now.getDate()).padStart(2, '0')
+  const timestamp = `${y}${m}${d}T000000Z`
+  const baseTime = Date.now()
 
   const icsLines = [
     'BEGIN:VCALENDAR',
@@ -155,12 +188,13 @@ export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '19:00') {
     const slotStart = slot.start || '17:00'
     const slotEnd = slot.end || '18:00'
     const { dtStart, dtEnd } = getEventDates(slotStart, slotEnd)
-    const slotName = slot.name ? `📖 StudyLoop: ${slot.name}` : '📖 StudyLoop Daily Study Session'
+    const slotName = slot.name ? `📖 StudyLoop: ${slot.name}` : `📖 StudyLoop Study Session ${idx + 1}`
+    const uniqueUID = `studyloop-slot-${idx + 1}-${baseTime}-${Math.floor(Math.random() * 10000)}@studyloop.app`
 
     icsLines.push(
       'BEGIN:VEVENT',
-      `UID:studyloop-slot-${idx}-${Date.now()}@studyloop.app`,
-      `DTSTAMP:${y}${m}${d}T000000Z`,
+      `UID:${uniqueUID}`,
+      `DTSTAMP:${timestamp}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,
       'RRULE:FREQ=DAILY',

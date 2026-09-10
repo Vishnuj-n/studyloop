@@ -9,6 +9,7 @@ export function useSettings(errorRef, successRef) {
     max_flashcards_per_session: 30,
     study_start_time: '17:00',
     study_end_time: '18:00',
+    study_slots_json: '[]',
     reminders_enabled: true,
     show_reward_notifications: true,
     active_profile_id: '',
@@ -34,6 +35,36 @@ export function useSettings(errorRef, successRef) {
   const studyDuration = ref('')
 
   function computeDuration() {
+    if (settings.value.study_slots_json) {
+      try {
+        const slots = JSON.parse(settings.value.study_slots_json)
+        if (Array.isArray(slots) && slots.length > 0) {
+          let totalMinutes = 0
+          for (const s of slots) {
+            if (!s.start || !s.end) continue
+            const [sh, sm] = s.start.split(':').map(Number)
+            const [eh, em] = s.end.split(':').map(Number)
+            if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) continue
+            let diff = eh * 60 + em - (sh * 60 + sm)
+            if (diff > 0) totalMinutes += diff
+          }
+          if (totalMinutes > 0) {
+            if (totalMinutes < 60) {
+              studyDuration.value = `${totalMinutes} min`
+              return
+            }
+            const hours = Math.floor(totalMinutes / 60)
+            const mins = totalMinutes % 60
+            studyDuration.value =
+              mins === 0 ? (hours === 1 ? '1 hour' : `${hours} hours`) : `${hours}h ${mins}m`
+            return
+          }
+        }
+      } catch {
+        // Fallback to single window
+      }
+    }
+
     const start = settings.value.study_start_time
     const end = settings.value.study_end_time
     if (!start || !end) {
@@ -110,11 +141,28 @@ export function useSettings(errorRef, successRef) {
           errorRef.value = 'Quiz passing score must be between 50% and 100%.'
           return
         }
-        const start = s.study_start_time
-        const end = s.study_end_time
-        if (!start || !end || start >= end) {
-          errorRef.value = 'Study start time must be strictly earlier than end time.'
-          return
+        if (s.study_slots_json && s.study_slots_json !== '[]') {
+          try {
+            const slots = JSON.parse(s.study_slots_json)
+            if (Array.isArray(slots) && slots.length > 0) {
+              for (let i = 0; i < slots.length; i++) {
+                const slot = slots[i]
+                if (!slot.start || !slot.end || slot.start >= slot.end) {
+                  errorRef.value = `Schedule #${i + 1} (${slot.name || 'Slot'}) start time must be strictly earlier than end time.`
+                  return
+                }
+              }
+            }
+          } catch {
+            // Non-fatal parse fallback
+          }
+        } else {
+          const start = s.study_start_time
+          const end = s.study_end_time
+          if (!start || !end || start >= end) {
+            errorRef.value = 'Study start time must be strictly earlier than end time.'
+            return
+          }
         }
       }
       const res = await updateUserSettings(s)
