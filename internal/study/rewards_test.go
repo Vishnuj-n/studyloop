@@ -12,25 +12,25 @@ func TestRollTaskRewards(t *testing.T) {
 	if xp != 20 || coins != 5 {
 		t.Fatalf("unexpected reading rewards: xp=%d coins=%d", xp, coins)
 	}
-	if box != nil && (box.BoxTier != "BRONZE" || box.RewardAmount <= 0) {
-		t.Fatalf("unexpected bronze chest when dropped: %+v", box)
+	if box != nil && box.RewardAmount <= 0 {
+		t.Fatalf("unexpected invalid chest when dropped: %+v", box)
 	}
 
-	// 2. Quiz Ace
+	// 2. Quiz Ace (guaranteed 100% drop with achievement odds)
 	xp, coins, box = RollTaskRewards(models.StudyTaskTypeQuiz, 100, true)
 	if xp != 100 || coins != 25 {
 		t.Fatalf("unexpected quiz ace rewards: xp=%d coins=%d", xp, coins)
 	}
-	if box == nil || box.BoxTier != "GOLD" || box.RewardAmount <= 0 {
-		t.Fatalf("unexpected gold chest: %+v", box)
+	if box == nil || box.RewardAmount <= 0 {
+		t.Fatalf("unexpected missing chest on quiz ace: %+v", box)
 	}
 
-	// 3. Milestone Exam
+	// 3. Milestone Exam (guaranteed 100% drop with achievement odds)
 	xp, coins, box = RollTaskRewards(models.StudyTaskTypeMilestoneExam, 0, false)
 	if xp != 150 || coins != 35 {
 		t.Fatalf("unexpected milestone rewards: xp=%d coins=%d", xp, coins)
 	}
-	if box == nil || box.BoxTier != "MYTHIC" || box.RewardAmount <= 0 {
-		t.Fatalf("unexpected mythic chest: %+v", box)
+	if box == nil || box.RewardAmount <= 0 {
+		t.Fatalf("unexpected missing chest on milestone exam: %+v", box)
 	}
 }

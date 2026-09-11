@@ -436,7 +436,7 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 
 ### `user_gamification`
 
-Singleton table (user_id = 1) tracking XP, coins, narrative titles, and streak freezes.
+Singleton table (user_id = 1) tracking XP, coins, narrative titles, streak freezes, and unlocked cosmetics.
 
 | Field | Type | Description |
 |---|---|---|
@@ -446,7 +446,8 @@ Singleton table (user_id = 1) tracking XP, coins, narrative titles, and streak f
 | `current_title` | TEXT NOT NULL DEFAULT 'The Apprentice' | Current narrative rank title |
 | `streak_freezes_owned` | INTEGER NOT NULL DEFAULT 1 | Available streak freeze shields |
 | `frozen_dates_json` | TEXT NOT NULL DEFAULT '[]' | JSON array of dates protected by streak freeze (YYYY-MM-DD) |
-| `unlocked_cosmetics_json` | TEXT NOT NULL DEFAULT '[]' | JSON list of unlocked cosmetics |
+| `unlocked_cosmetics_json` | TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]' | JSON list of unlocked cosmetics |
+| `stats_json` | TEXT NOT NULL DEFAULT '{}' | JSON map of incremental study achievement stats |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
 
 ### `pending_loot_boxes`

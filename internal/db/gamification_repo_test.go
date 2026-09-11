@@ -91,4 +91,41 @@ func TestGamificationRepo(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error buying streak freeze with insufficient coins")
 	}
+
+	// 6. Test UnlockCosmetic with coins
+	// First top up coins
+	_, _, err = repo.AddXPAndCoins(0, 100)
+	if err != nil {
+		t.Fatalf("AddXPAndCoins failed: %v", err)
+	}
+
+	afterUnlockProf, err := repo.UnlockCosmetic("dark-indigo", 75)
+	if err != nil {
+		t.Fatalf("UnlockCosmetic failed: %v", err)
+	}
+	if afterUnlockProf.Coins != 35 { // 10 + 100 - 75 = 35
+		t.Fatalf("expected coins 35, got %d", afterUnlockProf.Coins)
+	}
+
+	// 7. Test IncrementStat & Achievement auto-unlock
+	if err := repo.IncrementStat("quizzes_passed", 5); err != nil {
+		t.Fatalf("IncrementStat failed: %v", err)
+	}
+
+	store, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore failed: %v", err)
+	}
+
+	// Check if light-monochrome was auto unlocked by quiz_master achievement
+	foundMonochrome := false
+	for _, th := range store.Themes {
+		if th.ID == "light-monochrome" && th.Unlocked {
+			foundMonochrome = true
+			break
+		}
+	}
+	if !foundMonochrome {
+		t.Fatalf("expected light-monochrome to be unlocked by quiz_master achievement")
+	}
 }

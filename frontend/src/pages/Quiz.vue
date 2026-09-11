@@ -230,15 +230,29 @@
           {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
         </button>
 
-        <!-- Written Assessment optional routing on pass -->
-        <button
-          v-if="result.passed"
-          class="ghost-btn examiner-btn"
-          :disabled="generatingFlashcards"
-          @click="handleGoToExaminer"
-        >
-          Written Assessment
-        </button>
+        <!-- Viva Examiner Challenge Hero Card on Pass -->
+        <div v-if="result.passed" class="viva-challenge-card">
+          <div class="viva-challenge-card__badge">
+            <span>🏆 EXAMINER VIVA CHALLENGE</span>
+            <span class="viva-challenge-card__tag">🎲 Gamble for Loot</span>
+          </div>
+          <h4 class="viva-challenge-card__title">Want to gamble for better loot?</h4>
+          <p class="viva-challenge-card__desc">
+            Explain the concept in your own words (Speak via Handy/STT or Type).
+          </p>
+          <div class="viva-challenge-card__perks">
+            <span>✨ Bonus XP</span>
+            <span>✦</span>
+            <span>🎁 Boosted Rare-Chest Odds</span>
+          </div>
+          <button
+            class="viva-challenge-btn"
+            :disabled="generatingFlashcards"
+            @click="handleGoToExaminer"
+          >
+            📝 TAKE THE VIVA CHALLENGE
+          </button>
+        </div>
 
         <button
           class="primary-btn continue-btn"
@@ -1224,5 +1238,79 @@ async function handleGoToExaminer() {
 
 .val--incorrect {
   color: #e74c3c;
+}
+
+/* Voice Viva Challenge Hero Card */
+.viva-challenge-card {
+  margin: 16px 0;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(243, 156, 18, 0.15) 100%);
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(243, 156, 18, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.viva-challenge-card__badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #f39c12;
+}
+
+.viva-challenge-card__tag {
+  background: rgba(243, 156, 18, 0.2);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+}
+
+.viva-challenge-card__title {
+  margin: 2px 0 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-color, #ffffff);
+}
+
+.viva-challenge-card__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-text, #bdc3c7);
+}
+
+.viva-challenge-card__perks {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1c40f;
+  margin-top: 4px;
+}
+
+.viva-challenge-btn {
+  margin-top: 10px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(211, 84, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.viva-challenge-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(211, 84, 0, 0.45);
 }
 </style>

@@ -599,7 +599,36 @@ type GamificationProfile struct {
 	StreakFreezesOwned    int    `json:"streak_freezes_owned"`
 	FrozenDatesJSON       string `json:"frozen_dates_json"`
 	UnlockedCosmeticsJSON string `json:"unlocked_cosmetics_json"`
+	StatsJSON             string `json:"stats_json"`
 	UpdatedAt             string `json:"updated_at"`
+}
+
+type CosmeticItem struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Type            string `json:"type"` // "theme" or "title"
+	Price           int    `json:"price"`
+	Unlocked        bool   `json:"unlocked"`
+	UnlockCondition string `json:"unlock_condition,omitempty"`
+}
+
+type Achievement struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Icon         string `json:"icon"`
+	StatKey      string `json:"stat_key"`
+	TargetValue  int    `json:"target_value"`
+	CurrentValue int    `json:"current_value"`
+	Completed    bool   `json:"completed"`
+	RewardCoins  int    `json:"reward_coins"`
+	RewardItem   string `json:"reward_item,omitempty"`
+}
+
+type GamificationStore struct {
+	Profile      *GamificationProfile `json:"profile"`
+	Themes       []CosmeticItem       `json:"themes"`
+	Achievements []Achievement        `json:"achievements"`
 }
 
 // PendingLootBox represents an unopened or opened mystery chest.

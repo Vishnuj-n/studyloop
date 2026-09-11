@@ -928,3 +928,22 @@ func TestGetStreakState_StreakFreezeAutoConsume(t *testing.T) {
 	}
 }
 
+func TestApp_TestLLMConnection(t *testing.T) {
+	mockLLM := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"choices": []map[string]interface{}{
+				{"message": map[string]string{"content": "Hello!"}},
+			},
+		})
+	}))
+	t.Cleanup(mockLLM.Close)
+
+	app := newTestApp(t)
+	res := app.TestLLMConnection("fast", "custom", mockLLM.URL, "test-model", "test-key")
+	if res["ok"] != true {
+		t.Fatalf("expected ok: true, got %v", res)
+	}
+}
+
+

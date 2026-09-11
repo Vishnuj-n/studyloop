@@ -68,6 +68,7 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete reading transition: %w", err)
 		}
+		_ = s.repo.IncrementStat("reading_sessions", 1)
 		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeReading, 0, false)
 		return TransitionResult{
 			Success:      true,
@@ -87,6 +88,7 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		}
 		var rewards *models.RewardPayload
 		if res.Passed {
+			_ = s.repo.IncrementStat("quizzes_passed", 1)
 			rewards = s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeQuiz, res.Score, res.Score >= 100)
 		}
 		return TransitionResult{
@@ -115,6 +117,7 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			}
 		}
 
+		_ = s.repo.IncrementStat("flashcards_reviewed", req.CardCount)
 		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeFlashcardGenerate, 0, false)
 		return TransitionResult{
 			Success:        true,
@@ -127,6 +130,7 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if err := s.repo.CompleteReviewSession(req.TaskID); err != nil {
 			return TransitionResult{}, err
 		}
+		_ = s.repo.IncrementStat("flashcards_reviewed", 10)
 		rewards := s.awardCompletionRewards(req.TaskID, models.StudyTaskTypeFlashcardReview, 0, false)
 		return TransitionResult{
 			Success: true,

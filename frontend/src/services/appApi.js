@@ -221,8 +221,8 @@ export function deleteLLMAPIKey(tier) {
   return appBridge().DeleteLLMAPIKey(tier)
 }
 
-export function testLLMConnection(baseURL, model, apiKey) {
-  return appBridge().TestLLMConnection(baseURL || '', model || '', apiKey || '')
+export function testLLMConnection(tier, provider, baseURL, model, apiKey) {
+  return appBridge().TestLLMConnection(tier || 'fast', provider || '', baseURL || '', model || '', apiKey || '')
 }
 
 export function initializeRAG() {

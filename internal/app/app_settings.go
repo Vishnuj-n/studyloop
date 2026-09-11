@@ -279,9 +279,25 @@ func (a *App) DeleteLLMAPIKey(tier string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) TestLLMConnection(baseURL, model, apiKey string) map[string]interface{} {
-	provider := llm.NewProvider(&llm.Config{BaseURL: baseURL, Model: model, APIKey: apiKey, TimeoutMs: 10000})
-	if _, err := provider.GenerateAnswer("Hi"); err != nil {
+func (a *App) TestLLMConnection(tier, provider, baseURL, model, apiKey string) map[string]interface{} {
+	tier = normalizeLLMTierForApp(tier)
+	if apiKey == "" && tier != "" {
+		key, _ := llm.GetAPIKey(tier)
+		if key == "" && tier == "heavy" {
+			key, _ = llm.GetAPIKey("fast")
+		}
+		apiKey = key
+	}
+	cfg := llm.LoadConfigFromSettingsForPrefix(
+		strings.ToUpper(tier),
+		models.LLMTierSettings{Provider: provider, BaseURL: baseURL, Model: model},
+		apiKey,
+	)
+	if cfg.TimeoutMs <= 0 || cfg.TimeoutMs > 10000 {
+		cfg.TimeoutMs = 10000
+	}
+	providerObj := llm.NewProvider(cfg)
+	if _, err := providerObj.GenerateAnswer("Hi"); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}

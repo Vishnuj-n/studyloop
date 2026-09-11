@@ -667,3 +667,38 @@ func (a *App) BuyStreakFreeze() map[string]interface{} {
 		"profile": prof,
 	}
 }
+
+// UnlockCosmeticItem purchases/unlocks a theme or title item.
+func (a *App) UnlockCosmeticItem(itemCode string, price int) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.UnlockCosmetic(itemCode, price)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"profile": prof,
+	}
+}
+
+// GetGamificationStore returns full shop inventory, achievement progress, and profile.
+func (a *App) GetGamificationStore() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	store, err := repo.GetGamificationStore()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"store": store,
+	}
+}
