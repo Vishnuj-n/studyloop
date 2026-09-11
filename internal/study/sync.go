@@ -153,6 +153,10 @@ func TriggerCloudSync(repo *db.Repository) error {
 	userToken := ResolveCloudAPIToken(settings.CloudAPIToken)
 	anonKey := ResolveAnonKey()
 
+	if settings.ClassroomCode == "" && syncURL == "" {
+		return nil // Local profile without explicit classroom pairing or custom cloud sync URL; skip classroom sync
+	}
+
 	if syncURL == "" {
 		return nil // Classroom cloud sync not configured for this profile
 	}

@@ -592,6 +592,13 @@ func TestCreateReviewSessionDueCardBatchingAndDuplicatePrevention(t *testing.T) 
 	if linkedCount != 23 {
 		t.Fatalf("expected 23 linked review cards, got %d", linkedCount)
 	}
+	// A new card becomes due while the existing task is still pending. It must
+	// join that book's pending session instead of creating a later one-card task.
+	if err := testRepo.CreateFlashcards("topic-review-a", []models.Flashcard{{
+		ID: "late-due-card", TopicID: "topic-review-a", Prompt: "late", Answer: "late", DueAt: time.Now().Unix(),
+	}}, map[string]models.FlashcardState{"late-due-card": {}}); err != nil {
+		t.Fatalf("CreateFlashcards late due card failed: %v", err)
+	}
 
 	task2, existing2, err := testRepo.CreateReviewSession("nb-review")
 	if err != nil {
@@ -603,6 +610,7 @@ func TestCreateReviewSessionDueCardBatchingAndDuplicatePrevention(t *testing.T) 
 	if task2 == nil || task2.ID != task.ID {
 		t.Fatalf("expected duplicate prevention to return task %s, got %#v", task.ID, task2)
 	}
+	assertCountEquals(t, `SELECT COUNT(*) FROM review_task_cards WHERE task_id = ?`, task.ID, 24)
 	assertCountEquals(t, `SELECT COUNT(*) FROM study_queue WHERE notebook_id = ? AND task_type = 'FLASHCARD_REVIEW'`, "nb-review", 1)
 }
 
@@ -1569,7 +1577,7 @@ func TestMultiSessionChapterSlicingAndProgression(t *testing.T) {
 		t.Fatalf("complete quiz 2 failed: %v", err)
 	}
 
-	// 3. Next replenishment -> Slice 3 should be Pages 11-15
+	// 3. Next replenishment -> Slice 3 should be Pages 11-20 (clamped to end of Chapter 1 because remaining <= ClampWindowPages=8)
 	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
 		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 3 failed: %v", err)
 	}
@@ -1578,47 +1586,28 @@ func TestMultiSessionChapterSlicingAndProgression(t *testing.T) {
 		t.Fatalf("GetAllPendingTasks slice 3 failed: %v", err)
 	}
 	task3 := pending3[0]
-	if task3.StartPage != 11 || task3.EndPage != 15 || task3.TopicID != topicID1 {
-		t.Fatalf("expected slice 3 (pages 11-15), got range %d-%d", task3.StartPage, task3.EndPage)
+	if task3.StartPage != 11 || task3.EndPage != 20 || task3.TopicID != topicID1 {
+		t.Fatalf("expected slice 3 (pages 11-20), got range %d-%d", task3.StartPage, task3.EndPage)
 	}
 
-	// Complete slice 3 reading & quiz
+	// Complete slice 3 reading & quiz (finishes Chapter 1)
 	_ = testRepo.ActivateTask(task3.ID)
 	quizTaskID3, _ := testRepo.CompleteReadingWithGeneratedQuiz(task3.ID, quizPayload)
 	_ = testRepo.ActivateTask(quizTaskID3)
 	_ = testRepo.CompleteTask(quizTaskID3, models.CompletionResult{Status: models.StudyTaskStatusCompleted})
-
-	// 4. Next replenishment -> Slice 4 should be Pages 16-20 (end of Chapter 1)
-	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
-		t.Fatalf("EnsurePendingReadingTaskForNotebook slice 4 failed: %v", err)
-	}
-	pending4, err := testRepo.GetAllPendingTasks()
-	if err != nil || len(pending4) == 0 {
-		t.Fatalf("GetAllPendingTasks slice 4 failed: %v", err)
-	}
-	task4 := pending4[0]
-	if task4.StartPage != 16 || task4.EndPage != 20 || task4.TopicID != topicID1 {
-		t.Fatalf("expected slice 4 (pages 16-20), got range %d-%d", task4.StartPage, task4.EndPage)
-	}
-
-	// Complete slice 4 reading
-	_ = testRepo.ActivateTask(task4.ID)
-	quizTaskID4, _ := testRepo.CompleteReadingWithGeneratedQuiz(task4.ID, quizPayload)
-	_ = testRepo.ActivateTask(quizTaskID4)
-	_ = testRepo.CompleteTask(quizTaskID4, models.CompletionResult{Status: models.StudyTaskStatusCompleted})
 	_, _ = testRepo.db.Exec(`UPDATE topics SET status = 'completed' WHERE id = ?`, topicID1)
 
-	// 5. Next replenishment -> Should seamlessly transition to Chapter 2 (Pages 21-25)
+	// 4. Next replenishment -> Should seamlessly transition to Chapter 2 (Pages 21-25)
 	if err := testRepo.EnsurePendingReadingTaskForNotebook(notebookID, targetWords); err != nil {
 		t.Fatalf("EnsurePendingReadingTaskForNotebook Chapter 2 failed: %v", err)
 	}
-	pending5, err := testRepo.GetAllPendingTasks()
-	if err != nil || len(pending5) == 0 {
+	pending4, err := testRepo.GetAllPendingTasks()
+	if err != nil || len(pending4) == 0 {
 		t.Fatalf("GetAllPendingTasks Chapter 2 failed: %v", err)
 	}
-	task5 := pending5[0]
-	if task5.StartPage != 21 || task5.EndPage != 25 || task5.TopicID != topicID2 {
-		t.Fatalf("expected Chapter 2 slice 1 (pages 21-25, topic %s), got range %d-%d topic %s", topicID2, task5.StartPage, task5.EndPage, task5.TopicID)
+	task4 := pending4[0]
+	if task4.StartPage != 21 || task4.EndPage != 25 || task4.TopicID != topicID2 {
+		t.Fatalf("expected Chapter 2 slice 1 (pages 21-25, topic %s), got range %d-%d topic %s", topicID2, task4.StartPage, task4.EndPage, task4.TopicID)
 	}
 }
 
@@ -1701,4 +1690,3 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 		t.Fatalf("unexpected unexamined attempts: %#v", topicAttemptsAfter)
 	}
 }
-

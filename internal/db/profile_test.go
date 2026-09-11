@@ -225,3 +225,76 @@ func TestExtensionConfig(t *testing.T) {
 	}
 }
 
+func TestGetProfileRemainingWords_ExcludesDormant(t *testing.T) {
+	tempDB := "test_remaining_words.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	profID := "prof-words-test"
+	if err := repo.CreateProfile(models.StudyProfile{ID: profID, Name: "Test Words Profile"}); err != nil {
+		t.Fatalf("CreateProfile failed: %v", err)
+	}
+
+	// Create 1 Active notebook and 1 Dormant notebook
+	nbActive := "nb-active-1"
+	nbDormant := "nb-dormant-1"
+
+	if err := repo.CreateNotebook(nbActive, "Active Book", "active.pdf", "pdf", "", profID, 10, ""); err != nil {
+		t.Fatalf("CreateNotebook active failed: %v", err)
+	}
+	if err := repo.UpdateNotebookStudyStatus(nbActive, "active"); err != nil {
+		t.Fatalf("UpdateNotebookStudyStatus active failed: %v", err)
+	}
+
+	if err := repo.CreateNotebook(nbDormant, "Dormant Book", "dormant.pdf", "pdf", "", profID, 10, ""); err != nil {
+		t.Fatalf("CreateNotebook dormant failed: %v", err)
+	}
+	if err := repo.UpdateNotebookStudyStatus(nbDormant, "dormant"); err != nil {
+		t.Fatalf("UpdateNotebookStudyStatus dormant failed: %v", err)
+	}
+
+	// Create topics & chunks (10 words each)
+	topActive := "top-active-1"
+	topDormant := "top-dormant-1"
+	_ = repo.EnsureTopic(topActive, "Active Topic")
+	_ = repo.EnsureTopic(topDormant, "Dormant Topic")
+
+	chunkTextActive := "one two three four five six seven eight nine ten"
+	chunkTextDormant := "one two three four five six seven eight nine ten"
+
+	// Insert chunks into DB directly
+	_, err = repo.db.Exec(`INSERT INTO chunks (id, topic_id, chunk_text, page_num) VALUES ('c-active', ?, ?, 1)`, topActive, chunkTextActive)
+	if err != nil {
+		t.Fatalf("insert active chunk failed: %v", err)
+	}
+	_, err = repo.db.Exec(`INSERT INTO notebook_chunks (notebook_id, chunk_id, page_num) VALUES (?, 'c-active', 1)`, nbActive)
+	if err != nil {
+		t.Fatalf("link active chunk failed: %v", err)
+	}
+
+	_, err = repo.db.Exec(`INSERT INTO chunks (id, topic_id, chunk_text, page_num) VALUES ('c-dormant', ?, ?, 1)`, topDormant, chunkTextDormant)
+	if err != nil {
+		t.Fatalf("insert dormant chunk failed: %v", err)
+	}
+	_, err = repo.db.Exec(`INSERT INTO notebook_chunks (notebook_id, chunk_id, page_num) VALUES (?, 'c-dormant', 1)`, nbDormant)
+	if err != nil {
+		t.Fatalf("link dormant chunk failed: %v", err)
+	}
+
+	words, err := repo.GetProfileRemainingWords(profID)
+	if err != nil {
+		t.Fatalf("GetProfileRemainingWords failed: %v", err)
+	}
+
+	if words != 10 {
+		t.Errorf("expected 10 remaining words (active only), got %d", words)
+	}
+}
+
+

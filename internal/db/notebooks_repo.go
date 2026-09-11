@@ -728,7 +728,10 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			return tableErr
 		}
 
-		if hasChunkVectors {
+		// Vector cleanup is optional. A notebook without chunks cannot have
+		// vectors, and an unavailable vec0 extension must not block deleting
+		// the notebook's ordinary relational data.
+		if hasChunkVectors && len(chunkIDs) > 0 {
 			if _, delVecErr := tx.Exec(`
 				DELETE FROM chunk_vectors
 				WHERE rowid IN (
@@ -737,7 +740,7 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 					JOIN notebook_chunks nc ON nc.chunk_id = c.id
 					WHERE nc.notebook_id = ?
 				)
-			`, notebookID); delVecErr != nil {
+			`, notebookID); delVecErr != nil && !isVectorUnavailableError(delVecErr) {
 				return delVecErr
 			}
 		}
@@ -1064,7 +1067,7 @@ func (r *Repository) UpdateNotebookStudyStatus(notebookID string, studyStatus st
 	})
 }
 
-// GetProfileRemainingWords calculates the remaining unread words across all notebooks in a profile.
+// GetProfileRemainingWords calculates the remaining unread words across active notebooks in a profile.
 func (r *Repository) GetProfileRemainingWords(profileID string) (int, error) {
 	var total int
 	err := r.db.QueryRow(`
@@ -1085,6 +1088,7 @@ func (r *Repository) GetProfileRemainingWords(profileID string) (int, error) {
 		JOIN chunks c ON c.id = nc.chunk_id
 		LEFT JOIN topics t ON t.id = c.topic_id
 		WHERE (n.profile_id = ? OR n.profile_id IS NULL)
+		  AND n.study_status = 'active'
 	`, profileID).Scan(&total)
 	if err != nil {
 		return 0, err
@@ -1331,6 +1335,5 @@ func (r *Repository) PersistAnkiDeckImport(input AnkiDeckImportInput) ([]models.
 	}
 	return createdCards, nil
 }
-
 
 

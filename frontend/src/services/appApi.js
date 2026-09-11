@@ -65,6 +65,10 @@ export async function completeReading(taskID) {
   }
 }
 
+export function skipReadingTask(taskID) {
+  return appBridge().SkipReadingTask(taskID)
+}
+
 export function getTask(taskID) {
   return appBridge().GetTask(taskID)
 }

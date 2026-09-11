@@ -76,7 +76,9 @@ func aggregateQueueTasks(repo *db.Repository, active, pending []models.StudyQueu
 
 	learningMinutes := 0
 	for _, task := range queueTasks {
-		learningMinutes += task.EstimateMinutes
+		if task.ActionType != "flashcard_review" {
+			learningMinutes += task.EstimateMinutes
+		}
 	}
 
 	return queueTasks, activeTopics, learningMinutes, actionCounts
@@ -380,6 +382,19 @@ func (a *App) ActivateTask(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+// SkipReadingTask marks a READING task as SKIPPED and advances the topic cursor
+// so the same session is not re-seeded by EnsurePendingReadingTaskForNotebook.
+func (a *App) SkipReadingTask(taskID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.SkipReadingTask(taskID); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
 func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
@@ -558,6 +573,9 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+	if len(counts) < 7 {
+		return map[string]interface{}{"timeline": []FlashcardDuePoint{}}
 	}
 
 	timeline := make([]FlashcardDuePoint, 7)

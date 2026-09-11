@@ -18,7 +18,7 @@ type TransitionEvent string
 const (
 	EventCompleteReading          TransitionEvent = "COMPLETE_READING"
 	EventSubmitQuiz               TransitionEvent = "SUBMIT_QUIZ"
-	EventCompleteFlashcards        TransitionEvent = "COMPLETE_FLASHCARDS"
+	EventCompleteFlashcards       TransitionEvent = "COMPLETE_FLASHCARDS"
 	EventCompleteFlashcardReview  TransitionEvent = "COMPLETE_FLASHCARD_REVIEW"
 	EventCompleteSocraticRescue   TransitionEvent = "COMPLETE_SOCRATIC_RESCUE"
 	EventCompleteMilestoneExam    TransitionEvent = "COMPLETE_MILESTONE_EXAM"
@@ -36,6 +36,7 @@ type TransitionRequest struct {
 	CardCount   int
 	ErrorReason string
 }
+
 
 // TransitionResult provides the outcome and any spawned follow-up task IDs.
 type TransitionResult struct {
@@ -145,6 +146,21 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			Status: models.StudyTaskStatusCompleted,
 		}); err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to complete milestone exam: %w", err)
+		}
+
+		// Seed the next reading task so completing a milestone does not leave
+		// the queue dependent on whichever notebook was already seeded.
+		settings, settingsErr := s.repo.GetUserSettings()
+		targetWords := 3000
+		minWords := 0
+		if settingsErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+			minWords = settings.MinSessionWords
+		}
+		if task.NotebookID != "" {
+			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords, minWords); ensureErr != nil {
+				utils.Warnf("[QUEUE_TRANSITION] failed to seed next reading task for notebook %s: %v", task.NotebookID, ensureErr)
+			}
 		}
 
 		// Persist milestone_exam_complete telemetry to durable SQLite outbox
@@ -302,4 +318,3 @@ func (s *StudyService) awardCompletionRewards(taskID string, taskType models.Stu
 		NewTitleUnlocked: newTitle,
 	}
 }
-

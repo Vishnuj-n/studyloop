@@ -90,13 +90,23 @@ const { toast, hideToast } = useToast()
   background: var(--surface-container-low, #1e1e24);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25), 0 0 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2), 0 0 16px rgba(0, 0, 0, 0.06);
   color: var(--on-surface, #e2e8f0);
   display: flex;
   align-items: flex-start;
   gap: 12px;
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-toast-card.is-notice {
+  background: linear-gradient(135deg, var(--surface-container-low) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.app-toast-card.is-error {
+  background: linear-gradient(135deg, var(--surface-container-low) 0%, rgba(239, 68, 68, 0.08) 100%);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 .app-toast-card:hover {
@@ -137,13 +147,13 @@ const { toast, hideToast } = useToast()
 .app-toast-card.is-notice .toast-icon-badge {
   color: #10b981;
   border-color: rgba(16, 185, 129, 0.3);
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.12);
 }
 
 .app-toast-card.is-error .toast-icon-badge {
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .toast-body {
@@ -179,7 +189,7 @@ const { toast, hideToast } = useToast()
 }
 
 .toast-close-btn:hover {
-  color: #ffffff;
+  color: var(--on-surface, #ffffff);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -187,7 +197,7 @@ const { toast, hideToast } = useToast()
   margin: 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--on-surface-variant, #94a3b8);
+  color: var(--muted-text, #94a3b8);
   word-break: break-word;
 }
 

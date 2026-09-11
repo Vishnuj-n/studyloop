@@ -76,6 +76,7 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `setupExtension` | `SetupExtension` | 1 | Active |
 | `signUpStudent` | `SignUpStudent` | 1 | Active |
 | `simplifyReadingContent` | `SimplifyReadingContent` | 1 | Active |
+| `skipReadingTask` | `SkipReadingTask` | 1 | Active |
 | `startBrowserAuth` | `StartBrowserAuth` | 1 | Active |
 | `startTopicAudioOverview` | `StartTopicAudioOverview` | 1 | Active |
 | `stopTopicAudioOverview` | `StopTopicAudioOverview` | 1 | Active |
@@ -158,12 +159,8 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `LogoutStudent` | Yes |
 | `OpenRepoURL` | Yes |
 | `OpenURLInBrowser` | Yes |
-| `PomodoroCheckResumeSession` | No (Unused API) |
-| `PomodoroDeleteProfile` | No (Unused API) |
 | `PomodoroGetAudioState` | No (Unused API) |
 | `PomodoroGetProfileByID` | No (Unused API) |
-| `PomodoroGetSettings` | No (Unused API) |
-| `PomodoroGetStats` | No (Unused API) |
 | `PomodoroGetTimerState` | No (Unused API) |
 | `PomodoroLoadProfiles` | No (Unused API) |
 | `PomodoroPauseTimer` | No (Unused API) |
@@ -172,10 +169,8 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `PomodoroPlayChime` | No (Unused API) |
 | `PomodoroPlayLooping` | No (Unused API) |
 | `PomodoroPlayShuffleFolder` | No (Unused API) |
-| `PomodoroRecordSessionComplete` | No (Unused API) |
 | `PomodoroResumeTimer` | No (Unused API) |
 | `PomodoroSaveProfile` | No (Unused API) |
-| `PomodoroSaveSettings` | No (Unused API) |
 | `PomodoroSetVolume` | No (Unused API) |
 | `PomodoroStartTimer` | No (Unused API) |
 | `PomodoroStopAudio` | No (Unused API) |
@@ -193,6 +188,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `SetupExtension` | Yes |
 | `SignUpStudent` | Yes |
 | `SimplifyReadingContent` | Yes |
+| `SkipReadingTask` | Yes |
 | `StartBrowserAuth` | Yes |
 | `StartTopicAudioOverview` | Yes |
 | `StopTopicAudioOverview` | Yes |
@@ -227,11 +223,11 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `ExtractSyllabusChaptersFromMarkdown` | `internal\notebook\markdown_chunker.go:195` | None | `function` |
 | `GetEffectiveTier` | `internal\extension\tiers.go:18` | None | `function` |
 | `GetYouTubeSegmentTimestamps` | `internal\notebook\youtube.go:139` | `Service` | `method` |
-| `IngestDeepPDF` | `internal\notebook\deep_pdf.go:34` | `Service` | `method` |
-| `IngestDeepPDFWithProgress` | `internal\notebook\deep_pdf.go:39` | `Service` | `method` |
+| `IngestDeepPDF` | `internal\notebook\deep_pdf.go:37` | `Service` | `method` |
+| `IngestDeepPDFWithProgress` | `internal\notebook\deep_pdf.go:42` | `Service` | `method` |
 | `IngestYouTubeVideo` | `internal\notebook\youtube.go:32` | `Service` | `method` |
 | `InstallZip` | `internal\extension\installer.go:45` | `Manager` | `method` |
-| `MarkLLMKeyStored` | `internal\db\store.go:606` | `Repository` | `method` |
+| `MarkLLMKeyStored` | `internal\db\store.go:621` | `Repository` | `method` |
 | `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:276` | None | `function` |
 | `ParsePDFCPUBookmarkDraftFromJSON` | `internal\notebook\pdfcpu.go:75` | None | `function` |
 | `PlayChime` | `internal\pomodoro\services\audio\service.go:168` | `Service` | `method` |
@@ -245,12 +241,12 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `SetVolume` | `internal\pomodoro\services\audio\service.go:141` | `Service` | `method` |
 | `SetupExtensionEnv` | `internal\extension\checker.go:125` | None | `function` |
 | `SplitMarkdownIntoChunks` | `internal\notebook\markdown_chunker.go:30` | None | `function` |
-| `TransitionTask` | `internal\study\queue_transition.go:53` | `StudyService` | `method` |
+| `TransitionTask` | `internal\study\queue_transition.go:54` | `StudyService` | `method` |
 | `Uninstall` | `internal\extension\installer.go:15` | `Manager` | `method` |
 | `activateReadingSessionTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `aggregateQueueTasks` | `internal\app\app_study.go:53` | None | `function` |
 | `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:142` | None | `function` |
-| `awardCompletionRewards` | `internal\study\queue_transition.go:268` | `StudyService` | `method` |
+| `awardCompletionRewards` | `internal\study\queue_transition.go:286` | `StudyService` | `method` |
 | `bookmarkNodesToDraft` | `internal\notebook\pdfcpu.go:33` | None | `function` |
 | `buildInputValues` | `internal\embeddings\onnx.go:337` | `OnnxEmbedder` | `method` |
 | `buildPageSample` | `internal\notebook\syllabus.go:358` | None | `function` |
@@ -263,13 +259,13 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:265` | None | `function` |
 | `computeCurrentStreak` | `internal\app\app_study.go:115` | None | `function` |
 | `computeLongestStreak` | `internal\app\app_study.go:85` | None | `function` |
-| `copyPomoFile` | `internal\app\app_pomodoro.go:292` | None | `function` |
+| `copyPomoFile` | `internal\app\app_pomodoro.go:268` | None | `function` |
 | `destroyValues` | `internal\embeddings\onnx.go:536` | None | `function` |
 | `embedBatchInternal` | `internal\embeddings\onnx.go:210` | `OnnxEmbedder` | `method` |
 | `embedInternal` | `internal\embeddings\onnx.go:199` | `OnnxEmbedder` | `method` |
-| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1038` | None | `function` |
+| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1049` | None | `function` |
 | `emitState` | `internal\pomodoro\services\audio\service.go:273` | `Service` | `method` |
-| `envHasLLMAPIKey` | `internal\app\app_settings.go:321` | None | `function` |
+| `envHasLLMAPIKey` | `internal\app\app_settings.go:332` | None | `function` |
 | `extractBatchEmbedding` | `internal\embeddings\onnx.go:385` | None | `function` |
 | `extractIONames` | `internal\embeddings\onnx.go:496` | None | `function` |
 | `finalizeDeepStructuredPDFUpload` | `internal/app/app.go` | `App` | `AppHelper` |
@@ -289,7 +285,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `mapTaskError` | `internal\app\app_study.go:138` | None | `function` |
 | `maxPage` | `internal\notebook\syllabus.go:390` | None | `function` |
 | `normalizeL2` | `internal\embeddings\onnx.go:477` | None | `function` |
-| `normalizeLLMTierForApp` | `internal\app\app_settings.go:311` | None | `function` |
+| `normalizeLLMTierForApp` | `internal\app\app_settings.go:322` | None | `function` |
 | `parseBookmarkNode` | `internal\notebook\pdfcpu.go:23` | None | `function` |
 | `parseMarkdownBlocks` | `internal\notebook\markdown_chunker.go:96` | None | `function` |
 | `parseSyllabusDraft` | `internal\notebook\syllabus.go:257` | None | `function` |
@@ -306,9 +302,11 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `resolveRuntimeLibraryPath` | `internal\embeddings\onnx.go:544` | None | `function` |
 | `runDeepPDFExtraction` | `internal/app/app.go` | `App` | `AppHelper` |
 | `runPDFCPUBookmarksExport` | `internal\notebook\pdfcpu.go:117` | None | `function` |
-| `sameLLMSettingsForUI` | `internal\app\app_settings.go:335` | None | `function` |
+| `sameLLMSettingsForUI` | `internal\app\app_settings.go:346` | None | `function` |
 | `scanMP3s` | `internal\pomodoro\services\audio\service.go:282` | None | `function` |
 | `shuffleStrings` | `internal\pomodoro\services\audio\service.go:296` | None | `function` |
+| `splitDeepPDFMarkdown` | `internal\notebook\deep_pdf.go:168` | None | `function` |
+| `stripMarkdownHeadings` | `internal\notebook\deep_pdf.go:191` | None | `function` |
 | `tensorFromInputData` | `internal\embeddings\onnx.go:362` | None | `function` |
 | `validatePDFCPUInputFilePath` | `internal\notebook\pdfcpu.go:179` | None | `function` |
 | `walkBookmarkNode` | `internal\notebook\pdfcpu.go:44` | None | `function` |

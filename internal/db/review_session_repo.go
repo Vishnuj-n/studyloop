@@ -175,6 +175,33 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 	if existing, err := r.fetchExistingReviewTask(r.db, notebookID); err != nil {
 		return nil, false, err
 	} else if existing != nil {
+		// A pending task is a snapshot, but cards can become due while it waits in
+		// the queue. Merge those cards before returning it so a book does not turn
+		// into a sequence of one-card review tasks.
+		if existing.Status == models.StudyTaskStatusPending {
+			settings, err := r.GetUserSettings()
+			if err != nil {
+				return nil, false, err
+			}
+			limit := settings.MaxFlashcardsPerSession
+			if limit <= 0 {
+				limit = 30
+			}
+			cards, err := r.GetDueReviewCardsForNotebook(notebookID, now, limit)
+			if err != nil {
+				return nil, false, err
+			}
+			if len(cards) > 0 {
+				if err := r.mergePendingReviewCards(existing.ID, cards); err != nil {
+					return nil, false, err
+				}
+				if refreshed, err := r.fetchExistingReviewTask(r.db, notebookID); err != nil {
+					return nil, false, err
+				} else if refreshed != nil {
+					existing = refreshed
+				}
+			}
+		}
 		utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation reused_existing notebookID=%s taskID=%s status=%s", notebookID, existing.ID, existing.Status)
 		return existing, true, nil
 	}
@@ -272,6 +299,36 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 	utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation committed taskID=%s notebookID=%s linkedCards=%d", task.ID, notebookID, len(cards))
 	createdTask, err := r.GetTaskByID(task.ID)
 	return &createdTask, false, err
+}
+
+func (r *Repository) mergePendingReviewCards(taskID string, cards []models.Flashcard) error {
+	return r.withTx(func(tx *sql.Tx) error {
+		var status string
+		if err := tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status); err != nil {
+			return err
+		}
+		if status != string(models.StudyTaskStatusPending) {
+			return nil
+		}
+		for _, card := range cards {
+			if _, err := tx.Exec(`
+				INSERT OR IGNORE INTO review_task_cards (task_id, card_id, status)
+				VALUES (?, ?, 'pending')
+			`, taskID, card.ID); err != nil {
+				return err
+			}
+		}
+		var count int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM review_task_cards WHERE task_id = ?`, taskID).Scan(&count); err != nil {
+			return err
+		}
+		payloadBytes, err := json.Marshal(models.ReviewSessionPayload{CardCount: count})
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(`UPDATE study_queue SET payload_json = ? WHERE id = ? AND status = 'PENDING'`, string(payloadBytes), taskID)
+		return err
+	})
 }
 
 func (r *Repository) getExistingReviewTaskForNotebookTxRepo(tx *sql.Tx, notebookID string) (*models.StudyQueueTask, error) {

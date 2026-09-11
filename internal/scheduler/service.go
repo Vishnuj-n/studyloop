@@ -14,7 +14,7 @@ import (
 const (
 	ReviewMinutesPerCard = 0.5
 
-	ClampWindowPages = 4
+	ClampWindowPages = 8
 
 	// Reading assumptions
 	WordsPerMinute            = 200

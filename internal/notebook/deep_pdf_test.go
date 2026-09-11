@@ -7,6 +7,16 @@ import (
 	"testing"
 )
 
+func TestSplitDeepPDFMarkdownPreservesPDFPagesAndRemovesHeadingSyntax(t *testing.T) {
+	sections := splitDeepPDFMarkdown("<!-- page: 31 -->\n# Chapter 1\n## Topic\nbody\n\n<!-- page: 32 -->\n### Detail\nnext")
+	if len(sections) != 2 || sections[0].PageNum != 31 || sections[1].PageNum != 32 {
+		t.Fatalf("unexpected sections: %#v", sections)
+	}
+	if sections[0].Text != "body" || sections[1].Text != "next" {
+		t.Fatalf("markdown headings leaked into content: %#v", sections)
+	}
+}
+
 func TestIngestDeepPDF_MissingFile(t *testing.T) {
 	service := NewService(t.TempDir())
 	_, _, err := service.IngestDeepPDF(context.Background(), "/non/existent/file.pdf", nil, nil)

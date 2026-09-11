@@ -209,6 +209,51 @@ func (r *Repository) CompleteTask(taskID string, result models.CompletionResult)
 	return nil
 }
 
+// SkipReadingTask marks a READING task as SKIPPED and advances the topic's
+// current_page_cursor to task.EndPage so EnsurePendingReadingTaskForNotebook
+// does not re-seed the identical session on the next queue replenishment.
+func (r *Repository) SkipReadingTask(taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
+	}
+	return r.withTx(func(tx *sql.Tx) error {
+		var topicID string
+		var endPage int
+		err := tx.QueryRow(`
+			SELECT COALESCE(topic_id,''), COALESCE(end_page,0)
+			FROM study_queue WHERE id = ? AND task_type IN ('READING', 'REREAD')
+		`, taskID).Scan(&topicID, &endPage)
+		if err != nil {
+			return fmt.Errorf("SkipReadingTask: task not found: %w", err)
+		}
+		res, err := tx.Exec(`
+			UPDATE study_queue SET status = 'SKIPPED', completed_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND status IN ('PENDING','ACTIVE') AND task_type IN ('READING', 'REREAD')
+		`, taskID)
+		if err != nil {
+			return fmt.Errorf("SkipReadingTask: status update failed: %w", err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("SkipReadingTask: check affected rows failed: %w", err)
+		}
+		if affected == 0 {
+			return fmt.Errorf("SkipReadingTask: zero rows affected for task %s", taskID)
+		}
+		if topicID != "" && endPage > 0 {
+			if _, err := tx.Exec(`
+				UPDATE topics SET current_page_cursor = MAX(COALESCE(current_page_cursor,0), ?)
+				WHERE id = ?
+			`, endPage, topicID); err != nil {
+				return fmt.Errorf("SkipReadingTask: cursor advance failed: %w", err)
+			}
+		}
+		utils.Warnf("[QUEUE] SkipReadingTask taskID=%s topicID=%s cursorAdvancedTo=%d", taskID, topicID, endPage)
+		return nil
+	})
+}
+
 // PersistReadingProgress persists page progress directly to topics.current_page_cursor.
 // Used in trust-based completion model where user decides when reading is complete.
 func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool, error) {
@@ -690,6 +735,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 			// Semantic extension: check up to +3 additional pages
 			const maxExtensionPages = 3
 			const minSimilarityThreshold = 0.85
+			const minExtensionPageWords = 50
 			maxTotalWords := maxWordsCeiling
 			if maxTotalWords < targetSessionWords {
 				maxTotalWords = targetSessionWords + int(float64(targetSessionWords)*0.5)
@@ -708,6 +754,10 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 				nextPageWords := wordMap[nextPage]
 				if nextPageWords <= 0 {
 					nextPageWords = FallbackWordsPerPage
+				}
+				if wordMap[nextPage] > 0 && wordMap[nextPage] < minExtensionPageWords {
+					stopReason = "sparse_page"
+					break
 				}
 
 				if currentWords+nextPageWords > maxTotalWords {
@@ -754,6 +804,51 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		}
 		assignTaskTitle(&task, topicTitle, notebookTitle)
 		return r.InsertStudyTaskTx(tx, task)
+	})
+}
+
+// ReconcileReadingTasksForNotebook refreshes cached topic/page metadata after
+// syllabus confirmation. Pending orphan tasks are removed so the normal queue
+// seeding path can create tasks from the new bookmark-defined syllabus.
+func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return fmt.Errorf("notebook id is required")
+	}
+	return r.withTx(func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`
+			UPDATE study_queue
+			SET topic_id = (
+				SELECT nt.topic_id FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+				LIMIT 1
+			),
+			start_page = COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), start_page),
+			end_page = COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), end_page)
+			WHERE notebook_id = ?
+			  AND task_type IN ('READING', 'REREAD')
+			  AND status IN ('PENDING', 'ACTIVE')
+			  AND EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+			  )
+		`, notebookID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`
+			DELETE FROM study_queue
+			WHERE notebook_id = ?
+			  AND task_type IN ('READING', 'REREAD')
+			  AND status = 'PENDING'
+			  AND NOT EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+			  )
+		`, notebookID)
+		return err
 	})
 }
 

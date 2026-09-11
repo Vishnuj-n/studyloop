@@ -83,6 +83,8 @@ def run_cmd(cmd, check=True, capture=False):
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return result
 

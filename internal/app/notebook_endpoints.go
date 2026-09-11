@@ -134,15 +134,15 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 	} else if existingNb != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
-			"id":            existingNb.ID,
-			"file_name":     existingNb.Title,
-			"file_type":     existingNb.FileType,
-			"page_count":    existingNb.PageCount,
-			"chunk_count":   existingNb.ChunkCount,
-			"status":        existingNb.Status,
-			"duplicate":     true,
-			"existing_id":   existingNb.ID,
-			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+			"id":          existingNb.ID,
+			"file_name":   existingNb.Title,
+			"file_type":   existingNb.FileType,
+			"page_count":  existingNb.PageCount,
+			"chunk_count": existingNb.ChunkCount,
+			"status":      existingNb.Status,
+			"duplicate":   true,
+			"existing_id": existingNb.ID,
+			"message":     fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
 		}
 	}
 
@@ -183,12 +183,28 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 	emitIngestionProgress(a, ingestionProgressPayload{
 		NotebookID: nbID,
 		Status:     "processing",
-		Message:    "Starting Deep Structured extraction...",
+		Message:    "Initializing extraction...",
 		Phase:      "extraction",
-		Percent:    10,
+		Percent:    0,
 	})
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				utils.Errorf("[DEEP_PDF] Panic during background extraction for %s (%s): %v", fileName, nbID, r)
+				fallbackStatus := "failed"
+				if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
+					fallbackStatus = prevStatus
+				}
+				_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
+				_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
+				emitIngestionProgress(a, ingestionProgressPayload{
+					NotebookID: nbID,
+					Status:     fallbackStatus,
+					Message:    fmt.Sprintf("Extraction failed: internal panic (%v)", r),
+				})
+			}
+		}()
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
 		ctx := context.Background()
 
@@ -371,11 +387,19 @@ func (a *App) UploadYouTubeNotebook(videoURL string) map[string]interface{} {
 	// Trigger non-blocking background video download if enabled
 	if autoDownload {
 		videoDir := filepath.Join(a.notebookUploadDir, "videos")
+		if err := os.MkdirAll(videoDir, 0o755); err != nil {
+			utils.Warnf("[YOUTUBE_CACHE] Failed to create video directory %s: %v", videoDir, err)
+		}
 		videoFilePath := filepath.Join(videoDir, fmt.Sprintf("%s.mp4", notebookID))
 		if downloadQuality == "" {
 			downloadQuality = "720p"
 		}
 		go func(vURL, outPath, qual string) {
+			defer func() {
+				if r := recover(); r != nil {
+					utils.Errorf("[YOUTUBE_CACHE] Panic during background video download for %s: %v", notebookID, r)
+				}
+			}()
 			dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			defer dlCancel()
 			utils.Infof("[YOUTUBE_CACHE] Starting background video download for %s (%s)...", notebookID, vURL)
@@ -396,7 +420,7 @@ func (a *App) UploadYouTubeNotebook(videoURL string) map[string]interface{} {
 		"chunk_count":   0,
 		"indexed_count": 0,
 		"failed_count":  0,
-		"status":        "uploaded",
+		"status":        "draft_ready",
 		"video_id":      result.VideoID,
 		"uploader":      result.Uploader,
 		"duration":      result.DurationSeconds,
@@ -440,15 +464,15 @@ func (a *App) finalizeNotebookUpload(uploadResult *notebook.UploadResult) map[st
 	} else if existingNb != nil {
 		_ = a.notebookService.DeleteFile(uploadResult.FilePath)
 		return map[string]interface{}{
-			"id":            existingNb.ID,
-			"file_name":     existingNb.Title,
-			"file_type":     existingNb.FileType,
-			"page_count":    existingNb.PageCount,
-			"chunk_count":   existingNb.ChunkCount,
-			"status":        existingNb.Status,
-			"duplicate":     true,
-			"existing_id":   existingNb.ID,
-			"message":       fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
+			"id":          existingNb.ID,
+			"file_name":   existingNb.Title,
+			"file_type":   existingNb.FileType,
+			"page_count":  existingNb.PageCount,
+			"chunk_count": existingNb.ChunkCount,
+			"status":      existingNb.Status,
+			"duplicate":   true,
+			"existing_id": existingNb.ID,
+			"message":     fmt.Sprintf("Document already exists as '%s'", existingNb.Title),
 		}
 	}
 
@@ -628,14 +652,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
 	// Stop and return error if LLM is unavailable or draft generation fails.
 	if a.heavyLLMProvider == nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": "heavy LLM provider is not available for AI cleanup"}
 	}
 
 	result, llmErr := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, a.heavyLLMProvider)
 	if llmErr != nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": fmt.Sprintf("AI extraction failed: %v", llmErr)}
 	}
 	if len(result.Chapters) == 0 {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
@@ -775,29 +802,12 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if chTitle == "" {
 			chTitle = fmt.Sprintf("Chapter %d", i+1)
 		}
-		// Sanitize topic ID: lowercase, replace non-alphanumerics with hyphens, collapse duplicates
-		sanitized := strings.ToLower(chTitle)
-		// Replace any character not in [a-z0-9] with hyphen
-		var result []rune
-		for _, r := range sanitized {
-			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-				result = append(result, r)
-			} else {
-				result = append(result, '-')
-			}
+		// Keep topic identity stable when a user renames a chapter. Titles are
+		// mutable metadata; queue tasks and chunks must not lose their lineage.
+		topicID := fmt.Sprintf("nb-%s-ch-%02d", notebookID, i+1)
+		if i < len(existingTopics) && strings.TrimSpace(existingTopics[i].TopicID) != "" {
+			topicID = existingTopics[i].TopicID
 		}
-		sanitized = string(result)
-		// Collapse duplicate hyphens
-		for strings.Contains(sanitized, "--") {
-			sanitized = strings.ReplaceAll(sanitized, "--", "-")
-		}
-		// Trim leading/trailing hyphens
-		sanitized = strings.Trim(sanitized, "-")
-		// Fallback if empty
-		if sanitized == "" {
-			sanitized = "topic"
-		}
-		topicID := fmt.Sprintf("nb-%s-ch-%02d-%s", notebookID, i+1, sanitized)
 		topicIDs = append(topicIDs, topicID)
 
 		topicItems = append(topicItems, db.TopicBatchItem{
@@ -891,6 +901,10 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		_ = repo.DeleteTopics(newlyCreatedTopicIDs)
 		return map[string]interface{}{"error": "failed to link notebook topics: " + err.Error()}
 	}
+	if err := repo.ReconcileReadingTasksForNotebook(notebookID); err != nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "failed")
+		return map[string]interface{}{"error": "failed to reconcile reading tasks: " + err.Error()}
+	}
 
 	// Delete old orphaned topics that are no longer part of the new syllabus
 	if etErr == nil {
@@ -939,8 +953,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
 	isActivated := currentStudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than max_active_notebooks
-	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
+	// Initial ingestion may auto-activate when capacity is available. Deep re-ingestion
+	// preserves the user's existing active/dormant choice; activation remains explicit.
+	deepReingest := false
+	if currentNotebook, err := repo.GetNotebookByID(notebookID); err == nil && currentNotebook != nil {
+		deepReingest = currentNotebook.ExtractionEngine == "deep_structured"
+	}
+	if (currentStudyStatus == "dormant" || currentStudyStatus == "") && !deepReingest {
 		settings, err := repo.GetUserSettings()
 		maxActive := 4
 		targetProfileID := profileID
@@ -1016,6 +1035,7 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"start_page":      nb.StartPage,
 			"end_page":        nb.EndPage,
 			"flashcard_count": nb.FlashcardCount,
+			"extraction_engine": nb.ExtractionEngine,
 		})
 	}
 
@@ -1112,9 +1132,11 @@ func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 		}
 	}
 
-	// 2. Clean up internal extracted media cache for this notebook if present
+	// 2. Clean up internal extracted media cache and cached YouTube video for this notebook if present
 	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", notebookID)
 	_ = os.RemoveAll(mediaDir)
+	videoPath := filepath.Join(a.GetNotebookUploadDir(), "videos", fmt.Sprintf("%s.mp4", notebookID))
+	_ = os.Remove(videoPath)
 
 	// 3. Delete database record and all associated chunks/topics/tasks
 	if err := repo.DeleteNotebook(notebookID); err != nil {
@@ -1188,23 +1210,23 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 	targetWords := settings.TargetSessionWords
 
-	// Workload in sessions (e.g. 42,000 words / 3,000 words per session = 14 sessions)
+	// Workload in sessions
 	remainingSessions := 0.0
 	if remainingWords > 0 && targetWords > 0 {
-		remainingSessions = float64(remainingWords) / float64(targetWords)
+		remainingSessions = math.Ceil(float64(remainingWords) / float64(targetWords))
 	}
 
 	// Calculate required daily sessions
 	requiredDailySessions := 0.0
 	if daysRemaining > 0 && remainingSessions > 0 {
-		requiredDailySessions = remainingSessions / float64(daysRemaining)
+		requiredDailySessions = math.Ceil(remainingSessions / float64(daysRemaining))
 	} else if remainingSessions > 0 {
 		requiredDailySessions = remainingSessions
 	}
 
 	// Fetch historical completed reading stats from past 7 days
 	wordsPast7Days, sessionsPast7Days, _ := repo.GetProfileCompletedReadingStatsPastNDays(profileID, 7)
-	
+
 	// Feasibility status evaluation: NO_DATA, AHEAD, ON_TRACK, BEHIND
 	feasibilityStatus := "NO_DATA"
 	projectedFinishStr := ""
@@ -1236,7 +1258,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 				feasibilityStatus = "BEHIND"
 				diff := requiredDailySessions - currentDailySessions
 				if diff > 0 {
-					extraDailySessionsNeeded = math.Round(diff*10) / 10
+					extraDailySessionsNeeded = math.Ceil(diff)
 				}
 			}
 		}
@@ -1256,22 +1278,22 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"has_deadline":                true,
-		"deadline":                    deadlineTime.Format(dateFormatYYYYMMDD),
-		"daily_pace":                  dailyPace,
-		"remaining_words":             remainingWords,
-		"remaining_sessions":          math.Round(remainingSessions*10) / 10,
-		"target_session_words":        targetWords,
-		"days_remaining":              daysRemaining,
-		"sessions_per_day":            math.Round(requiredDailySessions*10) / 10,
-		"required_daily_sessions":     math.Round(requiredDailySessions*10) / 10,
-		"current_daily_sessions":      math.Round(currentDailySessions*10) / 10,
-		"extra_sessions_needed":       extraDailySessionsNeeded,
-		"feasibility_status":          feasibilityStatus,
-		"projected_finish":            projectedFinishStr,
-		"days_gap":                    daysGap,
-		"pace_label":                  paceLabel,
-		"study_slots_json":            settings.StudySlotsJSON,
+		"has_deadline":            true,
+		"deadline":                deadlineTime.Format(dateFormatYYYYMMDD),
+		"daily_pace":              dailyPace,
+		"remaining_words":         remainingWords,
+		"remaining_sessions":      math.Round(remainingSessions*10) / 10,
+		"target_session_words":    targetWords,
+		"days_remaining":          daysRemaining,
+		"sessions_per_day":        math.Round(requiredDailySessions*10) / 10,
+		"required_daily_sessions": math.Round(requiredDailySessions*10) / 10,
+		"current_daily_sessions":  math.Round(currentDailySessions*10) / 10,
+		"extra_sessions_needed":   extraDailySessionsNeeded,
+		"feasibility_status":      feasibilityStatus,
+		"projected_finish":        projectedFinishStr,
+		"days_gap":                daysGap,
+		"pace_label":              paceLabel,
+		"study_slots_json":        settings.StudySlotsJSON,
 	}
 }
 
@@ -1290,11 +1312,14 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("deep_pdf")
 	}
-
-	repo := a.getRepo()
-	if repo != nil {
-		if err := repo.UpdateNotebookStudyStatus(nb.ID, "dormant"); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook study status: %v", err)}
+	effectiveTier := "pro"
+	if ext != nil {
+		effectiveTier = extension.GetEffectiveTier(ext)
+	}
+	if effectiveTier == "pro" && !a.IsProUser() {
+		return map[string]interface{}{
+			"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+			"requires_pro": true,
 		}
 	}
 
@@ -1307,4 +1332,3 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		"status":      "processing",
 	}
 }
-

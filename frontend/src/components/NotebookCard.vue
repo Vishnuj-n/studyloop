@@ -193,10 +193,11 @@ const progressLabel = computed(() => {
   if (prog && typeof prog.percent === 'number' && prog.total > 0) {
     return `Extracting ${prog.percent}% (${prog.processed}/${prog.total} pgs)`
   }
-  if (prog && typeof prog.percent === 'number' && prog.percent > 0) {
+  if (prog && typeof prog.percent === 'number') {
+    if (prog.percent === 0) return 'Initializing...'
     return `Extracting ${prog.percent}%...`
   }
-  return 'Deep Extracting...'
+  return 'Initializing...'
 })
 
 const isDeepExtracted = computed(() => {
