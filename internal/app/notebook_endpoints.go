@@ -183,12 +183,24 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 	emitIngestionProgress(a, ingestionProgressPayload{
 		NotebookID: nbID,
 		Status:     "processing",
-		Message:    "Starting Deep Structured extraction...",
+		Message:    "Initializing extraction...",
 		Phase:      "extraction",
-		Percent:    10,
+		Percent:    0,
 	})
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				utils.Errorf("[DEEP_PDF] Panic during background extraction for %s (%s): %v", fileName, nbID, r)
+				_ = repo.UpdateNotebookStatus(nbID, "failed")
+				_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
+				emitIngestionProgress(a, ingestionProgressPayload{
+					NotebookID: nbID,
+					Status:     "failed",
+					Message:    fmt.Sprintf("Extraction failed: internal panic (%v)", r),
+				})
+			}
+		}()
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
 		ctx := context.Background()
 
@@ -371,11 +383,19 @@ func (a *App) UploadYouTubeNotebook(videoURL string) map[string]interface{} {
 	// Trigger non-blocking background video download if enabled
 	if autoDownload {
 		videoDir := filepath.Join(a.notebookUploadDir, "videos")
+		if err := os.MkdirAll(videoDir, 0o755); err != nil {
+			utils.Warnf("[YOUTUBE_CACHE] Failed to create video directory %s: %v", videoDir, err)
+		}
 		videoFilePath := filepath.Join(videoDir, fmt.Sprintf("%s.mp4", notebookID))
 		if downloadQuality == "" {
 			downloadQuality = "720p"
 		}
 		go func(vURL, outPath, qual string) {
+			defer func() {
+				if r := recover(); r != nil {
+					utils.Errorf("[YOUTUBE_CACHE] Panic during background video download for %s: %v", notebookID, r)
+				}
+			}()
 			dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			defer dlCancel()
 			utils.Infof("[YOUTUBE_CACHE] Starting background video download for %s (%s)...", notebookID, vURL)
@@ -396,7 +416,7 @@ func (a *App) UploadYouTubeNotebook(videoURL string) map[string]interface{} {
 		"chunk_count":   0,
 		"indexed_count": 0,
 		"failed_count":  0,
-		"status":        "uploaded",
+		"status":        "draft_ready",
 		"video_id":      result.VideoID,
 		"uploader":      result.Uploader,
 		"duration":      result.DurationSeconds,
@@ -628,14 +648,17 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
 	// Stop and return error if LLM is unavailable or draft generation fails.
 	if a.heavyLLMProvider == nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": "heavy LLM provider is not available for AI cleanup"}
 	}
 
 	result, llmErr := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, a.heavyLLMProvider)
 	if llmErr != nil {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": fmt.Sprintf("AI extraction failed: %v", llmErr)}
 	}
 	if len(result.Chapters) == 0 {
+		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": "AI extraction returned no chapters"}
 	}
 
@@ -948,8 +971,13 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 
 func (a *App) reconcileConfirmedNotebookTask(repo *db.Repository, notebookID, profileID, currentStudyStatus string) {
 	isActivated := currentStudyStatus == "active"
-	// Auto-activate the notebook if the active profile currently has less than max_active_notebooks
-	if currentStudyStatus == "dormant" || currentStudyStatus == "" {
+	// Initial ingestion may auto-activate when capacity is available. Deep re-ingestion
+	// preserves the user's existing active/dormant choice; activation remains explicit.
+	deepReingest := false
+	if currentNotebook, err := repo.GetNotebookByID(notebookID); err == nil && currentNotebook != nil {
+		deepReingest = currentNotebook.ExtractionEngine == "deep_structured"
+	}
+	if (currentStudyStatus == "dormant" || currentStudyStatus == "") && !deepReingest {
 		settings, err := repo.GetUserSettings()
 		maxActive := 4
 		targetProfileID := profileID
@@ -1121,9 +1149,11 @@ func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 		}
 	}
 
-	// 2. Clean up internal extracted media cache for this notebook if present
+	// 2. Clean up internal extracted media cache and cached YouTube video for this notebook if present
 	mediaDir := filepath.Join(a.GetNotebookUploadDir(), "media", notebookID)
 	_ = os.RemoveAll(mediaDir)
+	videoPath := filepath.Join(a.GetNotebookUploadDir(), "videos", fmt.Sprintf("%s.mp4", notebookID))
+	_ = os.Remove(videoPath)
 
 	// 3. Delete database record and all associated chunks/topics/tasks
 	if err := repo.DeleteNotebook(notebookID); err != nil {
@@ -1197,7 +1227,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 	targetWords := settings.TargetSessionWords
 
-	// Workload in sessions (e.g. 42,000 words / 3,000 words per session = 14 sessions)
+	// Workload in sessions
 	remainingSessions := 0.0
 	if remainingWords > 0 && targetWords > 0 {
 		remainingSessions = math.Ceil(float64(remainingWords) / float64(targetWords))
@@ -1298,12 +1328,11 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 	var ext *extension.Extension
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("deep_pdf")
-	}
-
-	repo := a.getRepo()
-	if repo != nil {
-		if err := repo.UpdateNotebookStudyStatus(nb.ID, "dormant"); err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to update notebook study status: %v", err)}
+		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !a.IsProUser() {
+			return map[string]interface{}{
+				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+				"requires_pro": true,
+			}
 		}
 	}
 
