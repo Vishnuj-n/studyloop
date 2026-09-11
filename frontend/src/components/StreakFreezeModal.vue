@@ -46,6 +46,13 @@
           </div>
         </div>
 
+        <div class="dont-show-toggle">
+          <label>
+            <input type="checkbox" v-model="dontShowAgain" @change="onToggleChange" />
+            Don't show this popup automatically on purchase
+          </label>
+        </div>
+
         <div class="modal-footer">
           <button class="action-btn" type="button" @click="closeModal">
             Got It, Keep Studying
@@ -70,10 +77,15 @@ defineProps({
 const emit = defineEmits(['close'])
 
 const visible = ref(true)
+const dontShowAgain = ref(localStorage.getItem('hideStreakFreezeModal') === 'true')
 
 onMounted(() => {
   playCorrectChime()
 })
+
+function onToggleChange() {
+  localStorage.setItem('hideStreakFreezeModal', dontShowAgain.value ? 'true' : 'false')
+}
 
 function closeModal() {
   visible.value = false
@@ -271,6 +283,23 @@ function closeModal() {
   width: 1px;
   height: 18px;
   background: var(--outline-variant);
+}
+
+.dont-show-toggle {
+  margin-bottom: 1rem;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dont-show-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  user-select: none;
 }
 
 .modal-footer {

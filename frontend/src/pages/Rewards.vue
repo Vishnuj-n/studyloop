@@ -55,7 +55,21 @@
               <span class="currency-icon">🛡️</span>
             </div>
             <div>
-              <span class="currency-val">{{ profile.streak_freezes_owned }}</span>
+              <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span class="currency-val">{{ profile.streak_freezes_owned }}</span>
+                <button
+                  type="button"
+                  title="View how streak freezes work"
+                  class="info-icon-btn"
+                  @click="showFreezeModal = true"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                </button>
+              </div>
               <span class="currency-name">Streak Freezes</span>
             </div>
           </div>
@@ -204,7 +218,9 @@ async function handleBuyStreakFreeze() {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
       profile.value = res.profile
-      showFreezeModal.value = true
+      if (localStorage.getItem('hideStreakFreezeModal') !== 'true') {
+        showFreezeModal.value = true
+      }
       window.dispatchEvent(new Event('gamification-updated'))
     }
   } catch (err) {
@@ -226,6 +242,26 @@ onMounted(() => {
   flex-direction: column;
   gap: 1.25rem;
   margin-top: 0.5rem;
+}
+
+.info-icon-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-text);
+  border-radius: 50%;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.info-icon-btn:hover {
+  color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  transform: scale(1.1);
 }
 
 .floating-card {
