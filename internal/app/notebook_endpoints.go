@@ -798,28 +798,6 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 		if chTitle == "" {
 			chTitle = fmt.Sprintf("Chapter %d", i+1)
 		}
-		// Sanitize topic ID: lowercase, replace non-alphanumerics with hyphens, collapse duplicates
-		sanitized := strings.ToLower(chTitle)
-		// Replace any character not in [a-z0-9] with hyphen
-		var result []rune
-		for _, r := range sanitized {
-			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-				result = append(result, r)
-			} else {
-				result = append(result, '-')
-			}
-		}
-		sanitized = string(result)
-		// Collapse duplicate hyphens
-		for strings.Contains(sanitized, "--") {
-			sanitized = strings.ReplaceAll(sanitized, "--", "-")
-		}
-		// Trim leading/trailing hyphens
-		sanitized = strings.Trim(sanitized, "-")
-		// Fallback if empty
-		if sanitized == "" {
-			sanitized = "topic"
-		}
 		// Keep topic identity stable when a user renames a chapter. Titles are
 		// mutable metadata; queue tasks and chunks must not lose their lineage.
 		topicID := fmt.Sprintf("nb-%s-ch-%02d", notebookID, i+1)
