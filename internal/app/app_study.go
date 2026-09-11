@@ -257,7 +257,7 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 	if materializedCards <= 0 {
 		return models.ScheduledTask{}, false
 	}
-	bestNotebookID, selectedDueCards, err := repo.GetNextDueReviewNotebook(now.Unix())
+	bestNotebookID, _, err := repo.GetNextDueReviewNotebook(now.Unix())
 	if err != nil || bestNotebookID == "" {
 		if err != nil {
 			utils.Warnf("failed to get next due review notebook: %v", err)
@@ -270,14 +270,17 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 	}
 
 	reviewCardsForTask := materializedCards
-	if selectedDueCards < reviewCardsForTask {
-		reviewCardsForTask = selectedDueCards
+	if session, err := repo.GetReviewSession(task.ID); err == nil && session != nil && session.Remaining > 0 {
+		reviewCardsForTask = session.Remaining
 	}
+
+	estimateMinutes := int(math.Ceil(float64(reviewCardsForTask) * scheduler.ReviewMinutesPerCard))
+
 	return models.ScheduledTask{
 		ID:              task.ID,
 		ActionType:      "flashcard_review",
 		Title:           fmt.Sprintf("Flashcard Review: %d cards", reviewCardsForTask),
-		EstimateMinutes: safeReviewBudget,
+		EstimateMinutes: estimateMinutes,
 		Priority:        1,
 		NotebookID:      bestNotebookID,
 		Meta:            fmt.Sprintf("Spaced repetition review (%d cards)", reviewCardsForTask),
