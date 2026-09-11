@@ -192,11 +192,15 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 		defer func() {
 			if r := recover(); r != nil {
 				utils.Errorf("[DEEP_PDF] Panic during background extraction for %s (%s): %v", fileName, nbID, r)
-				_ = repo.UpdateNotebookStatus(nbID, "failed")
+				fallbackStatus := "failed"
+				if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
+					fallbackStatus = prevStatus
+				}
+				_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
 				_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
 				emitIngestionProgress(a, ingestionProgressPayload{
 					NotebookID: nbID,
-					Status:     "failed",
+					Status:     fallbackStatus,
 					Message:    fmt.Sprintf("Extraction failed: internal panic (%v)", r),
 				})
 			}
@@ -1307,11 +1311,15 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 	var ext *extension.Extension
 	if a.extManager != nil {
 		ext, _ = a.extManager.Get("deep_pdf")
-		if ext != nil && extension.GetEffectiveTier(ext) == "pro" && !a.IsProUser() {
-			return map[string]interface{}{
-				"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
-				"requires_pro": true,
-			}
+	}
+	effectiveTier := "pro"
+	if ext != nil {
+		effectiveTier = extension.GetEffectiveTier(ext)
+	}
+	if effectiveTier == "pro" && !a.IsProUser() {
+		return map[string]interface{}{
+			"error":        "Deep Structured PDF Ingestion is a Pro feature. Please upgrade your plan to unlock.",
+			"requires_pro": true,
 		}
 	}
 

@@ -222,16 +222,24 @@ func (r *Repository) SkipReadingTask(taskID string) error {
 		var endPage int
 		err := tx.QueryRow(`
 			SELECT COALESCE(topic_id,''), COALESCE(end_page,0)
-			FROM study_queue WHERE id = ?
+			FROM study_queue WHERE id = ? AND task_type IN ('READING', 'REREAD')
 		`, taskID).Scan(&topicID, &endPage)
 		if err != nil {
 			return fmt.Errorf("SkipReadingTask: task not found: %w", err)
 		}
-		if _, err := tx.Exec(`
+		res, err := tx.Exec(`
 			UPDATE study_queue SET status = 'SKIPPED', completed_at = CURRENT_TIMESTAMP
-			WHERE id = ? AND status IN ('PENDING','ACTIVE')
-		`, taskID); err != nil {
+			WHERE id = ? AND status IN ('PENDING','ACTIVE') AND task_type IN ('READING', 'REREAD')
+		`, taskID)
+		if err != nil {
 			return fmt.Errorf("SkipReadingTask: status update failed: %w", err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("SkipReadingTask: check affected rows failed: %w", err)
+		}
+		if affected == 0 {
+			return fmt.Errorf("SkipReadingTask: zero rows affected for task %s", taskID)
 		}
 		if topicID != "" && endPage > 0 {
 			if _, err := tx.Exec(`
@@ -821,6 +829,11 @@ func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
 			WHERE notebook_id = ?
 			  AND task_type IN ('READING', 'REREAD')
 			  AND status IN ('PENDING', 'ACTIVE')
+			  AND EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = study_queue.notebook_id
+				  AND nt.topic_id = study_queue.topic_id
+			  )
 		`, notebookID); err != nil {
 			return err
 		}

@@ -303,6 +303,13 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 
 func (r *Repository) mergePendingReviewCards(taskID string, cards []models.Flashcard) error {
 	return r.withTx(func(tx *sql.Tx) error {
+		var status string
+		if err := tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status); err != nil {
+			return err
+		}
+		if status != string(models.StudyTaskStatusPending) {
+			return nil
+		}
 		for _, card := range cards {
 			if _, err := tx.Exec(`
 				INSERT OR IGNORE INTO review_task_cards (task_id, card_id, status)
