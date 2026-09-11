@@ -76,7 +76,9 @@ func aggregateQueueTasks(repo *db.Repository, active, pending []models.StudyQueu
 
 	learningMinutes := 0
 	for _, task := range queueTasks {
-		learningMinutes += task.EstimateMinutes
+		if task.ActionType != "flashcard_review" {
+			learningMinutes += task.EstimateMinutes
+		}
 	}
 
 	return queueTasks, activeTopics, learningMinutes, actionCounts
@@ -571,6 +573,9 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+	if len(counts) < 7 {
+		return map[string]interface{}{"timeline": []FlashcardDuePoint{}}
 	}
 
 	timeline := make([]FlashcardDuePoint, 7)

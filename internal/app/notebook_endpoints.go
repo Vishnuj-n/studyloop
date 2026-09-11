@@ -1053,6 +1053,7 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"start_page":      nb.StartPage,
 			"end_page":        nb.EndPage,
 			"flashcard_count": nb.FlashcardCount,
+			"extraction_engine": nb.ExtractionEngine,
 		})
 	}
 
