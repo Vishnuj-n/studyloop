@@ -1121,35 +1121,6 @@ async function handleGoToExaminer() {
   margin-top: 16px;
   flex-wrap: wrap;
 }
-
-.examiner-btn {
-  padding: 11px 20px;
-  border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  background: var(--surface-container-low);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--on-surface);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-}
-
-.examiner-btn:hover:not(:disabled) {
-  background: var(--surface-container-highest, rgba(255, 255, 255, 0.08));
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.examiner-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .retry-generation-btn {

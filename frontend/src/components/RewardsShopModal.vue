@@ -396,7 +396,7 @@ function closeModal() {
 
 .buy-btn {
   background: #f59e0b;
-  color: #000;
+  color: var(--on-surface);
 }
 
 .buy-btn:disabled {
