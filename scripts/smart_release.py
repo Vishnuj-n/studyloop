@@ -368,16 +368,28 @@ def main():
         print("\n[DRY RUN] Skipping version file updates, git commit/push, build.py, and release.py.")
         return
 
-    # 5. Update Version File & Commit to Remote
+    # 5. Sync, Update Version File, Commit & Push
+    print(f"\nSyncing latest changes from origin/{branch}...")
+    run_cmd(["git", "pull", "--rebase", "origin", branch], check=True)
+
     formatted_new_ver = update_version_files(rec_version)
 
-    print(f"\nCommitting version update ({formatted_new_ver}) and pushing to remote branch '{branch}'...")
-    run_cmd(["git", "add", "internal/app/VERSION"], check=False)
+    print(f"\nCommitting version update ({formatted_new_ver})...")
+    run_cmd(["git", "add", "internal/app/VERSION"], check=True)
     root_file = PROJECT_ROOT / "VERSION"
     if root_file.exists():
-        run_cmd(["git", "add", "VERSION"], check=False)
-    run_cmd(["git", "commit", "-m", f"chore(release): bump version to {formatted_new_ver}"], check=False)
-    run_cmd(["git", "push", "origin", branch], check=False)
+        run_cmd(["git", "add", "VERSION"], check=True)
+
+    commit_msg = f"chore: version bump to {formatted_new_ver}"
+    run_cmd(["git", "commit", "-m", commit_msg], check=True)
+
+    print(f"Pushing version bump commit to origin/{branch}...")
+    try:
+        run_cmd(["git", "push", "origin", branch], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"\n[ERROR] Failed to push version bump commit to origin/{branch}.", file=sys.stderr)
+        print("Aborting build and release process to prevent inconsistent release state.", file=sys.stderr)
+        sys.exit(1)
 
     # 6. Run build.py
     print("\n=== Step 1/2: Running scripts/build.py ===")
