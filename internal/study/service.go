@@ -51,9 +51,14 @@ func NewStudyService(cfg Config) *StudyService {
 // selectLLM dynamically routes to heavy provider if context exceeds fast provider limits.
 func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
 	if s.fastLLMProvider != nil {
-		limits := s.fastLLMProvider.GetLimits()
-		if limits.MaxInputTokens > 0 {
-			if tokens, err := embeddings.CountTokens(contextText); err == nil && tokens > limits.MaxInputTokens && s.heavyLLMProvider != nil {
+		fastLimits := s.fastLLMProvider.GetLimits()
+		// ponytail: 15% safety buffer accounts for prompt wrapper template overhead
+		effectiveLimit := int(float64(fastLimits.MaxInputTokens) * 0.85)
+		if effectiveLimit > 0 && s.heavyLLMProvider != nil {
+			heavyLimits := s.heavyLLMProvider.GetLimits()
+			// Only escalate if heavy tier has higher context limit or distinct model name
+			isHeavyLarger := heavyLimits.MaxInputTokens > fastLimits.MaxInputTokens || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()
+			if tokens, err := embeddings.CountTokens(contextText); err == nil && tokens > effectiveLimit && isHeavyLarger {
 				return s.heavyLLMProvider, "heavy"
 			}
 		}

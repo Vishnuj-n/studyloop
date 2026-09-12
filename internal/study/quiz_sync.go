@@ -321,13 +321,24 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		}
 	}
 
-	// Get model-specific token limits
-	llm := s.fastLLMProvider
+	// ponytail: select LLM tier dynamically based on combined chunk context size
+	var combinedText strings.Builder
+	for _, id := range normalizedChunkIDs {
+		if text, ok := chunkTextByID[id]; ok {
+			combinedText.WriteString(text)
+			combinedText.WriteString("\n")
+		}
+	}
+
+	llm, tier := s.selectLLM(combinedText.String())
+	if llm == nil {
+		return models.QuizTaskPayload{}, fmt.Errorf("no LLM provider available")
+	}
 	modelName := providerModelName(llm)
 	limits := llm.GetLimits()
 	maxInputTokens := limits.MaxInputTokens
 	maxOutputTokens := limits.MaxOutputTokens
-	utils.Warnf("[QUIZ_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
+	utils.Warnf("[QUIZ_PIPELINE] model_limits tier=%s model=%s max_input=%d max_output=%d", tier, modelName, maxInputTokens, maxOutputTokens)
 
 	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
 	userQuizCount := 8
@@ -365,7 +376,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 	prompt := buildQuizPrompt(notebookTitle, targetCount, ctxRes.contextParts)
 
-	raw, err := s.fastLLMProvider.GenerateAnswer(prompt)
+	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
 		return models.QuizTaskPayload{}, fmt.Errorf("quiz generation failed: %w", err)
 	}

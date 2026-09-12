@@ -89,7 +89,9 @@ Return only the markdown response without meta-commentary.`, styleDirective, con
 // SimplifyReadingContent takes dense text content and simplifies it using the fast LLM provider,
 // loading the prompt template dynamically from extensions/text_simplifier/prompt.md and injecting the comprehension style.
 func (s *StudyService) SimplifyReadingContent(ctx context.Context, content string, level ...string) (string, error) {
-	if s.fastLLMProvider == nil {
+// ponytail: select LLM tier dynamically based on reading content length
+	llm, _ := s.selectLLM(content)
+	if llm == nil {
 		return "", fmt.Errorf("AI provider not available. Please check your API key in Settings")
 	}
 
@@ -111,7 +113,7 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 		promptTemplate = string(data)
 	}
 
-	limits := s.fastLLMProvider.GetLimits()
+	limits := llm.GetLimits()
 	templateText := buildSimplifierPrompt(promptTemplate, "", styleDirective)
 	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templateText)
 	if err != nil {
@@ -125,7 +127,7 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 
 	prompt := buildSimplifierPrompt(promptTemplate, truncatedContent, styleDirective)
 
-	simplified, err := s.fastLLMProvider.GenerateAnswer(prompt)
+	simplified, err := llm.GenerateAnswer(prompt)
 	if err != nil {
 		utils.Warnf("[SIMPLIFY] LLM simplification error: %v", err)
 		return "", fmt.Errorf("failed to simplify content: %w", err)
