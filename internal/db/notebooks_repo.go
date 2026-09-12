@@ -368,12 +368,33 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			   OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
 		), 0) AS flashcard_count,
 		COALESCE((
-			SELECT CASE 
-				WHEN COUNT(*) > 0 THEN CAST(ROUND(SUM(CASE WHEN status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*)) AS INTEGER)
-				ELSE 0 
+			SELECT CASE
+				WHEN notebooks.page_count > 0 THEN
+					MIN(100, CAST(ROUND(
+						COALESCE(
+							SUM(
+								CASE 
+									WHEN COALESCE(t.current_page_cursor, 0) >= t.end_page AND t.end_page > 0 THEN (t.end_page - COALESCE(t.start_page, 1) + 1)
+									WHEN COALESCE(t.current_page_cursor, 0) > COALESCE(t.start_page, 1) THEN (t.current_page_cursor - COALESCE(t.start_page, 1))
+									ELSE 0
+								END
+							) * 100.0 / notebooks.page_count,
+							0.0
+						)
+					) AS INTEGER))
+				ELSE
+					COALESCE((
+						SELECT CASE 
+							WHEN COUNT(*) > 0 THEN CAST(ROUND(SUM(CASE WHEN status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*)) AS INTEGER)
+							ELSE 0 
+						END 
+						FROM study_queue sq 
+						WHERE sq.notebook_id = notebooks.id AND sq.task_type = 'READING'
+					), 0)
 			END
-			FROM study_queue sq
-			WHERE sq.notebook_id = notebooks.id
+			FROM topics t
+			WHERE t.id = notebooks.topic_id 
+			   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
 		), 0) AS completion_percent
 	FROM notebooks`
 	args := []interface{}{}
