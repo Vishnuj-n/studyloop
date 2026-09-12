@@ -14,6 +14,8 @@ import (
 // getSimplifierLevelDirective returns the prompt instruction for a given style level.
 func getSimplifierLevelDirective(level string) string {
 	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "eli5":
+		return "ELI5 (Explain Like I'm 5):\nUse extremely simple everyday language, clear fun analogies, and short sentences. Avoid complex jargon or explain it using simple real-world concepts a 5-year-old can easily understand."
 	case "very_simple", "eli10":
 		return "Very Simple:\nUse everyday language and short sentences. Explain necessary technical terms simply and use intuitive analogies when helpful."
 	case "academic":

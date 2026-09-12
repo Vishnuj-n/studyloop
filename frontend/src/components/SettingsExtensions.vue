@@ -50,6 +50,7 @@
           class="setting-select"
           :disabled="disabled"
         >
+          <option value="eli5">ELI5 (Explain Like I'm 5 - Ultra simple, fun analogies &amp; basic concepts)</option>
           <option value="very_simple">Very Simple (Everyday language, short sentences &amp; analogies)</option>
           <option value="simple">Simple (Clear, straightforward language with core terms)</option>
           <option value="academic">Academic (Precise terminology, definitions &amp; distinctions)</option>
