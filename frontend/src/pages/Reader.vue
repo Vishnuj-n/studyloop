@@ -220,6 +220,8 @@
       v-if="showAudioOverview && reader.selectedTopicID.value"
       :topic-id="reader.selectedTopicID.value"
       :notebook-id="reader.selectedNotebookID.value"
+      :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 0"
+      :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 0"
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />

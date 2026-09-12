@@ -309,8 +309,8 @@ export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
 
-export function startTopicAudioOverview(topicID, notebookID = '', voice = 'en-US-ChristopherNeural') {
-  return appBridge().StartTopicAudioOverview(topicID, notebookID, voice)
+export function startTopicAudioOverview(topicID, notebookID = '', startPage = 0, endPage = 0, voice = 'en-US-ChristopherNeural') {
+  return appBridge().StartTopicAudioOverview(topicID, notebookID, startPage, endPage, voice)
 }
 
 export function stopTopicAudioOverview() {
