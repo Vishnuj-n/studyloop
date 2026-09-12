@@ -1121,7 +1121,6 @@ async function handleGoToExaminer() {
   margin-top: 16px;
   flex-wrap: wrap;
 }
-}
 
 .retry-generation-btn {
   margin-top: 12px;

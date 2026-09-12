@@ -114,6 +114,20 @@
           <div class="card-inner">
             <!-- Front -->
             <div class="card-face card-front">
+              <div v-if="currentBookTitle" class="card-book-badge" :title="currentBookTitle">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <span class="book-badge-text">{{ currentBookTitle }}</span>
+              </div>
               <button
                 v-if="queueMode"
                 class="suspend-btn"
@@ -141,6 +155,20 @@
             </div>
             <!-- Back -->
             <div class="card-face card-back">
+              <div v-if="currentBookTitle" class="card-book-badge" :title="currentBookTitle">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <span class="book-badge-text">{{ currentBookTitle }}</span>
+              </div>
               <button
                 v-if="queueMode"
                 class="suspend-btn"
@@ -254,6 +282,7 @@ import {
   activateTask,
   completeReviewSession,
   getNotebooks,
+  getAvailableTopics,
   generateManualFlashcards,
   getReviewSession,
   recordCardReview,
@@ -313,6 +342,18 @@ const progressPercent = computed(() => {
   return (currentCardNumber.value / cards.value.length) * 100
 })
 
+const availableTopics = ref([])
+const currentBookTitle = computed(() => {
+  const nb = notebooks.value.find((n) => n.id === selectedNotebookID.value)
+  if (!nb?.title) return ''
+  return nb.title.replace(/\.(pdf|apkg|anki|zip|epub|txt|md|docx)$/i, '').trim()
+})
+const currentChapterTitle = computed(() => {
+  if (!currentCard.value?.topic_id) return ''
+  const topic = availableTopics.value.find((t) => t.id === currentCard.value.topic_id)
+  return topic?.title || ''
+})
+
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
   try {
@@ -320,6 +361,12 @@ onMounted(async () => {
     notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
   } catch {
     error.value = 'Failed to load notebooks.'
+  }
+  try {
+    const topicsRes = await getAvailableTopics()
+    availableTopics.value = Array.isArray(topicsRes) ? topicsRes.filter((t) => !t.error) : []
+  } catch (err) {
+    console.error('Failed to load topics in Flashcards:', err)
   }
   try {
     const settings = await getUserSettings()
@@ -540,6 +587,9 @@ async function loadQueueSession(taskID, notebookID = '') {
     if (session?.task?.id) {
       reviewTaskID.value = session.task.id
     }
+    if (session?.task?.notebook_id) {
+      selectedNotebookID.value = session.task.notebook_id
+    }
     cards.value = Array.isArray(session?.cards) ? session.cards : []
     reviewIndex.value = Number(session?.next_pending_idx ?? -1)
     sessionRemaining.value = Number(session?.remaining ?? 0)
@@ -716,6 +766,27 @@ async function loadQueueSession(taskID, notebookID = '') {
   background: linear-gradient(90deg, var(--primary-dim), var(--primary));
   border-radius: 999px;
   transition: width 0.3s ease;
+}
+
+.card-book-badge {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-text);
+  max-width: calc(100% - 80px);
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.book-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Flashcard Flip */
