@@ -331,7 +331,7 @@ func (r *Repository) GetNotebookTopicsWithBounds(notebookID string) ([]NotebookT
 
 // QueryNextReadingTopic returns the next reading topic with deterministic page bounds and cursor.
 // Joins with notebooks table to ensure topics have a valid notebook source.
-// Orders by notebook priority (higher first) to respect notebook priority biasing.
+// Orders by notebook priority (higher first), then 2-session blocked LRR streak rotation to prevent starvation.
 func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, error) {
 	settings, err := r.GetUserSettings()
 	if err != nil {
@@ -341,6 +341,22 @@ func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, e
 
 	var topic models.ReadingTopicCursor
 	query := `
+		WITH recent_reads AS (
+			SELECT notebook_id, completed_at,
+			       ROW_NUMBER() OVER (PARTITION BY notebook_id ORDER BY completed_at DESC) as rnum
+			FROM study_queue
+			WHERE task_type = 'READING' AND status = 'COMPLETED'
+		),
+		book_streak AS (
+			SELECT n.id as notebook_id,
+			       CASE 
+			           WHEN COUNT(rr.completed_at) < 2 THEN '1970-01-01 00:00:00'
+			           ELSE MAX(rr.completed_at)
+			       END as effective_last_read
+			FROM notebooks n
+			LEFT JOIN recent_reads rr ON n.id = rr.notebook_id AND rr.rnum <= 2
+			GROUP BY n.id
+		)
 		SELECT
 			t.id,
 			t.title,
@@ -351,6 +367,7 @@ func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, e
 		FROM topics t
 		LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
 		LEFT JOIN notebooks n ON (n.id = nt.notebook_id OR n.topic_id = t.id)
+		LEFT JOIN book_streak bs ON bs.notebook_id = n.id
 		WHERE t.status IN ('unseen', 'reading')
 		  AND COALESCE(t.end_page, 0) > 0
 		  AND COALESCE(t.current_page_cursor, 0) < COALESCE(t.end_page, 0)
@@ -365,7 +382,7 @@ func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, e
 		query += ` AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
 		args = append(args, activeProfileStr)
 	}
-	query += ` ORDER BY COALESCE(n.priority, 5) DESC, t.start_page ASC, t.created_at ASC LIMIT 1 `
+	query += ` ORDER BY COALESCE(n.priority, 5) DESC, COALESCE(bs.effective_last_read, '1970-01-01 00:00:00') ASC, t.start_page ASC, t.created_at ASC LIMIT 1 `
 
 	err = r.db.QueryRow(query, args...).Scan(&topic.ID, &topic.Title, &topic.StartPage, &topic.EndPage, &topic.CurrentPageCursor, &topic.NotebookID)
 	if err == sql.ErrNoRows {
@@ -374,7 +391,7 @@ func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, e
 	if err != nil {
 		return models.ReadingTopicCursor{}, false, err
 	}
-	utils.Warnf("[SCHEDULER] QueryNextReadingTopic selected topicID=%s notebookID=%s (ordered by notebook priority DESC)", topic.ID, topic.NotebookID)
+	utils.Warnf("[SCHEDULER] QueryNextReadingTopic selected topicID=%s notebookID=%s (ordered by notebook priority DESC, 2-session LRR ASC)", topic.ID, topic.NotebookID)
 	return topic, true, nil
 }
 
