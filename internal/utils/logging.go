@@ -29,6 +29,18 @@ func init() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
 }
 
+const maxLogSizeBytes int64 = 5 * 1024 * 1024 // 5 MB per log file
+
+func rotateLogFile(logPath string, maxSize int64) {
+	info, err := os.Stat(logPath)
+	if err != nil || info.Size() < maxSize {
+		return
+	}
+	oldPath := logPath + ".old"
+	_ = os.Remove(oldPath)
+	_ = os.Rename(logPath, oldPath)
+}
+
 // InitMultiFileLogger creates the logs subdirectory under appDataDir and
 // redirects QueueLogger, RagLogger, and the default slog logger to their
 // respective files.
@@ -60,13 +72,21 @@ func InitMultiFileLogger(appDataDir string) error {
 	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
 	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
+	queuePath := filepath.Join(logDir, "queue.log")
+	ragPath := filepath.Join(logDir, "rag_engine.log")
+	appPath := filepath.Join(logDir, "app.log")
+
+	rotateLogFile(queuePath, maxLogSizeBytes)
+	rotateLogFile(ragPath, maxLogSizeBytes)
+	rotateLogFile(appPath, maxLogSizeBytes)
+
 	var err error
-	queueLogFile, err = os.OpenFile(filepath.Join(logDir, "queue.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	queueLogFile, err = os.OpenFile(queuePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open queue log file: %w", err)
 	}
 
-	ragLogFile, err = os.OpenFile(filepath.Join(logDir, "rag_engine.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	ragLogFile, err = os.OpenFile(ragPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		_ = queueLogFile.Close()
 		queueLogFile = nil
@@ -74,7 +94,7 @@ func InitMultiFileLogger(appDataDir string) error {
 	}
 
 	var openErr error
-	errLogFile, openErr = os.OpenFile(filepath.Join(logDir, "app.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	errLogFile, openErr = os.OpenFile(appPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if openErr != nil {
 		_ = queueLogFile.Close()
 		_ = ragLogFile.Close()
