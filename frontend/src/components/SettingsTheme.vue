@@ -7,6 +7,8 @@
       </button>
     </div>
 
+    <div v-if="error" class="error-msg">{{ error }}</div>
+
     <div class="form-group">
       <label>Aesthetic Theme</label>
       <div class="theme-grid">
@@ -47,6 +49,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import RewardsShopModal from './RewardsShopModal.vue'
+import { getGamificationState } from '../services/appApi'
 
 const props = defineProps({
   settings: { type: Object, required: true },
@@ -55,6 +58,7 @@ const props = defineProps({
 
 const showShopModal = ref(false)
 const unlockedCosmetics = ref(['dark-gruvbox', 'light-classic', 'light-warm', 'dark-indigo'])
+const error = ref('')
 
 const themes = [
   { id: 'dark-gruvbox', label: 'Gruvbox Dark', bg: '#1d2021', primary: '#d79921', surface: '#282828' },
@@ -72,14 +76,18 @@ onMounted(async () => {
 })
 
 async function loadUnlockedCosmetics() {
+  error.value = ''
   try {
-    if (window.go?.main?.App?.GetGamificationState) {
-      const res = await window.go.main.App.GetGamificationState()
-      if (res.profile?.unlocked_cosmetics_json) {
-        unlockedCosmetics.value = JSON.parse(res.profile.unlocked_cosmetics_json)
-      }
+    const res = await getGamificationState()
+    if (res && res.error) {
+      unlockedCosmetics.value = []
+      error.value = res.error
+    } else if (res?.profile?.unlocked_cosmetics_json) {
+      unlockedCosmetics.value = JSON.parse(res.profile.unlocked_cosmetics_json)
     }
   } catch (err) {
+    unlockedCosmetics.value = []
+    error.value = err.message || 'Failed to load unlocked cosmetics'
     console.error('Failed to load unlocked cosmetics:', err)
   }
 }
@@ -258,5 +266,11 @@ h2 {
 .theme-card.active .theme-label {
   color: var(--on-surface);
   font-weight: 700;
+}
+
+.error-msg {
+  color: var(--danger, #ef4444);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>

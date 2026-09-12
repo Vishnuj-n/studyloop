@@ -373,6 +373,14 @@ export function getGamificationState() {
   return appBridge().GetGamificationState()
 }
 
+export function getGamificationStore() {
+  return appBridge().GetGamificationStore()
+}
+
+export function unlockCosmeticItem(itemID, price) {
+  return appBridge().UnlockCosmeticItem(itemID, price)
+}
+
 export function claimLootBox(boxID) {
   return appBridge().ClaimLootBox(boxID)
 }

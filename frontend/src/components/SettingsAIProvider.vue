@@ -205,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
 import { openURLInBrowser, testLLMConnection } from '../services/appApi'
 
@@ -221,6 +221,36 @@ const testingFast = ref(false)
 const fastResult = ref(null)
 const testingHeavy = ref(false)
 const heavyResult = ref(null)
+const fastRevision = ref(0)
+const heavyRevision = ref(0)
+
+watch(
+  () => [
+    props.llmSettings?.fast?.provider,
+    props.llmSettings?.fast?.base_url,
+    props.llmSettings?.fast?.model,
+    props.llmFastKey,
+  ],
+  () => {
+    fastRevision.value++
+    fastResult.value = null
+  },
+  { deep: true }
+)
+
+watch(
+  () => [
+    props.llmSettings?.heavy?.provider,
+    props.llmSettings?.heavy?.base_url,
+    props.llmSettings?.heavy?.model,
+    props.llmHeavyKey,
+  ],
+  () => {
+    heavyRevision.value++
+    heavyResult.value = null
+  },
+  { deep: true }
+)
 
 const hasFastTokenWarning = computed(() => {
   const words = Number(props.targetSessionWords) || 3000
@@ -241,6 +271,7 @@ async function openExternalLink(url) {
 async function testFastConnection() {
   testingFast.value = true
   fastResult.value = null
+  const reqRev = fastRevision.value
   try {
     const res = await testLLMConnection(
       'fast',
@@ -249,17 +280,24 @@ async function testFastConnection() {
       props.llmSettings?.fast?.model,
       props.llmFastKey
     )
-    fastResult.value = res
+    if (reqRev === fastRevision.value) {
+      fastResult.value = res
+    }
   } catch (err) {
-    fastResult.value = { error: err.message || 'Connection test failed' }
+    if (reqRev === fastRevision.value) {
+      fastResult.value = { error: err.message || 'Connection test failed' }
+    }
   } finally {
-    testingFast.value = false
+    if (reqRev === fastRevision.value) {
+      testingFast.value = false
+    }
   }
 }
 
 async function testHeavyConnection() {
   testingHeavy.value = true
   heavyResult.value = null
+  const reqRev = heavyRevision.value
   try {
     const res = await testLLMConnection(
       'heavy',
@@ -268,11 +306,17 @@ async function testHeavyConnection() {
       props.llmSettings?.heavy?.model,
       props.llmHeavyKey
     )
-    heavyResult.value = res
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = res
+    }
   } catch (err) {
-    heavyResult.value = { error: err.message || 'Connection test failed' }
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = { error: err.message || 'Connection test failed' }
+    }
   } finally {
-    testingHeavy.value = false
+    if (reqRev === heavyRevision.value) {
+      testingHeavy.value = false
+    }
   }
 }
 </script>

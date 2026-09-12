@@ -126,6 +126,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { getGamificationStore, unlockCosmeticItem } from '../services/appApi'
 
 const props = defineProps({
   activeTheme: { type: String, default: 'dark-gruvbox' },
@@ -144,15 +145,17 @@ async function fetchStore() {
   loading.value = true
   error.value = ''
   try {
-    if (window.go?.main?.App?.GetGamificationStore) {
-      const res = await window.go.main.App.GetGamificationStore()
-      if (res.error) {
-        error.value = res.error
-      } else {
-        store.value = res.store
-      }
-    } else {
-      // Mock fallback in dev mode if Wails bindings not present
+    const res = await getGamificationStore()
+    if (res && res.error) {
+      error.value = res.error
+    } else if (res && res.store) {
+      store.value = res.store
+    } else if (res) {
+      store.value = res
+    }
+  } catch (err) {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      // Mock fallback in dev/test mode if Wails bindings not present
       store.value = {
         profile: { coins: 120 },
         themes: [
@@ -172,9 +175,9 @@ async function fetchStore() {
           { id: 'memory_monk', title: 'Memory Monk', description: 'Review 25 flashcards', icon: '🧠', current_value: 12, target_value: 25, completed: false, reward_coins: 50 },
         ],
       }
+    } else {
+      error.value = err.message || 'Wails backend bridge unavailable'
     }
-  } catch (err) {
-    error.value = err.message || 'Failed to load store'
   } finally {
     loading.value = false
   }
@@ -188,17 +191,23 @@ async function buyItem(item) {
   if (buying.value) return
   buying.value = item.id
   try {
-    if (window.go?.main?.App?.UnlockCosmeticItem) {
-      const res = await window.go.main.App.UnlockCosmeticItem(item.id, item.price)
-      if (res.error) {
-        alert(res.error)
-      } else {
-        await fetchStore()
-        equipTheme(item.id)
-      }
+    const res = await unlockCosmeticItem(item.id, item.price)
+    if (res && res.error) {
+      alert(res.error)
+    } else {
+      await fetchStore()
+      equipTheme(item.id)
     }
   } catch (err) {
-    alert(err.message || 'Purchase failed')
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      if (store.value && store.value.themes) {
+        const t = store.value.themes.find((x) => x.id === item.id)
+        if (t) t.unlocked = true
+      }
+      equipTheme(item.id)
+    } else {
+      alert(err.message || 'Purchase failed')
+    }
   } finally {
     buying.value = ''
   }

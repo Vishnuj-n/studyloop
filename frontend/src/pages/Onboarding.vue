@@ -758,6 +758,8 @@ async function applyProviderPreset(tier) {
   }
 }
 
+const heavyTestRevision = ref(0)
+
 watch(
   [
     () => llmFast.value.provider,
@@ -768,6 +770,20 @@ watch(
   () => {
     testStatus.value = null
     testStatusMsg.value = ''
+  }
+)
+
+watch(
+  [
+    () => llmHeavy.value.provider,
+    () => llmHeavy.value.base_url,
+    () => llmHeavy.value.model,
+    () => llmHeavyKey.value,
+  ],
+  () => {
+    heavyTestRevision.value++
+    heavyTestStatus.value = null
+    heavyTestStatusMsg.value = ''
   }
 )
 
@@ -808,6 +824,7 @@ async function testHeavyLLMConnection() {
   heavyTestStatus.value = null
   heavyTestStatusMsg.value = ''
   error.value = ''
+  const reqRev = heavyTestRevision.value
 
   try {
     const res = await testLLMConnectionApi(
@@ -818,18 +835,24 @@ async function testHeavyLLMConnection() {
       llmHeavyKey.value.trim()
     )
 
-    if (res.error) {
-      heavyTestStatus.value = 'error'
-      heavyTestStatusMsg.value = res.error
-    } else {
-      heavyTestStatus.value = 'success'
-      heavyTestStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+    if (reqRev === heavyTestRevision.value) {
+      if (res.error) {
+        heavyTestStatus.value = 'error'
+        heavyTestStatusMsg.value = res.error
+      } else {
+        heavyTestStatus.value = 'success'
+        heavyTestStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+      }
     }
   } catch (err) {
-    heavyTestStatus.value = 'error'
-    heavyTestStatusMsg.value = err.message || 'Heavy connection test failed.'
+    if (reqRev === heavyTestRevision.value) {
+      heavyTestStatus.value = 'error'
+      heavyTestStatusMsg.value = err.message || 'Heavy connection test failed.'
+    }
   } finally {
-    isTestingHeavyLLM.value = false
+    if (reqRev === heavyTestRevision.value) {
+      isTestingHeavyLLM.value = false
+    }
   }
 }
 

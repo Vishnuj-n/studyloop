@@ -61,7 +61,7 @@
                   type="button"
                   title="View how streak freezes work"
                   class="info-icon-btn"
-                  @click="showFreezeModal = true"
+                  @click="openFreezeInfoModal"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -130,7 +130,9 @@
     <!-- Theme & Achievement Shop Modal -->
     <RewardsShopModal
       v-if="showShopModal"
+      :active-theme="activeTheme"
       @close="onShopClose"
+      @theme-changed="onThemeChanged"
     />
 
     <!-- Mystery Chest Modal -->
@@ -141,10 +143,11 @@
       @close="activeChest = null"
     />
 
-    <!-- Streak Freeze Acquired Modal -->
+    <!-- Streak Freeze Modal -->
     <StreakFreezeModal
       v-if="showFreezeModal"
       :total-freezes="profile.streak_freezes_owned"
+      :mode="freezeModalMode"
       @close="showFreezeModal = false"
     />
   </StudyPageLayout>
@@ -153,7 +156,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import { getGamificationState, buyStreakFreeze } from '../services/appApi'
+import { getGamificationState, buyStreakFreeze, getUserSettings, updateUserSettings } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 import RewardsShopModal from '../components/RewardsShopModal.vue'
@@ -163,6 +166,8 @@ const showShopModal = ref(false)
 const loading = ref(true)
 const buying = ref(false)
 const showFreezeModal = ref(false)
+const freezeModalMode = ref('purchase')
+const activeTheme = ref('dark-gruvbox')
 const loadError = ref('')
 const buyError = ref('')
 const profile = ref({
@@ -201,6 +206,11 @@ function getChestEmoji(tier) {
   }
 }
 
+function openFreezeInfoModal() {
+  freezeModalMode.value = 'info'
+  showFreezeModal.value = true
+}
+
 async function loadData() {
   loading.value = true
   loadError.value = ''
@@ -211,6 +221,10 @@ async function loadData() {
     }
     if (res && res.pending_chests) {
       chests.value = res.pending_chests
+    }
+    const settings = await getUserSettings().catch(() => null)
+    if (settings && settings.theme) {
+      activeTheme.value = settings.theme
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
@@ -236,6 +250,7 @@ async function handleBuyStreakFreeze() {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
       profile.value = res.profile
+      freezeModalMode.value = 'purchase'
       if (localStorage.getItem('hideStreakFreezeModal') !== 'true') {
         showFreezeModal.value = true
       }
@@ -246,6 +261,15 @@ async function handleBuyStreakFreeze() {
     buyError.value = err?.message || 'Failed to purchase streak freeze.'
   } finally {
     buying.value = false
+  }
+}
+
+async function onThemeChanged(newTheme) {
+  activeTheme.value = newTheme
+  try {
+    await updateUserSettings({ theme: newTheme })
+  } catch (err) {
+    console.error('Failed to update theme setting:', err)
   }
 }
 
