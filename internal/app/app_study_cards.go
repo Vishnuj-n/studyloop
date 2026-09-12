@@ -110,7 +110,7 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 
 	materialName := "my material"
 	if notebookTitle != "" {
-		materialName = notebookTitle
+		materialName = fmt.Sprintf(`"%s"`, notebookTitle)
 	}
 
 	tutorStyle := "socratic"
@@ -129,10 +129,24 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 	case "detailed":
 		directive = "Please act as a comprehensive step-by-step AI tutor. Provide detailed conceptual walkthroughs, real-world analogies, and illustrative examples to thoroughly explain the core concepts and clear up misunderstandings."
 	default: // "socratic"
-		directive = "Please act as a Socratic tutor — don't give me summaries or answers directly. Instead, ask me leading questions that guide me to discover the key concepts myself. Start with the most fundamental question."
+		directive = `You are an Adaptive Concept Tutor.
+
+Analyze my wrong answers against the provided material.
+
+For each mistake:
+- Identify what I misunderstood.
+- Explain the relevant concept clearly and simply.
+- Explain why my answer was wrong and why the correct answer is right.
+- Use an example when it helps.
+
+Look for underlying concepts causing multiple mistakes rather than treating every wrong answer as a separate problem.
+
+After explaining a concept, ask me one short question to check whether I understood it. If I get it wrong, explain the concept again differently before moving on.
+
+Focus only on what I need to understand from my mistakes. Do not reteach material I already understand.`
 	}
 
-	promptText := fmt.Sprintf("I'm studying the following text from %s for preparation. I've encountered difficulty understanding it. %s\n\n", materialName, directive)
+	promptText := fmt.Sprintf("I studied the material provided below from %s and took a quiz.\n\n%s\n\n", materialName, directive)
 
 	promptText = appendFailedQuestionsSection(promptText, task)
 
@@ -152,7 +166,7 @@ func appendFailedQuestionsSection(promptText string, task models.StudyQueueTask)
 	if len(payload.FailedQuestions) > 0 {
 		var builder strings.Builder
 		builder.WriteString(promptText)
-		builder.WriteString("During my quiz, I failed the following questions:\n")
+		builder.WriteString("Here are the questions I got wrong:\n")
 		for idx, q := range payload.FailedQuestions {
 			fmt.Fprintf(&builder, "%d. Question: %s\n", idx+1, q.Prompt)
 			if len(q.Options) > 0 {
@@ -165,7 +179,6 @@ func appendFailedQuestionsSection(promptText string, task models.StudyQueueTask)
 			fmt.Fprintf(&builder, "   My Answer: %s\n", userAns)
 			fmt.Fprintf(&builder, "   Correct Answer: %s\n\n", q.CorrectAnswer)
 		}
-		builder.WriteString("Please focus on guiding me through the concepts behind these failed questions.\n\n")
 		return builder.String()
 	}
 	return promptText
