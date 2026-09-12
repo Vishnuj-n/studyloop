@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -281,7 +282,7 @@ func InitSchema(tx *sql.Tx) error {
 			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
 			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
 			frozen_dates_json TEXT NOT NULL DEFAULT '[]',
-			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic", "light-warm", "dark-indigo"]',
+			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]',
 			stats_json TEXT NOT NULL DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
@@ -424,10 +425,42 @@ func InitSchema(tx *sql.Tx) error {
 	// Initialize default gamification state
 	if _, err := tx.Exec(`
 		INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json, stats_json)
-		VALUES (1, 0, 0, 'The Apprentice', 1, '["dark-gruvbox", "light-classic", "light-warm", "dark-indigo"]', '{}')
+		VALUES (1, 0, 0, 'The Apprentice', 1, '["dark-gruvbox", "light-classic"]', '{}')
 		ON CONFLICT(user_id) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize user gamification: %w", err)
+	}
+
+	// Migration: backfill missing starter cosmetics (dark-gruvbox, light-classic) into existing user profiles without removing current values
+	var currentUnlockedJSON string
+	err := tx.QueryRow(`SELECT unlocked_cosmetics_json FROM user_gamification WHERE user_id = 1`).Scan(&currentUnlockedJSON)
+	if err == nil && currentUnlockedJSON != "" {
+		var unlocked []string
+		if jsonErr := json.Unmarshal([]byte(currentUnlockedJSON), &unlocked); jsonErr == nil {
+			hasGruvbox := false
+			hasClassic := false
+			for _, id := range unlocked {
+				if id == "dark-gruvbox" {
+					hasGruvbox = true
+				}
+				if id == "light-classic" {
+					hasClassic = true
+				}
+			}
+			changed := false
+			if !hasGruvbox {
+				unlocked = append(unlocked, "dark-gruvbox")
+				changed = true
+			}
+			if !hasClassic {
+				unlocked = append(unlocked, "light-classic")
+				changed = true
+			}
+			if changed {
+				newBytes, _ := json.Marshal(unlocked)
+				_, _ = tx.Exec(`UPDATE user_gamification SET unlocked_cosmetics_json = ? WHERE user_id = 1`, string(newBytes))
+			}
+		}
 	}
 
 	return nil

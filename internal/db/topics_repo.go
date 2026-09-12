@@ -341,20 +341,30 @@ func (r *Repository) QueryNextReadingTopic() (models.ReadingTopicCursor, bool, e
 
 	var topic models.ReadingTopicCursor
 	query := `
-		WITH recent_reads AS (
+		WITH global_recent AS (
 			SELECT notebook_id, completed_at,
-			       ROW_NUMBER() OVER (PARTITION BY notebook_id ORDER BY completed_at DESC) as rnum
+			       ROW_NUMBER() OVER (ORDER BY completed_at DESC) as grnum
 			FROM study_queue
 			WHERE task_type = 'READING' AND status = 'COMPLETED'
+		),
+		current_block AS (
+			SELECT g1.notebook_id
+			FROM global_recent g1
+			WHERE g1.grnum = 1
+			  AND (
+			      (SELECT COUNT(*) FROM global_recent WHERE grnum <= 2) < 2
+			      OR (SELECT notebook_id FROM global_recent WHERE grnum = 2) != g1.notebook_id
+			  )
 		),
 		book_streak AS (
 			SELECT n.id as notebook_id,
 			       CASE 
-			           WHEN COUNT(rr.completed_at) < 2 THEN '1970-01-01 00:00:00'
-			           ELSE MAX(rr.completed_at)
+			           WHEN cb.notebook_id IS NOT NULL THEN '1970-01-01 00:00:00'
+			           ELSE COALESCE(MAX(sq.completed_at), '1970-01-01 00:00:00')
 			       END as effective_last_read
 			FROM notebooks n
-			LEFT JOIN recent_reads rr ON n.id = rr.notebook_id AND rr.rnum <= 2
+			LEFT JOIN current_block cb ON cb.notebook_id = n.id
+			LEFT JOIN study_queue sq ON sq.notebook_id = n.id AND sq.task_type = 'READING' AND sq.status = 'COMPLETED'
 			GROUP BY n.id
 		)
 		SELECT

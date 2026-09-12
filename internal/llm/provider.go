@@ -80,9 +80,9 @@ func LoadConfigFromSettingsForPrefix(prefix string, settings models.LLMTierSetti
 	timeoutKeys := prefixedKeys(prefix, "LLM_TIMEOUT_MS", "OPENAI_TIMEOUT_MS", "TIMEOUT_MS")
 
 	config := &Config{
-		BaseURL:   firstNonEmpty(firstEnv(baseURLKeys...), settings.BaseURL, defaultBaseURLForProvider(settings.Provider)),
-		APIKey:    firstNonEmpty(firstEnv(apiKeyKeys...), apiKey),
-		Model:     firstNonEmpty(firstEnv(modelKeys...), settings.Model, defaultModelForProvider(settings.Provider)),
+		BaseURL:   firstNonEmpty(settings.BaseURL, firstEnv(baseURLKeys...), defaultBaseURLForProvider(settings.Provider)),
+		APIKey:    firstNonEmpty(apiKey, firstEnv(apiKeyKeys...)),
+		Model:     firstNonEmpty(settings.Model, firstEnv(modelKeys...), defaultModelForProvider(settings.Provider)),
 		TimeoutMs: firstEnvInt(settings.TimeoutMs, timeoutKeys...),
 	}
 	if config.TimeoutMs <= 0 {

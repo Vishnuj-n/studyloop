@@ -929,7 +929,18 @@ func TestGetStreakState_StreakFreezeAutoConsume(t *testing.T) {
 }
 
 func TestApp_TestLLMConnection(t *testing.T) {
+	t.Setenv("FAST_LLM_BASE_URL", "http://env-override-url.invalid")
+	t.Setenv("FAST_LLM_MODEL", "env-model")
+	t.Setenv("FAST_LLM_API_KEY", "env-key")
+
+	var receivedModel, receivedAuth string
 	mockLLM := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if m, ok := body["model"].(string); ok {
+			receivedModel = m
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"choices": []map[string]interface{}{
@@ -943,6 +954,12 @@ func TestApp_TestLLMConnection(t *testing.T) {
 	res := app.TestLLMConnection("fast", "custom", mockLLM.URL, "test-model", "test-key")
 	if res["ok"] != true {
 		t.Fatalf("expected ok: true, got %v", res)
+	}
+	if receivedAuth != "Bearer test-key" {
+		t.Fatalf("expected Authorization header Bearer test-key, got %q", receivedAuth)
+	}
+	if receivedModel != "test-model" {
+		t.Fatalf("expected model test-model, got %q", receivedModel)
 	}
 }
 

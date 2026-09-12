@@ -11,27 +11,37 @@ Simultaneously, single-session round-robin rotation caused high cognitive contex
 We implemented **2-Session Blocked Interleaving (Least-Recently-Read Round-Robin)** within `QueryNextReadingTopic()` in `internal/db/topics_repo.go`.
 
 ### Key Mechanics
-1. **2-Session Block Streak Rotation**: A Common Table Expression (CTE) checks the number of completed reading tasks for each active notebook. Notebooks that have completed fewer than 2 consecutive reading tasks retain a streak anchor (`1970-01-01 00:00:00`), allowing them 2 full reading sessions to build focus and momentum before rotating.
+1. **2-Session Block Streak Rotation**: Common Table Expressions (CTEs) inspect the global completed reading history (`global_recent`). The active notebook retains a streak anchor (`1970-01-01 00:00:00`) while global history has fewer than 2 consecutive sessions for that notebook, allowing 2 full reading sessions to build focus before rotating.
 2. **Least-Recently-Read (LRR) Rotation**: Once a notebook completes its 2-session block, its `effective_last_read` timestamp updates to its latest task completion time, automatically passing the queue selection to the active notebook that hasn't been read in the longest time.
 3. **Explicit Priority Preserved**: Users can still bump a specific notebook's priority slider higher (e.g., priority `6` vs `5`) to force a dedicated single-subject sprint whenever desired.
 
 ### Code Changes
 In `internal/db/topics_repo.go`:
 ```sql
-WITH recent_reads AS (
+WITH global_recent AS (
     SELECT notebook_id, completed_at,
-           ROW_NUMBER() OVER (PARTITION BY notebook_id ORDER BY completed_at DESC) as rnum
+           ROW_NUMBER() OVER (ORDER BY completed_at DESC) as grnum
     FROM study_queue
     WHERE task_type = 'READING' AND status = 'COMPLETED'
+),
+current_block AS (
+    SELECT g1.notebook_id
+    FROM global_recent g1
+    WHERE g1.grnum = 1
+      AND (
+          (SELECT COUNT(*) FROM global_recent WHERE grnum <= 2) < 2
+          OR (SELECT notebook_id FROM global_recent WHERE grnum = 2) != g1.notebook_id
+      )
 ),
 book_streak AS (
     SELECT n.id as notebook_id,
            CASE 
-               WHEN COUNT(rr.completed_at) < 2 THEN '1970-01-01 00:00:00'
-               ELSE MAX(rr.completed_at)
+               WHEN cb.notebook_id IS NOT NULL THEN '1970-01-01 00:00:00'
+               ELSE COALESCE(MAX(sq.completed_at), '1970-01-01 00:00:00')
            END as effective_last_read
     FROM notebooks n
-    LEFT JOIN recent_reads rr ON n.id = rr.notebook_id AND rr.rnum <= 2
+    LEFT JOIN current_block cb ON cb.notebook_id = n.id
+    LEFT JOIN study_queue sq ON sq.notebook_id = n.id AND sq.task_type = 'READING' AND sq.status = 'COMPLETED'
     GROUP BY n.id
 )
 SELECT

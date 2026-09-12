@@ -179,6 +179,10 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
+	if err := repo.EnsurePendingReadingTasksForActiveNotebooks(activeProfileID); err != nil {
+		utils.Warnf("[TODAY_PLAN] EnsurePendingReadingTasksForActiveNotebooks failed: %v", err)
+	}
+
 	// Canonical queue recovery/materialization path for dashboard:
 	// if ACTIVE/PENDING queue tasks exist, surface those directly.
 	activeQueueTasks, err := repo.GetAllActiveTasks()
@@ -208,18 +212,27 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	materializedCards, deferredCards, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
 	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(repo, activeQueueTasks, pendingQueueTasks)
 
-	if reviewTask, ok := buildReviewTaskForPlan(repo, now, materializedCards, safeReviewBudget); ok {
+	actualReviewCards := materializedCards
+	actualReviewMinutes := safeReviewBudget
+	if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, now, materializedCards); ok {
 		queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
 		actionCounts["flashcard_review"]++
+		actualReviewCards = cards
+		actualReviewMinutes = mins
+	}
+
+	deferredCards = dueCards - actualReviewCards
+	if deferredCards < 0 {
+		deferredCards = 0
 	}
 
 	planSource := "queue-materialized"
 	plan := &models.TodayPlan{
 		Date:                now.Format(dateFormatYYYYMMDD),
 		TotalMinutes:        dailyStudyMinutes,
-		ReviewMinutes:       safeReviewBudget,
+		ReviewMinutes:       actualReviewMinutes,
 		LearningMinutes:     learningMinutes,
-		DueReviewCards:      materializedCards,
+		DueReviewCards:      actualReviewCards,
 		TotalDueReviewCards: dueCards,
 		DeferredReviewCards: deferredCards,
 		ActiveTopics:        activeTopics,
@@ -253,20 +266,20 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 }
 
-func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCards, safeReviewBudget int) (models.ScheduledTask, bool) {
+func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCards int) (models.ScheduledTask, int, int, bool) {
 	if materializedCards <= 0 {
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
 	bestNotebookID, _, err := repo.GetNextDueReviewNotebook(now.Unix())
 	if err != nil || bestNotebookID == "" {
 		if err != nil {
 			utils.Warnf("failed to get next due review notebook: %v", err)
 		}
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
 	task, _, err := repo.CreateReviewSession(bestNotebookID)
 	if err != nil || task == nil {
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
 
 	reviewCardsForTask := materializedCards
@@ -284,7 +297,7 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 		Priority:        1,
 		NotebookID:      bestNotebookID,
 		Meta:            fmt.Sprintf("Spaced repetition review (%d cards)", reviewCardsForTask),
-	}, true
+	}, reviewCardsForTask, estimateMinutes, true
 }
 
 func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) models.ScheduledTask {
