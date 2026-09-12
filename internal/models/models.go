@@ -215,6 +215,7 @@ type Notebook struct {
 	StartPage            int     `json:"start_page,omitempty"`
 	EndPage              int     `json:"end_page,omitempty"`
 	FlashcardCount       int     `json:"flashcard_count"`
+	CompletionPercent    int     `json:"completion_percent"`
 }
 
 // NotebookChunk links a chunk to a notebook (many chunks per notebook)

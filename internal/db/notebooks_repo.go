@@ -366,7 +366,15 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			FROM fsrs_cards fc
 			WHERE fc.topic_id = notebooks.topic_id
 			   OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
-		), 0) AS flashcard_count
+		), 0) AS flashcard_count,
+		COALESCE((
+			SELECT CASE 
+				WHEN COUNT(*) > 0 THEN CAST(ROUND(SUM(CASE WHEN status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*)) AS INTEGER)
+				ELSE 0 
+			END
+			FROM study_queue sq
+			WHERE sq.notebook_id = notebooks.id
+		), 0) AS completion_percent
 	FROM notebooks`
 	args := []interface{}{}
 	whereClause := ""
@@ -409,6 +417,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 			&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
 			&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage, &nb.FlashcardCount,
+			&nb.CompletionPercent,
 		); err != nil {
 			return nil, err
 		}
