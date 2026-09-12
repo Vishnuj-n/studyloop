@@ -70,6 +70,19 @@
         <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
         <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
       </p>
+      <div class="test-conn-row">
+        <button
+          type="button"
+          class="test-btn"
+          :disabled="disabled || testingFast"
+          @click="testFastConnection"
+        >
+          {{ testingFast ? 'Testing...' : 'Test Connection' }}
+        </button>
+        <span v-if="fastResult" :class="['test-result', fastResult.ok ? 'success' : 'error']">
+          {{ fastResult.ok ? '✓ Connected successfully' : '✗ ' + fastResult.error }}
+        </span>
+      </div>
     </div>
 
     <div class="form-group">
@@ -155,6 +168,19 @@
           <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio (Recommended Heavy) ↗</a> ·
           <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
         </p>
+        <div class="test-conn-row">
+          <button
+            type="button"
+            class="test-btn"
+            :disabled="disabled || testingHeavy"
+            @click="testHeavyConnection"
+          >
+            {{ testingHeavy ? 'Testing Heavy Connection...' : 'Test Heavy Connection' }}
+          </button>
+          <span v-if="heavyResult" :class="['test-result', heavyResult.ok ? 'success' : 'error']">
+            {{ heavyResult.ok ? '✓ Connected successfully' : '✗ ' + heavyResult.error }}
+          </span>
+        </div>
       </div>
       <div class="form-group">
         <label for="settings-heavy-max-input">Heavy Max Input Tokens</label>
@@ -179,9 +205,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
-import { openURLInBrowser } from '../services/appApi'
+import { openURLInBrowser, testLLMConnection } from '../services/appApi'
 
 const props = defineProps({
   llmSettings: { type: Object, required: true },
@@ -190,6 +216,41 @@ const props = defineProps({
   targetSessionWords: { type: Number, default: 3000 },
   disabled: { type: Boolean, default: false },
 })
+
+const testingFast = ref(false)
+const fastResult = ref(null)
+const testingHeavy = ref(false)
+const heavyResult = ref(null)
+const fastRevision = ref(0)
+const heavyRevision = ref(0)
+
+watch(
+  () => [
+    props.llmSettings?.fast?.provider,
+    props.llmSettings?.fast?.base_url,
+    props.llmSettings?.fast?.model,
+    props.llmFastKey,
+  ],
+  () => {
+    fastRevision.value++
+    fastResult.value = null
+  },
+  { deep: true }
+)
+
+watch(
+  () => [
+    props.llmSettings?.heavy?.provider,
+    props.llmSettings?.heavy?.base_url,
+    props.llmSettings?.heavy?.model,
+    props.llmHeavyKey,
+  ],
+  () => {
+    heavyRevision.value++
+    heavyResult.value = null
+  },
+  { deep: true }
+)
 
 const hasFastTokenWarning = computed(() => {
   const words = Number(props.targetSessionWords) || 3000
@@ -204,6 +265,58 @@ async function openExternalLink(url) {
     await openURLInBrowser(url)
   } catch {
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+async function testFastConnection() {
+  testingFast.value = true
+  fastResult.value = null
+  const reqRev = fastRevision.value
+  try {
+    const res = await testLLMConnection(
+      'fast',
+      props.llmSettings?.fast?.provider,
+      props.llmSettings?.fast?.base_url,
+      props.llmSettings?.fast?.model,
+      props.llmFastKey
+    )
+    if (reqRev === fastRevision.value) {
+      fastResult.value = res
+    }
+  } catch (err) {
+    if (reqRev === fastRevision.value) {
+      fastResult.value = { error: err.message || 'Connection test failed' }
+    }
+  } finally {
+    if (reqRev === fastRevision.value) {
+      testingFast.value = false
+    }
+  }
+}
+
+async function testHeavyConnection() {
+  testingHeavy.value = true
+  heavyResult.value = null
+  const reqRev = heavyRevision.value
+  try {
+    const res = await testLLMConnection(
+      'heavy',
+      props.llmSettings?.heavy?.provider,
+      props.llmSettings?.heavy?.base_url,
+      props.llmSettings?.heavy?.model,
+      props.llmHeavyKey
+    )
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = res
+    }
+  } catch (err) {
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = { error: err.message || 'Connection test failed' }
+    }
+  } finally {
+    if (reqRev === heavyRevision.value) {
+      testingHeavy.value = false
+    }
   }
 }
 </script>
@@ -315,5 +428,48 @@ h2 {
 .sync-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.test-conn-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.test-btn {
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface-container);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.test-btn:hover:not(:disabled) {
+  background: var(--surface-container-highest);
+  border-color: var(--primary);
+}
+
+.test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.test-result {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.test-result.success {
+  color: #10b981;
+}
+
+.test-result.error {
+  color: #ef4444;
 }
 </style>

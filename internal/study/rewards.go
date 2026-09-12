@@ -14,45 +14,73 @@ func RollTaskRewards(taskType models.StudyTaskType, quizScore int, isAce bool) (
 	var baseCoins int
 	var tier string
 
+	// Determine base XP and coins
 	switch taskType {
 	case models.StudyTaskTypeReading:
 		baseXP = 20
 		baseCoins = 5
-		tier = "BRONZE"
 
 	case models.StudyTaskTypeQuiz:
 		if isAce || quizScore >= 100 {
 			baseXP = 100
 			baseCoins = 25
-			tier = "GOLD"
 		} else {
 			baseXP = 50
 			baseCoins = 10
-			tier = "SILVER"
 		}
 
 	case models.StudyTaskTypeFlashcardReview, models.StudyTaskTypeFlashcardGenerate:
 		baseXP = 30
 		baseCoins = 8
-		tier = "SILVER"
 
 	case models.StudyTaskTypeMilestoneExam, models.StudyTaskTypeSocraticRemedial:
 		baseXP = 150
 		baseCoins = 35
-		tier = "MYTHIC"
 
 	default:
 		baseXP = 15
 		baseCoins = 3
-		tier = "BRONZE"
 	}
 
-	// ponytail: 100% chest drop on achievements & milestones; 30% random drop on routine study tasks
+	// Probabilistic Gacha Chest Engine:
+	// Achievements & Milestones (Ace, Socratic/Viva, Milestone Exam) get 100% drop with boosted odds.
+	// Routine tasks get 30% drop with standard rare odds.
+	isAchievement := isAce || quizScore >= 100 || taskType == models.StudyTaskTypeMilestoneExam || taskType == models.StudyTaskTypeSocraticRemedial
+
 	var box *models.PendingLootBox
-	if isAce || quizScore >= 100 || taskType == models.StudyTaskTypeMilestoneExam || taskType == models.StudyTaskTypeSocraticRemedial || rand.Intn(100) < 30 {
+	if isAchievement || rand.Intn(100) < 30 {
+		tier = rollChestTier(isAchievement)
 		box = generateLootBox(tier)
 	}
 	return baseXP, baseCoins, box
+}
+
+// rollChestTier uses transparent probabilistic gacha odds out of 1000.
+// Routine: MYTHIC 0.5% (5/1000), GOLD 5.5% (55/1000), SILVER 34% (340/1000), BRONZE 60% (600/1000)
+// Achievement (Viva/Milestone/Ace): MYTHIC 3.0% (30/1000), GOLD 37% (370/1000), SILVER 45% (450/1000), BRONZE 15% (150/1000)
+func rollChestTier(isAchievement bool) string {
+	roll := rand.Intn(1000)
+
+	if isAchievement {
+		if roll < 30 { // 3.0%
+			return "MYTHIC"
+		} else if roll < 400 { // 37.0%
+			return "GOLD"
+		} else if roll < 850 { // 45.0%
+			return "SILVER"
+		}
+		return "BRONZE"
+	}
+
+	// Routine odds
+	if roll < 5 { // 0.5% Ultra-rare
+		return "MYTHIC"
+	} else if roll < 60 { // 5.5% Rare
+		return "GOLD"
+	} else if roll < 400 { // 34.0%
+		return "SILVER"
+	}
+	return "BRONZE"
 }
 
 func generateLootBox(tier string) *models.PendingLootBox {

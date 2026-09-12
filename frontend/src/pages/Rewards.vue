@@ -55,19 +55,42 @@
               <span class="currency-icon">🛡️</span>
             </div>
             <div>
-              <span class="currency-val">{{ profile.streak_freezes_owned }}</span>
+              <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <span class="currency-val">{{ profile.streak_freezes_owned }}</span>
+                <button
+                  type="button"
+                  title="View how streak freezes work"
+                  class="info-icon-btn"
+                  @click="openFreezeInfoModal"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                </button>
+              </div>
               <span class="currency-name">Streak Freezes</span>
             </div>
           </div>
         </div>
-        <button
-          class="buy-freeze-btn"
-          type="button"
-          :disabled="profile.coins < 50 || buying"
-          @click="handleBuyStreakFreeze"
-        >
-          {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
-        </button>
+        <div class="shop-action-group">
+          <button
+            class="buy-freeze-btn"
+            type="button"
+            :disabled="profile.coins < 50 || buying"
+            @click="handleBuyStreakFreeze"
+          >
+            {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
+          </button>
+          <button
+            class="shop-trigger-btn"
+            type="button"
+            @click="showShopModal = true"
+          >
+            🛒 Rewards & Theme Shop
+          </button>
+        </div>
         <p v-if="buyError" class="buy-error-msg">{{ buyError }}</p>
       </div>
 
@@ -104,6 +127,14 @@
       </div>
     </div>
 
+    <!-- Theme & Achievement Shop Modal -->
+    <RewardsShopModal
+      v-if="showShopModal"
+      :active-theme="activeTheme"
+      @close="onShopClose"
+      @theme-changed="onThemeChanged"
+    />
+
     <!-- Mystery Chest Modal -->
     <MysteryChestModal
       v-if="activeChest"
@@ -112,10 +143,11 @@
       @close="activeChest = null"
     />
 
-    <!-- Streak Freeze Acquired Modal -->
+    <!-- Streak Freeze Modal -->
     <StreakFreezeModal
       v-if="showFreezeModal"
       :total-freezes="profile.streak_freezes_owned"
+      :mode="freezeModalMode"
       @close="showFreezeModal = false"
     />
   </StudyPageLayout>
@@ -124,13 +156,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import { getGamificationState, buyStreakFreeze } from '../services/appApi'
+import { getGamificationState, buyStreakFreeze, getUserSettings, updateUserSettings } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
+import RewardsShopModal from '../components/RewardsShopModal.vue'
+
+const showShopModal = ref(false)
 
 const loading = ref(true)
 const buying = ref(false)
 const showFreezeModal = ref(false)
+const freezeModalMode = ref('purchase')
+const activeTheme = ref('dark-gruvbox')
 const loadError = ref('')
 const buyError = ref('')
 const profile = ref({
@@ -169,6 +206,11 @@ function getChestEmoji(tier) {
   }
 }
 
+function openFreezeInfoModal() {
+  freezeModalMode.value = 'info'
+  showFreezeModal.value = true
+}
+
 async function loadData() {
   loading.value = true
   loadError.value = ''
@@ -179,6 +221,10 @@ async function loadData() {
     }
     if (res && res.pending_chests) {
       chests.value = res.pending_chests
+    }
+    const settings = await getUserSettings().catch(() => null)
+    if (settings && settings.theme) {
+      activeTheme.value = settings.theme
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
@@ -204,7 +250,10 @@ async function handleBuyStreakFreeze() {
     const res = await buyStreakFreeze()
     if (res && res.profile) {
       profile.value = res.profile
-      showFreezeModal.value = true
+      freezeModalMode.value = 'purchase'
+      if (localStorage.getItem('hideStreakFreezeModal') !== 'true') {
+        showFreezeModal.value = true
+      }
       window.dispatchEvent(new Event('gamification-updated'))
     }
   } catch (err) {
@@ -215,17 +264,80 @@ async function handleBuyStreakFreeze() {
   }
 }
 
+async function onThemeChanged(newTheme) {
+  activeTheme.value = newTheme
+  try {
+    await updateUserSettings({ theme: newTheme })
+  } catch (err) {
+    console.error('Failed to update theme setting:', err)
+  }
+}
+
+function onShopClose() {
+  showShopModal.value = false
+  loadData()
+}
+
 onMounted(() => {
   loadData()
 })
 </script>
 
 <style scoped>
+.shop-action-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.shop-trigger-btn {
+  background: var(--surface-card, #25282a);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  color: var(--text-color, #e0e0e0);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shop-trigger-btn:hover {
+  background: var(--surface-hover, #2f3336);
+  border-color: var(--accent-color, #d79921);
+  color: var(--accent-color, #d79921);
+}
+
 .rewards-grid {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   margin-top: 0.5rem;
+}
+
+.info-icon-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-text);
+  border-radius: 50%;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.info-icon-btn:hover {
+  color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  transform: scale(1.1);
 }
 
 .floating-card {

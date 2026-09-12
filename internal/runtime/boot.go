@@ -55,6 +55,11 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 		return nil, err
 	}
 
+	// Perform lightweight startup backup before opening DB connections
+	if backupErr := db.BackupDatabase(dbPath); backupErr != nil {
+		utils.Warnf("startup database backup warning: %v", backupErr)
+	}
+
 	// 1. Initialize DB without loading vec0 extension first (so we can query settings safely)
 	repo, err := db.Init(dbPath, "")
 	if err != nil {

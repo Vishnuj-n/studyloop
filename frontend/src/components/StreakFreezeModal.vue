@@ -6,9 +6,9 @@
         <button class="close-btn" type="button" aria-label="Close" @click="closeModal">✕</button>
 
         <div class="modal-header">
-          <span class="shield-pill">SHIELD ACQUIRED</span>
-          <h2 class="modal-title">Streak Freeze Equipped!</h2>
-          <p class="modal-subtitle">Your study streak is now actively protected.</p>
+          <span class="shield-pill">{{ mode === 'info' ? 'INFORMATION' : 'SHIELD ACQUIRED' }}</span>
+          <h2 class="modal-title">{{ mode === 'info' ? 'Streak Freeze Guide' : 'Streak Freeze Equipped!' }}</h2>
+          <p class="modal-subtitle">{{ mode === 'info' ? 'Learn how streak protection works in AI Tutor.' : 'Your study streak is now actively protected.' }}</p>
         </div>
 
         <div class="shield-display-area">
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Inventory Stats -->
-        <div class="transaction-summary">
+        <div v-if="mode !== 'info'" class="transaction-summary">
           <div class="summary-item cost">
             <span class="summary-icon">🪙</span>
             <span class="summary-text">-50 Coins</span>
@@ -46,9 +46,16 @@
           </div>
         </div>
 
+        <div v-if="mode !== 'info'" class="dont-show-toggle">
+          <label>
+            <input type="checkbox" v-model="dontShowAgain" @change="onToggleChange" />
+            Don't show this popup automatically on purchase
+          </label>
+        </div>
+
         <div class="modal-footer">
           <button class="action-btn" type="button" @click="closeModal">
-            Got It, Keep Studying
+            {{ mode === 'info' ? 'Close' : 'Got It, Keep Studying' }}
           </button>
         </div>
       </div>
@@ -60,20 +67,31 @@
 import { ref, onMounted } from 'vue'
 import { playCorrectChime } from '../utils/audioJuice'
 
-defineProps({
+const props = defineProps({
   totalFreezes: {
     type: Number,
     default: 1,
+  },
+  mode: {
+    type: String,
+    default: 'purchase',
   },
 })
 
 const emit = defineEmits(['close'])
 
 const visible = ref(true)
+const dontShowAgain = ref(localStorage.getItem('hideStreakFreezeModal') === 'true')
 
 onMounted(() => {
-  playCorrectChime()
+  if (props.mode !== 'info') {
+    playCorrectChime()
+  }
 })
+
+function onToggleChange() {
+  localStorage.setItem('hideStreakFreezeModal', dontShowAgain.value ? 'true' : 'false')
+}
 
 function closeModal() {
   visible.value = false
@@ -271,6 +289,23 @@ function closeModal() {
   width: 1px;
   height: 18px;
   background: var(--outline-variant);
+}
+
+.dont-show-toggle {
+  margin-bottom: 1rem;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dont-show-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  user-select: none;
 }
 
 .modal-footer {

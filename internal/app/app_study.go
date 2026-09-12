@@ -179,6 +179,10 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
+	if err := repo.EnsurePendingReadingTasksForActiveNotebooks(activeProfileID); err != nil {
+		utils.Warnf("[TODAY_PLAN] EnsurePendingReadingTasksForActiveNotebooks failed: %v", err)
+	}
+
 	// Canonical queue recovery/materialization path for dashboard:
 	// if ACTIVE/PENDING queue tasks exist, surface those directly.
 	activeQueueTasks, err := repo.GetAllActiveTasks()
@@ -205,21 +209,30 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 
 	dailyStudyMinutes := calculateDailyStudyMinutes(settings.StudyStartTime, settings.StudyEndTime)
-	materializedCards, deferredCards, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
+	materializedCards, _, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
 	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(repo, activeQueueTasks, pendingQueueTasks)
 
-	if reviewTask, ok := buildReviewTaskForPlan(repo, now, materializedCards, safeReviewBudget); ok {
+	actualReviewCards := materializedCards
+	actualReviewMinutes := safeReviewBudget
+	if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, now, materializedCards); ok {
 		queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
 		actionCounts["flashcard_review"]++
+		actualReviewCards = cards
+		actualReviewMinutes = mins
+	}
+
+	deferredCards := dueCards - actualReviewCards
+	if deferredCards < 0 {
+		deferredCards = 0
 	}
 
 	planSource := "queue-materialized"
 	plan := &models.TodayPlan{
 		Date:                now.Format(dateFormatYYYYMMDD),
 		TotalMinutes:        dailyStudyMinutes,
-		ReviewMinutes:       safeReviewBudget,
+		ReviewMinutes:       actualReviewMinutes,
 		LearningMinutes:     learningMinutes,
-		DueReviewCards:      materializedCards,
+		DueReviewCards:      actualReviewCards,
 		TotalDueReviewCards: dueCards,
 		DeferredReviewCards: deferredCards,
 		ActiveTopics:        activeTopics,
@@ -253,35 +266,38 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 }
 
-func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCards, safeReviewBudget int) (models.ScheduledTask, bool) {
+func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCards int) (models.ScheduledTask, int, int, bool) {
 	if materializedCards <= 0 {
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
-	bestNotebookID, selectedDueCards, err := repo.GetNextDueReviewNotebook(now.Unix())
+	bestNotebookID, _, err := repo.GetNextDueReviewNotebook(now.Unix())
 	if err != nil || bestNotebookID == "" {
 		if err != nil {
 			utils.Warnf("failed to get next due review notebook: %v", err)
 		}
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
 	task, _, err := repo.CreateReviewSession(bestNotebookID)
 	if err != nil || task == nil {
-		return models.ScheduledTask{}, false
+		return models.ScheduledTask{}, 0, 0, false
 	}
 
 	reviewCardsForTask := materializedCards
-	if selectedDueCards < reviewCardsForTask {
-		reviewCardsForTask = selectedDueCards
+	if session, err := repo.GetReviewSession(task.ID); err == nil && session != nil && session.Remaining > 0 {
+		reviewCardsForTask = session.Remaining
 	}
+
+	estimateMinutes := int(math.Ceil(float64(reviewCardsForTask) * scheduler.ReviewMinutesPerCard))
+
 	return models.ScheduledTask{
 		ID:              task.ID,
 		ActionType:      "flashcard_review",
 		Title:           fmt.Sprintf("Flashcard Review: %d cards", reviewCardsForTask),
-		EstimateMinutes: safeReviewBudget,
+		EstimateMinutes: estimateMinutes,
 		Priority:        1,
 		NotebookID:      bestNotebookID,
 		Meta:            fmt.Sprintf("Spaced repetition review (%d cards)", reviewCardsForTask),
-	}, true
+	}, reviewCardsForTask, estimateMinutes, true
 }
 
 func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) models.ScheduledTask {
@@ -662,5 +678,40 @@ func (a *App) BuyStreakFreeze() map[string]interface{} {
 	return map[string]interface{}{
 		"success": true,
 		"profile": prof,
+	}
+}
+
+// UnlockCosmeticItem purchases/unlocks a theme or title item.
+func (a *App) UnlockCosmeticItem(itemCode string, price int) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	prof, err := repo.UnlockCosmetic(itemCode, price)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success": true,
+		"profile": prof,
+	}
+}
+
+// GetGamificationStore returns full shop inventory, achievement progress, and profile.
+func (a *App) GetGamificationStore() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	store, err := repo.GetGamificationStore()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"store": store,
 	}
 }

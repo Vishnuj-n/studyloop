@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	queueLogFile *os.File
-	ragLogFile   *os.File
-	errLogFile   *os.File
+	queueLogWriter *rotatingWriter
+	ragLogWriter   *rotatingWriter
+	appLogWriter   *rotatingWriter
 
 	// QueueLogger writes structured queue lifecycle events to queue.log.
 	QueueLogger *slog.Logger
@@ -29,6 +29,100 @@ func init() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
 }
 
+const maxLogSizeBytes int64 = 5 * 1024 * 1024 // 5 MB per log file
+
+func rotateLogFile(logPath string, maxSize int64) error {
+	info, err := os.Stat(logPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("stat log file %s: %w", logPath, err)
+	}
+	if info.Size() < maxSize {
+		return nil
+	}
+	oldPath := logPath + ".old"
+	if err := os.Remove(oldPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove old log file %s: %w", oldPath, err)
+	}
+	if err := os.Rename(logPath, oldPath); err != nil {
+		return fmt.Errorf("rename log file %s to %s: %w", logPath, oldPath, err)
+	}
+	return nil
+}
+
+type rotatingWriter struct {
+	mu       sync.Mutex
+	logPath  string
+	maxSize  int64
+	file     *os.File
+	currSize int64
+}
+
+func newRotatingWriter(logPath string, maxSize int64) (*rotatingWriter, error) {
+	if err := rotateLogFile(logPath, maxSize); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open log file %s: %w", logPath, err)
+	}
+	var currSize int64
+	if info, err := f.Stat(); err == nil {
+		currSize = info.Size()
+	}
+	return &rotatingWriter{
+		logPath:  logPath,
+		maxSize:  maxSize,
+		file:     f,
+		currSize: currSize,
+	}, nil
+}
+
+func (w *rotatingWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.file != nil && w.currSize+int64(len(p)) > w.maxSize {
+		_ = w.file.Sync()
+		_ = w.file.Close()
+		_ = rotateLogFile(w.logPath, w.maxSize)
+		f, err := os.OpenFile(w.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			w.file = f
+			w.currSize = 0
+		}
+	}
+	if w.file == nil {
+		return 0, fmt.Errorf("log file closed")
+	}
+	n, err = w.file.Write(p)
+	w.currSize += int64(n)
+	return n, err
+}
+
+func (w *rotatingWriter) Sync() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file != nil {
+		return w.file.Sync()
+	}
+	return nil
+}
+
+func (w *rotatingWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file != nil {
+		_ = w.file.Sync()
+		err := w.file.Close()
+		w.file = nil
+		return err
+	}
+	return nil
+}
+
 // InitMultiFileLogger creates the logs subdirectory under appDataDir and
 // redirects QueueLogger, RagLogger, and the default slog logger to their
 // respective files.
@@ -42,17 +136,17 @@ func InitMultiFileLogger(appDataDir string) error {
 	}
 
 	// Close existing files if any are open (for safety in multi-call or testing environments).
-	if queueLogFile != nil {
-		_ = queueLogFile.Close()
-		queueLogFile = nil
+	if queueLogWriter != nil {
+		_ = queueLogWriter.Close()
+		queueLogWriter = nil
 	}
-	if ragLogFile != nil {
-		_ = ragLogFile.Close()
-		ragLogFile = nil
+	if ragLogWriter != nil {
+		_ = ragLogWriter.Close()
+		ragLogWriter = nil
 	}
-	if errLogFile != nil {
-		_ = errLogFile.Close()
-		errLogFile = nil
+	if appLogWriter != nil {
+		_ = appLogWriter.Close()
+		appLogWriter = nil
 	}
 
 	// Install io.Discard fallback loggers immediately after closing existing file handles.
@@ -60,32 +154,35 @@ func InitMultiFileLogger(appDataDir string) error {
 	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
 	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
+	queuePath := filepath.Join(logDir, "queue.log")
+	ragPath := filepath.Join(logDir, "rag_engine.log")
+	appPath := filepath.Join(logDir, "app.log")
+
 	var err error
-	queueLogFile, err = os.OpenFile(filepath.Join(logDir, "queue.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	queueLogWriter, err = newRotatingWriter(queuePath, maxLogSizeBytes)
 	if err != nil {
 		return fmt.Errorf("failed to open queue log file: %w", err)
 	}
 
-	ragLogFile, err = os.OpenFile(filepath.Join(logDir, "rag_engine.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	ragLogWriter, err = newRotatingWriter(ragPath, maxLogSizeBytes)
 	if err != nil {
-		_ = queueLogFile.Close()
-		queueLogFile = nil
+		_ = queueLogWriter.Close()
+		queueLogWriter = nil
 		return fmt.Errorf("failed to open rag engine log file: %w", err)
 	}
 
-	var openErr error
-	errLogFile, openErr = os.OpenFile(filepath.Join(logDir, "app.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if openErr != nil {
-		_ = queueLogFile.Close()
-		_ = ragLogFile.Close()
-		queueLogFile = nil
-		ragLogFile = nil
-		return fmt.Errorf("failed to open app log file: %w", openErr)
+	appLogWriter, err = newRotatingWriter(appPath, maxLogSizeBytes)
+	if err != nil {
+		_ = queueLogWriter.Close()
+		_ = ragLogWriter.Close()
+		queueLogWriter = nil
+		ragLogWriter = nil
+		return fmt.Errorf("failed to open app log file: %w", err)
 	}
 
-	QueueLogger = slog.New(slog.NewJSONHandler(queueLogFile, nil))
-	RagLogger = slog.New(slog.NewJSONHandler(ragLogFile, nil))
-	slog.SetDefault(slog.New(slog.NewJSONHandler(errLogFile, nil)))
+	QueueLogger = slog.New(slog.NewJSONHandler(queueLogWriter, nil))
+	RagLogger = slog.New(slog.NewJSONHandler(ragLogWriter, nil))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(appLogWriter, nil)))
 
 	return nil
 }
@@ -95,20 +192,17 @@ func CloseMultiFileLogger() {
 	logMutex.Lock()
 	defer logMutex.Unlock()
 
-	if queueLogFile != nil {
-		_ = queueLogFile.Sync()
-		_ = queueLogFile.Close()
-		queueLogFile = nil
+	if queueLogWriter != nil {
+		_ = queueLogWriter.Close()
+		queueLogWriter = nil
 	}
-	if ragLogFile != nil {
-		_ = ragLogFile.Sync()
-		_ = ragLogFile.Close()
-		ragLogFile = nil
+	if ragLogWriter != nil {
+		_ = ragLogWriter.Close()
+		ragLogWriter = nil
 	}
-	if errLogFile != nil {
-		_ = errLogFile.Sync()
-		_ = errLogFile.Close()
-		errLogFile = nil
+	if appLogWriter != nil {
+		_ = appLogWriter.Close()
+		appLogWriter = nil
 	}
 
 	// Revert to io.Discard fallback loggers on close to avoid leaking console streams or nil dereference.

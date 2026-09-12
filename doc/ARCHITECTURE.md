@@ -352,27 +352,45 @@ Explicit priority hierarchy with notebook biasing:
 - No AI-driven dynamic reprioritization
 - Notebook priority = static bias coefficient, not adaptive weighting
 
-**Ordering Query:**
+**Ordering Query & 2-Session Blocked Interleaving (LRR):**
+- Reading topic selection uses 2-Session Blocked LRR Streak Rotation: active notebooks derive their active 2-session block from the last two completed READING sessions globally, retaining the active notebook until 2 consecutive sessions are completed before rotating to the least-recently-read notebook of equal priority.
+- Notebook priority = static bias coefficient (Priority `6+` overrides default rotation).
+
 ```sql
-SELECT * FROM study_queue sq
-LEFT JOIN notebooks n ON sq.notebook_id = n.id
-WHERE sq.status = 'PENDING'
-ORDER BY
-  CASE sq.task_type
-    WHEN 'FLASHCARD_GENERATE' THEN 7
-    WHEN 'SOCRATIC_REMEDIAL' THEN 6
-    WHEN 'FLASHCARD_REVIEW' THEN 5
-    WHEN 'REREAD' THEN 4
-    WHEN 'QUIZ' THEN 3
-    WHEN 'MILESTONE_EXAM' THEN 2
-    WHEN 'READING' THEN 1
-    WHEN 'EXAMINER' THEN 0
-    ELSE 0
-  END DESC,
-  COALESCE(n.priority, 5) DESC,
-  (SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-  COALESCE(sq.created_at, '') ASC,
-  sq.id ASC;
+WITH global_recent AS (
+    SELECT notebook_id, completed_at,
+           ROW_NUMBER() OVER (ORDER BY completed_at DESC) as grnum
+    FROM study_queue
+    WHERE task_type = 'READING' AND status = 'COMPLETED'
+),
+current_block AS (
+    SELECT g1.notebook_id
+    FROM global_recent g1
+    WHERE g1.grnum = 1
+      AND (
+          (SELECT COUNT(*) FROM global_recent WHERE grnum <= 2) < 2
+          OR (SELECT notebook_id FROM global_recent WHERE grnum = 2) != g1.notebook_id
+      )
+),
+book_streak AS (
+    SELECT n.id as notebook_id,
+           CASE 
+               WHEN cb.notebook_id IS NOT NULL THEN '1970-01-01 00:00:00'
+               ELSE COALESCE(MAX(sq.completed_at), '1970-01-01 00:00:00')
+           END as effective_last_read
+    FROM notebooks n
+    LEFT JOIN current_block cb ON cb.notebook_id = n.id
+    LEFT JOIN study_queue sq ON sq.notebook_id = n.id AND sq.task_type = 'READING' AND sq.status = 'COMPLETED'
+    GROUP BY n.id
+)
+SELECT t.id, t.title, COALESCE(t.start_page, 0), COALESCE(t.end_page, 0), COALESCE(t.current_page_cursor, 0), n.id
+FROM topics t
+LEFT JOIN notebook_topics nt ON nt.topic_id = t.id
+LEFT JOIN notebooks n ON (n.id = nt.notebook_id OR n.topic_id = t.id)
+LEFT JOIN book_streak bs ON bs.notebook_id = n.id
+WHERE t.status IN ('unseen', 'reading')
+ORDER BY COALESCE(n.priority, 5) DESC, COALESCE(bs.effective_last_read, '1970-01-01 00:00:00') ASC, t.start_page ASC, t.created_at ASC
+LIMIT 1;
 ```
 
 ### How Retention Layer (FSRS) Integrates with Queue

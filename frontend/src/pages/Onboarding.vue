@@ -312,24 +312,48 @@
         <div v-if="error" class="error-banner">{{ error }}</div>
 
         <div class="test-connection-section">
-          <button
-            class="test-connection-btn"
-            :class="{
-              'is-loading': isTestingLLM,
-              'is-success': testStatus === 'success',
-              'is-error': testStatus === 'error'
-            }"
-            type="button"
-            :disabled="presetLoading || isTestingLLM"
-            @click="testLLMConnection"
-          >
-            <span v-if="testStatus === 'success'">✓ Connected</span>
-            <span v-else-if="testStatus === 'error'">✕ Connection Failed</span>
-            <span v-else-if="isTestingLLM">Testing Connection...</span>
-            <span v-else>Test Connection</span>
-          </button>
+          <div class="test-btn-group">
+            <button
+              class="test-connection-btn"
+              :class="{
+                'is-loading': isTestingLLM,
+                'is-success': testStatus === 'success',
+                'is-error': testStatus === 'error'
+              }"
+              type="button"
+              :disabled="presetLoading || isTestingLLM"
+              @click="testLLMConnection"
+            >
+              <span v-if="testStatus === 'success'">✓ {{ useSameLLMForHeavy ? 'Connected' : 'Fast Connected' }}</span>
+              <span v-else-if="testStatus === 'error'">✕ {{ useSameLLMForHeavy ? 'Connection Failed' : 'Fast Connection Failed' }}</span>
+              <span v-else-if="isTestingLLM">Testing {{ useSameLLMForHeavy ? 'Connection...' : 'Fast Connection...' }}</span>
+              <span v-else>{{ useSameLLMForHeavy ? 'Test Connection' : 'Test Fast Connection' }}</span>
+            </button>
+
+            <button
+              v-if="!useSameLLMForHeavy"
+              class="test-connection-btn"
+              :class="{
+                'is-loading': isTestingHeavyLLM,
+                'is-success': heavyTestStatus === 'success',
+                'is-error': heavyTestStatus === 'error'
+              }"
+              type="button"
+              :disabled="presetLoading || isTestingHeavyLLM"
+              @click="testHeavyLLMConnection"
+            >
+              <span v-if="heavyTestStatus === 'success'">✓ Heavy Connected</span>
+              <span v-else-if="heavyTestStatus === 'error'">✕ Heavy Connection Failed</span>
+              <span v-else-if="isTestingHeavyLLM">Testing Heavy Connection...</span>
+              <span v-else>Test Heavy Connection</span>
+            </button>
+          </div>
+
           <span v-if="testStatusMsg" :class="['test-status-msg', testStatus]">
             {{ testStatusMsg }}
+          </span>
+          <span v-if="!useSameLLMForHeavy && heavyTestStatusMsg" :class="['test-status-msg', heavyTestStatus]">
+            {{ heavyTestStatusMsg }}
           </span>
         </div>
 
@@ -589,6 +613,9 @@ const error = ref('')
 const isTestingLLM = ref(false)
 const testStatus = ref(null) // 'success' | 'error' | null
 const testStatusMsg = ref('')
+const isTestingHeavyLLM = ref(false)
+const heavyTestStatus = ref(null)
+const heavyTestStatusMsg = ref('')
 
 async function openExternalLink(url) {
   try {
@@ -731,6 +758,8 @@ async function applyProviderPreset(tier) {
   }
 }
 
+const heavyTestRevision = ref(0)
+
 watch(
   [
     () => llmFast.value.provider,
@@ -744,6 +773,20 @@ watch(
   }
 )
 
+watch(
+  [
+    () => llmHeavy.value.provider,
+    () => llmHeavy.value.base_url,
+    () => llmHeavy.value.model,
+    () => llmHeavyKey.value,
+  ],
+  () => {
+    heavyTestRevision.value++
+    heavyTestStatus.value = null
+    heavyTestStatusMsg.value = ''
+  }
+)
+
 async function testLLMConnection() {
   if (isTestingLLM.value || presetLoading.value) return
   isTestingLLM.value = true
@@ -753,6 +796,8 @@ async function testLLMConnection() {
 
   try {
     const res = await testLLMConnectionApi(
+      'fast',
+      llmFast.value.provider,
       llmFast.value.base_url,
       llmFast.value.model,
       llmFastKey.value.trim()
@@ -770,6 +815,44 @@ async function testLLMConnection() {
     testStatusMsg.value = err.message || 'Connection test failed.'
   } finally {
     isTestingLLM.value = false
+  }
+}
+
+async function testHeavyLLMConnection() {
+  if (isTestingHeavyLLM.value || presetLoading.value) return
+  isTestingHeavyLLM.value = true
+  heavyTestStatus.value = null
+  heavyTestStatusMsg.value = ''
+  error.value = ''
+  const reqRev = heavyTestRevision.value
+
+  try {
+    const res = await testLLMConnectionApi(
+      'heavy',
+      llmHeavy.value.provider,
+      llmHeavy.value.base_url,
+      llmHeavy.value.model,
+      llmHeavyKey.value.trim()
+    )
+
+    if (reqRev === heavyTestRevision.value) {
+      if (res.error) {
+        heavyTestStatus.value = 'error'
+        heavyTestStatusMsg.value = res.error
+      } else {
+        heavyTestStatus.value = 'success'
+        heavyTestStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+      }
+    }
+  } catch (err) {
+    if (reqRev === heavyTestRevision.value) {
+      heavyTestStatus.value = 'error'
+      heavyTestStatusMsg.value = err.message || 'Heavy connection test failed.'
+    }
+  } finally {
+    if (reqRev === heavyTestRevision.value) {
+      isTestingHeavyLLM.value = false
+    }
   }
 }
 

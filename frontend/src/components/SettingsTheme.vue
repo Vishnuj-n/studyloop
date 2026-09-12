@@ -1,6 +1,14 @@
 <template>
   <article class="panel form-grid">
-    <h2>Workspace Aesthetics</h2>
+    <div class="panel-header">
+      <h2>Workspace Aesthetics</h2>
+      <button type="button" class="shop-trigger-btn" @click="showShopModal = true">
+        🛒 Rewards & Theme Shop
+      </button>
+    </div>
+
+    <div v-if="error" class="error-msg">{{ error }}</div>
+
     <div class="form-group">
       <label>Aesthetic Theme</label>
       <div class="theme-grid">
@@ -9,29 +17,48 @@
           :key="t.id"
           type="button"
           class="theme-card"
-          :class="{ active: settings.theme === t.id }"
+          :class="{ active: settings.theme === t.id, locked: !isUnlocked(t.id) }"
           :disabled="disabled"
-          @click="selectTheme(t.id)"
+          @click="handleThemeClick(t)"
         >
           <div class="theme-preview" :style="{ background: t.bg }">
             <span class="preview-dot" :style="{ background: t.primary }"></span>
             <span class="preview-dot" :style="{ background: t.surface }"></span>
+            <span v-if="!isUnlocked(t.id)" class="lock-overlay">🔒</span>
           </div>
-          <span class="theme-label">{{ t.label }}</span>
+          <span class="theme-label">
+            {{ t.label }}
+            <span v-if="!isUnlocked(t.id)" class="lock-tag">Locked</span>
+          </span>
         </button>
       </div>
       <p class="hint">
-        Select a visual theme. Changing themes alters the colors of your study desk instantly.
+        Select a visual theme. Default themes are unlocked. Additional themes can be unlocked in the Rewards Shop using Coins or by completing study achievements!
       </p>
     </div>
+
+    <RewardsShopModal
+      v-if="showShopModal"
+      :active-theme="settings.theme"
+      @close="onShopClose"
+      @theme-changed="onThemeChanged"
+    />
   </article>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import RewardsShopModal from './RewardsShopModal.vue'
+import { getGamificationState } from '../services/appApi'
+
 const props = defineProps({
   settings: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
 })
+
+const showShopModal = ref(false)
+const unlockedCosmetics = ref(['dark-gruvbox', 'light-classic', 'light-warm', 'dark-indigo'])
+const error = ref('')
 
 const themes = [
   { id: 'dark-gruvbox', label: 'Gruvbox Dark', bg: '#1d2021', primary: '#d79921', surface: '#282828' },
@@ -44,14 +71,60 @@ const themes = [
   { id: 'light-classic', label: 'Light Classic', bg: '#f9f9fb', primary: '#005bc1', surface: '#ebeef2' },
 ]
 
-function selectTheme(themeId) {
+onMounted(async () => {
+  await loadUnlockedCosmetics()
+})
+
+async function loadUnlockedCosmetics() {
+  error.value = ''
+  try {
+    const res = await getGamificationState()
+    if (res && res.error) {
+      unlockedCosmetics.value = []
+      error.value = res.error
+    } else if (res?.profile?.unlocked_cosmetics_json) {
+      unlockedCosmetics.value = JSON.parse(res.profile.unlocked_cosmetics_json)
+    }
+  } catch (err) {
+    unlockedCosmetics.value = []
+    error.value = err.message || 'Failed to load unlocked cosmetics'
+    console.error('Failed to load unlocked cosmetics:', err)
+  }
+}
+
+function isUnlocked(themeId) {
+  return unlockedCosmetics.value.includes(themeId)
+}
+
+function handleThemeClick(theme) {
   if (props.disabled) return
+  if (!isUnlocked(theme.id)) {
+    showShopModal.value = true
+    return
+  }
+  props.settings.theme = theme.id
+  document.documentElement.setAttribute('data-theme', theme.id)
+}
+
+function onThemeChanged(themeId) {
   props.settings.theme = themeId
-  document.documentElement.setAttribute('data-theme', themeId)
+  loadUnlockedCosmetics()
+}
+
+function onShopClose() {
+  showShopModal.value = false
+  loadUnlockedCosmetics()
 }
 </script>
 
 <style scoped>
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
 label {
   font-weight: 600;
   font-size: 14px;
@@ -73,8 +146,25 @@ label {
 
 h2 {
   font-size: 20px;
-  margin: 0 0 16px;
+  margin: 0;
   font-weight: 700;
+}
+
+.shop-trigger-btn {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shop-trigger-btn:hover {
+  background: var(--surface-container-highest);
+  border-color: var(--primary);
 }
 
 .panel {
@@ -105,6 +195,11 @@ h2 {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
   color: var(--on-surface);
+  position: relative;
+}
+
+.theme-card.locked {
+  opacity: 0.75;
 }
 
 .theme-card:hover:not(:disabled) {
@@ -130,6 +225,19 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  position: relative;
+}
+
+.lock-overlay {
+  position: absolute;
+  font-size: 1.2rem;
+  background: rgba(0, 0, 0, 0.45);
+  inset: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
 }
 
 .preview-dot {
@@ -143,10 +251,26 @@ h2 {
   font-weight: 600;
   color: var(--muted-text);
   transition: color 0.2s ease, font-weight 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.lock-tag {
+  font-size: 0.7rem;
+  color: #f59e0b;
+  font-weight: 700;
 }
 
 .theme-card.active .theme-label {
   color: var(--on-surface);
   font-weight: 700;
+}
+
+.error-msg {
+  color: var(--danger, #ef4444);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>

@@ -51,7 +51,7 @@ func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextT
 // GetGamificationProfile retrieves the persistent gamification profile for the user.
 func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, error) {
 	row := r.db.QueryRow(`
-		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, updated_at
+		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, COALESCE(stats_json, '{}'), updated_at
 		FROM user_gamification
 		WHERE user_id = 1
 	`)
@@ -65,13 +65,14 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		&prof.StreakFreezesOwned,
 		&prof.FrozenDatesJSON,
 		&prof.UnlockedCosmeticsJSON,
+		&prof.StatsJSON,
 		&prof.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		// Auto-initialize if row was missing
 		_, insErr := r.db.Exec(`
-			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json)
-			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '[]')
+			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, stats_json)
+			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '["dark-gruvbox", "light-classic"]', '{}')
 			ON CONFLICT(user_id) DO NOTHING
 		`)
 		if insErr != nil {
@@ -430,4 +431,253 @@ func (r *Repository) ConsumeStreakFreeze(dateStr string) (*models.GamificationPr
 	}
 
 	return r.GetGamificationProfile()
+}
+
+func getCosmeticCatalog() []models.CosmeticItem {
+	return []models.CosmeticItem{
+		{ID: "dark-gruvbox", Name: "Gruvbox Dark", Type: "theme", Price: 0},
+		{ID: "light-classic", Name: "Light Classic", Type: "theme", Price: 0},
+		{ID: "dark-indigo", Name: "Deep Indigo", Type: "theme", Price: 75},
+		{ID: "dark-emerald", Name: "Forest Emerald", Type: "theme", Price: 75},
+		{ID: "light-warm", Name: "Warm Sepia", Type: "theme", Price: 50},
+		{ID: "light-sage", Name: "Sage Garden", Type: "theme", Price: 50},
+		{ID: "dark-obsidian", Name: "Obsidian Black", Type: "theme", Price: 0, UnlockCondition: "Achievement: Night Scholar"},
+		{ID: "light-monochrome", Name: "Monochrome Paper", Type: "theme", Price: 0, UnlockCondition: "Achievement: Quiz Master"},
+	}
+}
+
+func getCosmeticDefinition(itemCode string) (*models.CosmeticItem, bool) {
+	for _, item := range getCosmeticCatalog() {
+		if item.ID == itemCode {
+			return &item, true
+		}
+	}
+	return nil, false
+}
+
+// UnlockCosmetic unlocks a theme or title by deducting catalog price and adding itemCode to unlocked_cosmetics_json.
+func (r *Repository) UnlockCosmetic(itemCode string, _ int) (*models.GamificationProfile, error) {
+	if itemCode == "" {
+		return nil, fmt.Errorf("item code cannot be empty")
+	}
+
+	def, found := getCosmeticDefinition(itemCode)
+	if !found {
+		return nil, fmt.Errorf("unknown cosmetic item: %s", itemCode)
+	}
+	if def.UnlockCondition != "" {
+		return nil, fmt.Errorf("item %s is achievement-gated and cannot be purchased directly", itemCode)
+	}
+
+	price := def.Price
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var coins int
+	var unlockedJSON string
+	err = tx.QueryRow(`SELECT coins, unlocked_cosmetics_json FROM user_gamification WHERE user_id = 1`).Scan(&coins, &unlockedJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read user gamification state: %w", err)
+	}
+
+	var unlockedList []string
+	if unlockedJSON != "" {
+		_ = json.Unmarshal([]byte(unlockedJSON), &unlockedList)
+	}
+
+	for _, item := range unlockedList {
+		if item == itemCode {
+			// Already unlocked
+			_ = tx.Rollback()
+			return r.GetGamificationProfile()
+		}
+	}
+
+	if price > 0 {
+		if coins < price {
+			return nil, fmt.Errorf("insufficient coins: have %d, require %d", coins, price)
+		}
+		coins -= price
+	}
+
+	unlockedList = append(unlockedList, itemCode)
+	newUnlockedBytes, _ := json.Marshal(unlockedList)
+
+	_, err = tx.Exec(`
+		UPDATE user_gamification
+		SET coins = ?, unlocked_cosmetics_json = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1
+	`, coins, string(newUnlockedBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update unlocked cosmetics: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit cosmetic unlock: %w", err)
+	}
+
+	return r.GetGamificationProfile()
+}
+
+// IncrementStat increments a counter in stats_json and auto-unlocks any completed achievements.
+func (r *Repository) IncrementStat(statKey string, delta int) error {
+	if statKey == "" || delta <= 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin stat transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var statsJSON, unlockedJSON string
+	var coins int
+	err = tx.QueryRow(`SELECT COALESCE(stats_json, '{}'), unlocked_cosmetics_json, coins FROM user_gamification WHERE user_id = 1`).Scan(&statsJSON, &unlockedJSON, &coins)
+	if err != nil {
+		return fmt.Errorf("failed to query stats: %w", err)
+	}
+
+	stats := make(map[string]int)
+	if statsJSON != "" {
+		_ = json.Unmarshal([]byte(statsJSON), &stats)
+	}
+	stats[statKey] = stats[statKey] + delta
+
+	var unlockedList []string
+	if unlockedJSON != "" {
+		_ = json.Unmarshal([]byte(unlockedJSON), &unlockedList)
+	}
+
+	// Check achievement auto-unlocks
+	unlockedMap := make(map[string]bool)
+	for _, u := range unlockedList {
+		unlockedMap[u] = true
+	}
+
+	achievements := getAchievementDefinitions()
+	for _, ach := range achievements {
+		if stats[ach.StatKey] >= ach.TargetValue {
+			claimKey := "achievement:" + ach.ID
+			if !unlockedMap[claimKey] {
+				unlockedList = append(unlockedList, claimKey)
+				unlockedMap[claimKey] = true
+				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
+					unlockedList = append(unlockedList, ach.RewardItem)
+					unlockedMap[ach.RewardItem] = true
+				}
+				if ach.RewardCoins > 0 {
+					coins += ach.RewardCoins
+				}
+			}
+		}
+	}
+
+	newStatsBytes, _ := json.Marshal(stats)
+	newUnlockedBytes, _ := json.Marshal(unlockedList)
+
+	_, err = tx.Exec(`
+		UPDATE user_gamification
+		SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1
+	`, string(newStatsBytes), string(newUnlockedBytes), coins)
+	if err != nil {
+		return fmt.Errorf("failed to update stats: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+func getAchievementDefinitions() []models.Achievement {
+	return []models.Achievement{
+		{
+			ID:          "first_step",
+			Title:       "First Steps",
+			Description: "Complete 1 study reading session",
+			Icon:        "📖",
+			StatKey:     "reading_sessions",
+			TargetValue: 1,
+			RewardCoins: 20,
+		},
+		{
+			ID:          "night_scholar",
+			Title:       "Night Scholar",
+			Description: "Complete 5 study reading sessions",
+			Icon:        "🦉",
+			StatKey:     "reading_sessions",
+			TargetValue: 5,
+			RewardCoins: 50,
+			RewardItem:  "dark-obsidian",
+		},
+		{
+			ID:          "quiz_master",
+			Title:       "Quiz Master",
+			Description: "Pass 5 quizzes",
+			Icon:        "🎯",
+			StatKey:     "quizzes_passed",
+			TargetValue: 5,
+			RewardCoins: 75,
+			RewardItem:  "light-monochrome",
+		},
+		{
+			ID:          "memory_monk",
+			Title:       "Memory Monk",
+			Description: "Review 25 flashcards",
+			Icon:        "🧠",
+			StatKey:     "flashcards_reviewed",
+			TargetValue: 25,
+			RewardCoins: 50,
+		},
+	}
+}
+
+// GetGamificationStore returns profile, available themes with unlock status, and achievements progress.
+func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
+	prof, err := r.GetGamificationProfile()
+	if err != nil {
+		return nil, err
+	}
+
+	var unlockedList []string
+	if prof.UnlockedCosmeticsJSON != "" {
+		_ = json.Unmarshal([]byte(prof.UnlockedCosmeticsJSON), &unlockedList)
+	}
+	unlockedMap := make(map[string]bool)
+	for _, u := range unlockedList {
+		unlockedMap[u] = true
+	}
+
+	stats := make(map[string]int)
+	if prof.StatsJSON != "" {
+		_ = json.Unmarshal([]byte(prof.StatsJSON), &stats)
+	}
+
+	catalog := getCosmeticCatalog()
+	allThemes := make([]models.CosmeticItem, len(catalog))
+	for i, c := range catalog {
+		c.Unlocked = unlockedMap[c.ID]
+		if c.ID == "dark-gruvbox" || c.ID == "light-classic" {
+			c.Unlocked = true
+		}
+		allThemes[i] = c
+	}
+
+	achDefs := getAchievementDefinitions()
+	achievements := make([]models.Achievement, 0, len(achDefs))
+	for _, a := range achDefs {
+		curr := stats[a.StatKey]
+		a.CurrentValue = curr
+		a.Completed = curr >= a.TargetValue
+		achievements = append(achievements, a)
+	}
+
+	return &models.GamificationStore{
+		Profile:      prof,
+		Themes:       allThemes,
+		Achievements: achievements,
+	}, nil
 }
