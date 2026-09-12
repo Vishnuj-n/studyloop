@@ -91,8 +91,8 @@
               <li class="package-item">
                 <span class="item-icon">🧠</span>
                 <div class="item-details">
-                  <strong>Socratic Persona</strong>
-                  <span class="item-sub">Guides external AI not to reveal direct answers</span>
+                  <strong>Adaptive Concept Tutor</strong>
+                  <span class="item-sub">Analyzes mistakes, explains concepts with examples & checks understanding</span>
                 </div>
               </li>
             </ul>
