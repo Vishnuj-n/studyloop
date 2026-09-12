@@ -99,7 +99,7 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("AddXPAndCoins failed: %v", err)
 	}
 
-	afterUnlockProf, err := repo.UnlockCosmetic("dark-indigo", 75)
+	afterUnlockProf, err := repo.UnlockCosmetic("dark-emerald", 75)
 	if err != nil {
 		t.Fatalf("UnlockCosmetic failed: %v", err)
 	}

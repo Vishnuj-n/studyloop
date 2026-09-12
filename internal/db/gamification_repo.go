@@ -72,7 +72,7 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		// Auto-initialize if row was missing
 		_, insErr := r.db.Exec(`
 			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, stats_json)
-			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '["dark-gruvbox", "light-classic"]', '{}')
+			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '["dark-gruvbox", "light-classic", "light-warm", "dark-indigo"]', '{}')
 			ON CONFLICT(user_id) DO NOTHING
 		`)
 		if insErr != nil {

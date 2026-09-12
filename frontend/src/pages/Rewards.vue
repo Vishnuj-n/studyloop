@@ -74,14 +74,23 @@
             </div>
           </div>
         </div>
-        <button
-          class="buy-freeze-btn"
-          type="button"
-          :disabled="profile.coins < 50 || buying"
-          @click="handleBuyStreakFreeze"
-        >
-          {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
-        </button>
+        <div class="shop-action-group">
+          <button
+            class="buy-freeze-btn"
+            type="button"
+            :disabled="profile.coins < 50 || buying"
+            @click="handleBuyStreakFreeze"
+          >
+            {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
+          </button>
+          <button
+            class="shop-trigger-btn"
+            type="button"
+            @click="showShopModal = true"
+          >
+            🛒 Rewards & Theme Shop
+          </button>
+        </div>
         <p v-if="buyError" class="buy-error-msg">{{ buyError }}</p>
       </div>
 
@@ -118,6 +127,12 @@
       </div>
     </div>
 
+    <!-- Theme & Achievement Shop Modal -->
+    <RewardsShopModal
+      v-if="showShopModal"
+      @close="onShopClose"
+    />
+
     <!-- Mystery Chest Modal -->
     <MysteryChestModal
       v-if="activeChest"
@@ -141,6 +156,9 @@ import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { getGamificationState, buyStreakFreeze } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
+import RewardsShopModal from '../components/RewardsShopModal.vue'
+
+const showShopModal = ref(false)
 
 const loading = ref(true)
 const buying = ref(false)
@@ -231,12 +249,46 @@ async function handleBuyStreakFreeze() {
   }
 }
 
+function onShopClose() {
+  showShopModal.value = false
+  loadData()
+}
+
 onMounted(() => {
   loadData()
 })
 </script>
 
 <style scoped>
+.shop-action-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.shop-trigger-btn {
+  background: var(--surface-card, #25282a);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  color: var(--text-color, #e0e0e0);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shop-trigger-btn:hover {
+  background: var(--surface-hover, #2f3336);
+  border-color: var(--accent-color, #d79921);
+  color: var(--accent-color, #d79921);
+}
+
 .rewards-grid {
   display: flex;
   flex-direction: column;

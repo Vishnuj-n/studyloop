@@ -281,7 +281,7 @@ func InitSchema(tx *sql.Tx) error {
 			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
 			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
 			frozen_dates_json TEXT NOT NULL DEFAULT '[]',
-			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]',
+			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic", "light-warm", "dark-indigo"]',
 			stats_json TEXT NOT NULL DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
@@ -424,7 +424,7 @@ func InitSchema(tx *sql.Tx) error {
 	// Initialize default gamification state
 	if _, err := tx.Exec(`
 		INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json, stats_json)
-		VALUES (1, 0, 0, 'The Apprentice', 1, '["dark-gruvbox", "light-classic"]', '{}')
+		VALUES (1, 0, 0, 'The Apprentice', 1, '["dark-gruvbox", "light-classic", "light-warm", "dark-indigo"]', '{}')
 		ON CONFLICT(user_id) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize user gamification: %w", err)

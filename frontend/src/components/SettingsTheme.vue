@@ -54,7 +54,7 @@ const props = defineProps({
 })
 
 const showShopModal = ref(false)
-const unlockedCosmetics = ref(['dark-gruvbox', 'light-classic'])
+const unlockedCosmetics = ref(['dark-gruvbox', 'light-classic', 'light-warm', 'dark-indigo'])
 
 const themes = [
   { id: 'dark-gruvbox', label: 'Gruvbox Dark', bg: '#1d2021', primary: '#d79921', surface: '#282828' },
