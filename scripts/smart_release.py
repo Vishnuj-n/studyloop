@@ -8,8 +8,9 @@ Workflow:
 3. Read current version from internal/app/VERSION.
 4. Prompt AI to analyze commits and recommend patch (e.g., 1.3.12) vs minor/major (e.g., 1.4.0) in JSON.
 5. Update internal/app/VERSION (and root VERSION if present).
-6. Run scripts/build.py.
-7. Run scripts/release.py.
+6. Commit & push updated VERSION file to remote branch.
+7. Run scripts/build.py.
+8. Run scripts/release.py.
 
 CLI Options:
     --dry-run   Perform check and AI analysis without modifying files or building/releasing.
@@ -364,11 +365,19 @@ def main():
     print(f"\nDecision: Bump [{bump_type.upper()}] to {rec_version} ({reason})")
 
     if args.dry_run:
-        print("\n[DRY RUN] Skipping version file updates, build.py, and release.py.")
+        print("\n[DRY RUN] Skipping version file updates, git commit/push, build.py, and release.py.")
         return
 
-    # 5. Update Version File
+    # 5. Update Version File & Commit to Remote
     formatted_new_ver = update_version_files(rec_version)
+
+    print(f"\nCommitting version update ({formatted_new_ver}) and pushing to remote branch '{branch}'...")
+    run_cmd(["git", "add", "internal/app/VERSION"], check=False)
+    root_file = PROJECT_ROOT / "VERSION"
+    if root_file.exists():
+        run_cmd(["git", "add", "VERSION"], check=False)
+    run_cmd(["git", "commit", "-m", f"chore(release): bump version to {formatted_new_ver}"], check=False)
+    run_cmd(["git", "push", "origin", branch], check=False)
 
     # 6. Run build.py
     print("\n=== Step 1/2: Running scripts/build.py ===")
