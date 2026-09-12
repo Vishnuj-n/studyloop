@@ -15,15 +15,15 @@ import (
 func getSimplifierLevelDirective(level string) string {
 	switch strings.ToLower(strings.TrimSpace(level)) {
 	case "eli5":
-		return "ELI5 (Explain Like I'm 5):\nUse extremely simple everyday language, clear fun analogies, and short sentences. Avoid complex jargon or explain it using simple real-world concepts a 5-year-old can easily understand."
+		return "ELI5 (Explain Like I'm 5):\nUse extremely simple everyday language, clear fun analogies, and short sentences. Strictly avoid complex technical jargon. Translate every technical term into simple real-world concepts a 5-year-old can easily understand."
 	case "very_simple", "eli10":
-		return "Very Simple:\nUse everyday language and short sentences. Explain necessary technical terms simply and use intuitive analogies when helpful."
+		return "Very Simple:\nUse everyday language and short sentences. Replace complex jargon with simple everyday concepts and intuitive analogies wherever possible."
 	case "academic":
 		return "Academic:\nUse precise academic and technical language. Preserve terminology, definitions, distinctions, and technical details. Simplify only unnecessarily complicated wording."
 	case "summary", "bullet":
 		return "Summary:\nFocus on the essential ideas, arguments, definitions, and conclusions. Be substantially shorter than the source while preserving the information needed to understand the topic."
 	default: // "simple", "eli15", or default
-		return "Simple:\nUse clear, straightforward language. Explain difficult terminology, but retain the important technical vocabulary and detail."
+		return "Simple:\nUse clear, straightforward language. Explain difficult terminology simply, while retaining essential core vocabulary."
 	}
 }
 
@@ -44,7 +44,7 @@ func buildSimplifierPrompt(promptTemplate, content, styleDirective string) strin
 
 	return fmt.Sprintf(`You are an AI Text Simplifier.
 
-Transform the provided reading material into clear, well-structured Markdown notes that are easier to understand while preserving the original meaning and important information.
+Transform the provided reading material into clear, well-structured Markdown notes that are easier to understand while preserving the original meaning and core information.
 
 The user's selected comprehension level is:
 
@@ -54,31 +54,23 @@ Adapt the explanation strictly to this level.
 
 ## Core Requirements
 
-- Preserve the author's meaning, important facts, definitions, arguments, formulas, examples, and necessary technical details.
-- Simplify wording and sentence structure according to the selected comprehension level.
-- Explain difficult terminology when necessary for understanding.
-- Do not remove important information simply because it is difficult.
-- Do not invent facts, examples, arguments, or conclusions.
-- Do not add opinions, motivation, or unrelated information.
-- Do not turn the material into a lecture or a conversation.
-- Remove unnecessary repetition and filler.
-- Keep technical terminology when precision requires it.
-- Use natural Markdown structure: headings, subheadings, paragraphs, bullets, numbered steps, and equations where appropriate.
-- Use tables only when they genuinely improve understanding.
-- Follow the logical flow of the source material.
-- Use analogies or brief clarifications when they genuinely make a difficult concept easier to understand.
+- Match tone, sentence complexity, and vocabulary strictly to the user's selected comprehension level above.
+- For ELI5 / Very Simple levels: Strictly replace technical jargon, heavy formulas, and abstract terminology with simple, everyday real-world analogies. Do NOT keep un-simplified technical terms.
+- For Academic / Simple levels: Retain essential technical vocabulary, precise definitions, and formulas when precision requires it.
+- Preserve the author's underlying core meaning, main facts, arguments, and conclusions accurately.
+- Do not invent facts, examples, or conclusions, and do not add opinions or meta-commentary.
+- Remove unnecessary repetition, fluff, and filler.
+- Use clean, natural Markdown structure: headings, subheadings, bullet points, and numbered steps.
 
 ## Output
 
-Create a concise but sufficiently detailed explanation of the provided material.
+Create a clear, well-structured breakdown of the provided material matched to the selected comprehension level.
 
-Start with a short overview of the main topic.
+Start with a short, simple overview of the main topic.
 
-Then organize the explanation into natural sections based on the material. Do not force the content into a fixed template.
+Then organize the explanation into natural sections based on the material.
 
-End with a short **Key Takeaways** section containing the most important ideas.
-
-The result should feel like a clearer and better-organized version of the original reading, not a separate interpretation or lesson about it.
+End with a short **Key Takeaways** section summarizing the most important ideas.
 
 Reading Material:
 """
