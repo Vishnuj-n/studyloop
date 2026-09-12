@@ -209,7 +209,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 
 	dailyStudyMinutes := calculateDailyStudyMinutes(settings.StudyStartTime, settings.StudyEndTime)
-	materializedCards, deferredCards, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
+	materializedCards, _, safeReviewBudget := calculateFlashcardBudgets(dueCards, maxFlashcards)
 	queueTasks, activeTopics, learningMinutes, actionCounts := aggregateQueueTasks(repo, activeQueueTasks, pendingQueueTasks)
 
 	actualReviewCards := materializedCards
@@ -221,7 +221,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		actualReviewMinutes = mins
 	}
 
-	deferredCards = dueCards - actualReviewCards
+	deferredCards := dueCards - actualReviewCards
 	if deferredCards < 0 {
 		deferredCards = 0
 	}

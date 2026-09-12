@@ -12,7 +12,9 @@ func TestRotateLogFile(t *testing.T) {
 	oldPath := logPath + ".old"
 
 	// Case 1: File does not exist -> should not rotate or fail
-	rotateLogFile(logPath, 100)
+	if err := rotateLogFile(logPath, 100); err != nil {
+		t.Fatalf("unexpected error on non-existent log file: %v", err)
+	}
 	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
 		t.Fatalf("expected .old file to not exist when log does not exist")
 	}
@@ -21,7 +23,9 @@ func TestRotateLogFile(t *testing.T) {
 	if err := os.WriteFile(logPath, []byte("short content"), 0644); err != nil {
 		t.Fatalf("failed to write test log file: %v", err)
 	}
-	rotateLogFile(logPath, 100)
+	if err := rotateLogFile(logPath, 100); err != nil {
+		t.Fatalf("unexpected error on small log file: %v", err)
+	}
 	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
 		t.Fatalf("expected .old file to not exist when log size < maxSize")
 	}
@@ -31,7 +35,9 @@ func TestRotateLogFile(t *testing.T) {
 	if err := os.WriteFile(logPath, largeData, 0644); err != nil {
 		t.Fatalf("failed to write large log file: %v", err)
 	}
-	rotateLogFile(logPath, 100)
+	if err := rotateLogFile(logPath, 100); err != nil {
+		t.Fatalf("unexpected error on large log file: %v", err)
+	}
 
 	if _, err := os.Stat(logPath); !os.IsNotExist(err) {
 		t.Errorf("expected original log file to be moved away after rotation")
