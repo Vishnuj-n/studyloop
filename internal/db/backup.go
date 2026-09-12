@@ -23,7 +23,7 @@ func BackupDatabase(dbPath string) error {
 	if err != nil {
 		return fmt.Errorf("backup: open source db: %w", err)
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	tmpFile, err := os.CreateTemp(destDir, "studyloop-backup-*.tmp")
 	if err != nil {
