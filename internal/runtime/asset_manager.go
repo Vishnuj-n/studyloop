@@ -600,6 +600,13 @@ func computeSHA256(path string) (string, error) {
 
 // Copy file with progress updates.
 func copyFileWithProgress(src, dst string, startPct, endPct int, msg, detail string, cb func(string, int, string, string)) error {
+	absSrc, errSrc := filepath.Abs(src)
+	absDst, errDst := filepath.Abs(dst)
+	if errSrc == nil && errDst == nil && strings.EqualFold(filepath.Clean(absSrc), filepath.Clean(absDst)) {
+		cb("acquiring", endPct, msg, detail)
+		return nil
+	}
+
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -649,6 +656,12 @@ func copyFileWithProgress(src, dst string, startPct, endPct int, msg, detail str
 
 // Copy file helper.
 func copyFile(src, dst string) error {
+	absSrc, errSrc := filepath.Abs(src)
+	absDst, errDst := filepath.Abs(dst)
+	if errSrc == nil && errDst == nil && strings.EqualFold(filepath.Clean(absSrc), filepath.Clean(absDst)) {
+		return nil
+	}
+
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
