@@ -314,12 +314,11 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	limits := p.GetLimits()
-	utils.Warnf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d max_output_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
-		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, limits.MaxOutputTokens, estPromptTokens, len(prompt), words)
+	utils.Warnf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
+		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
-		Model:     p.config.Model,
-		MaxTokens: limits.MaxOutputTokens,
+		Model: p.config.Model,
 		Messages: []openAIMessage{
 			{
 				Role:    "user",

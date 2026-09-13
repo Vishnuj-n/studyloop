@@ -9,23 +9,19 @@
 
 ## Solution Architecture
 
-### 1. Provider Output Budgeting & Truncation Guards
-- Added `MaxTokens int` (`json:"max_tokens,omitempty"`) to `openAIRequest` in `internal/llm/provider.go`.
-- Added `FinishReason string` (`json:"finish_reason,omitempty"`) to `openAIResponse` choice structure.
-- Updated safe default `MaxOutputTokens` fallback in `getModelLimits()` and `app_settings.go` from 1000 to 2500 tokens.
-- Populated `requestBody.MaxTokens = limits.MaxOutputTokens` in every API call.
-- Added immediate error return when `finish_reason == "length"`:
-  `fmt.Errorf("LLM output truncated: max output tokens reached (finish_reason=length)")`.
+### 1. Free-Flow Provider Output (No Artificial Output Token Capping)
+- Removed `max_tokens` payload capping in `internal/llm/provider.go` to allow output to flow freely until natural completion (`finish_reason == "stop"`).
+- Retained input token limits (`MaxInputTokens`) to protect user TPM/RPM free tier quotas.
+- `finish_reason == "length"` remains handled in case provider/model sequence limits are reached natively.
 
-### 2. Dual Testing Controls
+### 2. Dual Testing & Input Validation Controls
 - **`Test Connection`**: Quick ping checking auth & reachability with a basic `"Hi"` prompt.
-- **`Test Limits`**: Added `TestLLMLimits` in `internal/app/app_settings.go` and `appApi.js` to validate whether provider API endpoints cleanly accept StudyLoop's configured `MaxInputTokens` and `MaxOutputTokens`.
-- Added **[ Test Limits ]** UI buttons alongside **[ Test Connection ]** in `SettingsAIProvider.vue` for Fast and Heavy tiers.
+- **`Test Limits`**: Validates whether provider API endpoints cleanly accept StudyLoop's configured `MaxInputTokens`.
+- UI fields focus purely on **Max Input Tokens** prompt protection.
 
-### 3. Capability-Aware LLM Routing & Quiz Target Fallbacks
-- Updated `selectLLM(contextText string, requiredOutputBudget int)` in `internal/study/service.go`.
-- Check if `fastLLMProvider` meets both input limit AND required output budget (`requiredOutputBudget <= fastLimits.MaxOutputTokens`). If either fails, evaluate and escalate to `heavyLLMProvider`.
-- Set `quizTaskOutputBudget = 2500` in `internal/study/quiz_sync.go`. If the selected model's `MaxOutputTokens < quizTaskOutputBudget`, `targetCount` (number of quiz questions) is adjusted proportionally down as a deliberate fallback.
+### 3. Capability-Aware LLM Routing
+- `selectLLM(contextText string)` routes requests based on input token limits (`MaxInputTokens`) and rate-limit cooldown tracking.
+- The LLM writes all requested quiz questions and flashcards freely without artificial output truncation or downscaling.
 
 ---
 

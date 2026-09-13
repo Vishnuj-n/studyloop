@@ -109,19 +109,6 @@
       </p>
     </div>
 
-    <div class="form-group">
-      <label for="settings-llm-max-output">Max Output Tokens</label>
-      <input
-        id="settings-llm-max-output"
-        v-model.number="llmSettings.fast.max_output_tokens"
-        type="number"
-        placeholder="2500 (Default)"
-        min="100"
-        :disabled="disabled"
-      />
-      <p class="hint">Maximum completion token ceiling per request. Default is 2500 tokens. Passed as max_tokens in API payloads.</p>
-    </div>
-
     <SettingsToggle
       v-model="llmSettings.use_same_for_heavy"
       :disabled="disabled"
@@ -222,19 +209,6 @@
           :disabled="disabled"
         />
         <p class="hint">Prompt token budget for heavy tasks (Socratic, syllabus, large context).</p>
-      </div>
-
-      <div class="form-group">
-        <label for="settings-heavy-max-output">Heavy Max Output Tokens</label>
-        <input
-          id="settings-heavy-max-output"
-          v-model.number="llmSettings.heavy.max_output_tokens"
-          type="number"
-          placeholder="2500 (Default)"
-          min="100"
-          :disabled="disabled"
-        />
-        <p class="hint">Maximum completion token ceiling for heavy tasks.</p>
       </div>
     </div>
 
@@ -349,8 +323,7 @@ async function testFastLimits() {
       props.llmSettings?.fast?.base_url,
       props.llmSettings?.fast?.model,
       props.llmFastKey,
-      props.llmSettings?.fast?.max_input_tokens || 4000,
-      props.llmSettings?.fast?.max_output_tokens || 2500
+      props.llmSettings?.fast?.max_input_tokens || 4000
     )
     if (reqRev === fastRevision.value) {
       fastResult.value = res
@@ -403,8 +376,7 @@ async function testHeavyLimits() {
       props.llmSettings?.heavy?.base_url,
       props.llmSettings?.heavy?.model,
       props.llmHeavyKey,
-      props.llmSettings?.heavy?.max_input_tokens || 4000,
-      props.llmSettings?.heavy?.max_output_tokens || 2500
+      props.llmSettings?.heavy?.max_input_tokens || 4000
     )
     if (reqRev === heavyRevision.value) {
       heavyResult.value = res

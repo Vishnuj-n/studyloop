@@ -74,7 +74,7 @@ Student question: %s
 
 Answer:`, scopeLabel, contextText, req.Question)
 
-	llm, tier := s.selectLLM(contextText, 0)
+	llm, tier := s.selectLLM(contextText)
 	if llm == nil {
 		return map[string]interface{}{"error": "LLM provider not available"}
 	}

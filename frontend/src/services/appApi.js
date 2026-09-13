@@ -225,15 +225,14 @@ export function testLLMConnection(tier, provider, baseURL, model, apiKey) {
   return appBridge().TestLLMConnection(tier || 'fast', provider || '', baseURL || '', model || '', apiKey || '')
 }
 
-export function testLLMLimits(tier, provider, baseURL, model, apiKey, maxInput, maxOutput) {
+export function testLLMLimits(tier, provider, baseURL, model, apiKey, maxInput) {
   return appBridge().TestLLMLimits(
     tier || 'fast',
     provider || '',
     baseURL || '',
     model || '',
     apiKey || '',
-    Number(maxInput) || 0,
-    Number(maxOutput) || 0
+    Number(maxInput) || 0
   )
 }
 

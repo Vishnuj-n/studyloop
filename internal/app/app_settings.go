@@ -303,7 +303,7 @@ func (a *App) TestLLMConnection(tier, provider, baseURL, model, apiKey string) m
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxInput, maxOutput int) map[string]interface{} {
+func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxInput int) map[string]interface{} {
 	tier = normalizeLLMTierForApp(tier)
 	if apiKey == "" && tier != "" {
 		key, _ := llm.GetAPIKey(tier)
@@ -315,15 +315,11 @@ func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxIn
 	if maxInput <= 0 {
 		maxInput = 4000
 	}
-	if maxOutput <= 0 {
-		maxOutput = 2500
-	}
 	tierSettings := models.LLMTierSettings{
-		Provider:        provider,
-		BaseURL:         baseURL,
-		Model:           model,
-		MaxInputTokens:  maxInput,
-		MaxOutputTokens: maxOutput,
+		Provider:       provider,
+		BaseURL:        baseURL,
+		Model:          model,
+		MaxInputTokens: maxInput,
 	}
 	cfg := llm.LoadConfigFromSettingsForPrefix(
 		strings.ToUpper(tier),
@@ -339,7 +335,7 @@ func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxIn
 	}
 	return map[string]interface{}{
 		"ok":     true,
-		"status": fmt.Sprintf("API syntax validated (max_tokens: %d). Actual %d token prompts depend on your provider's TPM quota.", maxOutput, maxInput),
+		"status": fmt.Sprintf("API reachability validated (%d token input prompt limit). Output flows freely without artificial capping.", maxInput),
 	}
 }
 

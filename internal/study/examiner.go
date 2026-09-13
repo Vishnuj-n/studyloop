@@ -38,7 +38,7 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 
 	rawContextText := buildContextTextFromChunks(contextChunks)
 
-	llm, tier := s.selectLLM(rawContextText, 0)
+	llm, tier := s.selectLLM(rawContextText)
 	if llm == nil {
 		return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
 	}
@@ -184,7 +184,10 @@ Scoring rubric:
 - 4-5 = partially correct with clear gaps.
 - 6-8 = mostly correct with some omissions.
 - 9-10 = strong, precise, and concise.
-- Feedback must be concise (max 2 sentences), specific, and actionable.
+- Feedback MUST be formatted in Markdown (using markdown headers, bold text, lists, and code/math formatting as appropriate).
+- Feedback MUST include:
+  1. An evaluation explaining any gaps, misunderstandings, or sign/direction errors in the student's answer.
+  2. An explicit expected response section titled "**Expected Answer**" that clearly outlines the correct, complete answer.
 
 Question: %s
 Student answer: %s`, question.Prompt, userAnswer)
