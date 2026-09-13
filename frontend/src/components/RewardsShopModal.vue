@@ -264,23 +264,6 @@ function closeModal() {
   color: var(--on-surface);
 }
 
-.close-btn {
-  position: absolute;
-  top: 16px;
-  right: 18px;
-  background: none;
-  border: none;
-  color: var(--muted-text);
-  font-size: 1.25rem;
-  cursor: pointer;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-.close-btn:hover {
-  color: var(--on-surface);
-  background: var(--surface-container);
-}
 
 .modal-header {
   display: flex;
@@ -598,20 +581,6 @@ function closeModal() {
   color: var(--muted-text);
 }
 
-.charge-indicator {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #3b82f6;
-  background: color-mix(in srgb, #3b82f6 12%, transparent);
-  border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
-  padding: 4px 10px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 12px;
-  align-self: flex-start;
-}
 
 .chest-unboxed-overlay {
   position: absolute;
@@ -648,111 +617,5 @@ function closeModal() {
   margin: 0.5rem 0 1.25rem;
 }
 
-.wager-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
 
-.wager-card {
-  background: var(--surface-container);
-  border: 1px solid var(--outline-variant);
-  border-radius: 14px;
-  padding: 1.25rem;
-}
-
-.wager-card.active {
-  border-color: #f59e0b;
-  background: color-mix(in srgb, #f59e0b 8%, var(--surface-container));
-}
-
-.wager-card.won {
-  border-color: #10b981;
-  background: color-mix(in srgb, #10b981 8%, var(--surface-container));
-}
-
-.wager-title {
-  margin: 0 0 0.5rem;
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.wager-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
-.stat-box {
-  background: var(--surface-container-low);
-  padding: 8px 12px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-label {
-  font-size: 0.7rem;
-  color: var(--muted-text);
-  font-weight: 600;
-}
-
-.stat-val {
-  font-size: 0.95rem;
-  font-weight: 800;
-}
-
-.stat-val.win {
-  color: #10b981;
-}
-
-.wager-options {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.option-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.option-group label {
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.pill-selector {
-  display: flex;
-  gap: 8px;
-}
-
-.pill-btn {
-  flex: 1;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.pill-btn.selected {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
-}
-
-.wager-summary {
-  font-size: 0.85rem;
-  margin-bottom: 1rem;
-  padding: 8px 12px;
-  background: var(--surface-container-high);
-  border-radius: 8px;
-}
 </style>
