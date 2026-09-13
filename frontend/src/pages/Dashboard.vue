@@ -613,6 +613,7 @@ function startTask(task) {
     routePath = '/quiz'
   } else if (action === 'examiner' || action === 'written') {
     routePath = '/examiner'
+    query.autoGenerate = 'true'
   } else if (action === 'reread') {
     routePath = '/reader'
   } else if (action === 'socratic_remedial') {
