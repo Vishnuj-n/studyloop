@@ -45,6 +45,7 @@ func InitSchema(tx *sql.Tx) error {
 			id TEXT PRIMARY KEY,
 			topic_id TEXT NOT NULL,
 			chunk_text TEXT NOT NULL,
+			chunk_hash TEXT DEFAULT '',
 			page_num INTEGER DEFAULT 0,
 			token_count INTEGER DEFAULT 0,
 			importance_score REAL DEFAULT 0,

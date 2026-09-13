@@ -220,6 +220,38 @@ func TestGetNotebookTopicTreeDeduplicatesTopicRowsPerNotebook(t *testing.T) {
 	}
 }
 
+func TestCreateChunkPopulatesHash(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-hash-test"
+	if err := testRepo.EnsureTopic(topicID, "Hash Test Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+
+	chunkID := "chunk-hash-1"
+	chunkText := "testing lsm chunk hash deduplication"
+	if err := testRepo.CreateChunk(chunkID, topicID, chunkText, 5, 1); err != nil {
+		t.Fatalf("CreateChunk failed: %v", err)
+	}
+
+	chunks, err := testRepo.GetChunksForTopic(topicID)
+	if err != nil {
+		t.Fatalf("GetChunksForTopic failed: %v", err)
+	}
+	if len(chunks) == 0 {
+		t.Fatalf("expected at least 1 chunk")
+	}
+
+	var foundHash string
+	err = testRepo.db.QueryRow("SELECT chunk_hash FROM chunks WHERE id = ?", chunkID).Scan(&foundHash)
+	if err != nil {
+		t.Fatalf("failed to query chunk_hash: %v", err)
+	}
+	if foundHash == "" {
+		t.Fatalf("expected non-empty chunk_hash for inserted chunk")
+	}
+}
+
 func TestSearchVectorsForTopicFiltersByPageWindow(t *testing.T) {
 	initDBForTest(t, true, 3)
 

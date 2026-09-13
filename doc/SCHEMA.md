@@ -125,10 +125,11 @@ Granular content chunks from source document.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | TEXT PRIMARY KEY | Chunk identifier |
-| `topic_id` | TEXT NOT NULL | FK → `topics(id)` |
-| `chunk_text` | TEXT NOT NULL | Chunk content |
-| `page_num` | INTEGER DEFAULT 0 | Source page |
+| `id` | TEXT PRIMARY KEY | Unique chunk identifier |
+| `topic_id` | TEXT NOT NULL | Context topic. FK → `topics(id)` |
+| `chunk_text` | TEXT NOT NULL | Text snippet |
+| `chunk_hash` | TEXT DEFAULT '' | SHA256 content hash of text for LSM-style embedding deduplication |
+| `page_num` | INTEGER DEFAULT 0 | Page number in source document |
 | `token_count` | INTEGER DEFAULT 0 | Token count |
 | `importance_score` | REAL DEFAULT 0 | Relative importance |
 | `weakness_score` | REAL DEFAULT 0 | Weakness signal |

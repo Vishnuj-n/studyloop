@@ -62,6 +62,7 @@ type NotebookChunkInput struct {
 	Text       string
 	TokenCount int
 	PageNum    int
+	ChunkHash  string
 }
 
 // NotebookTopicIngestionGroup contains topic-scoped chunk rows for one notebook ingestion run.
@@ -75,10 +76,14 @@ type sqlExecer interface {
 }
 
 func insertChunkRow(exec sqlExecer, topicID string, chunk NotebookChunkInput) error {
+	hashVal := chunk.ChunkHash
+	if hashVal == "" && chunk.Text != "" {
+		hashVal = utils.MD5Hex(chunk.Text)
+	}
 	_, err := exec.Exec(`
-		INSERT INTO chunks (id, topic_id, chunk_text, page_num, token_count, importance_score, weakness_score)
-		VALUES (?, ?, ?, ?, ?, 0, 0)
-	`, chunk.ID, topicID, chunk.Text, chunk.PageNum, chunk.TokenCount)
+		INSERT INTO chunks (id, topic_id, chunk_text, chunk_hash, page_num, token_count, importance_score, weakness_score)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+	`, chunk.ID, topicID, chunk.Text, hashVal, chunk.PageNum, chunk.TokenCount)
 	return err
 }
 
