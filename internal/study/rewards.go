@@ -50,7 +50,7 @@ func RollTaskRewards(taskType models.StudyTaskType, quizScore int, isAce bool) (
 	var box *models.PendingLootBox
 	if isAchievement || rand.Intn(100) < 30 {
 		tier = rollChestTier(isAchievement)
-		box = generateLootBox(tier)
+		box = GenerateLootBox(tier)
 	}
 	return baseXP, baseCoins, box
 }
@@ -83,7 +83,7 @@ func rollChestTier(isAchievement bool) string {
 	return "BRONZE"
 }
 
-func generateLootBox(tier string) *models.PendingLootBox {
+func GenerateLootBox(tier string) *models.PendingLootBox {
 	boxID := uuid.NewString()
 	var rewardType string
 	var amount int

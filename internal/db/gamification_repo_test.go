@@ -129,3 +129,54 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("expected light-monochrome to be unlocked by quiz_master achievement")
 	}
 }
+
+func TestGamificationStoreAutoReconcilesFromSQL(t *testing.T) {
+	tempDB := "test_gamification_reconcile.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// Seed completed reading task in study_queue
+	_, err = repo.db.Exec(`
+		INSERT INTO notebooks (id, title, file_path) VALUES ('nb-1', 'Test NB', '/path/test.pdf');
+		INSERT INTO study_queue (id, notebook_id, task_type, status) VALUES ('sq-1', 'nb-1', 'READING', 'COMPLETED');
+	`)
+	if err != nil {
+		t.Fatalf("failed to seed reading task: %v", err)
+	}
+
+	// Seed passed quiz attempt
+	_, err = repo.db.Exec(`
+		INSERT INTO quiz_attempts (id, task_id, score, passed, answers_json, completed_at) VALUES ('qa-1', 'sq-1', 100, 1, '[]', 1000);
+	`)
+	if err != nil {
+		t.Fatalf("failed to seed quiz attempt: %v", err)
+	}
+
+	store, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore failed: %v", err)
+	}
+
+	var firstStepAch, quizStarterAch *models.Achievement
+	for i := range store.Achievements {
+		if store.Achievements[i].ID == "first_step" {
+			firstStepAch = &store.Achievements[i]
+		}
+		if store.Achievements[i].ID == "quiz_starter" {
+			quizStarterAch = &store.Achievements[i]
+		}
+	}
+
+	if firstStepAch == nil || firstStepAch.CurrentValue != 1 || firstStepAch.TargetValue != 2 || firstStepAch.Title != "First Steps II" {
+		t.Fatalf("expected First Steps II achievement (1/2), got %+v", firstStepAch)
+	}
+	if quizStarterAch == nil || quizStarterAch.CurrentValue != 1 || quizStarterAch.TargetValue != 2 || quizStarterAch.Title != "Quiz Starter II" {
+		t.Fatalf("expected Quiz Starter II achievement (1/2), got %+v", quizStarterAch)
+	}
+}

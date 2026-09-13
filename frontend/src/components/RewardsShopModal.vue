@@ -1,20 +1,16 @@
 <template>
-  <Teleport to="body">
-    <div v-if="visible" class="shop-modal-backdrop" @click.self="closeModal">
-      <div class="shop-modal-card">
-        <button class="close-btn" type="button" aria-label="Close" @click="closeModal">✕</button>
+  <div class="card floating-card shop-section-card">
+    <div class="modal-header">
+      <div class="header-titles">
+        <h2 class="modal-title">Study Shop & Progression</h2>
+        <p class="modal-subtitle">Spend study coins on workspace themes and track your achievements!</p>
+      </div>
 
-        <div class="modal-header">
-          <div class="header-titles">
-            <h2 class="modal-title">Rewards & Achievement Shop</h2>
-            <p class="modal-subtitle">Spend coins on desk aesthetics or earn exclusive themes!</p>
-          </div>
-
-          <div v-if="store" class="coin-pill">
-            <span class="coin-icon">🪙</span>
-            <span class="coin-balance">{{ store.profile?.coins || 0 }} Coins</span>
-          </div>
-        </div>
+      <div v-if="store" class="coin-pill">
+        <span class="coin-icon">🪙</span>
+        <span class="coin-balance">{{ store.profile?.coins || 0 }} Coins</span>
+      </div>
+    </div>
 
         <!-- Navigation Tabs -->
         <div class="tab-nav">
@@ -24,7 +20,7 @@
             :class="{ active: activeTab === 'themes' }"
             @click="activeTab = 'themes'"
           >
-            🎨 Workspace Themes
+            Themes
           </button>
           <button
             type="button"
@@ -32,8 +28,20 @@
             :class="{ active: activeTab === 'achievements' }"
             @click="activeTab = 'achievements'"
           >
-            🏆 Achievements
+            Achievements
           </button>
+        </div>
+
+        <!-- Loot Box Purchased Toast Modal -->
+        <div v-if="purchasedChest" class="chest-unboxed-overlay" @click="purchasedChest = null">
+          <div class="chest-unboxed-card" @click.stop>
+            <div class="unboxed-icon">📦</div>
+            <h3>Chest Purchased!</h3>
+            <p class="unboxed-reward">
+              A {{ purchasedChest.box_tier }} Mystery Chest was added to your vault.
+            </p>
+            <button class="equip-btn" type="button" @click="purchasedChest = null">Got It!</button>
+          </div>
         </div>
 
         <!-- Loading / Error States -->
@@ -54,6 +62,16 @@
                 <span v-if="item.unlocked" class="badge unlocked-badge">✓ Unlocked</span>
                 <span v-else-if="item.price > 0" class="badge price-badge">🪙 {{ item.price }}</span>
                 <span v-else class="badge condition-badge">🔒 Locked</span>
+              </div>
+
+              <!-- Theme Color Swatch Preview -->
+              <div
+                v-if="themePreviewColors[item.id]"
+                class="shop-theme-preview"
+                :style="{ background: themePreviewColors[item.id].bg }"
+              >
+                <span class="swatch-dot" :style="{ background: themePreviewColors[item.id].primary }"></span>
+                <span class="swatch-dot" :style="{ background: themePreviewColors[item.id].surface }"></span>
               </div>
 
               <p v-if="item.unlock_condition && !item.unlocked" class="unlock-desc">
@@ -94,7 +112,11 @@
               class="achievement-card"
               :class="{ completed: ach.completed }"
             >
-              <div class="ach-icon">{{ ach.icon }}</div>
+              <div class="ach-badge-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              </div>
               <div class="ach-info">
                 <h4 class="ach-title">{{ ach.title }}</h4>
                 <p class="ach-desc">{{ ach.description }}</p>
@@ -119,20 +141,35 @@
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </Teleport>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getGamificationStore, unlockCosmeticItem } from '../services/appApi'
+import {
+  getGamificationStore,
+  unlockCosmeticItem,
+} from '../services/appApi'
 
 const props = defineProps({
   activeTheme: { type: String, default: 'dark-gruvbox' },
 })
 
 const emit = defineEmits(['close', 'theme-changed'])
+
+const themePreviewColors = {
+  'dark-gruvbox': { bg: '#1d2021', primary: '#d79921', surface: '#282828' },
+  'light-classic': { bg: '#f9f9fb', primary: '#005bc1', surface: '#ebeef2' },
+  'dark-indigo': { bg: '#0b0d16', primary: '#6366f1', surface: '#171a2b' },
+  'dark-emerald': { bg: '#0a120d', primary: '#10b981', surface: '#152219' },
+  'light-warm': { bg: '#fdfaf6', primary: '#c27d38', surface: '#f3eae1' },
+  'light-sage': { bg: '#f4f7f4', primary: '#2e7d32', surface: '#e2ebe2' },
+  'dark-academia': { bg: '#1c1917', primary: '#d97706', surface: '#292524' },
+  'dark-cyberpunk': { bg: '#090714', primary: '#ff007f', surface: '#161228' },
+  'light-zen': { bg: '#f5f5f0', primary: '#44403c', surface: '#e5e5df' },
+  'dark-obsidian': { bg: '#09090b', primary: '#f4f4f5', surface: '#18181b' },
+  'light-monochrome': { bg: '#f8f8f9', primary: '#18181b', surface: '#e8e8ec' },
+}
 
 const visible = ref(true)
 const activeTab = ref('themes')
@@ -155,9 +192,8 @@ async function fetchStore() {
     }
   } catch (err) {
     if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-      // Mock fallback in dev/test mode if Wails bindings not present
       store.value = {
-        profile: { coins: 120 },
+        profile: { coins: 350 },
         themes: [
           { id: 'dark-gruvbox', name: 'Gruvbox Dark', type: 'theme', price: 0, unlocked: true },
           { id: 'light-classic', name: 'Light Classic', type: 'theme', price: 0, unlocked: true },
@@ -165,15 +201,13 @@ async function fetchStore() {
           { id: 'dark-emerald', name: 'Forest Emerald', type: 'theme', price: 75, unlocked: false },
           { id: 'light-warm', name: 'Warm Sepia', type: 'theme', price: 50, unlocked: false },
           { id: 'light-sage', name: 'Sage Garden', type: 'theme', price: 50, unlocked: false },
-          { id: 'dark-obsidian', name: 'Obsidian Black', type: 'theme', price: 0, unlocked: false, unlock_condition: 'Achievement: Night Scholar' },
-          { id: 'light-monochrome', name: 'Monochrome Paper', type: 'theme', price: 0, unlocked: false, unlock_condition: 'Achievement: Quiz Master' },
+          { id: 'dark-academia', name: 'Dark Academia', type: 'theme', price: 400, unlocked: false },
+          { id: 'dark-cyberpunk', name: 'Neon Cyberpunk', type: 'theme', price: 600, unlocked: false },
+          { id: 'light-zen', name: 'Zen Minimalist', type: 'theme', price: 300, unlocked: false },
+          { id: 'dark-obsidian', name: 'Obsidian Black', type: 'theme', price: 0, unlock_condition: 'Achievement: Night Scholar', unlocked: false },
+          { id: 'light-monochrome', name: 'Monochrome Paper', type: 'theme', price: 0, unlock_condition: 'Achievement: Quiz Master', unlocked: false },
         ],
-        achievements: [
-          { id: 'first_step', title: 'First Steps', description: 'Complete 1 reading session', icon: '📖', current_value: 1, target_value: 1, completed: true, reward_coins: 20 },
-          { id: 'night_scholar', title: 'Night Scholar', description: 'Complete 5 reading sessions', icon: '🦉', current_value: 2, target_value: 5, completed: false, reward_coins: 50, reward_item: 'dark-obsidian' },
-          { id: 'quiz_master', title: 'Quiz Master', description: 'Pass 5 quizzes', icon: '🎯', current_value: 3, target_value: 5, completed: false, reward_coins: 75, reward_item: 'light-monochrome' },
-          { id: 'memory_monk', title: 'Memory Monk', description: 'Review 25 flashcards', icon: '🧠', current_value: 12, target_value: 25, completed: false, reward_coins: 50 },
-        ],
+        achievements: [],
       }
     } else {
       error.value = err.message || 'Wails backend bridge unavailable'
@@ -199,15 +233,7 @@ async function buyItem(item) {
       equipTheme(item.id)
     }
   } catch (err) {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-      if (store.value && store.value.themes) {
-        const t = store.value.themes.find((x) => x.id === item.id)
-        if (t) t.unlocked = true
-      }
-      equipTheme(item.id)
-    } else {
-      alert(err.message || 'Purchase failed')
-    }
+    alert(err.message || 'Purchase failed')
   } finally {
     buying.value = ''
   }
@@ -225,32 +251,17 @@ function closeModal() {
 </script>
 
 <style scoped>
-.shop-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.68);
-  backdrop-filter: blur(8px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-}
-
-.shop-modal-card {
+.shop-section-card {
   position: relative;
   background: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
   border-radius: 20px;
   width: 100%;
-  max-width: 620px;
-  max-height: 85vh;
   padding: 1.75rem;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   color: var(--on-surface);
-  overflow: hidden;
 }
 
 .close-btn {
@@ -306,66 +317,117 @@ function closeModal() {
 
 .tab-nav {
   display: flex;
-  gap: 8px;
-  margin-bottom: 1.25rem;
-  border-bottom: 1px solid var(--outline-variant);
-  padding-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 1.5rem;
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.04));
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--outline-variant);
+  overflow-x: auto;
 }
 
 .tab-btn {
+  flex: 1;
   background: transparent;
   border: none;
   color: var(--muted-text);
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 8px 16px;
+  font-size: 0.88rem;
+  padding: 10px 14px;
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tab-btn:hover {
+  color: var(--on-surface);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .tab-btn.active {
-  background: var(--surface-container);
-  color: var(--on-surface);
+  background: var(--surface-container-high, #34383b);
+  color: #f59e0b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
 }
 
 .tab-content {
-  overflow-y: auto;
-  flex: 1;
-  padding-right: 4px;
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .themes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
 }
 
 .shop-item-card {
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: space-between;
+  min-height: 190px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shop-item-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .item-title {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.shop-theme-preview {
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
 }
 
 .badge {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
 }
 
 .unlocked-badge {
@@ -384,23 +446,29 @@ function closeModal() {
 }
 
 .unlock-desc {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--muted-text);
-  margin: 0;
+  margin: 4px 0 12px;
+  line-height: 1.45;
 }
 
 .item-footer {
   margin-top: auto;
+  padding-top: 8px;
 }
 
 .buy-btn, .equip-btn {
   width: 100%;
-  padding: 8px;
-  border-radius: 8px;
+  height: 42px;
+  border-radius: 10px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   cursor: pointer;
   border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .buy-btn {
@@ -449,8 +517,23 @@ function closeModal() {
   border-color: color-mix(in srgb, #10b981 40%, transparent);
 }
 
-.ach-icon {
-  font-size: 2rem;
+.ach-badge-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.achievement-card.completed .ach-badge-icon {
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  border-color: color-mix(in srgb, #10b981 30%, transparent);
+  color: #10b981;
 }
 
 .ach-info {
@@ -513,5 +596,163 @@ function closeModal() {
   text-align: center;
   padding: 3rem 1rem;
   color: var(--muted-text);
+}
+
+.charge-indicator {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 12%, transparent);
+  border: 1px solid color-mix(in srgb, #3b82f6 25%, transparent);
+  padding: 4px 10px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  align-self: flex-start;
+}
+
+.chest-unboxed-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.chest-unboxed-card {
+  background: var(--surface-container);
+  border: 1px solid var(--primary);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.unboxed-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.unboxed-reward {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #f59e0b;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.wager-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wager-card {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+  padding: 1.25rem;
+}
+
+.wager-card.active {
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 8%, var(--surface-container));
+}
+
+.wager-card.won {
+  border-color: #10b981;
+  background: color-mix(in srgb, #10b981 8%, var(--surface-container));
+}
+
+.wager-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.wager-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.stat-box {
+  background: var(--surface-container-low);
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--muted-text);
+  font-weight: 600;
+}
+
+.stat-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.stat-val.win {
+  color: #10b981;
+}
+
+.wager-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.option-group label {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pill-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.pill-btn {
+  flex: 1;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-btn.selected {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.wager-summary {
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  padding: 8px 12px;
+  background: var(--surface-container-high);
+  border-radius: 8px;
 }
 </style>

@@ -4,8 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strings"
 
 	"ai-tutor/internal/models"
+
+	"github.com/google/uuid"
 )
 
 // Title milestones: minimum XP required for each title rank
@@ -223,12 +227,12 @@ func (r *Repository) AwardTaskRewardsTx(tx *sql.Tx, xp, coins int, box *models.P
 	}
 
 	var totalXP, coinBalance int
-	var currentTitle string
+	var currentTitle, statsJSON string
 	err := tx.QueryRow(`
-		SELECT total_xp, coins, current_title
+		SELECT total_xp, coins, current_title, COALESCE(stats_json, '{}')
 		FROM user_gamification
 		WHERE user_id = 1
-	`).Scan(&totalXP, &coinBalance, &currentTitle)
+	`).Scan(&totalXP, &coinBalance, &currentTitle, &statsJSON)
 	if err != nil {
 		return "", fmt.Errorf("failed to read user gamification: %w", err)
 	}
@@ -480,10 +484,80 @@ func getCosmeticCatalog() []models.CosmeticItem {
 		{ID: "dark-emerald", Name: "Forest Emerald", Type: "theme", Price: 75},
 		{ID: "light-warm", Name: "Warm Sepia", Type: "theme", Price: 50},
 		{ID: "light-sage", Name: "Sage Garden", Type: "theme", Price: 50},
+		{ID: "dark-academia", Name: "Dark Academia", Type: "theme", Price: 400},
+		{ID: "dark-cyberpunk", Name: "Neon Cyberpunk", Type: "theme", Price: 600},
+		{ID: "light-zen", Name: "Zen Minimalist", Type: "theme", Price: 300},
 		{ID: "dark-obsidian", Name: "Obsidian Black", Type: "theme", Price: 0, UnlockCondition: "Achievement: Night Scholar"},
 		{ID: "light-monochrome", Name: "Monochrome Paper", Type: "theme", Price: 0, UnlockCondition: "Achievement: Quiz Master"},
 	}
 }
+
+// GenerateLootBox produces a randomized reward loot box based on tier.
+func GenerateLootBox(tier string) *models.PendingLootBox {
+	boxID := uuid.NewString()
+	var rewardType string
+	var amount int
+
+	roll := rand.Intn(100)
+
+	switch tier {
+	case "BRONZE":
+		if roll < 60 {
+			rewardType = "XP"
+			amount = 15 + rand.Intn(26)
+		} else {
+			rewardType = "COINS"
+			amount = 5 + rand.Intn(6)
+		}
+
+	case "SILVER":
+		if roll < 65 {
+			rewardType = "XP"
+			amount = 40 + rand.Intn(61)
+		} else {
+			rewardType = "COINS"
+			amount = 15 + rand.Intn(16)
+		}
+
+	case "GOLD":
+		if roll < 50 {
+			rewardType = "XP"
+			amount = 100 + rand.Intn(151)
+		} else if roll < 85 {
+			rewardType = "COINS"
+			amount = 30 + rand.Intn(21)
+		} else {
+			rewardType = "STREAK_FREEZE"
+			amount = 1
+		}
+
+	case "MYTHIC":
+		if roll < 45 {
+			rewardType = "XP"
+			amount = 200 + rand.Intn(301)
+		} else if roll < 80 {
+			rewardType = "COINS"
+			amount = 50 + rand.Intn(51)
+		} else {
+			rewardType = "STREAK_FREEZE"
+			amount = 1
+		}
+
+	default:
+		rewardType = "XP"
+		amount = 20
+	}
+
+	return &models.PendingLootBox{
+		ID:           boxID,
+		BoxTier:      tier,
+		RewardType:   rewardType,
+		RewardAmount: amount,
+		Opened:       false,
+	}
+}
+
+
 
 func getCosmeticDefinition(itemCode string) (*models.CosmeticItem, bool) {
 	for _, item := range getCosmeticCatalog() {
@@ -562,6 +636,18 @@ func (r *Repository) UnlockCosmetic(itemCode string, _ int) (*models.Gamificatio
 	return r.GetGamificationProfile()
 }
 
+// AddDevCoins boosts user coin balance by specified amount for dev testing.
+func (r *Repository) AddDevCoins(amount int) (*models.GamificationProfile, error) {
+	if amount <= 0 {
+		amount = 10000
+	}
+	_, err := r.db.Exec(`UPDATE user_gamification SET coins = coins + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = 1`, amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add dev coins: %w", err)
+	}
+	return r.GetGamificationProfile()
+}
+
 // IncrementStat increments a counter in stats_json and auto-unlocks any completed achievements.
 func (r *Repository) IncrementStat(statKey string, delta int) error {
 	if statKey == "" || delta <= 0 {
@@ -637,7 +723,7 @@ func getAchievementDefinitions() []models.Achievement {
 			ID:          "first_step",
 			Title:       "First Steps",
 			Description: "Complete 1 study reading session",
-			Icon:        "📖",
+			Icon:        "book",
 			StatKey:     "reading_sessions",
 			TargetValue: 1,
 			RewardCoins: 20,
@@ -646,36 +732,96 @@ func getAchievementDefinitions() []models.Achievement {
 			ID:          "night_scholar",
 			Title:       "Night Scholar",
 			Description: "Complete 5 study reading sessions",
-			Icon:        "🦉",
+			Icon:        "owl",
 			StatKey:     "reading_sessions",
 			TargetValue: 5,
 			RewardCoins: 50,
 			RewardItem:  "dark-obsidian",
 		},
 		{
+			ID:          "deep_diver",
+			Title:       "Deep Diver",
+			Description: "Complete 15 study reading sessions",
+			Icon:        "diving",
+			StatKey:     "reading_sessions",
+			TargetValue: 15,
+			RewardCoins: 150,
+		},
+		{
+			ID:          "quiz_starter",
+			Title:       "Quiz Starter",
+			Description: "Pass 1 quiz",
+			Icon:        "target",
+			StatKey:     "quizzes_passed",
+			TargetValue: 1,
+			RewardCoins: 25,
+		},
+		{
 			ID:          "quiz_master",
 			Title:       "Quiz Master",
 			Description: "Pass 5 quizzes",
-			Icon:        "🎯",
+			Icon:        "trophy",
 			StatKey:     "quizzes_passed",
 			TargetValue: 5,
 			RewardCoins: 75,
 			RewardItem:  "light-monochrome",
 		},
 		{
+			ID:          "quiz_ace",
+			Title:       "Quiz Ace",
+			Description: "Pass 15 quizzes",
+			Icon:        "star",
+			StatKey:     "quizzes_passed",
+			TargetValue: 15,
+			RewardCoins: 200,
+		},
+		{
+			ID:          "flashcard_initiate",
+			Title:       "Flashcard Initiate",
+			Description: "Review 10 flashcards",
+			Icon:        "card",
+			StatKey:     "flashcards_reviewed",
+			TargetValue: 10,
+			RewardCoins: 30,
+		},
+		{
 			ID:          "memory_monk",
 			Title:       "Memory Monk",
 			Description: "Review 25 flashcards",
-			Icon:        "🧠",
+			Icon:        "brain",
 			StatKey:     "flashcards_reviewed",
 			TargetValue: 25,
 			RewardCoins: 50,
+		},
+		{
+			ID:          "memory_master",
+			Title:       "Memory Master",
+			Description: "Review 100 flashcards",
+			Icon:        "crown",
+			StatKey:     "flashcards_reviewed",
+			TargetValue: 100,
+			RewardCoins: 250,
+		},
+		{
+			ID:          "wager_winner",
+			Title:       "Goal Conqueror",
+			Description: "Win your first daily study wager",
+			Icon:        "flame",
+			StatKey:     "wagers_won",
+			TargetValue: 1,
+			RewardCoins: 150,
 		},
 	}
 }
 
 // GetGamificationStore returns profile, available themes with unlock status, and achievements progress.
 func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
+	// Reconcile stats from SQLite source of truth tables
+	var countReading, countQuizzes, countCards int
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM study_queue WHERE task_type IN ('READING', 'AUDIO_LECTURE', 'VIDEO_LECTURE') AND status = 'COMPLETED'`).Scan(&countReading)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM quiz_attempts WHERE passed = 1`).Scan(&countQuizzes)
+	_ = r.db.QueryRow(`SELECT COUNT(*) FROM fsrs_review_log`).Scan(&countCards)
+
 	prof, err := r.GetGamificationProfile()
 	if err != nil {
 		return nil, err
@@ -695,6 +841,55 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		_ = json.Unmarshal([]byte(prof.StatsJSON), &stats)
 	}
 
+	changed := false
+	if countReading > stats["reading_sessions"] {
+		stats["reading_sessions"] = countReading
+		changed = true
+	}
+	if countQuizzes > stats["quizzes_passed"] {
+		stats["quizzes_passed"] = countQuizzes
+		changed = true
+	}
+	if countCards > stats["flashcards_reviewed"] {
+		stats["flashcards_reviewed"] = countCards
+		changed = true
+	}
+
+	achDefs := getAchievementDefinitions()
+	coins := prof.Coins
+	for _, ach := range achDefs {
+		if stats[ach.StatKey] >= ach.TargetValue {
+			claimKey := "achievement:" + ach.ID
+			if !unlockedMap[claimKey] {
+				unlockedList = append(unlockedList, claimKey)
+				unlockedMap[claimKey] = true
+				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
+					unlockedList = append(unlockedList, ach.RewardItem)
+					unlockedMap[ach.RewardItem] = true
+				}
+				if ach.RewardCoins > 0 {
+					coins += ach.RewardCoins
+				}
+				changed = true
+			}
+		}
+	}
+
+	if changed {
+		newStatsBytes, _ := json.Marshal(stats)
+		newUnlockedBytes, _ := json.Marshal(unlockedList)
+		_, _ = r.db.Exec(`
+			UPDATE user_gamification
+			SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = 1
+		`, string(newStatsBytes), string(newUnlockedBytes), coins)
+
+		prof, err = r.GetGamificationProfile()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	catalog := getCosmeticCatalog()
 	allThemes := make([]models.CosmeticItem, len(catalog))
 	for i, c := range catalog {
@@ -705,12 +900,26 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		allThemes[i] = c
 	}
 
-	achDefs := getAchievementDefinitions()
 	achievements := make([]models.Achievement, 0, len(achDefs))
 	for _, a := range achDefs {
 		curr := stats[a.StatKey]
 		a.CurrentValue = curr
-		a.Completed = curr >= a.TargetValue
+
+		// ponytail: dynamic exponential target scaling (doubles target per tier: e.g. 5 -> 10 -> 20 -> 40...)
+		if a.TargetValue > 0 && curr >= a.TargetValue {
+			tier := 1
+			tVal := a.TargetValue
+			for curr >= tVal {
+				tier++
+				tVal *= 2
+			}
+			a.Title = fmt.Sprintf("%s %s", a.Title, toRoman(tier))
+			a.TargetValue = tVal
+			a.Completed = false
+		} else {
+			a.Completed = curr >= a.TargetValue
+		}
+
 		achievements = append(achievements, a)
 	}
 
@@ -719,4 +928,20 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		Themes:       allThemes,
 		Achievements: achievements,
 	}, nil
+}
+
+func toRoman(num int) string {
+	if num <= 0 {
+		return "I"
+	}
+	vals := []int{10, 9, 5, 4, 1}
+	syms := []string{"X", "IX", "V", "IV", "I"}
+	var b strings.Builder
+	for i := 0; i < len(vals); i++ {
+		for num >= vals[i] {
+			num -= vals[i]
+			b.WriteString(syms[i])
+		}
+	}
+	return b.String()
 }

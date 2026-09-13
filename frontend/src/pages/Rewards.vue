@@ -89,9 +89,9 @@
           <button
             class="shop-trigger-btn"
             type="button"
-            @click="showShopModal = true"
+            @click="scrollToShop"
           >
-            🛒 Rewards & Theme Shop
+            🛒 Study Shop 👇
           </button>
         </div>
         <p v-if="buyError" class="buy-error-msg">{{ buyError }}</p>
@@ -128,15 +128,14 @@
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Theme & Achievement Shop Modal -->
-    <RewardsShopModal
-      v-if="showShopModal"
-      :active-theme="activeTheme"
-      @close="onShopClose"
-      @theme-changed="onThemeChanged"
-    />
+      <!-- In-Page Study Shop & Progression Sinks -->
+      <RewardsShopModal
+        id="shop-section"
+        :active-theme="activeTheme"
+        @theme-changed="onThemeChanged"
+      />
+    </div>
 
     <!-- Mystery Chest Modal -->
     <MysteryChestModal
@@ -289,6 +288,13 @@ async function onThemeChanged(newTheme) {
     await updateUserSettings({ theme: newTheme })
   } catch (err) {
     console.error('Failed to update theme setting:', err)
+  }
+}
+
+function scrollToShop() {
+  const el = document.getElementById('shop-section')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
   }
 }
 
