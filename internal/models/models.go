@@ -592,6 +592,7 @@ type LLMSettings struct {
 // GamificationProfile represents the persistent user progression and title stats.
 type GamificationProfile struct {
 	UserID                int    `json:"user_id"`
+	Level                 int    `json:"level"`
 	TotalXP               int    `json:"total_xp"`
 	Coins                 int    `json:"coins"`
 	CurrentTitle          string `json:"current_title"`

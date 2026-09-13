@@ -23,23 +23,23 @@ func TestGamificationRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetGamificationProfile failed: %v", err)
 	}
-	if prof.UserID != 1 || prof.TotalXP != 0 || prof.CurrentTitle != "The Apprentice" || prof.StreakFreezesOwned != 1 {
+	if prof.UserID != 1 || prof.TotalXP != 0 || prof.CurrentTitle != "The Apprentice I" || prof.Level != 1 || prof.StreakFreezesOwned != 1 {
 		t.Fatalf("unexpected default profile: %+v", prof)
 	}
 
-	// 2. Add XP and Coins
-	updatedProf, unlockedTitle, err := repo.AddXPAndCoins(550, 60)
+	// 2. Add XP and Coins (1500 XP unlocks The Scholar I)
+	updatedProf, unlockedTitle, err := repo.AddXPAndCoins(1500, 60)
 	if err != nil {
 		t.Fatalf("AddXPAndCoins failed: %v", err)
 	}
-	if updatedProf.TotalXP != 550 || updatedProf.Coins != 60 {
+	if updatedProf.TotalXP != 1500 || updatedProf.Coins != 60 || updatedProf.Level != 6 {
 		t.Fatalf("unexpected updated values: %+v", updatedProf)
 	}
-	if updatedProf.CurrentTitle != "The Scholar" {
-		t.Fatalf("expected title 'The Scholar', got %q", updatedProf.CurrentTitle)
+	if updatedProf.CurrentTitle != "The Scholar I" {
+		t.Fatalf("expected title 'The Scholar I', got %q", updatedProf.CurrentTitle)
 	}
-	if unlockedTitle != "The Scholar" {
-		t.Fatalf("expected unlockedTitle 'The Scholar', got %q", unlockedTitle)
+	if unlockedTitle != "The Scholar I" {
+		t.Fatalf("expected unlockedTitle 'The Scholar I', got %q", unlockedTitle)
 	}
 
 	// 3. Create Pending Loot Box
@@ -70,8 +70,8 @@ func TestGamificationRepo(t *testing.T) {
 	if !claimedBox.Opened {
 		t.Fatalf("claimed box opened flag should be true")
 	}
-	if afterClaimProf.TotalXP != 550+75 {
-		t.Fatalf("expected total XP %d, got %d", 550+75, afterClaimProf.TotalXP)
+	if afterClaimProf.TotalXP != 1500+75 {
+		t.Fatalf("expected total XP %d, got %d", 1500+75, afterClaimProf.TotalXP)
 	}
 
 	// 5. Buy Streak Freeze

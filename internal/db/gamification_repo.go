@@ -10,42 +10,79 @@ import (
 
 // Title milestones: minimum XP required for each title rank
 var TitleTiers = []struct {
-	Title string
-	MinXP int
+	BaseTitle string
+	MinXP     int
 }{
-	{Title: "The Apprentice", MinXP: 0},
-	{Title: "The Scholar", MinXP: 500},
-	{Title: "The Inquisitor", MinXP: 1500},
-	{Title: "The Archivist", MinXP: 3000},
-	{Title: "The Polymath", MinXP: 5000},
-	{Title: "The Grandmaster", MinXP: 8000},
-	{Title: "The Paragon", MinXP: 12000},
-	{Title: "The Luminary", MinXP: 20000},
-	{Title: "The Mythic Sage", MinXP: 35000},
+	{BaseTitle: "The Apprentice", MinXP: 0},
+	{BaseTitle: "The Scholar", MinXP: 1500},
+	{BaseTitle: "The Inquisitor", MinXP: 4500},
+	{BaseTitle: "The Archivist", MinXP: 9000},
+	{BaseTitle: "The Polymath", MinXP: 16000},
+	{BaseTitle: "The Grandmaster", MinXP: 26000},
+	{BaseTitle: "The Paragon", MinXP: 40000},
+	{BaseTitle: "The Luminary", MinXP: 60000},
+	{BaseTitle: "The Mythic Sage", MinXP: 90000},
 }
 
-// ComputeTitleInfo determines the title, next title, and XP boundaries based on total XP.
-func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextTitleXP int, currentTitleMinXP int) {
+var romanNumerals = []string{"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"}
+
+// ComputeLevel calculates the numerical account level (1 to 100) based on total XP.
+func ComputeLevel(totalXP int) int {
+	if totalXP <= 0 {
+		return 1
+	}
+	lvl := (totalXP / 300) + 1
+	if lvl > 100 {
+		return 100
+	}
+	return lvl
+}
+
+// ComputeTitleInfo determines the title with sub-tier (e.g. "The Inquisitor III"), next title, XP boundaries, and level based on total XP.
+func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextTitleXP int, currentTitleMinXP int, level int) {
 	if totalXP < 0 {
 		totalXP = 0
 	}
+	level = ComputeLevel(totalXP)
 
 	for i := len(TitleTiers) - 1; i >= 0; i-- {
 		if totalXP >= TitleTiers[i].MinXP {
-			currentTitle = TitleTiers[i].Title
-			currentTitleMinXP = TitleTiers[i].MinXP
+			base := TitleTiers[i].BaseTitle
+			minXP := TitleTiers[i].MinXP
+			currentTitleMinXP = minXP
+
+			var maxXP int
 			if i < len(TitleTiers)-1 {
-				nextTitle = TitleTiers[i+1].Title
+				maxXP = TitleTiers[i+1].MinXP
+				nextTitle = TitleTiers[i+1].BaseTitle + " I"
 				nextTitleXP = TitleTiers[i+1].MinXP
 			} else {
+				maxXP = minXP + 30000
 				nextTitle = "Maximum Rank"
-				nextTitleXP = TitleTiers[i].MinXP
+				nextTitleXP = minXP
 			}
+
+			xpSpan := maxXP - minXP
+			if xpSpan <= 0 {
+				xpSpan = 3000
+			}
+			step := xpSpan / 10
+			if step <= 0 {
+				step = 100
+			}
+			subIndex := (totalXP - minXP) / step
+			if subIndex >= 10 {
+				subIndex = 9
+			} else if subIndex < 0 {
+				subIndex = 0
+			}
+
+			currentTitle = fmt.Sprintf("%s %s", base, romanNumerals[subIndex])
 			return
 		}
 	}
 
-	return TitleTiers[0].Title, TitleTiers[1].Title, TitleTiers[1].MinXP, 0
+	return TitleTiers[0].BaseTitle + " I", TitleTiers[1].BaseTitle + " I", TitleTiers[1].MinXP, 0, 1
 }
 
 // GetGamificationProfile retrieves the persistent gamification profile for the user.
@@ -72,7 +109,7 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		// Auto-initialize if row was missing
 		_, insErr := r.db.Exec(`
 			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, stats_json)
-			VALUES (1, 0, 0, 'The Apprentice', 1, '[]', '["dark-gruvbox", "light-classic"]', '{}')
+			VALUES (1, 0, 0, 'The Apprentice I', 1, '[]', '["dark-gruvbox", "light-classic"]', '{}')
 			ON CONFLICT(user_id) DO NOTHING
 		`)
 		if insErr != nil {
@@ -83,7 +120,8 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		return nil, fmt.Errorf("failed to load gamification profile: %w", err)
 	}
 
-	curTitle, nextTitle, nextXP, minXP := ComputeTitleInfo(prof.TotalXP)
+	curTitle, nextTitle, nextXP, minXP, lvl := ComputeTitleInfo(prof.TotalXP)
+	prof.Level = lvl
 	prof.CurrentTitle = curTitle
 	prof.NextTitle = nextTitle
 	prof.NextTitleXP = nextXP
@@ -123,7 +161,7 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 	oldTitle := currentTitle
 	newTotalXP := totalXP + xp
 	newCoins := coinBalance + coins
-	newTitle, nextTitle, nextTitleXP, currentTitleMinXP := ComputeTitleInfo(newTotalXP)
+	newTitle, nextTitle, nextTitleXP, currentTitleMinXP, lvl := ComputeTitleInfo(newTotalXP)
 
 	var newTitleUnlocked string
 	if newTitle != oldTitle {
@@ -144,6 +182,7 @@ func (r *Repository) AddXPAndCoins(xp, coins int) (*models.GamificationProfile, 
 	}
 
 	updatedProf := &models.GamificationProfile{
+		Level:                 lvl,
 		TotalXP:               newTotalXP,
 		Coins:                 newCoins,
 		CurrentTitle:          newTitle,
@@ -197,7 +236,7 @@ func (r *Repository) AwardTaskRewardsTx(tx *sql.Tx, xp, coins int, box *models.P
 	oldTitle := currentTitle
 	newTotalXP := totalXP + xp
 	newCoins := coinBalance + coins
-	newTitle, _, _, _ := ComputeTitleInfo(newTotalXP)
+	newTitle, _, _, _, _ := ComputeTitleInfo(newTotalXP)
 
 	var newTitleUnlocked string
 	if newTitle != oldTitle {
@@ -308,7 +347,7 @@ func (r *Repository) ClaimLootBox(boxID string) (*models.PendingLootBox, *models
 	// Refresh title based on updated total_xp
 	var currentTotalXP int
 	if err := tx.QueryRow(`SELECT total_xp FROM user_gamification WHERE user_id = 1`).Scan(&currentTotalXP); err == nil {
-		newTitle, _, _, _ := ComputeTitleInfo(currentTotalXP)
+		newTitle, _, _, _, _ := ComputeTitleInfo(currentTotalXP)
 		_, _ = tx.Exec(`UPDATE user_gamification SET current_title = ? WHERE user_id = 1`, newTitle)
 	}
 

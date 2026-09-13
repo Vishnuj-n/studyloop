@@ -22,7 +22,10 @@
             <span class="rank-avatar">{{ getTitleEmoji(profile.current_title) }}</span>
           </div>
           <div>
-            <span class="rank-label">Current Title</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+              <span class="rank-label">Current Rank</span>
+              <span class="level-chip">Lvl {{ profile.level || 1 }}</span>
+            </div>
             <h2 class="rank-title">{{ profile.current_title }}</h2>
           </div>
         </div>
@@ -172,11 +175,12 @@ const activeTheme = ref('dark-gruvbox')
 const loadError = ref('')
 const buyError = ref('')
 const profile = ref({
+  level: 1,
   total_xp: 0,
   coins: 0,
-  current_title: 'The Apprentice',
-  next_title: 'The Scholar',
-  next_title_xp: 500,
+  current_title: 'The Apprentice I',
+  next_title: 'The Scholar I',
+  next_title_xp: 1500,
   current_title_min_xp: 0,
   streak_freezes_owned: 1,
 })
@@ -424,11 +428,22 @@ onMounted(() => {
 }
 
 .rank-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
+}
+
+.level-chip {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary, #38bdf8);
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--muted-text);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  padding: 1px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.03em;
 }
 
 .rank-title {

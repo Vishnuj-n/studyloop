@@ -10,7 +10,7 @@
 
       <!-- Compact Gamification Pill -->
       <RouterLink to="/rewards" class="gamification-sidebar-pill" title="View Rewards & Progression">
-        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : gamification.current_title }}</span>
+        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : `Lvl ${gamification.level || 1} • ${gamification.current_title}` }}</span>
         <div v-if="!gamificationError" class="pill-xp-bar">
           <div class="pill-xp-fill" :style="{ width: xpPercent + '%' }"></div>
         </div>
@@ -58,9 +58,10 @@ import { triggerCloudSync, getUserSettings, getGamificationState } from '../serv
 import PomodoroWidget from './PomodoroWidget.vue'
 
 const gamification = ref({
-  current_title: 'The Apprentice',
+  level: 1,
+  current_title: 'The Apprentice I',
   total_xp: 0,
-  next_title_xp: 500,
+  next_title_xp: 1500,
   current_title_min_xp: 0,
 })
 
