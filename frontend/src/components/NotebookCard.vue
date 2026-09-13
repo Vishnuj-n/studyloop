@@ -31,7 +31,7 @@
           text-anchor="middle"
           dominant-baseline="central"
         >
-          {{ completionPercent }}%
+          {{ completionPercent }}
         </text>
       </svg>
     </div>
@@ -320,6 +320,7 @@ const circleDashOffset = computed(() => {
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  padding-right: 80px;
 }
 
 .btn-edit-pen {
@@ -343,6 +344,11 @@ const circleDashOffset = computed(() => {
 .file-icon {
   font-size: 28px;
   flex-shrink: 0;
+}
+
+.notebook-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .notebook-info h3 {

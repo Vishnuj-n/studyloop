@@ -8,9 +8,13 @@
         </div>
       </div>
 
-      <!-- Compact Gamification Pill -->
+      <!-- Compact Gamification Pill (Option 1: Two-Line Stacked) -->
       <RouterLink to="/rewards" class="gamification-sidebar-pill" title="View Rewards & Progression">
-        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : `Lvl ${gamification.level || 1} • ${gamification.current_title}` }}</span>
+        <div v-if="!gamificationError" class="pill-top-row">
+          <span class="pill-level-chip">LVL {{ gamification.level || 1 }}</span>
+          <span class="pill-xp-text">{{ gamification.total_xp || 0 }} XP</span>
+        </div>
+        <span class="pill-title">{{ gamificationError ? 'Progression Unavailable' : gamification.current_title }}</span>
         <div v-if="!gamificationError" class="pill-xp-bar">
           <div class="pill-xp-fill" :style="{ width: xpPercent + '%' }"></div>
         </div>
@@ -241,10 +245,35 @@ const topItems = [
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
 }
 
+.pill-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pill-level-chip {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 1.5px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary, #38bdf8);
+  line-height: 1.2;
+}
+
+.pill-xp-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-text);
+}
+
 .pill-title {
+  font-size: 13px;
   font-weight: 700;
   color: var(--on-surface);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -255,6 +284,7 @@ const topItems = [
   background: var(--outline-variant);
   border-radius: 999px;
   overflow: hidden;
+  margin-top: 1px;
 }
 
 .pill-xp-fill {
