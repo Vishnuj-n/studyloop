@@ -368,19 +368,26 @@ def main():
         print("\n[DRY RUN] Skipping version file updates, git commit/push, build.py, and release.py.")
         return
 
-    # 5. Sync, Update Version File, Commit & Push
-    print(f"\nSyncing latest changes from origin/{branch}...")
-    run_cmd(["git", "pull", "--rebase", "origin", branch], check=True)
+    # 5. Generate Release Notes & Update RELEASE_NOTES.md before building binary
+    print("\nGenerating AI release notes for local embedding...")
+    try:
+        from release import generate_release_notes
+        notes_text = generate_release_notes(rec_version, commit_history)
+    except Exception as e:
+        print(f"Warning: AI release notes generation skipped: {e}")
+        notes_text = f"# What's New in {rec_version}\n\n" + commit_history
 
-    formatted_new_ver = update_version_files(rec_version)
+    notes_file = PROJECT_ROOT / "internal" / "app" / "RELEASE_NOTES.md"
+    notes_file.write_text(notes_text + "\n", encoding="utf-8")
+    print(f"Updated {notes_file.relative_to(PROJECT_ROOT)}")
 
-    print(f"\nCommitting version update ({formatted_new_ver})...")
-    run_cmd(["git", "add", "internal/app/VERSION"], check=True)
+    print(f"\nCommitting version and release notes updates ({formatted_new_ver})...")
+    run_cmd(["git", "add", "internal/app/VERSION", "internal/app/RELEASE_NOTES.md"], check=True)
     root_file = PROJECT_ROOT / "VERSION"
     if root_file.exists():
         run_cmd(["git", "add", "VERSION"], check=True)
 
-    commit_msg = f"chore: version bump to {formatted_new_ver}"
+    commit_msg = f"chore: version bump to {formatted_new_ver} with release notes"
     run_cmd(["git", "commit", "-m", commit_msg], check=True)
 
     print(f"Pushing version bump commit to origin/{branch}...")

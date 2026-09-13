@@ -330,6 +330,15 @@ def main():
     print("=" * 70)
     print()
 
+    # Save to local internal/app/RELEASE_NOTES.md for offline fallback
+    notes_file = os.path.join("internal", "app", "RELEASE_NOTES.md")
+    try:
+        with open(notes_file, "w", encoding="utf-8") as f:
+            f.write(release_notes + "\n")
+        print(f"Updated local offline release notes fallback at {notes_file}")
+    except Exception as err:
+        print(f"Warning: Could not update local RELEASE_NOTES.md: {err}")
+
     if args.dry_run:
         print("Dry run complete.")
         return

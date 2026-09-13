@@ -6,11 +6,13 @@ import ConfirmModal from './components/ConfirmModal.vue'
 import MysteryChestModal from './components/MysteryChestModal.vue'
 import RewardToast from './components/RewardToast.vue'
 import AppToast from './components/AppToast.vue'
+import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
 import {
   getUserSettings,
   updateUserSettings,
   getTodayPlan,
   checkForUpdates,
+  getReleaseNotes,
   openRepoURL,
 } from './services/appApi'
 import { useToast } from './composables/useToast'
@@ -275,12 +277,41 @@ function goToUpdatePage() {
   openRepoURL()
 }
 
+const showReleaseNotesPopup = ref(false)
+const releaseNotesVersion = ref('')
+const releaseNotesText = ref('')
+
+async function checkOneTimeReleaseNotes() {
+  try {
+    const res = await getReleaseNotes()
+    if (res && res.version) {
+      const currentVer = String(res.version).replace(/^v+/, '')
+      const seenVer = localStorage.getItem('studyloop_seen_release_version')
+      if (seenVer !== currentVer) {
+        releaseNotesVersion.value = currentVer
+        releaseNotesText.value = res.notes || ''
+        showReleaseNotesPopup.value = true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch release notes on startup:', err)
+  }
+}
+
+function handleDismissReleaseNotes() {
+  if (releaseNotesVersion.value) {
+    localStorage.setItem('studyloop_seen_release_version', releaseNotesVersion.value)
+  }
+  showReleaseNotesPopup.value = false
+}
+
 let cancelIngestionListener = null
 
 onMounted(() => {
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
+  checkOneTimeReleaseNotes()
   cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
   window.addEventListener('study-reward-earned', handleStudyReward)
 })
@@ -393,6 +424,14 @@ onUnmounted(() => {
         :box="activeChest"
         :new-title="activeChestTitle"
         @close="closeActiveChest"
+      />
+
+      <!-- One-time Update Release Notes Modal -->
+      <ReleaseNotesModal
+        :visible="showReleaseNotesPopup"
+        :version="releaseNotesVersion"
+        :raw-notes="releaseNotesText"
+        @close="handleDismissReleaseNotes"
       />
 
       <!-- Global Toaster -->

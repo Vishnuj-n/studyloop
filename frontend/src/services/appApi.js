@@ -317,6 +317,10 @@ export function checkForUpdates() {
   return appBridge().CheckForUpdates()
 }
 
+export function getReleaseNotes() {
+  return appBridge().GetReleaseNotes()
+}
+
 export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
