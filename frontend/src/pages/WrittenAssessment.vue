@@ -152,7 +152,8 @@
           </div>
         </div>
 
-        <p class="result-panel__feedback">{{ result.feedback }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div class="result-panel__feedback" v-html="renderedFeedback"></div>
 
         <div class="form-footer">
           <button id="wa-dashboard-btn" class="primary-btn" @click="goToDashboard">
@@ -169,6 +170,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getNotebooks, generateComprehensiveExam, scoreShortAnswer } from '../services/appApi.js'
+import { renderMarkdown } from '../services/markdown'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 
 const route = useRoute()
@@ -215,6 +217,11 @@ const scoreClass = computed(() => {
   if (s >= 8) return 'score--great'
   if (s >= 5) return 'score--ok'
   return 'score--low'
+})
+
+const renderedFeedback = computed(() => {
+  if (!result.value?.feedback) return ''
+  return renderMarkdown(result.value.feedback)
 })
 
 onMounted(async () => {
@@ -698,6 +705,48 @@ function reset() {
   color: var(--on-surface);
   line-height: 1.65;
   max-width: 72ch;
+}
+
+.result-panel__feedback :deep(p) {
+  margin: 0 0 12px 0;
+}
+
+.result-panel__feedback :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.result-panel__feedback :deep(h1),
+.result-panel__feedback :deep(h2),
+.result-panel__feedback :deep(h3),
+.result-panel__feedback :deep(h4) {
+  margin: 16px 0 8px 0;
+  color: var(--on-surface);
+  font-weight: 700;
+}
+
+.result-panel__feedback :deep(ul),
+.result-panel__feedback :deep(ol) {
+  margin: 8px 0 12px 0;
+  padding-left: 20px;
+}
+
+.result-panel__feedback :deep(li) {
+  margin: 4px 0;
+}
+
+.result-panel__feedback :deep(code) {
+  background: var(--surface-container-high);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.result-panel__feedback :deep(blockquote) {
+  border-left: 3px solid var(--primary);
+  margin: 12px 0;
+  padding-left: 12px;
+  color: var(--muted-text);
 }
 
 /* ── Responsive ───────────────────────────────── */

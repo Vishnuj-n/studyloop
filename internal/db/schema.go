@@ -151,7 +151,7 @@ func InitSchema(tx *sql.Tx) error {
 			model TEXT NOT NULL DEFAULT '',
 			timeout_ms INTEGER NOT NULL DEFAULT 30000,
 			max_input_tokens INTEGER NOT NULL DEFAULT 4000,
-			max_output_tokens INTEGER NOT NULL DEFAULT 1000,
+			max_output_tokens INTEGER NOT NULL DEFAULT 2500,
 			api_key_source TEXT NOT NULL DEFAULT 'keyring',
 			has_api_key BOOLEAN DEFAULT 0,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -408,11 +408,20 @@ func InitSchema(tx *sql.Tx) error {
 	if _, err := tx.Exec(`
 		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
 		VALUES
-			('fast', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 4000, 1000, 'keyring', 0),
-			('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 4000, 1000, 'keyring', 0)
+			('fast', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 4000, 2500, 'keyring', 0),
+			('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 4000, 2500, 'keyring', 0)
 		ON CONFLICT(tier) DO NOTHING
 	`); err != nil {
 		return fmt.Errorf("failed to initialize llm settings: %w", err)
+	}
+
+	// Upgrade legacy llm_settings max_output_tokens from 1000 to 2500 to match full quiz output budget
+	if _, err := tx.Exec(`
+		UPDATE llm_settings
+		SET max_output_tokens = 2500
+		WHERE max_output_tokens = 1000
+	`); err != nil {
+		return fmt.Errorf("failed to update legacy max_output_tokens: %w", err)
 	}
 
 	// Upgrade any previously seeded groq base_url that missed /v1
@@ -502,7 +511,7 @@ var alterStatements = []struct {
 	{"study_profiles", "pomo_music_path", "ALTER TABLE study_profiles ADD COLUMN pomo_music_path TEXT DEFAULT ''"},
 	{"study_profiles", "pomo_shuffle", "ALTER TABLE study_profiles ADD COLUMN pomo_shuffle BOOLEAN DEFAULT 0"},
 	{"llm_settings", "max_input_tokens", "ALTER TABLE llm_settings ADD COLUMN max_input_tokens INTEGER NOT NULL DEFAULT 4000"},
-	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 1000"},
+	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 2500"},
 	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
 	{"study_queue", "current_page", "ALTER TABLE study_queue ADD COLUMN current_page INTEGER"},
 }
