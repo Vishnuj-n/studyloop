@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,29 @@ import (
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
 )
+
+// RateLimitError indicates an HTTP 429 rate limit / TPM exceeded error from the provider.
+type RateLimitError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *RateLimitError) Error() string {
+	return fmt.Sprintf("status 429: rate limit reached (%s)", e.Message)
+}
+
+// IsRateLimitError returns true if the error represents an HTTP 429 Rate Limit error.
+func IsRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var rErr *RateLimitError
+	if errors.As(err, &rErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "status 429") || strings.Contains(msg, "rate limit") || strings.Contains(msg, "tpm limit")
+}
 
 // ModelLimits defines token limits for specific models.
 type ModelLimits struct {
@@ -363,6 +387,9 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d status=%d err_body=%s", p.config.Model, respDuration.Milliseconds(), resp.StatusCode, string(bodyBytes))
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return "", &RateLimitError{StatusCode: resp.StatusCode, Message: string(bodyBytes)}
+		}
 		return "", fmt.Errorf("LLM API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 

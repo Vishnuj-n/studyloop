@@ -74,15 +74,15 @@ Student question: %s
 
 Answer:`, scopeLabel, contextText, req.Question)
 
-	// ponytail: select LLM tier dynamically based on retrieved context length
-	llm, _ := s.selectLLM(contextText, 0)
+	llm, tier := s.selectLLM(contextText, 0)
 	if llm == nil {
 		return map[string]interface{}{"error": "LLM provider not available"}
 	}
 
 	answer, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return map[string]interface{}{"error": "reader response failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, tier)
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 
 	return map[string]interface{}{

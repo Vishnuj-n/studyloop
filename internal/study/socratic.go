@@ -91,7 +91,8 @@ Retrieved material:
 
 	raw, err := s.fastLLMProvider.GenerateAnswer(prompt)
 	if err != nil {
-		return map[string]interface{}{"error": "short-answer prompt generation failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, "fast")
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 	parsed, err := parseShortAnswerPromptLLMResponse(raw)
 	if err != nil {
@@ -337,7 +338,11 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	answer, err := llm.GenerateAnswer(socraticPrompt)
 	if err != nil {
-		return nil, fmt.Errorf("socratic response generation failed: %w", err)
+		tier := "heavy"
+		if llm == s.fastLLMProvider {
+			tier = "fast"
+		}
+		return nil, s.FormatLLMError(err, tier)
 	}
 
 	return map[string]interface{}{

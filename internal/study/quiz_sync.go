@@ -390,7 +390,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return models.QuizTaskPayload{}, fmt.Errorf("quiz generation failed: %w", err)
+		return models.QuizTaskPayload{}, s.FormatLLMError(err, tier)
 	}
 	parsed, err := parseQuizLLMResponse(raw)
 	if err != nil {

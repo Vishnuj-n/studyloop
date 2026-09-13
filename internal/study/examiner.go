@@ -71,7 +71,8 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 	prompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, contextText)
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return map[string]interface{}{"error": "exam generation failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, tier)
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 	parsed, err := parseShortAnswerPromptLLMResponse(raw)
 	if err != nil {
@@ -190,7 +191,8 @@ Student answer: %s`, question.Prompt, userAnswer)
 
 	raw, err := s.fastLLMProvider.GenerateAnswer(scorePrompt)
 	if err != nil {
-		return map[string]interface{}{"error": "short-answer scoring failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, "fast")
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 	parsed, err := parseShortAnswerScoreLLMResponse(raw)
 	if err != nil {

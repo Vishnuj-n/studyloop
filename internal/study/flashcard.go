@@ -205,7 +205,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return nil, "", fmt.Errorf("flashcard generation failed: %w", err)
+		return nil, "", s.FormatLLMError(err, tier)
 	}
 
 	// Validate output size before parsing
