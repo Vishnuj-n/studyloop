@@ -19,7 +19,7 @@
         <div class="card-glow rank-glow"></div>
         <div class="rank-header">
           <div class="rank-avatar-pedestal">
-            <span class="rank-avatar">🎓</span>
+            <span class="rank-avatar">{{ getTitleEmoji(profile.current_title) }}</span>
           </div>
           <div>
             <span class="rank-label">Current Title</span>
@@ -116,7 +116,7 @@
             @click="openChest(chest)"
           >
             <div class="chest-pedestal">
-              <span class="chest-vault-icon">{{ getChestEmoji(chest.box_tier) }}</span>
+              <GamificationIcon :name="'chest-' + chest.box_tier.toLowerCase()" size="40" />
             </div>
             <div class="chest-vault-info">
               <span class="chest-vault-tier">{{ chest.box_tier }} CHEST</span>
@@ -158,6 +158,7 @@ import { ref, computed, onMounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { getGamificationState, buyStreakFreeze, getUserSettings, updateUserSettings } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
+import GamificationIcon from '../components/icons/GamificationIcon.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 import RewardsShopModal from '../components/RewardsShopModal.vue'
 
@@ -204,6 +205,20 @@ function getChestEmoji(tier) {
     default:
       return '📦'
   }
+}
+
+function getTitleEmoji(title) {
+  const t = (title || '').toLowerCase()
+  if (t.includes('mythic') || t.includes('sage')) return '🐉' // Mythic Dragon
+  if (t.includes('luminary')) return '🦸'                      // Superhero Luminary
+  if (t.includes('paragon')) return '🤴'                       // Royal King
+  if (t.includes('grandmaster')) return '🐦‍🔥'                  // Legendary Phoenix
+  if (t.includes('polymath')) return '🦖'                      // Apex T-Rex Dinosaur
+  if (t.includes('archivist')) return '🦄'                     // Magical Unicorn
+  if (t.includes('inquisitor')) return '🦚'                    // Flamboyant Peacock
+  if (t.includes('scholar')) return '🦁'                      // Mighty Lion
+  if (t.includes('apprentice') || t.includes('novice')) return '🧑‍🎓' // Student
+  return '🧑‍🎓'
 }
 
 function openFreezeInfoModal() {

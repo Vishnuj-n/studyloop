@@ -48,6 +48,7 @@
           <thead>
             <tr>
               <th>Title</th>
+              <th>Status</th>
               <th>{{ fileType === 'youtube' ? 'Start Segment' : 'Start Page' }}</th>
               <th>{{ fileType === 'youtube' ? 'End Segment' : 'End Page' }}</th>
               <th>Action</th>
@@ -63,6 +64,14 @@
                   placeholder="Chapter title"
                   :disabled="isCleaning"
                 />
+              </td>
+              <td>
+                <span v-if="chapter.in_queue" class="status-pill status-queued" title="Already added to study queue">
+                  🟢 Queued
+                </span>
+                <span v-else class="status-pill status-not-queued" title="Not yet added to study queue">
+                  🔴 Not Queued
+                </span>
               </td>
               <td>
                 <input
@@ -191,6 +200,7 @@ watch(
         title: ch.title || '',
         start_page: ch.start_page || 1,
         end_page: ch.end_page || 1,
+        in_queue: Boolean(ch.in_queue),
       }))
     } else {
       localChapters.value = []
@@ -435,6 +445,29 @@ function confirm() {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-queued {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.status-not-queued {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .duration-pill {

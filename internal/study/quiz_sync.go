@@ -18,6 +18,7 @@ import (
 )
 
 const maxAutomaticRereadAttempts = 1
+const quizTaskOutputBudget = 2500
 
 // GenerateFlashcardsAfterQuiz generates flashcards after successful quiz completion.
 // New cards are future-dated and intentionally excluded from immediate review materialization.
@@ -321,13 +322,24 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		}
 	}
 
-	// Get model-specific token limits
-	llm := s.fastLLMProvider
+	// ponytail: select LLM tier dynamically based on combined chunk context size
+	var combinedText strings.Builder
+	for _, id := range normalizedChunkIDs {
+		if text, ok := chunkTextByID[id]; ok {
+			combinedText.WriteString(text)
+			combinedText.WriteString("\n")
+		}
+	}
+
+	llm, tier := s.selectLLM(combinedText.String(), quizTaskOutputBudget)
+	if llm == nil {
+		return models.QuizTaskPayload{}, fmt.Errorf("no LLM provider available")
+	}
 	modelName := providerModelName(llm)
 	limits := llm.GetLimits()
 	maxInputTokens := limits.MaxInputTokens
 	maxOutputTokens := limits.MaxOutputTokens
-	utils.Warnf("[QUIZ_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
+	utils.Warnf("[QUIZ_PIPELINE] model_limits tier=%s model=%s max_input=%d max_output=%d", tier, modelName, maxInputTokens, maxOutputTokens)
 
 	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
 	userQuizCount := 8
@@ -362,12 +374,23 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	}
 
 	targetCount := userQuizCount
+	if maxOutputTokens > 0 && maxOutputTokens < quizTaskOutputBudget {
+		adjusted := (targetCount * maxOutputTokens) / quizTaskOutputBudget
+		if adjusted < 3 {
+			adjusted = 3
+		}
+		if adjusted < targetCount {
+			utils.Warnf("[QUIZ_PIPELINE] reducing quiz target question count %d -> %d due to lower model output limit max_output=%d",
+				targetCount, adjusted, maxOutputTokens)
+			targetCount = adjusted
+		}
+	}
 
 	prompt := buildQuizPrompt(notebookTitle, targetCount, ctxRes.contextParts)
 
-	raw, err := s.fastLLMProvider.GenerateAnswer(prompt)
+	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return models.QuizTaskPayload{}, fmt.Errorf("quiz generation failed: %w", err)
+		return models.QuizTaskPayload{}, s.FormatLLMError(err, tier)
 	}
 	parsed, err := parseQuizLLMResponse(raw)
 	if err != nil {

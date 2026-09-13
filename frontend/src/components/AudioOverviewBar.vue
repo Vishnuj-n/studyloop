@@ -94,6 +94,14 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  startPage: {
+    type: Number,
+    default: 0,
+  },
+  endPage: {
+    type: Number,
+    default: 0,
+  },
   topicTitle: {
     type: String,
     default: '',
@@ -256,7 +264,13 @@ function handleStart() {
   chunks.value = []
   currentIndex.value = 0
 
-  startTopicAudioOverview(props.topicId, props.notebookId, selectedVoice.value)
+  startTopicAudioOverview(
+    props.topicId,
+    props.notebookId,
+    props.startPage || 0,
+    props.endPage || 0,
+    selectedVoice.value
+  )
     .then((res) => {
       if (res?.generation_id) {
         activeGenerationId.value = res.generation_id
@@ -363,9 +377,9 @@ onUnmounted(() => {
 })
 
 watch(
-  () => props.topicId,
-  (newId, oldId) => {
-    if (newId && newId !== oldId) {
+  [() => props.topicId, () => props.startPage, () => props.endPage],
+  ([newId, newStart, newEnd], [oldId, oldStart, oldEnd]) => {
+    if (newId && (newId !== oldId || newStart !== oldStart || newEnd !== oldEnd)) {
       handleStart()
     }
   }

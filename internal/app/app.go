@@ -666,7 +666,7 @@ func emitRagSetupFailed(a *App, reason string) {
 }
 
 // StartTopicAudioOverview initiates streaming audio overview generation for a topic.
-func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice string) map[string]interface{} {
+func (a *App) StartTopicAudioOverview(topicID string, notebookID string, startPage int, endPage int, voice string) map[string]interface{} {
 	a.waitForReady()
 	a.aiMutex.Lock()
 	studySvc := a.studyService
@@ -700,7 +700,7 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, voice s
 			})
 		}
 
-		err := studySvc.GenerateAudioOverview(ctx, topicID, notebookID, voice, func(chunk study.AudioChunk) error {
+		err := studySvc.GenerateAudioOverview(ctx, topicID, notebookID, startPage, endPage, voice, func(chunk study.AudioChunk) error {
 			if a.ctx != nil {
 				chunk.GenerationID = generationID
 				wailsruntime.EventsEmit(a.ctx, "audio:overview:chunk", chunk)

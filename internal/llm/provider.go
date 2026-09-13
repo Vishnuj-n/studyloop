@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,29 @@ import (
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
 )
+
+// RateLimitError indicates an HTTP 429 rate limit / TPM exceeded error from the provider.
+type RateLimitError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *RateLimitError) Error() string {
+	return fmt.Sprintf("status 429: rate limit reached (%s)", e.Message)
+}
+
+// IsRateLimitError returns true if the error represents an HTTP 429 Rate Limit error.
+func IsRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var rErr *RateLimitError
+	if errors.As(err, &rErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "status 429") || strings.Contains(msg, "rate limit") || strings.Contains(msg, "tpm limit")
+}
 
 // ModelLimits defines token limits for specific models.
 type ModelLimits struct {
@@ -143,7 +167,7 @@ func defaultModelForProvider(provider string) string {
 func getModelLimits() ModelLimits {
 	return ModelLimits{
 		MaxInputTokens:  4000,
-		MaxOutputTokens: 1000,
+		MaxOutputTokens: 2500,
 	}
 }
 
@@ -248,8 +272,9 @@ func (p *Provider) GetLimits() ModelLimits {
 
 // openAIRequest follows the OpenAI API format.
 type openAIRequest struct {
-	Model    string          `json:"model"`
-	Messages []openAIMessage `json:"messages"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	MaxTokens int             `json:"max_tokens,omitempty"`
 }
 
 // openAIMessage represents a message in the OpenAI API.
@@ -264,6 +289,7 @@ type openAIResponse struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason,omitempty"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -292,7 +318,8 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, limits.MaxOutputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
-		Model: p.config.Model,
+		Model:     p.config.Model,
+		MaxTokens: limits.MaxOutputTokens,
 		Messages: []openAIMessage{
 			{
 				Role:    "user",
@@ -360,6 +387,9 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		utils.Warnf("[LLM_ERROR] model=%s duration_ms=%d status=%d err_body=%s", p.config.Model, respDuration.Milliseconds(), resp.StatusCode, string(bodyBytes))
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return "", &RateLimitError{StatusCode: resp.StatusCode, Message: string(bodyBytes)}
+		}
 		return "", fmt.Errorf("LLM API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -370,6 +400,10 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 
 	if len(apiResp.Choices) == 0 {
 		return "", fmt.Errorf("no response from LLM")
+	}
+
+	if apiResp.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("LLM output truncated: max output tokens reached (finish_reason=length)")
 	}
 
 	if apiResp.Usage.TotalTokens > 0 {

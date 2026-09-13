@@ -45,6 +45,7 @@ func InitSchema(tx *sql.Tx) error {
 			id TEXT PRIMARY KEY,
 			topic_id TEXT NOT NULL,
 			chunk_text TEXT NOT NULL,
+			chunk_hash TEXT DEFAULT '',
 			page_num INTEGER DEFAULT 0,
 			token_count INTEGER DEFAULT 0,
 			importance_score REAL DEFAULT 0,
@@ -243,6 +244,7 @@ func InitSchema(tx *sql.Tx) error {
 			payload_json TEXT,
 			start_page INTEGER,
 			end_page INTEGER,
+			current_page INTEGER,
 			FOREIGN KEY (notebook_id) REFERENCES notebooks(id),
 			FOREIGN KEY (topic_id) REFERENCES topics(id)
 		)`,
@@ -502,6 +504,7 @@ var alterStatements = []struct {
 	{"llm_settings", "max_input_tokens", "ALTER TABLE llm_settings ADD COLUMN max_input_tokens INTEGER NOT NULL DEFAULT 4000"},
 	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 1000"},
 	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
+	{"study_queue", "current_page", "ALTER TABLE study_queue ADD COLUMN current_page INTEGER"},
 }
 
 func columnExists(tx *sql.Tx, table, column string) (bool, error) {

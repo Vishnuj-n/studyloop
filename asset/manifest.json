@@ -1,0 +1,16 @@
+{
+  "assetVersion": "1.4.0",
+  "downloadUrl": "https://github.com/Vishnuj-n/studyloop/releases/download/v1.4.0/rag-assets.zip",
+  "requiredFiles": [
+    "tokenizer.json",
+    "model_int8.onnx",
+    "onnxruntime.dll",
+    "vec0.dll"
+  ],
+  "fileHashes": {
+    "onnxruntime.dll": "8A1AAD8D59D02A5337D4E3F5BBD1158C3F7BF84FE3B3F0052F957DD3E75A91CB",
+    "tokenizer.json": "FFB28886478B9B17A8C06F4FE6741B970D5DD3DE13330CCC3B9F686DF8A0545A",
+    "model_int8.onnx": "B4342336DEBAEA79DE872370664B0AAEB67DEA4605513D00EE236EA871A81F27",
+    "vec0.dll": "FCF98662A7AD9DCE394B96A88F91032047823831B951C76636787C312A6476E6"
+  }
+}

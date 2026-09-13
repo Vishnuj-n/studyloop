@@ -17,7 +17,7 @@
             @mouseenter="handleHover"
           >
             <div class="chest-modal-pedestal">
-              <span v-if="!opened" class="chest-emoji">{{ chestEmoji }}</span>
+              <GamificationIcon v-if="!opened" :name="'chest-' + chestTier.toLowerCase()" size="80" />
               <div v-else class="opened-burst">
                 <span class="reward-icon">{{ rewardEmoji }}</span>
               </div>
@@ -61,6 +61,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import GamificationIcon from './icons/GamificationIcon.vue'
 import { playChestRattle, playChestOpenFanfare } from '../utils/audioJuice'
 import { claimLootBox } from '../services/appApi'
 

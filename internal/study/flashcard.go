@@ -172,7 +172,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_auto_generation_batch generation_source=%s chunk_count=%d token_estimate=%d page_range=%d-%d", generationSource, len(contextChunks), tokenCount, startPage, endPage)
 	contextText := buildContextTextFromChunks(contextChunks)
 
-	llm, tier := s.selectLLM(contextText)
+	llm, tier := s.selectLLM(contextText, 0)
 	if llm == nil {
 		return nil, "", fmt.Errorf("no LLM provider available (tier: %s)", tier)
 	}
@@ -205,7 +205,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return nil, "", fmt.Errorf("flashcard generation failed: %w", err)
+		return nil, "", s.FormatLLMError(err, tier)
 	}
 
 	// Validate output size before parsing

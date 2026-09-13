@@ -242,7 +242,15 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
 		}
 
-		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		var chaptersDraft []models.SyllabusChapterDraft
+		fallbackUsed := false
+		if res, err := a.notebookService.DraftSyllabusChapters("pdf", filePath, doc, nil); err == nil && len(res.Chapters) > 0 {
+			chaptersDraft = res.Chapters
+			fallbackUsed = res.FallbackUsed
+		} else {
+			chaptersDraft = notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		}
+
 		if len(chaptersDraft) == 0 {
 			chaptersDraft = []models.SyllabusChapterDraft{
 				{
@@ -251,9 +259,10 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 					EndPage:   doc.PageCount,
 				},
 			}
+			fallbackUsed = true
 		}
 
-		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
+		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, fallbackUsed); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
 			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
@@ -577,6 +586,24 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		}
 	}
 
+	annotateInQueue := func(chapters []models.SyllabusChapterDraft) []models.SyllabusChapterDraft {
+		existingTopics, err := repo.GetNotebookTopicsWithBounds(notebookID)
+		if err != nil || len(existingTopics) == 0 {
+			return chapters
+		}
+		annotated := make([]models.SyllabusChapterDraft, len(chapters))
+		for i, ch := range chapters {
+			annotated[i] = ch
+			for _, et := range existingTopics {
+				if et.StartPage == ch.StartPage && et.EndPage == ch.EndPage {
+					annotated[i].InQueue = true
+					break
+				}
+			}
+		}
+		return annotated
+	}
+
 	// Try to load persisted draft if not regenerating
 	if !regenerate {
 		draftJSON, err := repo.GetNotebookSyllabusDraft(notebookID)
@@ -589,7 +616,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 				resp := map[string]interface{}{
 					"notebook_id":   notebookID,
 					"page_count":    persistedDraft.PageCount,
-					"chapters":      persistedDraft.Chapters,
+					"chapters":      annotateInQueue(persistedDraft.Chapters),
 					"status":        "draft_ready",
 					"fallback_used": persistedDraft.FallbackUsed,
 				}
@@ -639,7 +666,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		resp := map[string]interface{}{
 			"notebook_id":   notebookID,
 			"page_count":    doc.PageCount,
-			"chapters":      chapters,
+			"chapters":      annotateInQueue(chapters),
 			"status":        "draft_ready",
 			"fallback_used": fallbackUsed,
 		}
@@ -672,7 +699,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	resp := map[string]interface{}{
 		"notebook_id":   notebookID,
 		"page_count":    doc.PageCount,
-		"chapters":      result.Chapters,
+		"chapters":      annotateInQueue(result.Chapters),
 		"status":        "draft_ready",
 		"fallback_used": result.FallbackUsed,
 	}
@@ -1034,8 +1061,9 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 			"study_status":    nb.StudyStatus,
 			"start_page":      nb.StartPage,
 			"end_page":        nb.EndPage,
-			"flashcard_count": nb.FlashcardCount,
-			"extraction_engine": nb.ExtractionEngine,
+			"flashcard_count":    nb.FlashcardCount,
+			"extraction_engine":  nb.ExtractionEngine,
+			"completion_percent": nb.CompletionPercent,
 		})
 	}
 

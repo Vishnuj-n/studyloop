@@ -1,5 +1,41 @@
 <template>
   <div class="notebook-card" :class="variantClass">
+    <div
+      class="completion-ring-container"
+      :title="`${completionPercent}% syllabus completed`"
+    >
+      <svg class="progress-ring" width="40" height="40" viewBox="0 0 40 40">
+        <circle
+          class="progress-ring-bg"
+          cx="20"
+          cy="20"
+          r="15"
+          fill="transparent"
+          stroke-width="3"
+        />
+        <circle
+          class="progress-ring-fill"
+          cx="20"
+          cy="20"
+          r="15"
+          fill="transparent"
+          stroke-width="3"
+          transform="rotate(-90 20 20)"
+          :stroke-dasharray="circleCircumference"
+          :stroke-dashoffset="circleDashOffset"
+        />
+        <text
+          x="20"
+          y="20"
+          class="progress-ring-text"
+          text-anchor="middle"
+          dominant-baseline="central"
+        >
+          {{ completionPercent }}%
+        </text>
+      </svg>
+    </div>
+
     <button
       class="btn-edit-pen"
       title="Edit notebook and chapters"
@@ -223,6 +259,21 @@ const ingestionBadgeLabel = computed(() => {
 const variantClass = computed(() =>
   props.variant === 'active' ? 'active-notebook-card' : 'dormant-notebook-card'
 )
+
+const completionPercent = computed(() => {
+  const pct = props.notebook.completion_percent
+  if (typeof pct === 'number' && !isNaN(pct)) {
+    return Math.min(100, Math.max(0, Math.round(pct)))
+  }
+  return 0
+})
+
+const circleRadius = 15
+const circleCircumference = computed(() => 2 * Math.PI * circleRadius)
+const circleDashOffset = computed(() => {
+  const c = circleCircumference.value
+  return c - (c * completionPercent.value) / 100
+})
 </script>
 
 <style scoped>
@@ -233,6 +284,32 @@ const variantClass = computed(() =>
   border: 1px solid var(--outline-variant);
   transition: all 0.2s;
   position: relative;
+}
+
+.completion-ring-container {
+  position: absolute;
+  top: 10px;
+  right: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.progress-ring-bg {
+  stroke: var(--outline-variant, rgba(255, 255, 255, 0.12));
+}
+
+.progress-ring-fill {
+  stroke: var(--primary, #6366f1);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+
+.progress-ring-text {
+  font-size: 9.5px;
+  font-weight: 700;
+  fill: var(--on-surface, #ffffff);
 }
 
 .notebook-card:hover {

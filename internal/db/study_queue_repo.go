@@ -66,8 +66,13 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 	}
 	var beforeStatus string
 	var taskType string
-	if err := tx.QueryRow(`SELECT COALESCE(status, ''), COALESCE(task_type, '') FROM study_queue WHERE id = ?`, taskID).Scan(&beforeStatus, &taskType); err == nil {
-		utils.Debugf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s", taskID, beforeStatus, taskType)
+	var topicID string
+	var startPage int
+	if err := tx.QueryRow(`
+		SELECT COALESCE(status, ''), COALESCE(task_type, ''), COALESCE(topic_id, ''), COALESCE(start_page, 0)
+		FROM study_queue WHERE id = ?
+	`, taskID).Scan(&beforeStatus, &taskType, &topicID, &startPage); err == nil {
+		utils.Debugf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s topicID=%s startPage=%d", taskID, beforeStatus, taskType, topicID, startPage)
 	} else {
 		utils.Warnf("[QUEUE] ActivateTaskTx before update taskID=%s statusLoadErr=%v", taskID, err)
 	}
@@ -84,6 +89,24 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 		return err
 	}
 	if affected == 1 {
+		if (taskType == string(models.StudyTaskTypeReading) || taskType == string(models.StudyTaskTypeReread)) && startPage > 0 {
+			if _, err := tx.Exec(`
+				UPDATE study_queue
+				SET current_page = ?
+				WHERE id = ?
+			`, startPage, taskID); err != nil {
+				utils.Warnf("[QUEUE] ActivateTaskTx failed to set task current_page taskID=%s startPage=%d err=%v", taskID, startPage, err)
+			}
+			if topicID != "" {
+				if _, err := tx.Exec(`
+					UPDATE topics
+					SET current_page_cursor = ?, updated_at = CURRENT_TIMESTAMP
+					WHERE id = ?
+				`, startPage, topicID); err != nil {
+					utils.Warnf("[QUEUE] ActivateTaskTx failed to align topic page cursor taskID=%s topicID=%s startPage=%d err=%v", taskID, topicID, startPage, err)
+				}
+			}
+		}
 		utils.LogQueueTransition(taskID, taskType, string(models.StudyTaskStatusPending), string(models.StudyTaskStatusActive), "task_activated")
 		return nil
 	}
@@ -254,7 +277,7 @@ func (r *Repository) SkipReadingTask(taskID string) error {
 	})
 }
 
-// PersistReadingProgress persists page progress directly to topics.current_page_cursor.
+// PersistReadingProgress persists page progress directly to study_queue.current_page and topics.current_page_cursor.
 // Used in trust-based completion model where user decides when reading is complete.
 func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool, error) {
 	task, err := r.GetReadingTask(taskID)
@@ -269,19 +292,27 @@ func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool,
 		finalPage = task.EndPage
 	}
 
-	if task.TopicID != "" {
-		err = r.withTx(func(tx *sql.Tx) error {
-			_, err := tx.Exec(`
+	err = r.withTx(func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`
+			UPDATE study_queue
+			SET current_page = ?
+			WHERE id = ?
+		`, finalPage, taskID); err != nil {
+			return err
+		}
+		if task.TopicID != "" {
+			_, err = tx.Exec(`
 				UPDATE topics
 				SET current_page_cursor = ?,
 				    updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND current_page_cursor < ?
 			`, finalPage, task.TopicID, finalPage)
 			return err
-		})
-		if err != nil {
-			return false, err
 		}
+		return nil
+	})
+	if err != nil {
+		return false, err
 	}
 
 	return reachedEnd, nil

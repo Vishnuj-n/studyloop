@@ -38,13 +38,18 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 
 	rawContextText := buildContextTextFromChunks(contextChunks)
 
-	llm, tier := s.selectLLM(rawContextText)
+	llm, tier := s.selectLLM(rawContextText, 0)
 	if llm == nil {
 		return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
 	}
 
+	notebookTitle := notebookID
+	if nb, nbErr := s.repo.GetNotebookByID(notebookID); nbErr == nil && nb != nil && strings.TrimSpace(nb.Title) != "" {
+		notebookTitle = strings.TrimSpace(nb.Title)
+	}
+
 	limits := llm.GetLimits()
-	templatePrompt := buildComprehensiveExamPrompt(notebookID, startPage, endPage, "")
+	templatePrompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, "")
 	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
@@ -63,10 +68,11 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 	utils.Warnf("[EXAMINER] generate_exam notebookID=%s page_range=%d-%d total_chunks=%d included_chunks=%d est_tokens=%d max_input=%d tier=%s model=%s",
 		notebookID, startPage, endPage, len(contextChunks), len(budgetedChunks), tokenCount, limits.MaxInputTokens, tier, providerModelName(llm))
 
-	prompt := buildComprehensiveExamPrompt(notebookID, startPage, endPage, contextText)
+	prompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, contextText)
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
-		return map[string]interface{}{"error": "exam generation failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, tier)
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 	parsed, err := parseShortAnswerPromptLLMResponse(raw)
 	if err != nil {
@@ -129,19 +135,24 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 	}
 }
 
-func buildComprehensiveExamPrompt(notebookID string, startPage, endPage int, contextText string) string {
+func buildComprehensiveExamPrompt(notebookTitle string, startPage, endPage int, contextText string) string {
 	var b strings.Builder
-	b.WriteString("You are an AI tutor generating a short-answer assessment question.\n")
-	fmt.Fprintf(&b, "Generate exactly one short-answer question grounded in pages %d-%d of notebook '%s'.\n",
-		startPage, endPage, notebookID)
+	b.WriteString("You are an AI tutor generating one oral viva question.\n")
+	fmt.Fprintf(&b, "Generate exactly ONE high-quality question based ONLY on the supplied material from pages %d-%d of notebook '%s'.\n",
+		startPage, endPage, notebookTitle)
+
 	b.WriteString(`Return STRICT JSON only in this shape: {"prompt":"..."}.` + "\n")
+	b.WriteString("Test genuine understanding rather than definition recall. Target the most important concept or relationship in the material. Prefer questions requiring the student to explain WHY/HOW, apply the concept, predict an outcome, or explain cause and effect.\n\n")
 	b.WriteString("Rules:\n")
-	b.WriteString("- Ask exactly one question.\n")
-	b.WriteString("- Keep it concise (max 30 words).\n")
-	b.WriteString("- Require understanding, not pure definition recall.\n")
-	b.WriteString("- Do not include answer choices, rubric, preamble, or markdown.\n")
+	b.WriteString("- Ask exactly one clear question.\n")
+	b.WriteString("- Use ONLY information supported by the supplied material; do not rely on outside knowledge.\n")
+	b.WriteString("- Avoid trivial factual recall, yes/no questions, and questions answerable by copying a sentence.\n")
+	b.WriteString("- Encourage a 30–90 second spoken explanation.\n")
+	b.WriteString("- Maximum 35 words.\n")
+	b.WriteString("- Do not include answer choices, rubric, hints, preamble, or markdown.\n")
 	b.WriteString("\n=== SOURCE MATERIAL ===\n")
 	b.WriteString(contextText)
+
 	return b.String()
 }
 
@@ -180,7 +191,8 @@ Student answer: %s`, question.Prompt, userAnswer)
 
 	raw, err := s.fastLLMProvider.GenerateAnswer(scorePrompt)
 	if err != nil {
-		return map[string]interface{}{"error": "short-answer scoring failed: " + err.Error()}
+		formattedErr := s.FormatLLMError(err, "fast")
+		return map[string]interface{}{"error": formattedErr.Error()}
 	}
 	parsed, err := parseShortAnswerScoreLLMResponse(raw)
 	if err != nil {

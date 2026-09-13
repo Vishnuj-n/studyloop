@@ -5,7 +5,7 @@
     :style="{ width: width + 'px' }"
   >
     <vue-pdf-embed
-      :key="`${source}-p${pageNum}-w${width}`"
+      :key="`${source}-p${pageNum}`"
       :source="source"
       :page="pageNum"
       :width="width"
