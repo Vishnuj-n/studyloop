@@ -187,6 +187,25 @@ function close() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.release-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.release-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.release-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
+}
+
+.release-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .notes-section {
