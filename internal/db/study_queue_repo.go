@@ -66,8 +66,13 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 	}
 	var beforeStatus string
 	var taskType string
-	if err := tx.QueryRow(`SELECT COALESCE(status, ''), COALESCE(task_type, '') FROM study_queue WHERE id = ?`, taskID).Scan(&beforeStatus, &taskType); err == nil {
-		utils.Debugf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s", taskID, beforeStatus, taskType)
+	var topicID string
+	var startPage int
+	if err := tx.QueryRow(`
+		SELECT COALESCE(status, ''), COALESCE(task_type, ''), COALESCE(topic_id, ''), COALESCE(start_page, 0)
+		FROM study_queue WHERE id = ?
+	`, taskID).Scan(&beforeStatus, &taskType, &topicID, &startPage); err == nil {
+		utils.Debugf("[QUEUE] ActivateTaskTx before update taskID=%s status=%s taskType=%s topicID=%s startPage=%d", taskID, beforeStatus, taskType, topicID, startPage)
 	} else {
 		utils.Warnf("[QUEUE] ActivateTaskTx before update taskID=%s statusLoadErr=%v", taskID, err)
 	}
@@ -84,6 +89,15 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 		return err
 	}
 	if affected == 1 {
+		if (taskType == string(models.StudyTaskTypeReading) || taskType == string(models.StudyTaskTypeReread)) && topicID != "" && startPage > 0 {
+			if _, err := tx.Exec(`
+				UPDATE topics
+				SET current_page_cursor = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?
+			`, startPage, topicID); err != nil {
+				utils.Warnf("[QUEUE] ActivateTaskTx failed to align topic page cursor taskID=%s topicID=%s startPage=%d err=%v", taskID, topicID, startPage, err)
+			}
+		}
 		utils.LogQueueTransition(taskID, taskType, string(models.StudyTaskStatusPending), string(models.StudyTaskStatusActive), "task_activated")
 		return nil
 	}
