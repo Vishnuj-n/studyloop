@@ -586,6 +586,24 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		}
 	}
 
+	annotateInQueue := func(chapters []models.SyllabusChapterDraft) []models.SyllabusChapterDraft {
+		existingTopics, err := repo.GetNotebookTopicsWithBounds(notebookID)
+		if err != nil || len(existingTopics) == 0 {
+			return chapters
+		}
+		annotated := make([]models.SyllabusChapterDraft, len(chapters))
+		for i, ch := range chapters {
+			annotated[i] = ch
+			for _, et := range existingTopics {
+				if et.StartPage == ch.StartPage && et.EndPage == ch.EndPage {
+					annotated[i].InQueue = true
+					break
+				}
+			}
+		}
+		return annotated
+	}
+
 	// Try to load persisted draft if not regenerating
 	if !regenerate {
 		draftJSON, err := repo.GetNotebookSyllabusDraft(notebookID)
@@ -598,7 +616,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 				resp := map[string]interface{}{
 					"notebook_id":   notebookID,
 					"page_count":    persistedDraft.PageCount,
-					"chapters":      persistedDraft.Chapters,
+					"chapters":      annotateInQueue(persistedDraft.Chapters),
 					"status":        "draft_ready",
 					"fallback_used": persistedDraft.FallbackUsed,
 				}
@@ -648,7 +666,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		resp := map[string]interface{}{
 			"notebook_id":   notebookID,
 			"page_count":    doc.PageCount,
-			"chapters":      chapters,
+			"chapters":      annotateInQueue(chapters),
 			"status":        "draft_ready",
 			"fallback_used": fallbackUsed,
 		}
@@ -681,7 +699,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	resp := map[string]interface{}{
 		"notebook_id":   notebookID,
 		"page_count":    doc.PageCount,
-		"chapters":      result.Chapters,
+		"chapters":      annotateInQueue(result.Chapters),
 		"status":        "draft_ready",
 		"fallback_used": result.FallbackUsed,
 	}

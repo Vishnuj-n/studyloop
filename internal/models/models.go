@@ -246,6 +246,7 @@ type SyllabusChapterDraft struct {
 	Title     string `json:"title"`
 	StartPage int    `json:"start_page"`
 	EndPage   int    `json:"end_page"`
+	InQueue   bool   `json:"in_queue,omitempty"`
 }
 
 // SyllabusDraft captures the backend-generated chapter draft shown in the Notebook verification modal.
