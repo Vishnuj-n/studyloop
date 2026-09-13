@@ -86,9 +86,9 @@ func (s *StudyService) FormatLLMError(err error, tier string) error {
 	return err
 }
 
-// selectLLM dynamically routes to heavy provider if context exceeds fast provider limits or output budget,
+// selectLLM dynamically routes to heavy provider if context exceeds fast provider input limits
 // or if fast provider is currently in rate-limit cooldown.
-func (s *StudyService) selectLLM(contextText string, requiredOutputBudget int) (LLMProvider, string) {
+func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
 	if s.IsFastRateLimited() && s.heavyLLMProvider != nil {
 		return s.heavyLLMProvider, "heavy"
 	}
@@ -104,12 +104,10 @@ func (s *StudyService) selectLLM(contextText string, requiredOutputBudget int) (
 			}
 		}
 
-		outputExceeded := requiredOutputBudget > 0 && fastLimits.MaxOutputTokens < requiredOutputBudget
-
-		if (inputExceeded || outputExceeded) && s.heavyLLMProvider != nil {
+		if inputExceeded && s.heavyLLMProvider != nil {
 			heavyLimits := s.heavyLLMProvider.GetLimits()
-			// Only escalate if heavy tier can satisfy budget or has distinct model name
-			isHeavyLarger := heavyLimits.MaxInputTokens > fastLimits.MaxInputTokens || heavyLimits.MaxOutputTokens > fastLimits.MaxOutputTokens || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()
+			// Only escalate if heavy tier has larger input limit or distinct model name
+			isHeavyLarger := heavyLimits.MaxInputTokens > fastLimits.MaxInputTokens || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()
 			if isHeavyLarger {
 				return s.heavyLLMProvider, "heavy"
 			}

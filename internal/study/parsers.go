@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"ai-tutor/internal/utils"
 )
 
 // ---------- LLM response types (shared across study sub-files) ----------
@@ -87,15 +89,70 @@ func providerModelName(provider LLMProvider) string {
 	return name
 }
 
+func recoverTruncatedQuizJSON(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(raw, "```") {
+		if idx := strings.Index(raw, "\n"); idx != -1 {
+			raw = raw[idx+1:]
+		}
+		if lastIdx := strings.LastIndex(raw, "```"); lastIdx != -1 {
+			raw = raw[:lastIdx]
+		}
+		raw = strings.TrimSpace(raw)
+	}
+
+	qIdx := strings.Index(raw, `"questions"`)
+	if qIdx == -1 {
+		return ""
+	}
+
+	lastBrace := strings.LastIndex(raw, "}")
+	if lastBrace <= qIdx {
+		return ""
+	}
+
+	sub := strings.TrimSpace(raw[:lastBrace+1])
+	sub = strings.TrimSuffix(sub, ",")
+	sub = strings.TrimSpace(sub)
+
+	openBrackets := strings.Count(sub, "[")
+	closeBrackets := strings.Count(sub, "]")
+	openBraces := strings.Count(sub, "{")
+	closeBraces := strings.Count(sub, "}")
+
+	var sb strings.Builder
+	sb.WriteString(sub)
+	for i := 0; i < openBrackets-closeBrackets; i++ {
+		sb.WriteString("]")
+	}
+	for i := 0; i < openBraces-closeBraces; i++ {
+		sb.WriteString("}")
+	}
+
+	return sb.String()
+}
+
 func parseQuizLLMResponse(raw string) (*quizLLMResponse, error) {
 	out, err := parseLLMJSON[quizLLMResponse](raw)
+	if err == nil && len(out.Questions) > 0 {
+		return out, nil
+	}
+
+	if recoveredRaw := recoverTruncatedQuizJSON(raw); recoveredRaw != "" {
+		if recOut, recErr := parseLLMJSON[quizLLMResponse](recoveredRaw); recErr == nil && len(recOut.Questions) > 0 {
+			utils.Warnf("[QUIZ_RECOVERY] recovered %d valid questions from truncated LLM response", len(recOut.Questions))
+			return recOut, nil
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	if len(out.Questions) == 0 {
-		return nil, fmt.Errorf("no questions in LLM response")
-	}
-	return out, nil
+	return nil, fmt.Errorf("no questions in LLM response")
 }
 
 func parseFlashcardLLMResponse(raw string) (*flashcardLLMResponse, error) {
