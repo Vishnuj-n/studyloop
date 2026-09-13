@@ -35,12 +35,13 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `generateManualFlashcards` | `GenerateManualFlashcards` | 1 | Active |
 | `generateQuizForPageRange` | `GenerateQuizForPageRange` | 1 | Active |
 | `getAppEnv` | `GetAppEnv` | 1 | Active |
-| `getAvailableTopics` | `GetAvailableTopics` | 1 | Active |
+| `getAvailableTopics` | `GetAvailableTopics` | 2 | Active |
 | `getCloudConfig` | `GetCloudConfig` | 1 | Active |
 | `getDashboardOverview` | `GetDashboardOverview` | 1 | Active |
 | `getExtensionConfig` | `GetExtensionConfig` | 1 | Active |
 | `getFlashcardDueTimeline` | `GetFlashcardDueTimeline` | 1 | Active |
-| `getGamificationState` | `GetGamificationState` | 2 | Active |
+| `getGamificationState` | `GetGamificationState` | 3 | Active |
+| `getGamificationStore` | `GetGamificationStore` | 1 | Active |
 | `getLLMProviderPreset` | `GetLLMProviderPreset` | 2 | Active |
 | `getLLMSettings` | `GetLLMSettings` | 1 | Active |
 | `getNotebookTopicTree` | `GetNotebookTopicTree` | 2 | Active |
@@ -53,7 +54,7 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `getTaskContext` | `GetTaskContext` | 2 | Active |
 | `getTodayPlan` | `GetTodayPlan` | 1 | Active |
 | `getTopicSectionsContent` | `GetTopicSectionsContent` | 3 | Active |
-| `getUserSettings` | `GetUserSettings` | 9 | Active |
+| `getUserSettings` | `GetUserSettings` | 10 | Active |
 | `importAnkiDeck` | `ImportAnkiDeck` | 1 | Active |
 | `initializeRAG` | `InitializeRAG` | 2 | Active |
 | `initializeReadingSession` | `InitializeReadingSession` | 1 | Active |
@@ -82,15 +83,17 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `stopTopicAudioOverview` | `StopTopicAudioOverview` | 1 | Active |
 | `submitQuizAttempt` | `SubmitQuizAttempt` | 1 | Active |
 | `suspendFlashcard` | `SuspendFlashcard` | 1 | Active |
-| `testLLMConnection` | `TestLLMConnection` | 1 | Active |
+| `testLLMConnection` | `TestLLMConnection` | 2 | Active |
+| `testLLMLimits` | `TestLLMLimits` | 1 | Active |
 | `trackAnalyticsEvent` | `TrackAnalyticsEvent` | 2 | Active |
 | `triggerCloudSync` | `TriggerCloudSync` | 2 | Active |
+| `unlockCosmeticItem` | `UnlockCosmeticItem` | 1 | Active |
 | `updateLLMSettings` | `UpdateLLMSettings` | 2 | Active |
 | `updateNotebookPriority` | `UpdateNotebookPriority` | 1 | Active |
 | `updateNotebookStudyStatus` | `UpdateNotebookStudyStatus` | 1 | Active |
 | `updateNotebookTitle` | `UpdateNotebookTitle` | 1 | Active |
 | `updateProfile` | `UpdateProfile` | 1 | Active |
-| `updateUserSettings` | `UpdateUserSettings` | 4 | Active |
+| `updateUserSettings` | `UpdateUserSettings` | 5 | Active |
 | `upgradeNotebookToDeepPDF` | `UpgradeNotebookToDeepPDF` | 1 | Active |
 | `uploadNotebook` | `UploadNotebook` | 1 | Active |
 | `uploadYouTubeNotebook` | `UploadYouTubeNotebook` | 1 | Active |
@@ -133,6 +136,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `GetExtensionConfig` | Yes |
 | `GetFlashcardDueTimeline` | Yes |
 | `GetGamificationState` | Yes |
+| `GetGamificationStore` | Yes |
 | `GetLLMProviderPreset` | Yes |
 | `GetLLMSettings` | Yes |
 | `GetNotebookTopicTree` | Yes |
@@ -146,7 +150,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `GetTaskContext` | Yes |
 | `GetTodayPlan` | Yes |
 | `GetTopicSectionsContent` | Yes |
-| `GetUserSession` | No (Unused API) |
 | `GetUserSettings` | Yes |
 | `ImportAnkiDeck` | Yes |
 | `InitializeRAG` | Yes |
@@ -184,7 +187,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `ScoreShortAnswer` | Yes |
 | `SelectAndUploadDeepStructuredPDF` | Yes |
 | `SelectAnkiFile` | Yes |
-| `SetSession` | No (Unused API) |
 | `SetupExtension` | Yes |
 | `SignUpStudent` | Yes |
 | `SimplifyReadingContent` | Yes |
@@ -195,8 +197,10 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `SubmitQuizAttempt` | Yes |
 | `SuspendFlashcard` | Yes |
 | `TestLLMConnection` | Yes |
+| `TestLLMLimits` | Yes |
 | `TrackAnalyticsEvent` | Yes |
 | `TriggerCloudSync` | Yes |
+| `UnlockCosmeticItem` | Yes |
 | `UpdateLLMSettings` | Yes |
 | `UpdateNotebookPriority` | Yes |
 | `UpdateNotebookStudyStatus` | Yes |
@@ -245,27 +249,27 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `Uninstall` | `internal\extension\installer.go:15` | `Manager` | `method` |
 | `activateReadingSessionTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `aggregateQueueTasks` | `internal\app\app_study.go:53` | None | `function` |
-| `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:142` | None | `function` |
-| `awardCompletionRewards` | `internal\study\queue_transition.go:286` | `StudyService` | `method` |
+| `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:156` | None | `function` |
+| `awardCompletionRewards` | `internal\study\queue_transition.go:298` | `StudyService` | `method` |
 | `bookmarkNodesToDraft` | `internal\notebook\pdfcpu.go:33` | None | `function` |
 | `buildInputValues` | `internal\embeddings\onnx.go:337` | `OnnxEmbedder` | `method` |
 | `buildPageSample` | `internal\notebook\syllabus.go:358` | None | `function` |
-| `buildReviewTaskForPlan` | `internal\app\app_study.go:254` | None | `function` |
+| `buildReviewTaskForPlan` | `internal\app\app_study.go:269` | None | `function` |
 | `buildSocraticRemedialPrompt` | `internal\app\app_study_cards.go:91` | None | `function` |
 | `buildTokenArrays` | `internal\embeddings\onnx.go:286` | None | `function` |
 | `calculateDailyStudyMinutes` | `internal\app\app_study.go:21` | None | `function` |
 | `calculateFlashcardBudgets` | `internal\app\app_study.go:40` | None | `function` |
 | `chapterIndexForPage` | `internal\notebook\ingestion.go:83` | None | `function` |
-| `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:265` | None | `function` |
-| `computeCurrentStreak` | `internal\app\app_study.go:115` | None | `function` |
-| `computeLongestStreak` | `internal\app\app_study.go:85` | None | `function` |
+| `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:278` | None | `function` |
+| `computeCurrentStreak` | `internal\app\app_study.go:117` | None | `function` |
+| `computeLongestStreak` | `internal\app\app_study.go:87` | None | `function` |
 | `copyPomoFile` | `internal\app\app_pomodoro.go:268` | None | `function` |
 | `destroyValues` | `internal\embeddings\onnx.go:536` | None | `function` |
 | `embedBatchInternal` | `internal\embeddings\onnx.go:210` | `OnnxEmbedder` | `method` |
 | `embedInternal` | `internal\embeddings\onnx.go:199` | `OnnxEmbedder` | `method` |
-| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1049` | None | `function` |
+| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1070` | None | `function` |
 | `emitState` | `internal\pomodoro\services\audio\service.go:273` | `Service` | `method` |
-| `envHasLLMAPIKey` | `internal\app\app_settings.go:332` | None | `function` |
+| `envHasLLMAPIKey` | `internal\app\app_settings.go:388` | None | `function` |
 | `extractBatchEmbedding` | `internal\embeddings\onnx.go:385` | None | `function` |
 | `extractIONames` | `internal\embeddings\onnx.go:496` | None | `function` |
 | `finalizeDeepStructuredPDFUpload` | `internal/app/app.go` | `App` | `AppHelper` |
@@ -274,36 +278,39 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `firstInt` | `internal\notebook\pdfcpu.go:281` | None | `function` |
 | `firstN` | `internal\notebook\syllabus.go:398` | None | `function` |
 | `firstString` | `internal\notebook\pdfcpu.go:266` | None | `function` |
-| `generateLootBox` | `internal\study\rewards.go:58` | None | `function` |
+| `generateLootBox` | `internal\study\rewards.go:86` | None | `function` |
 | `getAppVersion` | `internal\app\app_update.go:17` | None | `function` |
 | `getNotebookAndRepo` | `internal/app/app.go` | `App` | `AppHelper` |
 | `getStreakState` | `internal/app/app.go` | `App` | `AppHelper` |
+| `getUserSession` | `internal/app/app.go` | `App` | `AppHelper` |
 | `inferMaxSeqLen` | `internal\embeddings\onnx.go:524` | None | `function` |
-| `insertMilestoneForAttempts` | `internal\app\app_study_cards.go:284` | None | `function` |
+| `insertMilestoneForAttempts` | `internal\app\app_study_cards.go:297` | None | `function` |
 | `isTableRow` | `internal\notebook\markdown_chunker.go:190` | None | `function` |
 | `linearToLog` | `internal\pomodoro\services\audio\service.go:266` | None | `function` |
-| `mapTaskError` | `internal\app\app_study.go:138` | None | `function` |
+| `mapTaskError` | `internal\app\app_study.go:140` | None | `function` |
 | `maxPage` | `internal\notebook\syllabus.go:390` | None | `function` |
 | `normalizeL2` | `internal\embeddings\onnx.go:477` | None | `function` |
-| `normalizeLLMTierForApp` | `internal\app\app_settings.go:322` | None | `function` |
+| `normalizeLLMTierForApp` | `internal\app\app_settings.go:378` | None | `function` |
 | `parseBookmarkNode` | `internal\notebook\pdfcpu.go:23` | None | `function` |
 | `parseMarkdownBlocks` | `internal\notebook\markdown_chunker.go:96` | None | `function` |
 | `parseSyllabusDraft` | `internal\notebook\syllabus.go:257` | None | `function` |
-| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:519` | None | `function` |
+| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:552` | None | `function` |
 | `pickInputSource` | `internal\embeddings\onnx.go:504` | None | `function` |
 | `playChimeAsync` | `internal\pomodoro\services\audio\service.go:172` | `Service` | `method` |
 | `playFile` | `internal\pomodoro\services\audio\service.go:210` | `Service` | `method` |
-| `queueTaskToScheduledTask` | `internal\app\app_study.go:285` | None | `function` |
+| `queueTaskToScheduledTask` | `internal\app\app_study.go:303` | None | `function` |
 | `reconcileConfirmedNotebookTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `reloadLLMProviders` | `internal/app/app.go` | `App` | `AppHelper` |
-| `requireRepo` | `internal\app\app_study.go:156` | None | `function` |
+| `requireRepo` | `internal\app\app_study.go:158` | None | `function` |
 | `resolveExplicitActiveProfileID` | `internal/app/app.go` | `App` | `AppHelper` |
-| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:506` | None | `function` |
+| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:519` | None | `function` |
 | `resolveRuntimeLibraryPath` | `internal\embeddings\onnx.go:544` | None | `function` |
+| `rollChestTier` | `internal\study\rewards.go:61` | None | `function` |
 | `runDeepPDFExtraction` | `internal/app/app.go` | `App` | `AppHelper` |
 | `runPDFCPUBookmarksExport` | `internal\notebook\pdfcpu.go:117` | None | `function` |
-| `sameLLMSettingsForUI` | `internal\app\app_settings.go:346` | None | `function` |
+| `sameLLMSettingsForUI` | `internal\app\app_settings.go:402` | None | `function` |
 | `scanMP3s` | `internal\pomodoro\services\audio\service.go:282` | None | `function` |
+| `setSession` | `internal/app/app.go` | `App` | `AppHelper` |
 | `shuffleStrings` | `internal\pomodoro\services\audio\service.go:296` | None | `function` |
 | `splitDeepPDFMarkdown` | `internal\notebook\deep_pdf.go:168` | None | `function` |
 | `stripMarkdownHeadings` | `internal\notebook\deep_pdf.go:191` | None | `function` |
