@@ -33,7 +33,7 @@ func TestAppTestLLMConnectionAndLimits(t *testing.T) {
 		t.Fatalf("expected TestLLMLimits ok: true, got: %v", limitsRes)
 	}
 	statusStr, _ := limitsRes["status"].(string)
-	if !strings.Contains(statusStr, "Input budget: 4000") || !strings.Contains(statusStr, "Output budget: 2500") {
+	if !strings.Contains(statusStr, "max_tokens: 2500") || !strings.Contains(statusStr, "4000 token prompts") {
 		t.Fatalf("unexpected status output from TestLLMLimits: %s", statusStr)
 	}
 }

@@ -339,7 +339,7 @@ func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxIn
 	}
 	return map[string]interface{}{
 		"ok":     true,
-		"status": fmt.Sprintf("Input budget: %d | Output budget: %d — accepted cleanly by provider API.", maxInput, maxOutput),
+		"status": fmt.Sprintf("API syntax validated (max_tokens: %d). Actual %d token prompts depend on your provider's TPM quota.", maxOutput, maxInput),
 	}
 }
 

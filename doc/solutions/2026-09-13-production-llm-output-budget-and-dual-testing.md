@@ -41,7 +41,8 @@
 | `internal/study/quiz_sync.go` | Set `quizTaskOutputBudget = 2500`, passed budget to `selectLLM`, and added `targetCount` fallback |
 | `internal/study/*` | Updated callers of `selectLLM` across `examiner.go`, `audio_overview.go`, `flashcard.go`, `reader_ai.go`, `simplifier.go` |
 | `frontend/src/services/appApi.js` | Exported `testLLMLimits` Wails bridge function |
-| `frontend/src/components/SettingsAIProvider.vue` | Added **[ Test Limits ]** buttons and result state handlers for Fast and Heavy tiers |
+| `frontend/src/composables/useLLM.js` | Updated `max_output_tokens` default to 2500 tokens in reactive settings state |
+| `frontend/src/components/SettingsAIProvider.vue` | Added **Max Output Tokens** input fields for both Fast and Heavy provider settings panels and **[ Test Limits ]** buttons |
 
 ---
 
