@@ -595,7 +595,9 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 		for i, ch := range chapters {
 			annotated[i] = ch
 			for _, et := range existingTopics {
-				if et.StartPage == ch.StartPage && et.EndPage == ch.EndPage {
+				// Match if exact page bounds match OR page ranges overlap
+				if (et.StartPage == ch.StartPage && et.EndPage == ch.EndPage) ||
+					(ch.StartPage > 0 && et.StartPage > 0 && !(ch.EndPage < et.StartPage || ch.StartPage > et.EndPage)) {
 					annotated[i].InQueue = true
 					break
 				}
