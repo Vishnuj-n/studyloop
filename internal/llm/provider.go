@@ -143,7 +143,7 @@ func defaultModelForProvider(provider string) string {
 func getModelLimits() ModelLimits {
 	return ModelLimits{
 		MaxInputTokens:  4000,
-		MaxOutputTokens: 1000,
+		MaxOutputTokens: 2500,
 	}
 }
 
@@ -248,8 +248,9 @@ func (p *Provider) GetLimits() ModelLimits {
 
 // openAIRequest follows the OpenAI API format.
 type openAIRequest struct {
-	Model    string          `json:"model"`
-	Messages []openAIMessage `json:"messages"`
+	Model     string          `json:"model"`
+	Messages  []openAIMessage `json:"messages"`
+	MaxTokens int             `json:"max_tokens,omitempty"`
 }
 
 // openAIMessage represents a message in the OpenAI API.
@@ -264,6 +265,7 @@ type openAIResponse struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason,omitempty"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -292,7 +294,8 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, limits.MaxOutputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
-		Model: p.config.Model,
+		Model:     p.config.Model,
+		MaxTokens: limits.MaxOutputTokens,
 		Messages: []openAIMessage{
 			{
 				Role:    "user",
@@ -370,6 +373,10 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 
 	if len(apiResp.Choices) == 0 {
 		return "", fmt.Errorf("no response from LLM")
+	}
+
+	if apiResp.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("LLM output truncated: max output tokens reached (finish_reason=length)")
 	}
 
 	if apiResp.Usage.TotalTokens > 0 {

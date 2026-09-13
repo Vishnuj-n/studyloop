@@ -79,8 +79,16 @@
         >
           {{ testingFast ? 'Testing...' : 'Test Connection' }}
         </button>
+        <button
+          type="button"
+          class="test-btn"
+          :disabled="disabled || testingFastLimits"
+          @click="testFastLimits"
+        >
+          {{ testingFastLimits ? 'Testing Limits...' : 'Test Limits' }}
+        </button>
         <span v-if="fastResult" :class="['test-result', fastResult.ok ? 'success' : 'error']">
-          {{ fastResult.ok ? '✓ Connected successfully' : '✗ ' + fastResult.error }}
+          {{ fastResult.ok ? (fastResult.status ? '✓ ' + fastResult.status : '✓ Connected successfully') : '✗ ' + fastResult.error }}
         </span>
       </div>
     </div>
@@ -177,8 +185,16 @@
           >
             {{ testingHeavy ? 'Testing Heavy Connection...' : 'Test Heavy Connection' }}
           </button>
+          <button
+            type="button"
+            class="test-btn"
+            :disabled="disabled || testingHeavyLimits"
+            @click="testHeavyLimits"
+          >
+            {{ testingHeavyLimits ? 'Testing Limits...' : 'Test Heavy Limits' }}
+          </button>
           <span v-if="heavyResult" :class="['test-result', heavyResult.ok ? 'success' : 'error']">
-            {{ heavyResult.ok ? '✓ Connected successfully' : '✗ ' + heavyResult.error }}
+            {{ heavyResult.ok ? (heavyResult.status ? '✓ ' + heavyResult.status : '✓ Connected successfully') : '✗ ' + heavyResult.error }}
           </span>
         </div>
       </div>
@@ -207,7 +223,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
-import { openURLInBrowser, testLLMConnection } from '../services/appApi'
+import { openURLInBrowser, testLLMConnection, testLLMLimits } from '../services/appApi'
 
 const props = defineProps({
   llmSettings: { type: Object, required: true },
@@ -221,6 +237,8 @@ const testingFast = ref(false)
 const fastResult = ref(null)
 const testingHeavy = ref(false)
 const heavyResult = ref(null)
+const testingFastLimits = ref(false)
+const testingHeavyLimits = ref(false)
 const fastRevision = ref(0)
 const heavyRevision = ref(0)
 
@@ -294,6 +312,34 @@ async function testFastConnection() {
   }
 }
 
+async function testFastLimits() {
+  testingFastLimits.value = true
+  fastResult.value = null
+  const reqRev = fastRevision.value
+  try {
+    const res = await testLLMLimits(
+      'fast',
+      props.llmSettings?.fast?.provider,
+      props.llmSettings?.fast?.base_url,
+      props.llmSettings?.fast?.model,
+      props.llmFastKey,
+      props.llmSettings?.fast?.max_input_tokens || 4000,
+      props.llmSettings?.fast?.max_output_tokens || 2500
+    )
+    if (reqRev === fastRevision.value) {
+      fastResult.value = res
+    }
+  } catch (err) {
+    if (reqRev === fastRevision.value) {
+      fastResult.value = { error: err.message || 'Limits test failed' }
+    }
+  } finally {
+    if (reqRev === fastRevision.value) {
+      testingFastLimits.value = false
+    }
+  }
+}
+
 async function testHeavyConnection() {
   testingHeavy.value = true
   heavyResult.value = null
@@ -316,6 +362,34 @@ async function testHeavyConnection() {
   } finally {
     if (reqRev === heavyRevision.value) {
       testingHeavy.value = false
+    }
+  }
+}
+
+async function testHeavyLimits() {
+  testingHeavyLimits.value = true
+  heavyResult.value = null
+  const reqRev = heavyRevision.value
+  try {
+    const res = await testLLMLimits(
+      'heavy',
+      props.llmSettings?.heavy?.provider,
+      props.llmSettings?.heavy?.base_url,
+      props.llmSettings?.heavy?.model,
+      props.llmHeavyKey,
+      props.llmSettings?.heavy?.max_input_tokens || 4000,
+      props.llmSettings?.heavy?.max_output_tokens || 2500
+    )
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = res
+    }
+  } catch (err) {
+    if (reqRev === heavyRevision.value) {
+      heavyResult.value = { error: err.message || 'Limits test failed' }
+    }
+  } finally {
+    if (reqRev === heavyRevision.value) {
+      testingHeavyLimits.value = false
     }
   }
 }

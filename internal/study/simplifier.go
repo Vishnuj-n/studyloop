@@ -84,7 +84,7 @@ Return only the markdown response without meta-commentary.`, styleDirective, con
 // loading the prompt template dynamically from extensions/text_simplifier/prompt.md and injecting the comprehension style.
 func (s *StudyService) SimplifyReadingContent(ctx context.Context, content string, level ...string) (string, error) {
 // ponytail: select LLM tier dynamically based on reading content length
-	llm, _ := s.selectLLM(content)
+	llm, _ := s.selectLLM(content, 0)
 	if llm == nil {
 		return "", fmt.Errorf("AI provider not available. Please check your API key in Settings")
 	}

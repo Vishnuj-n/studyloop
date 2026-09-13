@@ -201,7 +201,7 @@ func (s *StudyService) GenerateAudioOverview(
 		// Prioritize heavy LLM for rich script overview, fallback to fast LLM
 		llmProvider := s.heavyLLMProvider
 		if llmProvider == nil {
-			llmProvider, _ = s.selectLLM(topicContent)
+			llmProvider, _ = s.selectLLM(topicContent, 0)
 		}
 		if llmProvider == nil {
 			return fmt.Errorf("no LLM provider available")

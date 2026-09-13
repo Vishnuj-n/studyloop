@@ -48,17 +48,27 @@ func NewStudyService(cfg Config) *StudyService {
 	}
 }
 
-// selectLLM dynamically routes to heavy provider if context exceeds fast provider limits.
-func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
+// selectLLM dynamically routes to heavy provider if context exceeds fast provider limits or output budget.
+func (s *StudyService) selectLLM(contextText string, requiredOutputBudget int) (LLMProvider, string) {
 	if s.fastLLMProvider != nil {
 		fastLimits := s.fastLLMProvider.GetLimits()
 		// ponytail: 15% safety buffer accounts for prompt wrapper template overhead
-		effectiveLimit := int(float64(fastLimits.MaxInputTokens) * 0.85)
-		if effectiveLimit > 0 && s.heavyLLMProvider != nil {
+		effectiveInputLimit := int(float64(fastLimits.MaxInputTokens) * 0.85)
+
+		inputExceeded := false
+		if effectiveInputLimit > 0 {
+			if tokens, err := embeddings.CountTokens(contextText); err == nil && tokens > effectiveInputLimit {
+				inputExceeded = true
+			}
+		}
+
+		outputExceeded := requiredOutputBudget > 0 && fastLimits.MaxOutputTokens < requiredOutputBudget
+
+		if (inputExceeded || outputExceeded) && s.heavyLLMProvider != nil {
 			heavyLimits := s.heavyLLMProvider.GetLimits()
-			// Only escalate if heavy tier has higher context limit or distinct model name
-			isHeavyLarger := heavyLimits.MaxInputTokens > fastLimits.MaxInputTokens || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()
-			if tokens, err := embeddings.CountTokens(contextText); err == nil && tokens > effectiveLimit && isHeavyLarger {
+			// Only escalate if heavy tier can satisfy budget or has distinct model name
+			isHeavyLarger := heavyLimits.MaxInputTokens > fastLimits.MaxInputTokens || heavyLimits.MaxOutputTokens > fastLimits.MaxOutputTokens || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()
+			if isHeavyLarger {
 				return s.heavyLLMProvider, "heavy"
 			}
 		}

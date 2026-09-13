@@ -38,7 +38,7 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 
 	rawContextText := buildContextTextFromChunks(contextChunks)
 
-	llm, tier := s.selectLLM(rawContextText)
+	llm, tier := s.selectLLM(rawContextText, 0)
 	if llm == nil {
 		return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
 	}

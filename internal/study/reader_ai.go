@@ -75,7 +75,7 @@ Student question: %s
 Answer:`, scopeLabel, contextText, req.Question)
 
 	// ponytail: select LLM tier dynamically based on retrieved context length
-	llm, _ := s.selectLLM(contextText)
+	llm, _ := s.selectLLM(contextText, 0)
 	if llm == nil {
 		return map[string]interface{}{"error": "LLM provider not available"}
 	}

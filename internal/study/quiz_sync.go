@@ -18,6 +18,7 @@ import (
 )
 
 const maxAutomaticRereadAttempts = 1
+const quizTaskOutputBudget = 2500
 
 // GenerateFlashcardsAfterQuiz generates flashcards after successful quiz completion.
 // New cards are future-dated and intentionally excluded from immediate review materialization.
@@ -330,7 +331,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		}
 	}
 
-	llm, tier := s.selectLLM(combinedText.String())
+	llm, tier := s.selectLLM(combinedText.String(), quizTaskOutputBudget)
 	if llm == nil {
 		return models.QuizTaskPayload{}, fmt.Errorf("no LLM provider available")
 	}
@@ -373,6 +374,17 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	}
 
 	targetCount := userQuizCount
+	if maxOutputTokens > 0 && maxOutputTokens < quizTaskOutputBudget {
+		adjusted := (targetCount * maxOutputTokens) / quizTaskOutputBudget
+		if adjusted < 3 {
+			adjusted = 3
+		}
+		if adjusted < targetCount {
+			utils.Warnf("[QUIZ_PIPELINE] reducing quiz target question count %d -> %d due to lower model output limit max_output=%d",
+				targetCount, adjusted, maxOutputTokens)
+			targetCount = adjusted
+		}
+	}
 
 	prompt := buildQuizPrompt(notebookTitle, targetCount, ctxRes.contextParts)
 
