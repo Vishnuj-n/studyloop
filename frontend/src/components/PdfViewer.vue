@@ -215,16 +215,11 @@ onMounted(() => {
   parentWidth.value = vp.clientWidth || BASE_WIDTH
   console.log('[PdfViewer] parentWidth set to:', parentWidth.value)
 
-  let resizeRafId = null
+  // ResizeObserver for container width tracking
   resizeObserver = new ResizeObserver((entries) => {
-    if (resizeRafId) cancelAnimationFrame(resizeRafId)
-    resizeRafId = requestAnimationFrame(() => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          parentWidth.value = Math.round(entry.contentRect.width)
-        }
-      }
-    })
+    for (const entry of entries) {
+      parentWidth.value = entry.contentRect.width || BASE_WIDTH
+    }
   })
   resizeObserver.observe(vp)
 

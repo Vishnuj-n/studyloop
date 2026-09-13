@@ -60,11 +60,6 @@ func main() {
 
 func notebookHandler(a *app.App) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		// Only handle requests under /notebooks/
-		if !strings.HasPrefix(req.URL.Path, "/notebooks/") {
-			return
-		}
-
 		if a == nil {
 			utils.Warnf("[notebookHandler] Service unavailable: app is nil")
 			http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
@@ -74,6 +69,11 @@ func notebookHandler(a *app.App) http.Handler {
 		if uploadDir == "" {
 			utils.Warnf("[notebookHandler] Service unavailable: upload dir empty")
 			http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		// Only handle requests under /notebooks/
+		if !strings.HasPrefix(req.URL.Path, "/notebooks/") {
 			return
 		}
 

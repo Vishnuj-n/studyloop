@@ -31,8 +31,8 @@ type authServerState struct {
 
 var activeAuthServer = &authServerState{}
 
-// setSession sets the active session in memory.
-func (a *App) setSession(userID, email string, isPro bool) {
+// SetSession sets the active session in memory.
+func (a *App) SetSession(userID, email string, isPro bool) {
 	a.sessionMu.Lock()
 	defer a.sessionMu.Unlock()
 	a.sessionUserID = userID
@@ -74,8 +74,8 @@ func (a *App) IsProUser() bool {
 	return a.sessionIsPro
 }
 
-// getUserSession returns the current active session state.
-func (a *App) getUserSession() map[string]interface{} {
+// GetUserSession returns the current active session state.
+func (a *App) GetUserSession() map[string]interface{} {
 	a.sessionMu.RLock()
 	defer a.sessionMu.RUnlock()
 	return map[string]interface{}{
@@ -147,7 +147,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		utils.Infof("[AUTH] Authoritative Clerk JS sync: user=%s email=%s plan=%s role=%s -> isPro=%v",
 			payload.UserID, payload.Email, payload.Plan, payload.Role, isPro)
 
-		a.setSession(payload.UserID, payload.Email, isPro)
+		a.SetSession(payload.UserID, payload.Email, isPro)
 
 		result := AuthCallbackResult{
 			Success: true,
@@ -195,7 +195,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		}
 		utils.Infof("[AUTH] Received initial callback for user %s (%s), isPro: %v", userID, email, isPro)
 
-		a.setSession(userID, email, isPro)
+		a.SetSession(userID, email, isPro)
 
 		result := AuthCallbackResult{
 			Success: true,

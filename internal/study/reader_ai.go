@@ -35,8 +35,8 @@ func (s *StudyService) AnswerReaderQuestion(req ReaderAIRequest) map[string]inte
 	if req.Question == "" {
 		return map[string]interface{}{"error": "question is required"}
 	}
-	if s.fastLLMProvider == nil && s.heavyLLMProvider == nil {
-		return map[string]interface{}{"error": "LLM provider not initialized"}
+	if s.fastLLMProvider == nil {
+		return map[string]interface{}{"error": "FAST_LLM provider not initialized"}
 	}
 	if s.retrievalEngine == nil {
 		return map[string]interface{}{"error": "retrieval engine not initialized"}
@@ -74,15 +74,9 @@ Student question: %s
 
 Answer:`, scopeLabel, contextText, req.Question)
 
-	llm, tier := s.selectLLM(contextText, 0)
-	if llm == nil {
-		return map[string]interface{}{"error": "LLM provider not available"}
-	}
-
-	answer, err := llm.GenerateAnswer(prompt)
+	answer, err := s.fastLLMProvider.GenerateAnswer(prompt)
 	if err != nil {
-		formattedErr := s.FormatLLMError(err, tier)
-		return map[string]interface{}{"error": formattedErr.Error()}
+		return map[string]interface{}{"error": "reader response failed: " + err.Error()}
 	}
 
 	return map[string]interface{}{

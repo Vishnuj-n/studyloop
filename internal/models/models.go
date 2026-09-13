@@ -215,7 +215,6 @@ type Notebook struct {
 	StartPage            int     `json:"start_page,omitempty"`
 	EndPage              int     `json:"end_page,omitempty"`
 	FlashcardCount       int     `json:"flashcard_count"`
-	CompletionPercent    int     `json:"completion_percent"`
 }
 
 // NotebookChunk links a chunk to a notebook (many chunks per notebook)
@@ -246,7 +245,6 @@ type SyllabusChapterDraft struct {
 	Title     string `json:"title"`
 	StartPage int    `json:"start_page"`
 	EndPage   int    `json:"end_page"`
-	InQueue   bool   `json:"in_queue,omitempty"`
 }
 
 // SyllabusDraft captures the backend-generated chapter draft shown in the Notebook verification modal.

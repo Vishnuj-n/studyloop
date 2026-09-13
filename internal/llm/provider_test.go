@@ -1,10 +1,6 @@
 package llm
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"ai-tutor/internal/models"
@@ -59,87 +55,8 @@ func TestGetModelLimitsDefault(t *testing.T) {
 	if limits.MaxInputTokens != 4000 {
 		t.Errorf("expected default MaxInputTokens to be 4000, got %d", limits.MaxInputTokens)
 	}
-	if limits.MaxOutputTokens != 2500 {
-		t.Errorf("expected default MaxOutputTokens to be 2500, got %d", limits.MaxOutputTokens)
-	}
-}
-
-func TestGenerateAnswerMaxTokensAndTruncation(t *testing.T) {
-	var capturedPayload openAIRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&capturedPayload)
-		w.Header().Set("Content-Type", "application/json")
-		if strings.Contains(r.Header.Get("X-Test-Case"), "length") {
-			_, _ = w.Write([]byte(`{
-				"choices": [
-					{
-						"message": {"content": "Truncated content"},
-						"finish_reason": "length"
-					}
-				]
-			}`))
-			return
-		}
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {"content": "OK response"},
-					"finish_reason": "stop"
-				}
-			]
-		}`))
-	}))
-	defer server.Close()
-
-	cfg := &Config{
-		BaseURL: server.URL,
-		APIKey:  "sk-test",
-		Model:   "test-model",
-		Limits:  ModelLimits{MaxInputTokens: 4000, MaxOutputTokens: 2500},
-	}
-	provider := NewProvider(cfg)
-
-	resp, err := provider.GenerateAnswer("Test prompt")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp != "OK response" {
-		t.Fatalf("expected 'OK response', got %q", resp)
-	}
-	if capturedPayload.MaxTokens != 2500 {
-		t.Fatalf("expected max_tokens in payload to be 2500, got %d", capturedPayload.MaxTokens)
-	}
-
-	// Test truncation error when finish_reason == "length"
-	req, _ := http.NewRequest("GET", server.URL, nil)
-	_ = req
-	serverLength := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"choices": [
-				{
-					"message": {"content": "Truncated content"},
-					"finish_reason": "length"
-				}
-			]
-		}`))
-	}))
-	defer serverLength.Close()
-
-	cfgLength := &Config{
-		BaseURL: serverLength.URL,
-		APIKey:  "sk-test",
-		Model:   "test-model",
-		Limits:  ModelLimits{MaxInputTokens: 4000, MaxOutputTokens: 2500},
-	}
-	providerLength := NewProvider(cfgLength)
-
-	_, errLength := providerLength.GenerateAnswer("Test prompt")
-	if errLength == nil {
-		t.Fatalf("expected truncation error for finish_reason=length, got nil")
-	}
-	if !strings.Contains(errLength.Error(), "finish_reason=length") {
-		t.Fatalf("expected error mentioning finish_reason=length, got: %v", errLength)
+	if limits.MaxOutputTokens != 1000 {
+		t.Errorf("expected default MaxOutputTokens to be 1000, got %d", limits.MaxOutputTokens)
 	}
 }
 

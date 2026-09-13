@@ -435,46 +435,6 @@ func TestCompleteReadingWithGeneratedQuizAdvancesTopicCursorToTaskEnd(t *testing
 	}
 }
 
-func TestActivatePendingReadingTaskAlignsTopicCursor(t *testing.T) {
-	initDBForTest(t, false, 0)
-	nbID := "nb-cursor"
-	_, _ = testRepo.db.Exec(`INSERT INTO notebooks (id, title, file_path) VALUES (?, 'Test NB', 'test.pdf')`, nbID)
-	topicID := "topic-stale-cursor"
-	_, err := testRepo.db.Exec(`
-		INSERT INTO topics (id, title, status, start_page, end_page, current_page_cursor)
-		VALUES (?, 'Stale Cursor Topic', 'reading', 1, 100, 82)
-	`, topicID)
-	if err != nil {
-		t.Fatalf("failed to insert topic: %v", err)
-	}
-
-	taskID := "task-pending-68-99"
-	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
-		ID:         taskID,
-		NotebookID: nbID,
-		TopicID:    topicID,
-		TaskType:   models.StudyTaskTypeReading,
-		Status:     models.StudyTaskStatusPending,
-		Priority:   1,
-		StartPage:  68,
-		EndPage:    99,
-	}); err != nil {
-		t.Fatalf("InsertStudyTask reading failed: %v", err)
-	}
-
-	if err := testRepo.ActivateTask(taskID); err != nil {
-		t.Fatalf("ActivateTask failed: %v", err)
-	}
-
-	task, err := testRepo.GetReadingTask(taskID)
-	if err != nil {
-		t.Fatalf("GetReadingTask failed: %v", err)
-	}
-	if task.CurrentPage != 68 {
-		t.Fatalf("expected task CurrentPage to be aligned to startPage 68, got %d", task.CurrentPage)
-	}
-}
-
 func TestRereadTaskCanBeLoadedAndCompletedThroughReaderHelpers(t *testing.T) {
 	initDBForTest(t, false, 0)
 

@@ -39,12 +39,9 @@ func TestSplitIntoSentences(t *testing.T) {
 }
 
 func TestBuildAudioOverviewPrompt(t *testing.T) {
-	prompt := BuildAudioOverviewPrompt("Machine Learning Basics", "Neural networks are models composed of layers.", 103, 111)
+	prompt := BuildAudioOverviewPrompt("Machine Learning Basics", "Neural networks are models composed of layers.")
 	if !strings.Contains(prompt, "Machine Learning Basics") {
 		t.Fatalf("prompt missing topic title")
-	}
-	if !strings.Contains(prompt, "Pages 103-111") {
-		t.Fatalf("prompt missing page bounds")
 	}
 	if !strings.Contains(prompt, "Neural networks are models") {
 		t.Fatalf("prompt missing material context")

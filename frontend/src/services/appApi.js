@@ -225,18 +225,6 @@ export function testLLMConnection(tier, provider, baseURL, model, apiKey) {
   return appBridge().TestLLMConnection(tier || 'fast', provider || '', baseURL || '', model || '', apiKey || '')
 }
 
-export function testLLMLimits(tier, provider, baseURL, model, apiKey, maxInput, maxOutput) {
-  return appBridge().TestLLMLimits(
-    tier || 'fast',
-    provider || '',
-    baseURL || '',
-    model || '',
-    apiKey || '',
-    Number(maxInput) || 0,
-    Number(maxOutput) || 0
-  )
-}
-
 export function initializeRAG() {
   return appBridge().InitializeRAG()
 }
@@ -321,8 +309,8 @@ export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
 
-export function startTopicAudioOverview(topicID, notebookID = '', startPage = 0, endPage = 0, voice = 'en-US-ChristopherNeural') {
-  return appBridge().StartTopicAudioOverview(topicID, notebookID, startPage, endPage, voice)
+export function startTopicAudioOverview(topicID, notebookID = '', voice = 'en-US-ChristopherNeural') {
+  return appBridge().StartTopicAudioOverview(topicID, notebookID, voice)
 }
 
 export function stopTopicAudioOverview() {

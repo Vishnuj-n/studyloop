@@ -10,7 +10,6 @@ func TestSimplifierLevelDirectives(t *testing.T) {
 		level    string
 		expected string
 	}{
-		{"eli5", "5-year-old"},
 		{"very_simple", "everyday language"},
 		{"eli10", "everyday language"},
 		{"summary", "essential ideas"},

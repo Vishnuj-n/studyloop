@@ -3,7 +3,7 @@
     <header class="page-header">
       <p class="eyebrow">Remediation</p>
       <h1>Concept Rescue</h1>
-      <p class="subtitle">Failed quiz twice. Complete the Concept Rescue session below to retry.</p>
+      <p class="subtitle">Failed quiz twice. Complete the Socratic session below to retry.</p>
     </header>
 
     <div v-if="loading" class="loading-state">
@@ -17,7 +17,7 @@
     </div>
 
     <div v-else class="split-layout">
-      <!-- Option A: In-App Adaptive Tutor -->
+      <!-- Option A: In-App Socratic Tutor -->
       <section class="lane left-lane card in-app-lane">
         <header class="lane-header">
           <h2>Option A: Chat In-App</h2>
@@ -27,7 +27,8 @@
         <div class="lane-content">
           <p class="option-desc">
             Resolve this concept rescue directly within our interactive learning environment. The
-            in-app Adaptive Tutor will explain your quiz mistakes, clarify concepts with examples, and guide you to master the material.
+            in-app Socratic tutor will guide you through leading questions to help you master the
+            material.
           </p>
 
           <div class="features-list">
@@ -53,7 +54,7 @@
 
           <div class="action-box">
             <button type="button" class="tutor-btn" @click="startInAppTutor">
-              Start Adaptive Tutor Chat ➔
+              Start Socratic Chat In-App ➔
             </button>
           </div>
         </div>
@@ -68,7 +69,7 @@
 
         <div class="lane-content">
           <p class="option-desc">
-            Prefer using a model like ChatGPT, Claude, or Gemini? Copy our pre-engineered Adaptive Tutor prompt containing all question context and notebook source material.
+            Prefer using a model like ChatGPT, Claude, or Gemini? Copy our pre-engineered Socratic prompt containing all question context and notebook source material.
           </p>
 
           <div class="summary-package-box">
@@ -90,8 +91,8 @@
               <li class="package-item">
                 <span class="item-icon">🧠</span>
                 <div class="item-details">
-                  <strong>Adaptive Concept Tutor</strong>
-                  <span class="item-sub">Analyzes mistakes, explains concepts with examples & checks understanding</span>
+                  <strong>Socratic Persona</strong>
+                  <span class="item-sub">Guides external AI not to reveal direct answers</span>
                 </div>
               </li>
             </ul>

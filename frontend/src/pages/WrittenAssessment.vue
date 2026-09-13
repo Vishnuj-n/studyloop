@@ -189,10 +189,8 @@ const selectedNotebook = computed(() =>
   notebooks.value.find((n) => n.id === selectedNotebookID.value)
 )
 
-let isInitialLoad = true
-
-watch(selectedNotebookID, (newID, oldID) => {
-  if (!newID || isInitialLoad) return
+watch(selectedNotebookID, (newID) => {
+  if (!newID) return
   const nb = notebooks.value.find((n) => n.id === newID)
   if (nb) {
     const minP = nb.start_page || 1
@@ -222,34 +220,16 @@ onMounted(async () => {
     const res = await getNotebooks()
     notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
 
-    // Read optional query parameters from router (e.g. from Quiz completion or Dashboard)
-    const {
-      notebookID,
-      notebookId,
-      startPage: queryStart,
-      endPage: queryEnd,
-      autoGenerate,
-    } = route.query
-
-    const targetNotebookID = String(notebookID || notebookId || '')
-    if (targetNotebookID) {
-      selectedNotebookID.value = targetNotebookID
+    // Read optional query parameters from router (e.g. from Quiz completion)
+    const { notebookID, startPage: queryStart, endPage: queryEnd, autoGenerate } = route.query
+    if (notebookID) {
+      selectedNotebookID.value = String(notebookID)
     }
-
-    const nb = notebooks.value.find((n) => n.id === selectedNotebookID.value)
-    const minP = nb?.start_page || 1
-    const maxP = nb?.end_page || nb?.page_count || minP
-
     if (queryStart && Number(queryStart) > 0) {
       startPage.value = Number(queryStart)
-    } else if (nb) {
-      startPage.value = minP
     }
-
     if (queryEnd && Number(queryEnd) >= startPage.value) {
       endPage.value = Number(queryEnd)
-    } else if (nb) {
-      endPage.value = Math.min(startPage.value + 5, maxP)
     }
 
     if (autoGenerate === 'true' && selectedNotebookID.value) {
@@ -258,8 +238,6 @@ onMounted(async () => {
     }
   } catch {
     error.value = 'Failed to load notebooks.'
-  } finally {
-    isInitialLoad = false
   }
 })
 

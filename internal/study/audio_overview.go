@@ -97,12 +97,7 @@ func SplitIntoSentences(text string) []string {
 }
 
 // BuildAudioOverviewPrompt creates a prompt for the conversational overview script.
-func BuildAudioOverviewPrompt(topicTitle string, contextContent string, startPage, endPage int) string {
-	titleHeader := topicTitle
-	if startPage > 0 && endPage >= startPage {
-		titleHeader = fmt.Sprintf("%s (Pages %d-%d)", topicTitle, startPage, endPage)
-	}
-
+func BuildAudioOverviewPrompt(topicTitle string, contextContent string) string {
 	return fmt.Sprintf(`You are an engaging, insightful study host providing a comprehensive, in-depth spoken audio lesson on this topic.
 Write a rich, detailed audio lecture that sounds natural, warm, and engaging when spoken aloud.
 
@@ -118,7 +113,7 @@ Topic: %s
 Material:
 %s
 
-Spoken Overview:`, titleHeader, contextContent)
+Spoken Overview:`, topicTitle, contextContent)
 }
 
 // GenerateAudioOverview generates a spoken audio overview for a topic and streams chunks via onChunk callback.
@@ -126,8 +121,6 @@ func (s *StudyService) GenerateAudioOverview(
 	ctx context.Context,
 	topicID string,
 	notebookID string,
-	startPage int,
-	endPage int,
 	voice string,
 	onChunk func(chunk AudioChunk) error,
 ) error {
@@ -151,11 +144,6 @@ func (s *StudyService) GenerateAudioOverview(
 
 	var contentBuilder strings.Builder
 	for _, section := range bundle.Sections {
-		if startPage > 0 && endPage >= startPage {
-			if section.PageNum > 0 && (section.PageNum < startPage || section.PageNum > endPage) {
-				continue
-			}
-		}
 		if strings.TrimSpace(section.Content) != "" {
 			contentBuilder.WriteString(section.Content)
 			contentBuilder.WriteString("\n\n")
@@ -164,34 +152,12 @@ func (s *StudyService) GenerateAudioOverview(
 
 	topicContent := strings.TrimSpace(contentBuilder.String())
 	if topicContent == "" {
-		// Fallback: If section filtering by page returned empty, try chunk query for exact page range
-		if startPage > 0 && endPage >= startPage {
-			if pageChunks, pErr := s.repo.GetChunksForTopicPageRange(topicID, startPage, endPage); pErr == nil && len(pageChunks) > 0 {
-				var chunkBuilder strings.Builder
-				for _, c := range pageChunks {
-					if strings.TrimSpace(c.Text) != "" {
-						chunkBuilder.WriteString(c.Text)
-						chunkBuilder.WriteString("\n\n")
-					}
-				}
-				topicContent = strings.TrimSpace(chunkBuilder.String())
-			}
-		}
-	}
-
-	if topicContent == "" {
 		return fmt.Errorf("no topic text found to generate audio overview")
 	}
 
-	// Cache key incorporates topicID and page bounds
-	cacheKey := topicID
-	if startPage > 0 && endPage >= startPage {
-		cacheKey = fmt.Sprintf("%s:%d-%d", topicID, startPage, endPage)
-	}
-
-	// Check if sentences are already cached for this topic/session window
+	// Check if sentences are already cached for this topic (e.g. when user changes voice)
 	s.audioCacheMu.RLock()
-	cachedSentences, found := s.audioScriptCache[cacheKey]
+	cachedSentences, found := s.audioScriptCache[topicID]
 	s.audioCacheMu.RUnlock()
 
 	var sentences []string
@@ -201,14 +167,14 @@ func (s *StudyService) GenerateAudioOverview(
 		// Prioritize heavy LLM for rich script overview, fallback to fast LLM
 		llmProvider := s.heavyLLMProvider
 		if llmProvider == nil {
-			llmProvider, _ = s.selectLLM(topicContent, 0)
+			llmProvider, _ = s.selectLLM(topicContent)
 		}
 		if llmProvider == nil {
 			return fmt.Errorf("no LLM provider available")
 		}
 
 		limits := llmProvider.GetLimits()
-		templatePrompt := BuildAudioOverviewPrompt(bundle.TopicTitle, "", startPage, endPage)
+		templatePrompt := BuildAudioOverviewPrompt(bundle.TopicTitle, "")
 		availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
 		if err != nil {
 			return err
@@ -220,7 +186,7 @@ func (s *StudyService) GenerateAudioOverview(
 		}
 		topicContent = truncatedContent
 
-		prompt := BuildAudioOverviewPrompt(bundle.TopicTitle, topicContent, startPage, endPage)
+		prompt := BuildAudioOverviewPrompt(bundle.TopicTitle, topicContent)
 		script, err := llmProvider.GenerateAnswer(prompt)
 		if err != nil {
 			return fmt.Errorf("failed to generate audio script: %w", err)
@@ -235,7 +201,7 @@ func (s *StudyService) GenerateAudioOverview(
 		if s.audioScriptCache == nil {
 			s.audioScriptCache = make(map[string][]string)
 		}
-		s.audioScriptCache[cacheKey] = sentences
+		s.audioScriptCache[topicID] = sentences
 		s.audioCacheMu.Unlock()
 	}
 

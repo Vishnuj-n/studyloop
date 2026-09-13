@@ -206,7 +206,7 @@ func (a *App) UpdateLLMSettings(settings models.LLMSettings) map[string]interfac
 		settings.Fast.MaxInputTokens = 4000
 	}
 	if settings.Fast.MaxOutputTokens <= 0 {
-		settings.Fast.MaxOutputTokens = 2500
+		settings.Fast.MaxOutputTokens = 1000
 	}
 	if settings.UseSameForHeavy {
 		settings.Heavy = settings.Fast
@@ -220,7 +220,7 @@ func (a *App) UpdateLLMSettings(settings models.LLMSettings) map[string]interfac
 			settings.Heavy.MaxInputTokens = 4000
 		}
 		if settings.Heavy.MaxOutputTokens <= 0 {
-			settings.Heavy.MaxOutputTokens = 2500
+			settings.Heavy.MaxOutputTokens = 1000
 		}
 	}
 	settings.Fast.HasAPIKey = current.Fast.HasAPIKey || llm.HasAPIKey("fast") || envHasLLMAPIKey("FAST_LLM")
@@ -301,46 +301,6 @@ func (a *App) TestLLMConnection(tier, provider, baseURL, model, apiKey string) m
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}
-}
-
-func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxInput, maxOutput int) map[string]interface{} {
-	tier = normalizeLLMTierForApp(tier)
-	if apiKey == "" && tier != "" {
-		key, _ := llm.GetAPIKey(tier)
-		if key == "" && tier == "heavy" {
-			key, _ = llm.GetAPIKey("fast")
-		}
-		apiKey = key
-	}
-	if maxInput <= 0 {
-		maxInput = 4000
-	}
-	if maxOutput <= 0 {
-		maxOutput = 2500
-	}
-	tierSettings := models.LLMTierSettings{
-		Provider:        provider,
-		BaseURL:         baseURL,
-		Model:           model,
-		MaxInputTokens:  maxInput,
-		MaxOutputTokens: maxOutput,
-	}
-	cfg := llm.LoadConfigFromSettingsForPrefix(
-		strings.ToUpper(tier),
-		tierSettings,
-		apiKey,
-	)
-	if cfg.TimeoutMs <= 0 || cfg.TimeoutMs > 10000 {
-		cfg.TimeoutMs = 10000
-	}
-	providerObj := llm.NewProvider(cfg)
-	if _, err := providerObj.GenerateAnswer("Hi"); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{
-		"ok":     true,
-		"status": fmt.Sprintf("API syntax validated (max_tokens: %d). Actual %d token prompts depend on your provider's TPM quota.", maxOutput, maxInput),
-	}
 }
 
 func (a *App) reloadLLMProviders() error {

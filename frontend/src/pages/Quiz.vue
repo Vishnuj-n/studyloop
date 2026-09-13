@@ -219,42 +219,40 @@
         </article>
       </section>
 
-      <!-- Viva Examiner Challenge Hero Banner on Pass -->
-      <section v-if="result.passed" class="viva-challenge-card">
-        <div class="viva-challenge-card__content">
+      <div class="result-panel__actions">
+        <!-- Retry Sync Button -->
+        <button
+          v-if="result.passed && result.flashcards_generation_error"
+          class="primary-btn retry-btn"
+          :disabled="generatingFlashcards"
+          @click="retryFlashcardGeneration"
+        >
+          {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
+        </button>
+
+        <!-- Viva Examiner Challenge Hero Card on Pass -->
+        <div v-if="result.passed" class="viva-challenge-card">
           <div class="viva-challenge-card__badge">
             <span>🏆 EXAMINER VIVA CHALLENGE</span>
             <span class="viva-challenge-card__tag">🎲 Gamble for Loot</span>
           </div>
           <h4 class="viva-challenge-card__title">Want to gamble for better loot?</h4>
           <p class="viva-challenge-card__desc">
-            Explain the concept in your own words (Speak via STT or Type).
+            Explain the concept in your own words (Speak via Handy/STT or Type).
           </p>
           <div class="viva-challenge-card__perks">
             <span>✨ Bonus XP</span>
             <span>✦</span>
             <span>🎁 Boosted Rare-Chest Odds</span>
           </div>
+          <button
+            class="viva-challenge-btn"
+            :disabled="generatingFlashcards"
+            @click="handleGoToExaminer"
+          >
+            📝 TAKE THE VIVA CHALLENGE
+          </button>
         </div>
-        <button
-          class="viva-challenge-btn"
-          :disabled="generatingFlashcards"
-          @click="handleGoToExaminer"
-        >
-          📝 TAKE THE VIVA CHALLENGE
-        </button>
-      </section>
-
-      <div class="result-panel__footer">
-        <!-- Retry Sync Button -->
-        <button
-          v-if="result.passed && result.flashcards_generation_error"
-          class="secondary-btn retry-btn"
-          :disabled="generatingFlashcards"
-          @click="retryFlashcardGeneration"
-        >
-          {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
-        </button>
 
         <button
           class="primary-btn continue-btn"
@@ -262,7 +260,7 @@
           @click="handleContinue"
         >
           <span v-if="generatingFlashcards">Generating flashcards for spaced repetition...</span>
-          <span v-else>Continue →</span>
+          <span v-else>Continue</span>
         </button>
       </div>
     </article>
@@ -1116,30 +1114,12 @@ async function handleGoToExaminer() {
   color: var(--on-surface);
 }
 
-.result-panel__footer {
+.result-panel__actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
   margin-top: 16px;
-  width: 100%;
-}
-
-.secondary-btn {
-  border: 1px solid var(--outline-variant);
-  border-radius: 12px;
-  padding: 11px 20px;
-  color: var(--on-surface);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  background: var(--surface-container-low);
-  cursor: pointer;
-  transition: background 0.14s ease, transform 0.14s ease;
-}
-
-.secondary-btn:hover:not(:disabled) {
-  background: var(--surface-container-high);
+  flex-wrap: wrap;
 }
 
 .retry-generation-btn {
@@ -1155,7 +1135,6 @@ async function handleGoToExaminer() {
   border-top: 1px solid var(--outline-variant);
   padding-top: 20px;
   text-align: left;
-  width: 100%;
 }
 
 .breakdown-title {
@@ -1233,56 +1212,46 @@ async function handleGoToExaminer() {
 
 /* Voice Viva Challenge Hero Card */
 .viva-challenge-card {
-  width: 100%;
-  margin: 20px 0 8px;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, rgba(243, 156, 18, 0.08) 0%, rgba(211, 84, 0, 0.12) 100%);
-  border: 1px solid rgba(243, 156, 18, 0.35);
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(243, 156, 18, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  box-sizing: border-box;
-}
-
-.viva-challenge-card__content {
+  margin: 16px 0;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(243, 156, 18, 0.15) 100%);
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(243, 156, 18, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   text-align: left;
 }
 
 .viva-challenge-card__badge {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.5px;
   color: #f39c12;
 }
 
 .viva-challenge-card__tag {
   background: rgba(243, 156, 18, 0.2);
-  padding: 2px 10px;
+  padding: 2px 8px;
   border-radius: 20px;
   font-size: 10px;
 }
 
 .viva-challenge-card__title {
-  margin: 2px 0 0;
-  font-size: 17px;
+  margin: 2px 0 0 0;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--on-surface);
+  color: var(--text-color, #ffffff);
 }
 
 .viva-challenge-card__desc {
   margin: 0;
   font-size: 13px;
-  color: var(--muted-text);
-  line-height: 1.4;
+  color: var(--muted-text, #bdc3c7);
 }
 
 .viva-challenge-card__perks {
@@ -1292,37 +1261,26 @@ async function handleGoToExaminer() {
   font-size: 12px;
   font-weight: 600;
   color: #f1c40f;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .viva-challenge-btn {
-  flex-shrink: 0;
-  padding: 12px 20px;
+  margin-top: 10px;
+  padding: 10px 18px;
   background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
   color: #ffffff;
   font-weight: 700;
   font-size: 13px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.5px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(211, 84, 0, 0.3);
-  transition: all 0.16s ease;
-  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(211, 84, 0, 0.3);
+  transition: all 0.2s ease;
 }
 
 .viva-challenge-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 5px 15px rgba(211, 84, 0, 0.45);
-}
-
-@media (max-width: 768px) {
-  .viva-challenge-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .viva-challenge-btn {
-    width: 100%;
-  }
+  box-shadow: 0 4px 12px rgba(211, 84, 0, 0.45);
 }
 </style>

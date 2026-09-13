@@ -62,7 +62,6 @@ type NotebookChunkInput struct {
 	Text       string
 	TokenCount int
 	PageNum    int
-	ChunkHash  string
 }
 
 // NotebookTopicIngestionGroup contains topic-scoped chunk rows for one notebook ingestion run.
@@ -76,14 +75,10 @@ type sqlExecer interface {
 }
 
 func insertChunkRow(exec sqlExecer, topicID string, chunk NotebookChunkInput) error {
-	hashVal := chunk.ChunkHash
-	if hashVal == "" && chunk.Text != "" {
-		hashVal = utils.MD5Hex(chunk.Text)
-	}
 	_, err := exec.Exec(`
-		INSERT INTO chunks (id, topic_id, chunk_text, chunk_hash, page_num, token_count, importance_score, weakness_score)
-		VALUES (?, ?, ?, ?, ?, ?, 0, 0)
-	`, chunk.ID, topicID, chunk.Text, hashVal, chunk.PageNum, chunk.TokenCount)
+		INSERT INTO chunks (id, topic_id, chunk_text, page_num, token_count, importance_score, weakness_score)
+		VALUES (?, ?, ?, ?, ?, 0, 0)
+	`, chunk.ID, topicID, chunk.Text, chunk.PageNum, chunk.TokenCount)
 	return err
 }
 
@@ -371,36 +366,7 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			FROM fsrs_cards fc
 			WHERE fc.topic_id = notebooks.topic_id
 			   OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
-		), 0) AS flashcard_count,
-		COALESCE((
-			SELECT CASE
-				WHEN notebooks.page_count > 0 THEN
-					MIN(100, CAST(ROUND(
-						COALESCE(
-							SUM(
-								CASE 
-									WHEN COALESCE(t.current_page_cursor, 0) >= t.end_page AND t.end_page > 0 THEN (t.end_page - COALESCE(t.start_page, 1) + 1)
-									WHEN COALESCE(t.current_page_cursor, 0) > COALESCE(t.start_page, 1) THEN (t.current_page_cursor - COALESCE(t.start_page, 1))
-									ELSE 0
-								END
-							) * 100.0 / notebooks.page_count,
-							0.0
-						)
-					) AS INTEGER))
-				ELSE
-					COALESCE((
-						SELECT CASE 
-							WHEN COUNT(*) > 0 THEN CAST(ROUND(SUM(CASE WHEN status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*)) AS INTEGER)
-							ELSE 0 
-						END 
-						FROM study_queue sq 
-						WHERE sq.notebook_id = notebooks.id AND sq.task_type = 'READING'
-					), 0)
-			END
-			FROM topics t
-			WHERE t.id = notebooks.topic_id 
-			   OR t.id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = notebooks.id)
-		), 0) AS completion_percent
+		), 0) AS flashcard_count
 	FROM notebooks`
 	args := []interface{}{}
 	whereClause := ""
@@ -443,7 +409,6 @@ func (r *Repository) GetNotebooks(topicID, profileID string) ([]models.Notebook,
 			&nb.ID, &nb.Title, &nb.FilePath, &nb.FileType, &nb.TopicID, &nb.Status, &nb.IndexingStatus,
 			&nb.PageCount, &nb.ChunkCount, &nb.Priority, &nb.ExamDeadline, &nb.UploadedAt, &nb.ProfileID, &nb.StudyStatus,
 			&nb.FileHash, &nb.ExtractionEngine, &nb.ExternalHelpRequired, &nb.StartPage, &nb.EndPage, &nb.FlashcardCount,
-			&nb.CompletionPercent,
 		); err != nil {
 			return nil, err
 		}

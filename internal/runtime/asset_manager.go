@@ -216,14 +216,7 @@ func (am *AssetManager) CheckAssets() error {
 }
 
 // EnsureAssetsReady checks if assets are ready, returns nil if yes.
-// If CheckAssets fails (e.g. manifest missing), it attempts auto-acquisition.
 func (am *AssetManager) EnsureAssetsReady() error {
-	if err := am.CheckAssets(); err == nil {
-		return nil
-	}
-	if err := am.AcquireAssets(nil); err != nil {
-		return err
-	}
 	return am.CheckAssets()
 }
 
@@ -284,17 +277,14 @@ func (am *AssetManager) StageDLLs() (map[string]string, error) {
 }
 
 // hasLocalSourceAssets checks if all required assets for the current platform exist locally
-// in the source directory, project root, or target directory.
+// in the source directory or project root.
 func (am *AssetManager) hasLocalSourceAssets() bool {
 	for _, file := range GetPlatformRequiredFiles() {
 		src := filepath.Join(am.sourceAssetDir, file)
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			alt := filepath.Join(".", file)
 			if _, err := os.Stat(alt); os.IsNotExist(err) {
-				target := filepath.Join(am.targetDir, file)
-				if _, err := os.Stat(target); os.IsNotExist(err) {
-					return false
-				}
+				return false
 			}
 		}
 	}
@@ -600,13 +590,6 @@ func computeSHA256(path string) (string, error) {
 
 // Copy file with progress updates.
 func copyFileWithProgress(src, dst string, startPct, endPct int, msg, detail string, cb func(string, int, string, string)) error {
-	absSrc, errSrc := filepath.Abs(src)
-	absDst, errDst := filepath.Abs(dst)
-	if errSrc == nil && errDst == nil && strings.EqualFold(filepath.Clean(absSrc), filepath.Clean(absDst)) {
-		cb("acquiring", endPct, msg, detail)
-		return nil
-	}
-
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -656,12 +639,6 @@ func copyFileWithProgress(src, dst string, startPct, endPct int, msg, detail str
 
 // Copy file helper.
 func copyFile(src, dst string) error {
-	absSrc, errSrc := filepath.Abs(src)
-	absDst, errDst := filepath.Abs(dst)
-	if errSrc == nil && errDst == nil && strings.EqualFold(filepath.Clean(absSrc), filepath.Clean(absDst)) {
-		return nil
-	}
-
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err

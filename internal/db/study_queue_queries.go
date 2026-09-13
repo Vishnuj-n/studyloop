@@ -317,7 +317,7 @@ func (r *Repository) GetReadingTask(taskID string) (models.ReadingTask, error) {
 			COALESCE(sq.topic_id, ''),
 			COALESCE(sq.start_page, 0),
 			COALESCE(sq.end_page, 0),
-			COALESCE(sq.current_page, COALESCE(sq.start_page, 0)),
+			COALESCE(t.current_page_cursor, COALESCE(sq.start_page, 0)),
 			COALESCE(nb.file_hash, '')
 		FROM study_queue sq
 		LEFT JOIN topics t ON t.id = sq.topic_id

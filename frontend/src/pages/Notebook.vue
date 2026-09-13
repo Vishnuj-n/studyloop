@@ -622,9 +622,8 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
             title: String(ch?.title || 'Untitled Chapter').trim() || 'Untitled Chapter',
             start_page: Number(ch?.start_page) || 1,
             end_page: Number(ch?.end_page) || 1,
-            in_queue: Boolean(ch?.in_queue),
           }))
-        : [{ title: 'General', start_page: 1, end_page: draftPageCount.value, in_queue: false }]
+        : [{ title: 'General', start_page: 1, end_page: draftPageCount.value }]
 
     // Load notebook to get current priority and file type
     const notebook = notebooks.value.find((nb) => nb.id === notebookID)

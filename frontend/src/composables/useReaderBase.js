@@ -292,6 +292,16 @@ export function useReaderBase(taskID) {
       selectedNotebookID.value = task.notebook_id
       selectedTopicID.value = task.topic_id
 
+      // Validate bounds have valid values
+      const validStart = Number(navigationBounds.start_page) || 1
+      const validEnd = Number(navigationBounds.end_page) || validStart
+      const validCurrent = Number(navigationBounds.current_page) || validStart
+
+      navigationMinPage.value = validStart
+      navigationMaxPage.value = validEnd
+      currentPage.value = Math.min(Math.max(validCurrent, validStart), validEnd)
+      navigationState.value = nav
+
       // Apply bundle data safely (bundle might be null/empty)
       topicTitle.value = cleanTopicTitle(bundle?.topic_title || task.topic_title) || 'Reader'
       notebookUrl.value = bundle?.notebook_url || ''
@@ -302,27 +312,6 @@ export function useReaderBase(taskID) {
       topicEndPage.value = Number(bundle?.topic_end_page ?? 0)
       sections.value = bundle?.sections || []
       activeSection.value = sections.value[0] || null
-
-      // Validate bounds have valid values
-      const validStart = Number(navigationBounds.start_page) || 1
-      const validEnd = Number(navigationBounds.end_page) || validStart
-      const validCurrent = Number(navigationBounds.current_page) || validStart
-
-      // PDF Context Bridge: allow scrolling back 1 page (start_page - 1) for visual continuity
-      const isPdfFormat = isPdf.value || fileType.value === 'pdf'
-      const minPage = validStart > 1 && isPdfFormat ? validStart - 1 : validStart
-
-      navigationMinPage.value = minPage
-      navigationMaxPage.value = validEnd
-
-      // Context bridge: if launching at start_page, initialize view at start_page - 1 for PDFs
-      const displayCurrent =
-        validCurrent === validStart && validStart > 1 && isPdfFormat
-          ? validStart - 1
-          : validCurrent
-
-      currentPage.value = Math.min(Math.max(displayCurrent, minPage), validEnd)
-      navigationState.value = nav
 
       if (!isPdf.value) {
         textContent.value =
