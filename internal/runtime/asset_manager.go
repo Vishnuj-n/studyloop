@@ -216,7 +216,14 @@ func (am *AssetManager) CheckAssets() error {
 }
 
 // EnsureAssetsReady checks if assets are ready, returns nil if yes.
+// If CheckAssets fails (e.g. manifest missing), it attempts auto-acquisition.
 func (am *AssetManager) EnsureAssetsReady() error {
+	if err := am.CheckAssets(); err == nil {
+		return nil
+	}
+	if err := am.AcquireAssets(nil); err != nil {
+		return err
+	}
 	return am.CheckAssets()
 }
 
@@ -277,14 +284,17 @@ func (am *AssetManager) StageDLLs() (map[string]string, error) {
 }
 
 // hasLocalSourceAssets checks if all required assets for the current platform exist locally
-// in the source directory or project root.
+// in the source directory, project root, or target directory.
 func (am *AssetManager) hasLocalSourceAssets() bool {
 	for _, file := range GetPlatformRequiredFiles() {
 		src := filepath.Join(am.sourceAssetDir, file)
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			alt := filepath.Join(".", file)
 			if _, err := os.Stat(alt); os.IsNotExist(err) {
-				return false
+				target := filepath.Join(am.targetDir, file)
+				if _, err := os.Stat(target); os.IsNotExist(err) {
+					return false
+				}
 			}
 		}
 	}
