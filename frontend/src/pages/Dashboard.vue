@@ -58,6 +58,15 @@
 
     <!-- Status Banners -->
     <StatusBanner
+      v-if="showGitHubStarToast"
+      variant="success"
+      icon="⭐"
+      title="Enjoying Studyloop?"
+      subtitle="You've completed 5+ study sessions! If you find Studyloop helpful, consider starring the repo on GitHub to support open-source development."
+      action-label="⭐ Star on GitHub"
+      @action="handleStarGitHub"
+    />
+    <StatusBanner
       v-if="streakSavedEvent"
       variant="info"
       icon="🛡️"
@@ -241,6 +250,7 @@ import {
   getProfileDailyPace,
   retryFlashcardGeneration,
   getFlashcardDueTimeline,
+  getGamificationState,
   openURLInBrowser,
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
@@ -262,6 +272,38 @@ import StudyPaceModal from '../components/StudyPaceModal.vue'
 
 const router = useRouter()
 const route = useRoute()
+
+const showGitHubStarToast = ref(false)
+
+async function checkGitHubStarToast() {
+  if (localStorage.getItem('github_star_toast_dismissed') === 'true') {
+    showGitHubStarToast.value = false
+    return
+  }
+  try {
+    const res = await getGamificationState()
+    if (res && res.profile && res.profile.stats_json) {
+      let stats = {}
+      try {
+        stats = JSON.parse(res.profile.stats_json)
+      } catch (e) {
+        console.error('Failed to parse gamification stats JSON', e)
+      }
+      const totalSessions = (stats.reading_sessions || 0) + (stats.quizzes_passed || 0) + (stats.flashcards_reviewed || 0)
+      if (totalSessions >= 5) {
+        showGitHubStarToast.value = true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check star toast eligibility', err)
+  }
+}
+
+function handleStarGitHub() {
+  localStorage.setItem('github_star_toast_dismissed', 'true')
+  showGitHubStarToast.value = false
+  openGitHubRepo()
+}
 
 // --- Reactive State ---
 const loading = ref(true)
@@ -439,7 +481,7 @@ async function loadAgenda() {
       return
     }
 
-    await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset)])
+    await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset), checkGitHubStarToast()])
   } catch (err) {
     error.value = err.message || 'Failed to load tasks'
   } finally {

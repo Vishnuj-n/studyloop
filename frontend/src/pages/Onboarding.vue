@@ -247,7 +247,7 @@
           <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
             Get free key:
             <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio ↗</a> ·
-            <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq (Recommended Fast) ↗</a> ·
+            <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq ↗</a> ·
             <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
           </p>
         </div>
@@ -483,84 +483,6 @@
               <span class="preview-dot surface"></span>
             </div>
             <span class="theme-label">Gruvbox Dark</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-obsidian' }"
-            @click="selectTheme('dark-obsidian')"
-          >
-            <div class="theme-preview dark-obsidian">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Obsidian Black</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-indigo' }"
-            @click="selectTheme('dark-indigo')"
-          >
-            <div class="theme-preview dark-indigo">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Deep Indigo</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-emerald' }"
-            @click="selectTheme('dark-emerald')"
-          >
-            <div class="theme-preview dark-emerald">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Forest Emerald</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'light-monochrome' }"
-            @click="selectTheme('light-monochrome')"
-          >
-            <div class="theme-preview light-monochrome">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Monochrome Paper</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'light-warm' }"
-            @click="selectTheme('light-warm')"
-          >
-            <div class="theme-preview light-warm">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Warm Sepia</span>
-          </button>
-
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'light-sage' }"
-            @click="selectTheme('light-sage')"
-          >
-            <div class="theme-preview light-sage">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
-            </div>
-            <span class="theme-label">Sage Garden</span>
           </button>
 
           <button
@@ -1343,6 +1265,11 @@ select:focus {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
   color: var(--on-surface);
+  position: relative;
+}
+
+.theme-card.locked {
+  opacity: 0.75;
 }
 
 .theme-card:hover {
@@ -1364,6 +1291,37 @@ select:focus {
   justify-content: center;
   gap: 8px; /* 8px grid */
   border: none; /* No-line rule */
+  position: relative;
+}
+
+.lock-overlay {
+  position: absolute;
+  font-size: 1.1rem;
+  background: rgba(0, 0, 0, 0.45);
+  inset: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.lock-tag {
+  font-size: 0.7rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.theme-lock-notice {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 6px;
 }
 
 .preview-dot {
@@ -1397,36 +1355,6 @@ select:focus {
   background: #ebeef2;
 }
 
-.theme-preview.light-warm {
-  background: #fdfaf6;
-}
-.theme-preview.light-warm .preview-dot.primary {
-  background: #c27d38;
-}
-.theme-preview.light-warm .preview-dot.surface {
-  background: #f3eae1;
-}
-
-.theme-preview.light-sage {
-  background: #f4f7f4;
-}
-.theme-preview.light-sage .preview-dot.primary {
-  background: #2e7d32;
-}
-.theme-preview.light-sage .preview-dot.surface {
-  background: #e2ebe2;
-}
-
-.theme-preview.dark-indigo {
-  background: #0b0d16;
-}
-.theme-preview.dark-indigo .preview-dot.primary {
-  background: #6366f1;
-}
-.theme-preview.dark-indigo .preview-dot.surface {
-  background: #171a2b;
-}
-
 .theme-preview.dark-gruvbox {
   background: #1d2021;
 }
@@ -1435,36 +1363,6 @@ select:focus {
 }
 .theme-preview.dark-gruvbox .preview-dot.surface {
   background: #282828;
-}
-
-.theme-preview.dark-emerald {
-  background: #0a120d;
-}
-.theme-preview.dark-emerald .preview-dot.primary {
-  background: #10b981;
-}
-.theme-preview.dark-emerald .preview-dot.surface {
-  background: #152219;
-}
-
-.theme-preview.dark-obsidian {
-  background: #09090b;
-}
-.theme-preview.dark-obsidian .preview-dot.primary {
-  background: #f4f4f5;
-}
-.theme-preview.dark-obsidian .preview-dot.surface {
-  background: #18181b;
-}
-
-.theme-preview.light-monochrome {
-  background: #f8f8f9;
-}
-.theme-preview.light-monochrome .preview-dot.primary {
-  background: #18181b;
-}
-.theme-preview.light-monochrome .preview-dot.surface {
-  background: #e8e8ec;
 }
 
 /* RAG Options Stylings */
