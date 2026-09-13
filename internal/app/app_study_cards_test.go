@@ -10,6 +10,13 @@ import (
 func TestBuildSocraticRemedialPrompt_Integration(t *testing.T) {
 	app := newTestApp(t)
 
+	if err := app.repo.EnsureTopic("topic-1", "Topic 1"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := app.repo.CreateNotebook("nb-1", "Notebook 1", "/path", "pdf", "", "", 1, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
 	task := models.StudyQueueTask{
 		ID:          "task-1",
 		TopicID:     "topic-1",

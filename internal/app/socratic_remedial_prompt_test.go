@@ -11,6 +11,13 @@ import (
 func TestBuildSocraticRemedialPrompt_AdaptiveFormat(t *testing.T) {
 	app := newTestApp(t)
 
+	if err := app.repo.EnsureTopic("topic-1", "Topic 1"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := app.repo.CreateNotebook("nb-1", "Notebook 1", "/path", "pdf", "", "", 1, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
 	// Create test task with failed questions payload
 	payload := struct {
 		FailedQuestions []models.FailedQuestionDetail `json:"failed_questions"`
