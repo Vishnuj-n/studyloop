@@ -242,7 +242,15 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 			utils.Warnf("[DEEP_PDF] Failed to update page count for %s (%s): %v", fileName, nbID, err)
 		}
 
-		chaptersDraft := notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		var chaptersDraft []models.SyllabusChapterDraft
+		fallbackUsed := false
+		if res, err := a.notebookService.DraftSyllabusChapters("pdf", filePath, doc, nil); err == nil && len(res.Chapters) > 0 {
+			chaptersDraft = res.Chapters
+			fallbackUsed = res.FallbackUsed
+		} else {
+			chaptersDraft = notebook.ExtractSyllabusChaptersFromMarkdown(result.Markdown, doc.PageCount)
+		}
+
 		if len(chaptersDraft) == 0 {
 			chaptersDraft = []models.SyllabusChapterDraft{
 				{
@@ -251,9 +259,10 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 					EndPage:   doc.PageCount,
 				},
 			}
+			fallbackUsed = true
 		}
 
-		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, false); err != nil {
+		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, fallbackUsed); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
 			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
 			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
