@@ -1,5 +1,9 @@
 <template>
-  <aside class="panel chat" :class="{ closed: chat.chatCollapsed.value, 'rag-off': !ragEnabled }">
+  <aside
+    id="reader-chat-panel"
+    class="panel chat"
+    :class="{ closed: chat.chatCollapsed.value, 'rag-off': !ragEnabled }"
+  >
     <div class="chat-head">
       <div class="chat-head-title-group">
         <h2>AI Chat</h2>
@@ -18,87 +22,109 @@
           🧠 Socratic Tutor ↗
         </router-link>
       </div>
-      <button class="ghost" @click="chat.toggleChat">
+      <button
+        class="ghost"
+        :aria-expanded="!chat.chatCollapsed.value"
+        aria-controls="reader-chat-panel"
+        @click="chat.toggleChat"
+      >
         {{ chat.chatCollapsed.value ? 'Expand' : 'Collapse' }}
       </button>
     </div>
 
-    <div v-if="!chat.chatCollapsed.value && !ragSettingsLoaded" class="rag-disabled-overlay">
-      <h3>Loading settings...</h3>
-    </div>
-    <div v-else-if="!chat.chatCollapsed.value && ragSettingsError" class="rag-disabled-overlay">
-      <div class="lock-icon">⚠️</div>
-      <h3>Settings Error</h3>
-      <p>{{ ragSettingsError }}</p>
-      <button class="primary" @click="$emit('retry-settings')">Retry</button>
-    </div>
-    <template v-else-if="!chat.chatCollapsed.value && ragEnabled">
-      <p class="chat-context">
-        Using topic <strong>{{ selectedTopicTitle || 'None' }}</strong>
-        <span v-if="selectedNotebookTitle">from {{ selectedNotebookTitle }}</span>
-      </p>
+    <template v-if="!chat.chatCollapsed.value">
+      <div v-if="!ragSettingsLoaded" class="rag-disabled-overlay">
+        <h3>Loading settings...</h3>
+      </div>
+      <div v-else-if="ragSettingsError" class="rag-disabled-overlay">
+        <div class="lock-icon">⚠️</div>
+        <h3>Settings Error</h3>
+        <p>{{ ragSettingsError }}</p>
+        <button class="primary" @click="$emit('retry-settings')">Retry</button>
+      </div>
+      <div v-else-if="!ragEnabled" class="rag-disabled-overlay">
+        <div class="lock-icon">🔒</div>
+        <h3>Local AI Retrieval Offline</h3>
+        <p>Local semantic search and Q&A is currently disabled to save memory and CPU.</p>
+        <router-link to="/settings" class="enable-rag-btn">Enable in Settings</router-link>
+      </div>
+      <template v-else>
+        <p class="chat-context">
+          Using topic <strong>{{ selectedTopicTitle || 'None' }}</strong>
+          <span v-if="selectedNotebookTitle">from {{ selectedNotebookTitle }}</span>
+        </p>
 
-      <div class="scope-bar">
-        <div class="scope-main">
-          <span class="scope-label">Retrieval Scope</span>
-          <select v-model="chat.chatScope.value" class="scope-select">
-            <option value="entire_notebook">Entire Notebook</option>
-            <option value="current_chapter">Current Chapter</option>
-            <option value="current_page">Current Page</option>
-          </select>
+        <div class="scope-bar">
+          <div class="scope-main">
+            <label for="scope-select" class="scope-label">Retrieval Scope</label>
+            <select id="scope-select" v-model="chat.chatScope.value" class="scope-select">
+              <option value="entire_notebook">Entire Notebook</option>
+              <option value="current_chapter">Current Chapter</option>
+              <option value="current_page">Current Page</option>
+            </select>
+          </div>
+          <p class="scope-helper">Broader scopes search more of your notebook.</p>
         </div>
-        <p class="scope-helper">Broader scopes search more of your notebook.</p>
-      </div>
 
-      <div ref="messagesPaneRef" class="messages">
-        <article
-          v-for="(msg, idx) in chat.chatMessages.value"
-          :key="msg.id || idx"
-          class="msg"
-          :class="msg.role"
-        >
-          <p class="role">{{ msg.role === 'user' ? 'You' : 'Tutor' }}</p>
-          <p v-if="msg.role === 'user'">{{ msg.text }}</p>
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-else class="markdown-body" v-html="chat.renderMarkdown(msg.text)"></div>
-        </article>
-      </div>
+        <div :ref="(el) => { if (chat && chat.messagesPane) chat.messagesPane.value = el }" class="messages">
+          <article
+            v-for="(msg, idx) in chat.chatMessages.value"
+            :key="msg.id || idx"
+            class="msg"
+            :class="msg.role"
+          >
+            <p class="role">{{ msg.role === 'user' ? 'You' : 'Tutor' }}</p>
+            <p v-if="msg.role === 'user'">{{ msg.text }}</p>
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-else class="markdown-body" v-html="chat.renderMarkdown(msg.text)"></div>
+          </article>
+        </div>
 
-      <article v-if="chat.chatError.value" class="error">{{ chat.chatError.value }}</article>
+        <article v-if="chat.chatError.value" class="error">{{ chat.chatError.value }}</article>
 
-      <label class="field">
-        <span>Ask AI</span>
-        <textarea
-          v-model="chat.chatInput.value"
-          :disabled="chat.chatLoading.value || !selectedTopicID"
-          placeholder="Ask about what you’re reading right now..."
-          @keydown.enter="handleEnterKey"
-        ></textarea>
-      </label>
-
-      <button
-        class="primary"
-        :disabled="chat.chatLoading.value || !chat.chatInput.value.trim() || !selectedTopicID"
-        @click="sendChat"
-      >
-        {{ chat.chatLoading.value ? 'Thinking...' : 'Send' }}
-      </button>
+        <form class="composer" @submit.prevent="sendChat">
+          <div class="composer-box">
+            <textarea
+              v-model="chat.chatInput.value"
+              class="composer-input"
+              :disabled="chat.chatLoading.value || !selectedTopicID"
+              placeholder="Ask about what you’re reading right now..."
+              rows="1"
+              @keydown.enter="handleEnterKey"
+            ></textarea>
+            <button
+              type="submit"
+              class="composer-send-btn"
+              :disabled="chat.chatLoading.value || !chat.chatInput.value.trim() || !selectedTopicID"
+              title="Send question"
+            >
+              <svg
+                v-if="!chat.chatLoading.value"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                class="send-svg"
+              >
+                <path
+                  d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z"
+                />
+              </svg>
+              <span v-else class="thinking-dot-loader">
+                <span></span><span></span><span></span>
+              </span>
+            </button>
+          </div>
+          <div class="composer-hint-row">
+            <span>Enter to send, Shift+Enter for line break</span>
+          </div>
+        </form>
+      </template>
     </template>
-
-    <div
-      v-if="!chat.chatCollapsed.value && ragSettingsLoaded && !ragEnabled && !ragSettingsError"
-      class="rag-disabled-overlay"
-    >
-      <div class="lock-icon">🔒</div>
-      <h3>Local AI Retrieval Offline</h3>
-      <p>Local semantic search and Q&A is currently disabled to save memory and CPU.</p>
-      <router-link to="/settings" class="enable-rag-btn">Enable in Settings</router-link>
-    </div>
   </aside>
 </template>
 
 <script setup>
-import { inject, ref, watch, onUnmounted } from 'vue'
+import { inject, watch } from 'vue'
 import { logFrontendEvent } from '../services/appApi'
 
 const props = defineProps({
@@ -147,7 +173,6 @@ const props = defineProps({
 defineEmits(['retry-settings'])
 
 const chat = inject('chat')
-const messagesPaneRef = ref(null)
 
 // Watch settings errors and RAG toggle status
 watch(
@@ -163,41 +188,30 @@ watch(
   () => props.ragEnabled,
   (newVal) => {
     logFrontendEvent('info', 'ReaderChat', 'rag_status_changed', { enabled: newVal })
-  },
-  { immediate: true }
+  }
 )
 
-// Synchronize messages pane element reference with parent's chat state
-let activePaneEl = null
-
-watch(messagesPaneRef, (el) => {
-  chat.messagesPane.value = el
-  if (el) {
-    activePaneEl = el
-  }
-})
-
-onUnmounted(() => {
-  if (chat.messagesPane.value && chat.messagesPane.value === activePaneEl) {
-    chat.messagesPane.value = null
-  }
-})
-
 async function sendChat() {
-  await chat.sendMessage({
-    topicID: props.selectedTopicID,
-    notebookID: props.selectedNotebookID,
-    currentPage: props.currentPage,
-    chapterStartPage: props.topicStartPage,
-    chapterEndPage: props.topicEndPage,
-  })
+  try {
+    await chat.sendMessage({
+      topicID: props.selectedTopicID,
+      notebookID: props.selectedNotebookID,
+      currentPage: props.currentPage,
+      chapterStartPage: props.topicStartPage,
+      chapterEndPage: props.topicEndPage,
+    })
+  } catch (err) {
+    if (chat && chat.chatError) {
+      chat.chatError.value = err.message || 'Failed to send message'
+    }
+  }
 }
 
 function handleEnterKey(event) {
-  if (event.shiftKey) return
+  if (event.shiftKey || event.isComposing) return
   event.preventDefault()
   if (!chat.chatLoading.value && chat.chatInput.value.trim() && props.selectedTopicID) {
-    sendChat()
+    void sendChat()
   }
 }
 </script>
@@ -211,9 +225,11 @@ function handleEnterKey(event) {
 }
 
 .chat {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-content: start;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .chat.closed {
@@ -246,6 +262,7 @@ function handleEnterKey(event) {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .chat-head-title-group {
@@ -293,6 +310,7 @@ h3 {
   margin: 0;
   font-size: 13px;
   color: var(--muted-text);
+  flex-shrink: 0;
 }
 
 .scope-bar {
@@ -301,6 +319,7 @@ h3 {
   padding: 10px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface-container-low) 86%, transparent);
+  flex-shrink: 0;
 }
 
 .scope-main {
@@ -334,9 +353,11 @@ h3 {
 }
 
 .messages {
-  max-height: 320px;
-  overflow: auto;
-  display: grid;
+  flex: 1;
+  min-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding-right: 3px;
 }
@@ -411,21 +432,129 @@ h3 {
   padding: 0;
 }
 
-.field {
-  display: grid;
-  gap: 5px;
+/* Integrated Composer Input Box */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.field span {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 6px 10px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.composer-box:focus-within {
+  border-color: var(--primary);
+  background: var(--surface-container-lowest);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.composer-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 4px 36px 4px 4px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.45;
+  outline: none;
+  resize: none;
+  min-height: 24px;
+  max-height: 90px;
+}
+
+.composer-send-btn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--primary);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.composer-send-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  background: var(--primary-dim);
+}
+
+.composer-send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.composer-send-btn:disabled {
+  background: var(--surface-container-highest);
+  color: var(--muted-text);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.send-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.composer-hint-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 4px;
+}
+
+.composer-hint-row span {
+  font-size: 10px;
   color: var(--muted-text);
 }
 
-select,
-textarea {
+.thinking-dot-loader {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.thinking-dot-loader span {
+  width: 4px;
+  height: 4px;
+  background-color: var(--on-primary);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.1s infinite ease-in-out;
+}
+
+.thinking-dot-loader span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.thinking-dot-loader span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    opacity: 0.32;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+select {
   width: 100%;
   border: 1px solid var(--outline-variant);
   background: var(--surface-container-lowest);
@@ -434,11 +563,6 @@ textarea {
   font: inherit;
   padding: 10px;
   outline: 0;
-}
-
-textarea {
-  min-height: 110px;
-  resize: vertical;
 }
 
 button {

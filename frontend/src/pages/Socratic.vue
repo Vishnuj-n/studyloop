@@ -512,11 +512,7 @@ async function initiateSocraticSession() {
 }
 
 function handleComposerKeydown(event) {
-  if (event.key !== 'Enter') {
-    return
-  }
-
-  if (event.shiftKey || event.isComposing) {
+  if (event.key !== 'Enter' || event.shiftKey) {
     return
   }
 

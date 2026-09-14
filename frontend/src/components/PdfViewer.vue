@@ -2,7 +2,6 @@
   <div
     ref="viewportRef"
     class="pdf-viewer-viewport"
-    tabindex="0"
     :style="{ opacity: ready || loadError ? 1 : 0, transition: 'opacity 0.2s ease' }"
   >
     <div v-if="loadError" class="pdf-viewer-error">{{ loadError }}</div>
@@ -60,20 +59,11 @@ const activePage = ref(props.initialPage)
 // ponytail: default aspect ratio assumes US Letter; overwritten after first page renders
 const pageAspectRatio = ref(11 / 8.5)
 let scrollListenerActive = false
-let resizeObserver = null
-let parentWidth = ref(BASE_WIDTH)
-
-// ─── DEBUG LOGGING ──────────────────────────────────────────────────────────────
-console.log('[PdfViewer] INIT props:', {
-  source: props.source,
-  pageCount: props.pageCount,
-  initialPage: props.initialPage,
-  zoomScale: props.zoomScale,
-})
 
 // ─── Derived ────────────────────────────────────────────────────────────────────
+// ponytail: stable base width scaled by zoom avoids 2-3s PDF.js canvas re-renders on sidebar toggle
 const containerWidth = computed(() =>
-  Math.round(Math.max(200, parentWidth.value * props.zoomScale))
+  Math.round(Math.max(200, BASE_WIDTH * props.zoomScale))
 )
 
 const pageSlotHeight = computed(() =>
@@ -86,16 +76,11 @@ const totalSlotHeight = computed(() =>
 
 // ─── Virtualization ─────────────────────────────────────────────────────────────
 function isPageActive(pg) {
-  const active = Math.abs(pg - activePage.value) <= BUFFER
-  if (active) {
-    console.log('[PdfViewer] isPageActive:', pg, '→ ACTIVE (activePage:', activePage.value, ')')
-  }
-  return active
+  return Math.abs(pg - activePage.value) <= BUFFER
 }
 
 // ─── O(1) Scroll Tracking ───────────────────────────────────────────────────────
 function pageFromScrollTop(scrollTop, viewportHeight) {
-  // Which page's center is closest to the viewport center?
   const centerY = scrollTop + viewportHeight / 2
   const page = Math.floor(centerY / totalSlotHeight.value) + 1
   return Math.max(1, Math.min(page, props.pageCount))
@@ -125,12 +110,11 @@ function handleScroll() {
 function jumpToPage(page) {
   const vp = viewportRef.value
   if (!vp) return
-  const target = scrollTopForPage(page)
-  // Temporarily disable scroll listener to prevent feedback loop
+  const validPage = Math.max(1, Math.min(page, props.pageCount))
+  const target = scrollTopForPage(validPage)
   scrollListenerActive = false
   vp.scrollTop = target
-  activePage.value = page
-  // Re-enable after the browser settles
+  activePage.value = validPage
   requestAnimationFrame(() => {
     scrollListenerActive = true
   })
@@ -142,7 +126,7 @@ function onPageRendered(pg) {
   if (!ready.value) {
     ready.value = true
   }
-  // On first render of page 1, measure the actual aspect ratio from the canvas
+  // On first render of page 1, measure actual aspect ratio from canvas
   if (pg <= 2) {
     nextTick(() => {
       const vp = viewportRef.value
@@ -150,10 +134,8 @@ function onPageRendered(pg) {
       const canvas = vp.querySelector(`[data-page="${pg}"] canvas`)
       if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
         const measured = canvas.clientHeight / canvas.clientWidth
-        // Only update if significantly different from default (avoids infinite re-render)
         if (Math.abs(measured - pageAspectRatio.value) > 0.01) {
           pageAspectRatio.value = measured
-          // Re-jump to maintain position after aspect ratio update
           nextTick(() => jumpToPage(activePage.value))
         }
       }
@@ -198,49 +180,15 @@ watch(
 // ─── Lifecycle ──────────────────────────────────────────────────────────────────
 onMounted(() => {
   const vp = viewportRef.value
-  console.log('[PdfViewer] onMounted:', {
-    viewportExists: !!vp,
-    clientWidth: vp?.clientWidth,
-    clientHeight: vp?.clientHeight,
-    source: props.source,
-    pageCount: props.pageCount,
-    initialPage: props.initialPage,
-    activePage: activePage.value,
-    containerWidth: containerWidth.value,
-    pageSlotHeight: pageSlotHeight.value,
-  })
   if (!vp) return
 
-  // Measure available parent width for responsive sizing
-  parentWidth.value = vp.clientWidth || BASE_WIDTH
-  console.log('[PdfViewer] parentWidth set to:', parentWidth.value)
-
-  let resizeRafId = null
-  resizeObserver = new ResizeObserver((entries) => {
-    if (resizeRafId) cancelAnimationFrame(resizeRafId)
-    resizeRafId = requestAnimationFrame(() => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          parentWidth.value = Math.round(entry.contentRect.width)
-        }
-      }
-    })
-  })
-  resizeObserver.observe(vp)
-
-  // Attach scroll listener
   vp.addEventListener('scroll', onViewportScroll, { passive: true })
   scrollListenerActive = true
 
-  // Instant jump to initial page (synchronous scrollTop set, no animation)
   nextTick(() => jumpToPage(props.initialPage))
 })
 
 onUnmounted(() => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
-  }
   if (scrollRafId) {
     cancelAnimationFrame(scrollRafId)
     scrollRafId = null
@@ -263,10 +211,6 @@ defineExpose({ jumpToPage })
   overflow-x: auto;
   background: var(--background);
   border-radius: 10px;
-}
-
-.pdf-viewer-scroll-container {
-  /* Width set inline via containerWidth */
 }
 
 .pdf-page-slot {
