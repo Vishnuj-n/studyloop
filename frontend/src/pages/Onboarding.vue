@@ -1294,35 +1294,6 @@ select:focus {
   position: relative;
 }
 
-.lock-overlay {
-  position: absolute;
-  font-size: 1.1rem;
-  background: rgba(0, 0, 0, 0.45);
-  inset: 0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(2px);
-}
-
-.lock-tag {
-  font-size: 0.7rem;
-  color: #f59e0b;
-  font-weight: 700;
-}
-
-.theme-lock-notice {
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface);
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  margin-top: 6px;
-}
 
 .preview-dot {
   width: 12px;
