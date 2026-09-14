@@ -375,32 +375,106 @@ func (r *Repository) GetReadingTask(taskID string) (models.ReadingTask, error) {
 	return task, nil
 }
 
+func (r *Repository) countWordsInPageRange(topicID string, startPage, endPage int) int {
+	rows, err := r.db.Query(`
+		SELECT chunk_text FROM chunks WHERE topic_id = ? AND page_num BETWEEN ? AND ?
+	`, topicID, startPage, endPage)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = rows.Close() }()
+	totalWords := 0
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err == nil {
+			totalWords += len(strings.Fields(text))
+		}
+	}
+	return totalWords
+}
+
+func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPage, targetWords int) int {
+	currentEnd := startPage
+	accumulatedWords := 0
+
+	rows, err := r.db.Query(`
+		SELECT page_num, chunk_text FROM chunks
+		WHERE topic_id = ? AND page_num BETWEEN ? AND ?
+		ORDER BY page_num ASC
+	`, topicID, startPage, maxEndPage)
+	if err != nil {
+		return maxEndPage
+	}
+	defer func() { _ = rows.Close() }()
+
+	pageWords := make(map[int]int)
+	for rows.Next() {
+		var pNum int
+		var text string
+		if err := rows.Scan(&pNum, &text); err == nil {
+			pageWords[pNum] += len(strings.Fields(text))
+		}
+	}
+
+	for p := startPage; p <= maxEndPage; p++ {
+		w := pageWords[p]
+		if p > startPage && (accumulatedWords+w > int(float64(targetWords)*1.3)) {
+			break
+		}
+		accumulatedWords += w
+		currentEnd = p
+	}
+
+	return currentEnd
+}
+
 func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int) (int, int, error) {
-	if startPage > 0 && endPage > 0 {
+	if startPage > 0 && endPage > 0 && endPage >= startPage {
 		return startPage, endPage, nil
 	}
 	if topicID == "" {
 		return startPage, endPage, nil
 	}
-	var topicStart, topicEnd int
+	var topicStart, topicEnd, currentCursor int
 	err := r.db.QueryRow(`
-		SELECT COALESCE(start_page, 1), COALESCE(end_page, start_page)
+		SELECT COALESCE(start_page, 1), COALESCE(end_page, start_page), COALESCE(current_page_cursor, 0)
 		FROM topics WHERE id = ?
-	`, topicID).Scan(&topicStart, &topicEnd)
+	`, topicID).Scan(&topicStart, &topicEnd, &currentCursor)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return startPage, endPage, nil
 		}
 		return 0, 0, err
 	}
+
 	resolvedStart := startPage
 	resolvedEnd := endPage
+
 	if resolvedStart <= 0 {
-		resolvedStart = topicStart
+		if currentCursor >= topicStart && currentCursor <= topicEnd {
+			resolvedStart = currentCursor
+		} else {
+			resolvedStart = topicStart
+		}
 	}
-	if resolvedEnd <= 0 {
+
+	targetWords := 3000
+	if settings, sErr := r.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+		targetWords = settings.TargetSessionWords
+	}
+
+	if resolvedEnd <= 0 || resolvedEnd < resolvedStart || resolvedEnd > topicEnd {
 		resolvedEnd = topicEnd
 	}
+
+	words := r.countWordsInPageRange(topicID, resolvedStart, resolvedEnd)
+	if words > int(float64(targetWords)*1.3) && resolvedEnd > resolvedStart {
+		cappedEnd := r.capEndPageByWordBudget(topicID, resolvedStart, resolvedEnd, targetWords)
+		if cappedEnd >= resolvedStart {
+			resolvedEnd = cappedEnd
+		}
+	}
+
 	return resolvedStart, resolvedEnd, nil
 }
 
