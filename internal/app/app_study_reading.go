@@ -172,6 +172,24 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		}
 	}
 
+	// Cap total chunk payload to TargetSessionWords user setting ceiling
+	if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+		maxWords := int(float64(settings.TargetSessionWords) * 1.3)
+		totalWords := 0
+		cappedChunks := make([]models.Chunk, 0, len(chunks))
+		for _, chunk := range chunks {
+			cWords := len(strings.Fields(chunk.Text))
+			if len(cappedChunks) > 0 && totalWords+cWords > maxWords {
+				break
+			}
+			totalWords += cWords
+			cappedChunks = append(cappedChunks, chunk)
+		}
+		if len(cappedChunks) > 0 {
+			chunks = cappedChunks
+		}
+	}
+
 	chunkIDs := make([]string, 0, len(chunks))
 	chunkTextByID := make(map[string]string, len(chunks))
 	for _, chunk := range chunks {
