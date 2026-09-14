@@ -23,14 +23,16 @@ func calculateDailyStudyMinutes(studyStart, studyEnd string) int {
 	var sh, sm, eh, em int
 	if _, errS := fmt.Sscanf(studyStart, "%d:%d", &sh, &sm); errS == nil {
 		if _, errE := fmt.Sscanf(studyEnd, "%d:%d", &eh, &em); errE == nil {
-			startMins := sh*60 + sm
-			endMins := eh*60 + em
-			diff := endMins - startMins
-			if diff < 0 {
-				diff += 1440
-			}
-			if diff > 0 {
-				dailyStudyMinutes = diff
+			if sh >= 0 && sh <= 23 && sm >= 0 && sm <= 59 && eh >= 0 && eh <= 23 && em >= 0 && em <= 59 {
+				startMins := sh*60 + sm
+				endMins := eh*60 + em
+				diff := endMins - startMins
+				if diff < 0 {
+					diff += 1440
+				}
+				if diff > 0 {
+					dailyStudyMinutes = diff
+				}
 			}
 		}
 	}
@@ -96,10 +98,10 @@ func computeLongestStreak(sortedDates []string, loc *time.Location) int {
 		if streakTemp == 0 {
 			streakTemp = 1
 		} else {
-			daysDiff := int(d.Sub(prevDate).Hours()+0.5) / 24
-			if daysDiff == 1 {
+			expected := prevDate.AddDate(0, 0, 1)
+			if d.Equal(expected) {
 				streakTemp++
-			} else if daysDiff > 1 {
+			} else if d.After(expected) {
 				if streakTemp > longestStreak {
 					longestStreak = streakTemp
 				}
@@ -279,6 +281,9 @@ func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCard
 	}
 	task, _, err := repo.CreateReviewSession(bestNotebookID)
 	if err != nil || task == nil {
+		if err != nil {
+			utils.Warnf("failed to create review session for notebook %s: %v", bestNotebookID, err)
+		}
 		return models.ScheduledTask{}, 0, 0, false
 	}
 
@@ -460,31 +465,47 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 
 	if errProf == nil && prof != nil {
 		streakFreezes = prof.StreakFreezesOwned
-		yesterdayStr := nowClient.AddDate(0, 0, -1).Format(dateFormatYYYYMMDD)
 
-		// If the user did not study today, and missed yesterday, check if yesterday can be saved with a streak freeze
-		if currentStreak == 0 && !todayCompleted && !dateSet[yesterdayStr] && streakFreezes > 0 {
-			// Check if day before yesterday was part of a streak
-			yesterdayTime := time.Now().In(loc).AddDate(0, 0, -1)
-			potentialStreak := computeCurrentStreak(yesterdayTime, dateSet)
-			if potentialStreak > 0 {
-				// Consume 1 streak freeze and bridge yesterday permanently in SQLite
-				updatedProf, consumeErr := repo.ConsumeStreakFreeze(yesterdayStr)
-				if consumeErr == nil && updatedProf != nil {
-					streakFreezes = updatedProf.StreakFreezesOwned
-					// Add yesterday to dateSet to bridge the streak
-					dateSet[yesterdayStr] = true
-					activeDates = append(activeDates, yesterdayStr)
-					sort.Strings(activeDates)
-					currentStreak = computeCurrentStreak(nowClient, dateSet)
-					if currentStreak > longestStreak {
-						longestStreak = currentStreak
-					}
-					streakSavedEvent = map[string]interface{}{
-						"streak_length":     currentStreak,
-						"freezes_remaining": streakFreezes,
+		// Auto-Protection Loop: Bridge missed past days using available freezes
+		// Check backward from yesterday to find missed days that can be bridged
+		for streakFreezes > 0 {
+			// Find the most recent date in the past (starting from yesterday) that is missing and has an active streak before it
+			checkDate := nowClient.AddDate(0, 0, -1)
+			bridgedAny := false
+
+			// Look back up to 30 days
+			for i := 0; i < 30; i++ {
+				dStr := checkDate.Format(dateFormatYYYYMMDD)
+				if !dateSet[dStr] {
+					// Check if there is study history prior to this date
+					prevDate := checkDate.AddDate(0, 0, -1)
+					potentialStreak := computeCurrentStreak(prevDate, dateSet)
+					if potentialStreak > 0 {
+						// Consume 1 streak freeze to bridge this day
+						updatedProf, consumeErr := repo.ConsumeStreakFreeze(dStr)
+						if consumeErr == nil && updatedProf != nil {
+							streakFreezes = updatedProf.StreakFreezesOwned
+							dateSet[dStr] = true
+							activeDates = append(activeDates, dStr)
+							sort.Strings(activeDates)
+							currentStreak = computeCurrentStreak(nowClient, dateSet)
+							if currentStreak > longestStreak {
+								longestStreak = currentStreak
+							}
+							streakSavedEvent = map[string]interface{}{
+								"streak_length":     currentStreak,
+								"freezes_remaining": streakFreezes,
+							}
+							bridgedAny = true
+							break
+						}
 					}
 				}
+				checkDate = checkDate.AddDate(0, 0, -1)
+			}
+
+			if !bridgedAny {
+				break
 			}
 		}
 
@@ -584,14 +605,17 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	now := time.Now().In(loc)
 	y, m, d := now.Date()
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
-	endOfToday := midnight.Add(24 * time.Hour).Unix()
+	endOfToday := midnight.AddDate(0, 0, 1).Unix()
 
 	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+
 	if len(counts) < 7 {
-		return map[string]interface{}{"timeline": []FlashcardDuePoint{}}
+		padded := make([]int, 7)
+		copy(padded, counts)
+		counts = padded
 	}
 
 	timeline := make([]FlashcardDuePoint, 7)
@@ -603,7 +627,7 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 
 	dayNames := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	for i := 1; i < 7; i++ {
-		targetDay := midnight.Add(time.Duration(i*24) * time.Hour)
+		targetDay := midnight.AddDate(0, 0, i)
 		dayLabel := dayNames[targetDay.Weekday()]
 		if i == 1 {
 			dayLabel = "Tomorrow"
@@ -636,6 +660,9 @@ func (a *App) GetGamificationState() map[string]interface{} {
 	boxes, err := repo.GetUnopenedLootBoxes()
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+	if boxes == nil {
+		boxes = []models.PendingLootBox{}
 	}
 
 	return map[string]interface{}{
@@ -715,3 +742,5 @@ func (a *App) GetGamificationStore() map[string]interface{} {
 		"store": store,
 	}
 }
+
+

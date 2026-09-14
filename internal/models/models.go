@@ -589,20 +589,36 @@ type LLMSettings struct {
 	Heavy           LLMTierSettings `json:"heavy"`
 }
 
+// UserWager represents an active coin wager on daily or weekly task goals.
+type UserWager struct {
+	ID             string `json:"id"`
+	StakedCoins    int    `json:"staked_coins"`
+	TargetTasks    int    `json:"target_tasks"`
+	CompletedTasks int    `json:"completed_tasks"`
+	RewardCoins    int    `json:"reward_coins"`
+	ExpiresAt      string `json:"expires_at"`
+	Status         string `json:"status"` // "ACTIVE", "WON", "LOST"
+	WagerType      string `json:"wager_type,omitempty"` // "DAILY" or "WEEKLY"
+}
+
 // GamificationProfile represents the persistent user progression and title stats.
 type GamificationProfile struct {
-	UserID                int    `json:"user_id"`
-	TotalXP               int    `json:"total_xp"`
-	Coins                 int    `json:"coins"`
-	CurrentTitle          string `json:"current_title"`
-	NextTitle             string `json:"next_title"`
-	NextTitleXP           int    `json:"next_title_xp"`
-	CurrentTitleMinXP     int    `json:"current_title_min_xp"`
-	StreakFreezesOwned    int    `json:"streak_freezes_owned"`
-	FrozenDatesJSON       string `json:"frozen_dates_json"`
-	UnlockedCosmeticsJSON string `json:"unlocked_cosmetics_json"`
-	StatsJSON             string `json:"stats_json"`
-	UpdatedAt             string `json:"updated_at"`
+	UserID                int        `json:"user_id"`
+	Level                 int        `json:"level"`
+	TotalXP               int        `json:"total_xp"`
+	Coins                 int        `json:"coins"`
+	CurrentTitle          string     `json:"current_title"`
+	NextTitle             string     `json:"next_title"`
+	NextTitleXP           int        `json:"next_title_xp"`
+	CurrentTitleMinXP     int        `json:"current_title_min_xp"`
+	StreakFreezesOwned    int        `json:"streak_freezes_owned"`
+	FrozenDatesJSON       string     `json:"frozen_dates_json"`
+	UnlockedCosmeticsJSON string     `json:"unlocked_cosmetics_json"`
+	StatsJSON             string     `json:"stats_json"`
+	XPElixirCharges       int        `json:"xp_elixir_charges"`
+	LuckCharmCharges      int        `json:"luck_charm_charges"`
+	ActiveWager           *UserWager `json:"active_wager,omitempty"`
+	UpdatedAt             string     `json:"updated_at"`
 }
 
 type CosmeticItem struct {

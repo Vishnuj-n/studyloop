@@ -1282,3 +1282,40 @@ func TestUserSettingsQuizAndTutorStylePersistence(t *testing.T) {
 		t.Fatalf("expected updated StudySlotsJSON '[{\"start\":\"09:00\",\"end\":\"10:00\"}]', got %q", updated.StudySlotsJSON)
 	}
 }
+
+func TestNotebookRepoFixes(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	notebookID := "nb-fixes-1"
+	topicID := "topic-fixes-1"
+	if err := testRepo.EnsureTopic(topicID, "Fixes Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(notebookID, "Fixes Notebook", "/tmp/fixes.txt", "txt", topicID, "", 1, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	groups := []NotebookTopicIngestionGroup{{
+		TopicID: topicID,
+		Chunks: []NotebookChunkInput{
+			{ID: "c-fix-1", Text: "sample chunk text", TokenCount: 3, PageNum: 1},
+		},
+	}}
+
+	if err := testRepo.IngestNotebookContentByTopic(notebookID, groups); err != nil {
+		t.Fatalf("IngestNotebookContentByTopic failed: %v", err)
+	}
+
+	// Verify chunk hash was populated by insertChunkRowRepo
+	var hashVal string
+	err := testRepo.db.QueryRow(`SELECT chunk_hash FROM chunks WHERE id = ?`, "c-fix-1").Scan(&hashVal)
+	if err != nil || hashVal == "" {
+		t.Fatalf("expected non-empty chunk_hash, got err=%v hash=%q", err, hashVal)
+	}
+
+	// Verify DeleteNotebook deletes chunk via notebook_chunks link
+	if err := testRepo.DeleteNotebook(notebookID); err != nil {
+		t.Fatalf("DeleteNotebook failed: %v", err)
+	}
+	assertCountEquals(t, `SELECT COUNT(*) FROM chunks WHERE id = ?`, "c-fix-1", 0)
+}

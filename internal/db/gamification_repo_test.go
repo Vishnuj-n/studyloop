@@ -23,23 +23,23 @@ func TestGamificationRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetGamificationProfile failed: %v", err)
 	}
-	if prof.UserID != 1 || prof.TotalXP != 0 || prof.CurrentTitle != "The Apprentice" || prof.StreakFreezesOwned != 1 {
+	if prof.UserID != 1 || prof.TotalXP != 0 || prof.CurrentTitle != "The Apprentice I" || prof.Level != 1 || prof.StreakFreezesOwned != 1 {
 		t.Fatalf("unexpected default profile: %+v", prof)
 	}
 
-	// 2. Add XP and Coins
-	updatedProf, unlockedTitle, err := repo.AddXPAndCoins(550, 60)
+	// 2. Add XP and Coins (1500 XP unlocks The Scholar I)
+	updatedProf, unlockedTitle, err := repo.AddXPAndCoins(1500, 60)
 	if err != nil {
 		t.Fatalf("AddXPAndCoins failed: %v", err)
 	}
-	if updatedProf.TotalXP != 550 || updatedProf.Coins != 60 {
+	if updatedProf.TotalXP != 1500 || updatedProf.Coins != 60 || updatedProf.Level != 6 {
 		t.Fatalf("unexpected updated values: %+v", updatedProf)
 	}
-	if updatedProf.CurrentTitle != "The Scholar" {
-		t.Fatalf("expected title 'The Scholar', got %q", updatedProf.CurrentTitle)
+	if updatedProf.CurrentTitle != "The Scholar I" {
+		t.Fatalf("expected title 'The Scholar I', got %q", updatedProf.CurrentTitle)
 	}
-	if unlockedTitle != "The Scholar" {
-		t.Fatalf("expected unlockedTitle 'The Scholar', got %q", unlockedTitle)
+	if unlockedTitle != "The Scholar I" {
+		t.Fatalf("expected unlockedTitle 'The Scholar I', got %q", unlockedTitle)
 	}
 
 	// 3. Create Pending Loot Box
@@ -70,8 +70,8 @@ func TestGamificationRepo(t *testing.T) {
 	if !claimedBox.Opened {
 		t.Fatalf("claimed box opened flag should be true")
 	}
-	if afterClaimProf.TotalXP != 550+75 {
-		t.Fatalf("expected total XP %d, got %d", 550+75, afterClaimProf.TotalXP)
+	if afterClaimProf.TotalXP != 1500+75 {
+		t.Fatalf("expected total XP %d, got %d", 1500+75, afterClaimProf.TotalXP)
 	}
 
 	// 5. Buy Streak Freeze
@@ -129,3 +129,72 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("expected light-monochrome to be unlocked by quiz_master achievement")
 	}
 }
+
+func TestGamificationStoreAutoReconcilesFromSQL(t *testing.T) {
+	tempDB := "test_gamification_reconcile.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// Seed completed reading task in study_queue
+	_, err = repo.db.Exec(`
+		INSERT INTO notebooks (id, title, file_path) VALUES ('nb-1', 'Test NB', '/path/test.pdf');
+		INSERT INTO study_queue (id, notebook_id, task_type, status) VALUES ('sq-1', 'nb-1', 'READING', 'COMPLETED');
+	`)
+	if err != nil {
+		t.Fatalf("failed to seed reading task: %v", err)
+	}
+
+	// Seed passed quiz attempt
+	_, err = repo.db.Exec(`
+		INSERT INTO quiz_attempts (id, task_id, score, passed, answers_json, completed_at) VALUES ('qa-1', 'sq-1', 100, 1, '[]', 1000);
+	`)
+	if err != nil {
+		t.Fatalf("failed to seed quiz attempt: %v", err)
+	}
+
+	store, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore failed: %v", err)
+	}
+
+	var firstStepAch, quizStarterAch *models.Achievement
+	for i := range store.Achievements {
+		if store.Achievements[i].ID == "first_step" {
+			firstStepAch = &store.Achievements[i]
+		}
+		if store.Achievements[i].ID == "quiz_starter" {
+			quizStarterAch = &store.Achievements[i]
+		}
+	}
+
+	if firstStepAch == nil || firstStepAch.CurrentValue != 1 || firstStepAch.TargetValue != 2 || firstStepAch.Title != "First Steps II" {
+		t.Fatalf("expected First Steps II achievement (1/2), got %+v", firstStepAch)
+	}
+	if quizStarterAch == nil || quizStarterAch.CurrentValue != 1 || quizStarterAch.TargetValue != 2 || quizStarterAch.Title != "Quiz Starter II" {
+		t.Fatalf("expected Quiz Starter II achievement (1/2), got %+v", quizStarterAch)
+	}
+
+	// Verify Tier II achievements clear RewardItem
+	_ = repo.IncrementStat("reading_sessions", 5)
+	storeAfterTier2, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore after tier 2 failed: %v", err)
+	}
+	for _, a := range storeAfterTier2.Achievements {
+		if a.ID == "night_scholar" {
+			if a.Title != "Night Scholar II" {
+				t.Fatalf("expected Night Scholar II, got %s", a.Title)
+			}
+			if a.RewardItem != "" {
+				t.Fatalf("expected empty RewardItem on Night Scholar II, got %s", a.RewardItem)
+			}
+		}
+	}
+}
+

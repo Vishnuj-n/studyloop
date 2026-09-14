@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const socraticInstructions = `You are an Adaptive Concept Tutor helping a student who struggled with a quiz or concept.
+const socraticRescueInstructions = `You are an Adaptive Concept Tutor helping a student who struggled with a quiz or concept.
 Act like an encouraging, highly clear human tutor.
 Prefer concrete examples, step-by-step clarity, and direct explanations over abstract or indirect questioning.
 
@@ -36,6 +36,35 @@ Rules:
 - End your response with exactly one short question to check whether the student understood the concept.
 - If the student gets a follow-up question wrong, explain the concept again using a different perspective or example before moving on.
 - Keep responses focused, friendly, and clear.`
+
+const socraticGeneralInstructions = `You are an adaptive Socratic tutor helping a student understand material from the retrieved content.
+Act like a human tutor talking to a confused student.
+Prefer concrete examples over abstract analysis.
+Start from the student's likely confusion.
+
+Goal:
+Help the student discover the answer through guided thinking, not answer substitution.
+
+Rules:
+- Stay within the retrieved material.
+- The student cannot see the retrieved material. Do NOT refer to "retrieved material", "provided text", "context", "document", or "source". Talk to the student naturally as if you both know the subject matter.
+- First identify what the student is being asked to do (theme identification, concept understanding, comparison, argument analysis, application, etc.).
+- Stay at the same level of abstraction as the question.
+- Guide using questions and hints before explanations.
+- Build on the student's current understanding.
+- Help the student notice evidence, patterns, contrasts, causes, and assumptions.
+- Do not create study plans, teaching plans, summaries, or new tasks unless requested.
+- Do not provide the final answer unless asked or the student is clearly stuck.
+- Keep responses concise and focused.
+- Continue the conversation naturally. Reference what the student said before.
+
+Hint Progression:
+Observation → Pattern → Concept → Near Answer → Full Explanation
+
+Response Format Guidelines:
+- Respond in a natural, conversational manner.
+- Directly respond to the student's input: validate if they are correct, partially correct, or incorrect, and explain why briefly using the retrieved material. If they ask a question, answer it directly and clearly.
+- End your response with exactly one short probing question to guide them further. If helpful, you may add a hint below the question labeled 'Hint:'.`
 
 // GenerateShortAnswerPrompt creates, persists, and returns one grounded short-answer
 // question for the Socratic mode.  It is the only method in the study package
@@ -166,16 +195,12 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	if notebookID == "" {
 		return nil, retrieval.ErrInvalidNotebookContext
 	}
-	if question == "" || question == "__START__" {
-		question = "I studied this material and took a quiz, but I struggled with some questions. Please analyze my wrong answers, explain what I misunderstood and why the correct answers are right, and ask me one follow-up question to check if I understood."
-	}
 	if s.fastLLMProvider == nil {
 		return nil, fmt.Errorf("FAST_LLM provider not initialized")
 	}
 	if s.retrievalEngine == nil {
 		return nil, fmt.Errorf("retrieval engine not initialized")
 	}
-
 	// ponytail: check for active remedial task and retrieve failed questions payload
 	var failedQuestionsSummary string
 	if topicID != "" {
@@ -196,6 +221,19 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		}
 	}
 
+	if question == "" || question == "__START__" {
+		if failedQuestionsSummary != "" {
+			question = "I studied this material and took a quiz, but I struggled with some questions. Please analyze my wrong answers, explain what I misunderstood and why the correct answers are right, and ask me one follow-up question to check if I understood."
+		} else {
+			question = "I am studying this material. Please introduce the key concept and ask me a probing question to guide my understanding."
+		}
+	}
+
+	socraticInstructions := socraticGeneralInstructions
+	if failedQuestionsSummary != "" {
+		socraticInstructions = socraticRescueInstructions
+	}
+
 	// 1. Semantic search for relevant chunks inside the notebook scope
 	const topK = 5
 	results, err := s.retrievalEngine.SemanticSearchNotebook(notebookID, topicID, question, topK)
@@ -205,6 +243,9 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	// 2. Build retrieved material context blocks, citations, and chunk texts
 	blocks, citations, chunkTexts := buildReaderContextBlocksWithText(results)
+	if len(blocks) != len(citations) || len(blocks) != len(chunkTexts) {
+		return nil, fmt.Errorf("context block length mismatch: blocks=%d citations=%d chunkTexts=%d", len(blocks), len(citations), len(chunkTexts))
+	}
 
 	// 3. Generate answer using heavy LLM provider (to ensure high quality guiding responses)
 	llm := s.heavyLLMProvider
@@ -321,20 +362,23 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	}
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
-	citations = newCitations
-	chunkTexts = newChunkTexts
 
-	// Rebuild the final prompt now that contextText may have been truncated
-	socraticPrompt := strings.Join([]string{
+	// Ensure contextText label is omitted when empty
+	promptParts := []string{
 		socraticInstructions,
 		failedQuestionsSummary,
 		"",
 		historyBlock,
-		"Retrieved material:",
-		contextText,
-		"",
-		"Student question: " + question,
-	}, "\n")
+	}
+	if contextText != "" {
+		promptParts = append(promptParts, "Retrieved material:", contextText, "")
+	}
+	promptParts = append(promptParts, "Student question: "+question)
+	socraticPrompt := strings.Join(promptParts, "\n")
+
+	if llm == s.fastLLMProvider && s.heavyLLMProvider == nil {
+		utils.Warnf("[SOCRATIC] heavy LLM provider not configured; falling back to fast LLM provider for topic %s", topicID)
+	}
 
 	answer, err := llm.GenerateAnswer(socraticPrompt)
 	if err != nil {
@@ -347,10 +391,7 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	return map[string]interface{}{
 		"answer":         answer,
-		"cited_sections": citations,
-		"chunk_texts":    chunkTexts,
+		"cited_sections": newCitations,
+		"chunk_texts":    newChunkTexts,
 	}, nil
 }
-
-// Ensure retrieval import is used (the Engine type lives there).
-var _ *retrieval.Engine

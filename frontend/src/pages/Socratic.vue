@@ -46,14 +46,47 @@
           title="Clear chat history"
           @click="clearConversation"
         >
-          <span class="clear-icon">🧹</span> Clear Chat
+          <svg
+            class="clear-btn-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          </svg>
+          Clear Chat
         </button>
       </div>
 
       <div ref="threadRef" class="chat-thread">
         <div v-if="messages.length === 0" class="empty-state">
           <div class="welcome-card">
-            <div class="welcome-icon">🧠</div>
+            <div class="welcome-icon">
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+                <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+                <path d="M12 5v13" />
+                <path d="M9.5 9A3.5 3.5 0 0 1 12 10.5 3.5 3.5 0 0 1 14.5 9" />
+              </svg>
+            </div>
             <h3 v-if="isRescueMode">Concept Rescue Session</h3>
             <h3 v-else>Socratic Tutor</h3>
 
@@ -326,14 +359,16 @@ onMounted(async () => {
     globalError.value = `Failed to load settings: ${err.message}`
   }
 
-  const nbParam = route.query.notebook_id || route.query.notebookId || ''
-  const topicParam = route.query.topic_id || route.query.topicId || ''
+  if (!taskId.value) {
+    const nbParam = route.query.notebook_id || route.query.notebookId || ''
+    const topicParam = route.query.topic_id || route.query.topicId || ''
 
-  if (topicParam) {
-    selectedTopicID.value = topicParam
-  }
-  if (nbParam) {
-    selectedNotebookID.value = nbParam
+    if (topicParam) {
+      selectedTopicID.value = topicParam
+    }
+    if (nbParam) {
+      selectedNotebookID.value = nbParam
+    }
   }
 })
 
@@ -477,11 +512,7 @@ async function initiateSocraticSession() {
 }
 
 function handleComposerKeydown(event) {
-  if (event.key !== 'Enter') {
-    return
-  }
-
-  if (event.shiftKey || event.isComposing) {
+  if (event.key !== 'Enter' || event.shiftKey) {
     return
   }
 
@@ -524,14 +555,21 @@ async function retrySocraticMessage(messageIdx) {
   retryingMessageId.value = messageIdx
   const prompt = failedMsg.promptText
 
+  // Capture conversation history before removing failed turn
+  const conversationHistory = messages.value
+    .slice(0, messageIdx)
+    .filter((m) => !m.error)
+    .map((m) => ({ role: m.role, content: m.text }))
+
+  if (conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].role === 'user') {
+    conversationHistory.pop()
+  }
+
   messages.value.splice(messageIdx, 1)
 
   isLoading.value = true
+  globalError.value = ''
   await scrollToBottom()
-
-  const conversationHistory = messages.value
-    .filter((m, idx) => !m.error && idx !== messageIdx - 1)
-    .map((m) => ({ role: m.role, content: m.text }))
 
   try {
     const topicID = effectiveTopicID.value
@@ -716,7 +754,10 @@ h1 {
 }
 
 .welcome-icon {
-  font-size: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
   margin-bottom: 12px;
   animation: pulse-slow 3s infinite ease-in-out;
 }

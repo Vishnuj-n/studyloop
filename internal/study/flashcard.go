@@ -172,7 +172,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	utils.Warnf("[FLASHCARD_PIPELINE] flashcard_auto_generation_batch generation_source=%s chunk_count=%d token_estimate=%d page_range=%d-%d", generationSource, len(contextChunks), tokenCount, startPage, endPage)
 	contextText := buildContextTextFromChunks(contextChunks)
 
-	llm, tier := s.selectLLM(contextText, 0)
+	llm, tier := s.selectLLM(contextText)
 	if llm == nil {
 		return nil, "", fmt.Errorf("no LLM provider available (tier: %s)", tier)
 	}
@@ -181,8 +181,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	modelName := providerModelName(llm)
 	limits := llm.GetLimits()
 	maxInputTokens := limits.MaxInputTokens
-	maxOutputTokens := limits.MaxOutputTokens
-	utils.Warnf("[FLASHCARD_PIPELINE] model_limits model=%s max_input=%d max_output=%d", modelName, maxInputTokens, maxOutputTokens)
+	utils.Warnf("[FLASHCARD_PIPELINE] model_limits model=%s max_input=%d", modelName, maxInputTokens)
 	if maxInputTokens <= 0 {
 		return nil, "", fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
 	}
@@ -210,7 +209,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 
 	// Validate output size before parsing
 	outputTokenEstimate := len(strings.Fields(raw))
-	utils.Warnf("[FLASHCARD_PIPELINE] output_validation output_tokens_est=%d max_output=%d", outputTokenEstimate, maxOutputTokens)
+	utils.Warnf("[FLASHCARD_PIPELINE] output_validation output_tokens_est=%d", outputTokenEstimate)
 
 	parsed, err := parseFlashcardLLMResponse(raw)
 	if err != nil {

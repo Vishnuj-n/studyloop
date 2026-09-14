@@ -171,22 +171,12 @@
           v-for="(q, index) in questions"
           :key="q.id"
           class="breakdown-card"
-          :class="
-            (answers[q.id] || '').trim().toLowerCase() ===
-            (q.correct_answer || '').trim().toLowerCase()
-              ? 'breakdown-card--correct'
-              : 'breakdown-card--incorrect'
-          "
+          :class="isCorrect(q) ? 'breakdown-card--correct' : 'breakdown-card--incorrect'"
         >
           <div class="breakdown-header">
             <span class="question-num">{{ index + 1 }}</span>
             <span class="breakdown-status">
-              {{
-                (answers[q.id] || '').trim().toLowerCase() ===
-                (q.correct_answer || '').trim().toLowerCase()
-                  ? '✓ Correct'
-                  : '✗ Incorrect'
-              }}
+              {{ isCorrect(q) ? '✓ Correct' : '✗ Incorrect' }}
             </span>
           </div>
           <p class="question-prompt">{{ q.prompt }}</p>
@@ -195,23 +185,12 @@
               <span class="answer-label">Your Answer:</span>
               <span
                 class="answer-val"
-                :class="
-                  (answers[q.id] || '').trim().toLowerCase() ===
-                  (q.correct_answer || '').trim().toLowerCase()
-                    ? 'val--correct'
-                    : 'val--incorrect'
-                "
+                :class="isCorrect(q) ? 'val--correct' : 'val--incorrect'"
               >
                 {{ answers[q.id] || 'None' }}
               </span>
             </p>
-            <p
-              v-if="
-                (answers[q.id] || '').trim().toLowerCase() !==
-                (q.correct_answer || '').trim().toLowerCase()
-              "
-              class="answer-item"
-            >
+            <p v-if="!isCorrect(q)" class="answer-item">
               <span class="answer-label">Correct Answer:</span>
               <span class="answer-val val--correct">{{ q.correct_answer }}</span>
             </p>
@@ -278,6 +257,14 @@
       >
         {{ submitting ? 'Completing...' : 'Complete Milestone Exam' }}
       </button>
+      <button
+        v-else-if="taskID"
+        class="primary-btn retry-generation-btn"
+        :disabled="loading"
+        @click="loadQuizTask"
+      >
+        Retry Loading Quiz
+      </button>
     </article>
 
     <!-- Quiz form -->
@@ -324,7 +311,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   activateTask,
@@ -402,6 +389,11 @@ const canRetryGeneration = computed(() => {
   )
 })
 
+function isCorrect(q) {
+  if (!q || !q.correct_answer) return false
+  return (answers.value[q.id] || '').trim().toLowerCase() === q.correct_answer.trim().toLowerCase()
+}
+
 onMounted(async () => {
   await loadNotebooks()
   try {
@@ -418,12 +410,25 @@ onMounted(async () => {
   }
 })
 
+watch(taskID, (newID) => {
+  if (newID) {
+    loadQuizTask()
+  } else {
+    taskMeta.value = null
+    questions.value = []
+    submitted.value = false
+    result.value = null
+  }
+})
+
 async function loadNotebooks() {
   try {
     const res = await getNotebooks()
     notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
   } catch {
-    error.value = 'Failed to load notebooks.'
+    if (!taskID.value) {
+      error.value = 'Failed to load notebooks.'
+    }
   }
 }
 
@@ -450,10 +455,15 @@ async function loadQuizTask() {
     }
 
     taskMeta.value = task
-    const payload =
-      typeof task.payload_json === 'string' && task.payload_json.trim() !== ''
-        ? JSON.parse(task.payload_json)
-        : null
+    let payload = null
+    if (typeof task.payload_json === 'string' && task.payload_json.trim() !== '') {
+      try {
+        payload = JSON.parse(task.payload_json)
+      } catch {
+        error.value = 'Quiz payload data is corrupted.'
+        return
+      }
+    }
 
     questions.value = Array.isArray(payload?.questions) ? payload.questions : []
     if (task.task_type === 'MILESTONE_EXAM') {
@@ -474,6 +484,10 @@ async function loadQuizTask() {
 }
 
 async function submitMilestone() {
+  if (!taskID.value) {
+    error.value = 'Missing task ID for milestone exam.'
+    return
+  }
   submitting.value = true
   error.value = ''
   try {
@@ -545,11 +559,7 @@ async function submitQuiz() {
     try {
       let correctCount = 0
       questions.value.forEach((q) => {
-        if (
-          typeof answers.value[q.id] === 'string' &&
-          typeof q.correct_answer === 'string' &&
-          answers.value[q.id].trim().toLowerCase() === q.correct_answer.trim().toLowerCase()
-        ) {
+        if (isCorrect(q)) {
           correctCount++
         }
       })
@@ -585,6 +595,11 @@ async function submitQuiz() {
       return
     }
     result.value = response?.result || null
+    if (!result.value) {
+      error.value = response?.error || 'Quiz submission returned no result.'
+      submitted.value = false
+      return
+    }
     submitted.value = true
 
     if (result.value?.passed) {
@@ -602,14 +617,14 @@ async function submitQuiz() {
       const notebook = notebooks.value.find((n) => n.id === taskMeta.value?.notebook_id)
       const fileHash = notebook?.file_hash || ''
       const currentQuizResult = response?.result
-      trackAnalyticsEvent('quiz_complete', fileHash, taskMeta.value?.start_page || 0, {
+      void trackAnalyticsEvent('quiz_complete', fileHash, taskMeta.value?.start_page || 0, {
         task_id: taskID.value,
         score: currentQuizResult?.score || 0,
         passed: currentQuizResult?.passed || false,
         correct_count: currentQuizResult?.correct_count || 0,
         total_count: currentQuizResult?.total_count || 0,
         anonymous_user_id: anonymousUserID.value,
-      })
+      }).catch(() => {})
     }
   } catch (err) {
     error.value = err?.message || 'Failed to submit quiz.'
@@ -674,52 +689,29 @@ async function handleContinue() {
 }
 
 async function handleGoToExaminer() {
-  // If quiz passed with flashcards pending, generate flashcards first to maintain state machine integrity
-  if (result.value?.passed && result.value?.flashcards_pending) {
-    generatingFlashcards.value = true
-    error.value = ''
-    result.value.flashcards_generation_error = false
-    result.value.flashcards_generation_message = ''
-    try {
-      const genResult = await generateFlashcardsForQuizTask(result.value.task_id)
-      if (genResult?.error) {
-        console.warn('[FLASHCARD_PIPELINE] Flashcard generation failed:', genResult.error)
-        result.value.flashcards_generation_error = true
-        result.value.flashcards_generation_message = genResult.error
-        result.value.flashcards_pending = false
-        return
-      } else {
-        if (genResult?.rewards) {
-          window.dispatchEvent(
-            new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
-          )
-        }
-        result.value.flashcards_generated = genResult?.cards_scheduled || 0
-        result.value.flashcards_pending = false
-      }
-    } catch (err) {
-      console.warn('[FLASHCARD_PIPELINE] Flashcard generation error:', err)
-      result.value.flashcards_generation_error = true
-      result.value.flashcards_generation_message = err?.message || 'Flashcard generation failed.'
-      result.value.flashcards_pending = false
-      return
-    } finally {
-      generatingFlashcards.value = false
-    }
-  }
-
   const nbID = taskMeta.value?.notebook_id || selectedNotebookID.value || ''
   const startP = taskMeta.value?.start_page || startPage.value || 1
   const endP = taskMeta.value?.end_page || endPage.value || startP
 
+  // Defer flashcard generation to avoid double LLM calls (429 TPM limit) when Examiner auto-generates
+  const quizTaskId =
+    result.value?.passed && result.value?.flashcards_pending
+      ? result.value?.task_id || taskID.value || ''
+      : ''
+
+  const query = {
+    notebookID: nbID,
+    startPage: String(startP),
+    endPage: String(endP),
+    autoGenerate: 'true',
+  }
+  if (quizTaskId) {
+    query.quizTaskId = quizTaskId
+  }
+
   router.push({
     path: '/examiner',
-    query: {
-      notebookID: nbID,
-      startPage: String(startP),
-      endPage: String(endP),
-      autoGenerate: 'true',
-    },
+    query,
   })
 }
 </script>

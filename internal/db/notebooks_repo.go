@@ -312,14 +312,39 @@ func (r *Repository) IngestNotebookContentByTopic(notebookID string, groups []No
 			return err
 		}
 
+		var chunkIDs []string
+		rows, err := tx.Query(`SELECT chunk_id FROM notebook_chunks WHERE notebook_id = ?`, notebookID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var cid string
+			if err := rows.Scan(&cid); err != nil {
+				rows.Close()
+				return err
+			}
+			chunkIDs = append(chunkIDs, cid)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
 		if _, err := tx.Exec("DELETE FROM notebook_chunks WHERE notebook_id = ?", notebookID); err != nil {
 			return err
 		}
 
-		chunkPrefix := fmt.Sprintf("nbc_%s_%%", notebookID)
-
-		if _, err := tx.Exec("DELETE FROM chunks WHERE id LIKE ?", chunkPrefix); err != nil {
-			return err
+		if len(chunkIDs) > 0 {
+			placeholders := make([]string, len(chunkIDs))
+			args := make([]interface{}, len(chunkIDs))
+			for i, cid := range chunkIDs {
+				placeholders[i] = "?"
+				args[i] = cid
+			}
+			query := fmt.Sprintf("DELETE FROM chunks WHERE id IN (%s)", strings.Join(placeholders, ","))
+			if _, err := tx.Exec(query, args...); err != nil {
+				return err
+			}
 		}
 
 		totalChunks := 0
@@ -339,9 +364,9 @@ func (r *Repository) IngestNotebookContentByTopic(notebookID string, groups []No
 
 		if _, err := tx.Exec(`
 			UPDATE notebooks
-			SET chunk_count = ?, status = ?, topic_id = ?
+			SET chunk_count = ?, status = ?
 			WHERE id = ?
-		`, totalChunks, "chunked", normalizedGroups[0].TopicID, notebookID); err != nil {
+		`, totalChunks, "chunked", notebookID); err != nil {
 			return err
 		}
 		return nil
@@ -574,7 +599,7 @@ func (r *Repository) LinkChunksToNotebook(notebookID string, chunkIDs []string) 
 
 			id := "nb-chunk-" + validatedNotebookID + "-" + validatedChunkID // simple composite ID
 			_, err = tx.Exec(`
-				INSERT INTO notebook_chunks (id, notebook_id, chunk_id, page_num)
+				INSERT OR IGNORE INTO notebook_chunks (id, notebook_id, chunk_id, page_num)
 				SELECT ?, ?, ?, COALESCE(page_num, 0) FROM chunks WHERE id = ?
 			`, id, validatedNotebookID, validatedChunkID, validatedChunkID)
 			if err != nil {
@@ -732,14 +757,10 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 
 		chunkIDs := make([]string, 0)
 		chunkRows, err := tx.Query(`
-			SELECT DISTINCT c.id
-			FROM chunks c
-			WHERE c.topic_id IN (
-				SELECT topic_id FROM notebook_topics WHERE notebook_id = ?
-				UNION
-				SELECT id FROM topics WHERE id LIKE ?
-			)
-		`, notebookID, "nb-"+notebookID+"-%")
+			SELECT DISTINCT chunk_id
+			FROM notebook_chunks
+			WHERE notebook_id = ?
+		`, notebookID)
 		if err != nil {
 			return err
 		}
@@ -965,11 +986,7 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 }
 
 func insertChunkRowRepo(exec sqlExecer, topicID string, chunk NotebookChunkInput) error {
-	_, err := exec.Exec(`
-		INSERT INTO chunks (id, topic_id, chunk_text, page_num, token_count, importance_score, weakness_score)
-		VALUES (?, ?, ?, ?, ?, 0, 0)
-	`, chunk.ID, topicID, chunk.Text, chunk.PageNum, chunk.TokenCount)
-	return err
+	return insertChunkRow(exec, topicID, chunk)
 }
 
 func linkNotebookChunkRowRepo(exec sqlExecer, notebookID string, chunk NotebookChunkInput) error {
@@ -1122,7 +1139,7 @@ func (r *Repository) GetProfileRemainingWords(profileID string) (int, error) {
 		JOIN notebook_chunks nc ON nc.notebook_id = n.id
 		JOIN chunks c ON c.id = nc.chunk_id
 		LEFT JOIN topics t ON t.id = c.topic_id
-		WHERE (n.profile_id = ? OR n.profile_id IS NULL)
+		WHERE (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '')
 		  AND n.study_status = 'active'
 	`, profileID).Scan(&total)
 	if err != nil {

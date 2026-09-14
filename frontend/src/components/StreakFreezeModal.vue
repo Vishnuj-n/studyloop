@@ -48,7 +48,7 @@
 
         <div v-if="mode !== 'info'" class="dont-show-toggle">
           <label>
-            <input type="checkbox" v-model="dontShowAgain" @change="onToggleChange" />
+            <input v-model="dontShowAgain" type="checkbox" @change="onToggleChange" />
             Don't show this popup automatically on purchase
           </label>
         </div>

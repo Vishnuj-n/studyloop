@@ -498,7 +498,7 @@ function zoomOut() {
   zoomScale.value = Math.max(0.5, Math.round((zoomScale.value - 0.1) * 100) / 100)
 }
 
-function onPdfRendered(pageNum) {
+function onPdfRendered(_pageNum) {
   // ponytail: no-op hook for future telemetry if needed
 }
 

@@ -39,7 +39,7 @@ func TestFastTierCooldownRouting(t *testing.T) {
 	}
 
 	// 1. Initial state: routes to fast
-	provider, tier := svc.selectLLM("sample context", 0)
+	provider, tier := svc.selectLLM("sample context")
 	if tier != "fast" || provider.ModelName() != "gpt-4.1-mini" {
 		t.Fatalf("expected initial routing to fast tier (gpt-4.1-mini), got tier=%s model=%s", tier, provider.ModelName())
 	}
@@ -51,7 +51,7 @@ func TestFastTierCooldownRouting(t *testing.T) {
 	}
 
 	// 3. Routing during cooldown: escalates to heavy tier
-	provider, tier = svc.selectLLM("sample context", 0)
+	provider, tier = svc.selectLLM("sample context")
 	if tier != "heavy" || provider.ModelName() != "gemini-2.5-flash" {
 		t.Fatalf("expected routing to heavy tier (gemini-2.5-flash) during cooldown, got tier=%s model=%s", tier, provider.ModelName())
 	}
@@ -63,7 +63,7 @@ func TestFastTierCooldownRouting(t *testing.T) {
 	}
 
 	// 5. Routing after cooldown: back to fast tier
-	provider, tier = svc.selectLLM("sample context", 0)
+	provider, tier = svc.selectLLM("sample context")
 	if tier != "fast" || provider.ModelName() != "gpt-4.1-mini" {
 		t.Fatalf("expected routing back to fast tier after cooldown expiry, got tier=%s model=%s", tier, provider.ModelName())
 	}

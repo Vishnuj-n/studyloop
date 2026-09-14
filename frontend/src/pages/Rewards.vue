@@ -22,7 +22,10 @@
             <span class="rank-avatar">{{ getTitleEmoji(profile.current_title) }}</span>
           </div>
           <div>
-            <span class="rank-label">Current Title</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+              <span class="rank-label">Current Rank</span>
+              <span class="level-chip">Lvl {{ profile.level || 1 }}</span>
+            </div>
             <h2 class="rank-title">{{ profile.current_title }}</h2>
           </div>
         </div>
@@ -86,9 +89,9 @@
           <button
             class="shop-trigger-btn"
             type="button"
-            @click="showShopModal = true"
+            @click="scrollToShop"
           >
-            🛒 Rewards & Theme Shop
+            🛒 Study Shop 👇
           </button>
         </div>
         <p v-if="buyError" class="buy-error-msg">{{ buyError }}</p>
@@ -125,15 +128,14 @@
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Theme & Achievement Shop Modal -->
-    <RewardsShopModal
-      v-if="showShopModal"
-      :active-theme="activeTheme"
-      @close="onShopClose"
-      @theme-changed="onThemeChanged"
-    />
+      <!-- In-Page Study Shop & Progression Sinks -->
+      <RewardsShopModal
+        id="shop-section"
+        :active-theme="activeTheme"
+        @theme-changed="onThemeChanged"
+      />
+    </div>
 
     <!-- Mystery Chest Modal -->
     <MysteryChestModal
@@ -154,15 +156,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { getGamificationState, buyStreakFreeze, getUserSettings, updateUserSettings } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import GamificationIcon from '../components/icons/GamificationIcon.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 import RewardsShopModal from '../components/RewardsShopModal.vue'
-
-const showShopModal = ref(false)
 
 const loading = ref(true)
 const buying = ref(false)
@@ -172,11 +172,12 @@ const activeTheme = ref('dark-gruvbox')
 const loadError = ref('')
 const buyError = ref('')
 const profile = ref({
+  level: 1,
   total_xp: 0,
   coins: 0,
-  current_title: 'The Apprentice',
-  next_title: 'The Scholar',
-  next_title_xp: 500,
+  current_title: 'The Apprentice I',
+  next_title: 'The Scholar I',
+  next_title_xp: 1500,
   current_title_min_xp: 0,
   streak_freezes_owned: 1,
 })
@@ -193,19 +194,6 @@ const progressPercent = computed(() => {
   const pct = ((cur - min) / range) * 100
   return Math.min(100, Math.max(0, Math.round(pct)))
 })
-
-function getChestEmoji(tier) {
-  switch ((tier || '').toUpperCase()) {
-    case 'SILVER':
-      return '🥈'
-    case 'GOLD':
-      return '🎁'
-    case 'MYTHIC':
-      return '👑'
-    default:
-      return '📦'
-  }
-}
 
 function getTitleEmoji(title) {
   const t = (title || '').toLowerCase()
@@ -288,13 +276,20 @@ async function onThemeChanged(newTheme) {
   }
 }
 
-function onShopClose() {
-  showShopModal.value = false
-  loadData()
+function scrollToShop() {
+  const el = document.getElementById('shop-section')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 
 onMounted(() => {
   loadData()
+  window.addEventListener('gamification-updated', loadData)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('gamification-updated', loadData)
 })
 </script>
 
@@ -424,11 +419,22 @@ onMounted(() => {
 }
 
 .rank-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
+}
+
+.level-chip {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--primary, #38bdf8);
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--muted-text);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  padding: 1px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.03em;
 }
 
 .rank-title {

@@ -18,7 +18,6 @@ import (
 )
 
 const maxAutomaticRereadAttempts = 1
-const quizTaskOutputBudget = 2500
 
 // GenerateFlashcardsAfterQuiz generates flashcards after successful quiz completion.
 // New cards are future-dated and intentionally excluded from immediate review materialization.
@@ -331,16 +330,6 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		}
 	}
 
-	llm, tier := s.selectLLM(combinedText.String(), quizTaskOutputBudget)
-	if llm == nil {
-		return models.QuizTaskPayload{}, fmt.Errorf("no LLM provider available")
-	}
-	modelName := providerModelName(llm)
-	limits := llm.GetLimits()
-	maxInputTokens := limits.MaxInputTokens
-	maxOutputTokens := limits.MaxOutputTokens
-	utils.Warnf("[QUIZ_PIPELINE] model_limits tier=%s model=%s max_input=%d max_output=%d", tier, modelName, maxInputTokens, maxOutputTokens)
-
 	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
 	userQuizCount := 8
 	userPassingScore := 70
@@ -356,6 +345,15 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 			userPassingScore = userSettings.QuizPassingScore
 		}
 	}
+
+	llm, tier := s.selectLLM(combinedText.String())
+	if llm == nil {
+		return models.QuizTaskPayload{}, fmt.Errorf("no LLM provider available")
+	}
+	modelName := providerModelName(llm)
+	limits := llm.GetLimits()
+	maxInputTokens := limits.MaxInputTokens
+	utils.Warnf("[QUIZ_PIPELINE] model_limits tier=%s model=%s max_input=%d", tier, modelName, maxInputTokens)
 
 	templatePrompt := buildQuizPrompt(notebookTitle, userQuizCount, nil)
 	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, templatePrompt)
@@ -373,20 +371,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 			len(normalizedChunkIDs), len(ctxRes.contextParts), ctxRes.truncatedCount, ctxRes.currentTokens, availableBudget)
 	}
 
-	targetCount := userQuizCount
-	if maxOutputTokens > 0 && maxOutputTokens < quizTaskOutputBudget {
-		adjusted := (targetCount * maxOutputTokens) / quizTaskOutputBudget
-		if adjusted < 3 {
-			adjusted = 3
-		}
-		if adjusted < targetCount {
-			utils.Warnf("[QUIZ_PIPELINE] reducing quiz target question count %d -> %d due to lower model output limit max_output=%d",
-				targetCount, adjusted, maxOutputTokens)
-			targetCount = adjusted
-		}
-	}
-
-	prompt := buildQuizPrompt(notebookTitle, targetCount, ctxRes.contextParts)
+	prompt := buildQuizPrompt(notebookTitle, userQuizCount, ctxRes.contextParts)
 
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {

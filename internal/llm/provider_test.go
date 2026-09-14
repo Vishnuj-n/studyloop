@@ -106,8 +106,8 @@ func TestGenerateAnswerMaxTokensAndTruncation(t *testing.T) {
 	if resp != "OK response" {
 		t.Fatalf("expected 'OK response', got %q", resp)
 	}
-	if capturedPayload.MaxTokens != 2500 {
-		t.Fatalf("expected max_tokens in payload to be 2500, got %d", capturedPayload.MaxTokens)
+	if capturedPayload.MaxTokens != 0 {
+		t.Fatalf("expected max_tokens in payload to be 0 (omitted for free-flow output), got %d", capturedPayload.MaxTokens)
 	}
 
 	// Test truncation error when finish_reason == "length"

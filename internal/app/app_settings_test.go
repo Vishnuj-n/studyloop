@@ -28,12 +28,12 @@ func TestAppTestLLMConnectionAndLimits(t *testing.T) {
 		t.Fatalf("expected TestLLMConnection ok: true, got: %v", connRes)
 	}
 
-	limitsRes := app.TestLLMLimits("fast", "custom", server.URL, "test-model", "test-key", 4000, 2500)
+	limitsRes := app.TestLLMLimits("fast", "custom", server.URL, "test-model", "test-key", 4000)
 	if limitsRes["ok"] != true {
 		t.Fatalf("expected TestLLMLimits ok: true, got: %v", limitsRes)
 	}
 	statusStr, _ := limitsRes["status"].(string)
-	if !strings.Contains(statusStr, "max_tokens: 2500") || !strings.Contains(statusStr, "4000 token prompts") {
+	if !strings.Contains(statusStr, "4000 token input prompt limit") {
 		t.Fatalf("unexpected status output from TestLLMLimits: %s", statusStr)
 	}
 }

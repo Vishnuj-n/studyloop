@@ -2,7 +2,21 @@
   <!-- Pills Variant (e.g. Socratic Tutor header) -->
   <div v-if="variant === 'pills'" class="selector-pills">
     <div class="selector-pill">
-      <span class="pill-icon" aria-hidden="true">📖</span>
+      <svg
+        class="pill-icon"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
       <select
         id="notebook-select"
         :value="notebookId"
@@ -22,7 +36,22 @@
     </div>
 
     <div class="selector-pill">
-      <span class="pill-icon" aria-hidden="true">🎯</span>
+      <svg
+        class="pill-icon"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="2" />
+      </svg>
       <select
         id="topic-select"
         :value="topicId"
@@ -99,7 +128,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { getNotebookTopicTree } from '../services/appApi'
 import { sortNotebookTopics } from '../composables/useReaderBase'
 
@@ -259,8 +288,11 @@ function onTopicSelect(newTopicId) {
 }
 
 .pill-icon {
-  font-size: 14px;
+  width: 14px;
+  height: 14px;
   margin-right: 6px;
+  flex-shrink: 0;
+  color: var(--on-surface-variant);
 }
 
 .selector-pill select {

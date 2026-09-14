@@ -1,9 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   getGoogleCalendarUrl,
   getOutlookCalendarUrl,
   generateRoutineICS,
-  downloadRoutineICS,
   playStudyChime,
   escapeICSText,
 } from './calendarService'

@@ -47,9 +47,33 @@
           </button>
         </div>
       </div>
+
+      <!-- Right-edge Minimal GitHub Icon Button -->
+      <button type="button" class="topbar-github-icon" title="View GitHub Repository" @click="openGitHubRepo">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+        </svg>
+      </button>
     </header>
 
     <!-- Status Banners -->
+    <StatusBanner
+      v-if="showGitHubStarToast"
+      variant="star"
+      icon=""
+      title="Support Studyloop on GitHub"
+      subtitle="You've completed 5+ study sessions! If you find Studyloop helpful, consider starring the repo on GitHub to support open-source development."
+      action-label="⭐ Star on GitHub ↗"
+      dismissable
+      @action="handleStarGitHub"
+      @dismiss="dismissGitHubStarToast"
+    >
+      <template #icon>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+        </svg>
+      </template>
+    </StatusBanner>
     <StatusBanner
       v-if="streakSavedEvent"
       variant="info"
@@ -234,6 +258,8 @@ import {
   getProfileDailyPace,
   retryFlashcardGeneration,
   getFlashcardDueTimeline,
+  getGamificationState,
+  openURLInBrowser,
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
 
@@ -247,12 +273,53 @@ import StreakCalendar from '../components/StreakCalendar.vue'
 import ForecastChart from '../components/ForecastChart.vue'
 import StudyPaceModal from '../components/StudyPaceModal.vue'
 
+function openGitHubRepo() {
+  openURLInBrowser('https://github.com/Vishnuj-n/studyloop')
+}
 
 const router = useRouter()
 const route = useRoute()
 
+const showGitHubStarToast = ref(false)
+
+async function checkGitHubStarToast() {
+  if (localStorage.getItem('github_star_toast_dismissed') === 'true') {
+    showGitHubStarToast.value = false
+    return
+  }
+  try {
+    const res = await getGamificationState()
+    if (res && res.profile && res.profile.stats_json) {
+      let stats = {}
+      try {
+        stats = JSON.parse(res.profile.stats_json)
+      } catch (e) {
+        console.error('Failed to parse gamification stats JSON', e)
+      }
+      const totalSessions = (stats.reading_sessions || 0) + (stats.quizzes_passed || 0) + (stats.flashcards_reviewed || 0)
+      if (totalSessions >= 5) {
+        showGitHubStarToast.value = true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check star toast eligibility', err)
+  }
+}
+
+function handleStarGitHub() {
+  localStorage.setItem('github_star_toast_dismissed', 'true')
+  showGitHubStarToast.value = false
+  openGitHubRepo()
+}
+
+function dismissGitHubStarToast() {
+  localStorage.setItem('github_star_toast_dismissed', 'true')
+  showGitHubStarToast.value = false
+}
+
 // --- Reactive State ---
 const loading = ref(true)
+const refreshing = ref(false)
 const error = ref('')
 const actionError = ref('')
 const flashcardNotice = ref('')
@@ -261,12 +328,15 @@ const tasks = ref([])
 const hasActiveStudyContent = ref(false)
 const dueReviewCards = ref(0)
 const totalDueReviewCards = ref(0)
+const flashcardsJustCreated = ref(0)
 
 const profiles = ref([])
 const userSettings = ref({
   max_flashcards_per_session: 30,
   study_start_time: '17:00',
   study_end_time: '18:00',
+  study_slots_json: '[]',
+  classroom_code: '',
   reminders_enabled: true,
   active_profile_id: '',
   skip_to_reading_active: false,
@@ -283,24 +353,6 @@ const activeProfilePace = ref(null)
 const lastPersistedProfile = ref('')
 const showPaceModal = ref(false)
 
-async function handleSaveStudySlots(newSlotsJson) {
-  try {
-    userSettings.value.study_slots_json = newSlotsJson
-    const res = await updateUserSettings({
-      ...userSettings.value,
-      study_slots_json: newSlotsJson,
-    })
-    if (res && res.error) {
-      actionError.value = res.error
-      return
-    }
-    window.dispatchEvent(new CustomEvent('settings-updated'))
-    await loadAgenda()
-  } catch (err) {
-    actionError.value = 'Failed to save study schedule'
-  }
-}
-
 const timelineData = ref([])
 
 const streakState = ref({
@@ -315,29 +367,23 @@ const isSyncing = ref(false)
 const profileMenuOpen = ref(false)
 
 // --- Calendar computeds ---
-const currentDate = new Date()
-const currentYear = currentDate.getFullYear()
-const currentMonth = currentDate.getMonth()
+const now = ref(new Date())
 
 const currentMonthLabel = computed(() => {
-  return `${MONTH_NAMES[currentMonth]} ${currentYear}`
+  return `${MONTH_NAMES[now.value.getMonth()]} ${now.value.getFullYear()}`
 })
 
 const calendarDays = computed(() => {
-  return buildCalendarDays(currentYear, currentMonth, streakState.value?.active_dates || [])
+  return buildCalendarDays(now.value.getFullYear(), now.value.getMonth(), streakState.value?.active_dates || [])
 })
 
 // --- Task computeds ---
-const maxFlashcardsLimit = computed(() => {
-  return userSettings.value.max_flashcards_per_session || 30
-})
-
 const reviewTask = computed(() => {
-  return tasks.value.find((t) => t.id === 'task-review-daily')
+  return tasks.value.find((t) => (t.action_type || '').toLowerCase() === 'flashcard_review' || t.id === 'task-review-daily')
 })
 
 const nonReviewTasks = computed(() => {
-  return tasks.value.filter((t) => t.id !== 'task-review-daily')
+  return tasks.value.filter((t) => (t.action_type || '').toLowerCase() !== 'flashcard_review' && t.id !== 'task-review-daily')
 })
 
 const isReviewHero = computed(() => {
@@ -358,11 +404,6 @@ const queueTasks = computed(() => {
   return nonReviewTasks.value.slice(1)
 })
 
-const flashcardsJustCreated = computed(() => {
-  const created = Number.parseInt(route.query.flashcardsCreated, 10)
-  return isNaN(created) || created <= 0 ? 0 : created
-})
-
 const activeProfileName = computed(() => {
   const p = profiles.value.find((pr) => pr.id === userSettings.value.active_profile_id)
   return p ? p.name : 'Unknown'
@@ -379,7 +420,7 @@ function profileDeadlineLabel(profile) {
 }
 
 const hasSocraticRescueTask = computed(() => {
-  return tasks.value.some((t) => t.action_type === 'socratic_remedial')
+  return tasks.value.some((t) => (t.action_type || '').toLowerCase() === 'socratic_remedial')
 })
 
 // ponytail: pending ingestion notification state
@@ -401,11 +442,15 @@ const completedSessionsToday = computed(() => {
 // --- Lifecycle ---
 onMounted(async () => {
   window.addEventListener('click', closeProfileMenu)
-  if (flashcardsJustCreated.value > 0) {
+  
+  const created = Number.parseInt(route.query.flashcardsCreated, 10)
+  if (created > 0) {
+    flashcardsJustCreated.value = created
     const newQuery = { ...route.query }
     delete newQuery.flashcardsCreated
     await router.replace({ query: newQuery })
   }
+
   await loadAgenda()
 })
 
@@ -427,7 +472,7 @@ async function loadAgenda() {
       return
     }
 
-    await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset)])
+    await Promise.all([loadActiveProfilePace(), loadFlashcardTimeline(tzOffset), checkGitHubStarToast()])
   } catch (err) {
     error.value = err.message || 'Failed to load tasks'
   } finally {
@@ -473,6 +518,7 @@ function applyDashboardOverview(overview) {
     streakError.value = ''
     if (overview.streak_state.streak_saved_event) {
       streakSavedEvent.value = overview.streak_state.streak_saved_event
+      window.dispatchEvent(new Event('gamification-updated'))
     }
   }
 
@@ -520,7 +566,8 @@ async function selectProfile(newProfileID) {
   profileMenuOpen.value = false
   const oldProfileID = lastPersistedProfile.value
   try {
-    loading.value = true
+    refreshing.value = true
+    actionError.value = ''
     const res = await updateUserSettings({
       ...userSettings.value,
       active_profile_id: newProfileID,
@@ -537,7 +584,7 @@ async function selectProfile(newProfileID) {
     userSettings.value.active_profile_id = oldProfileID
     actionError.value = 'Failed to switch active profile'
   } finally {
-    loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -554,7 +601,8 @@ function goToProfileOverview() {
 async function toggleEscapeHatch() {
   const previousSkipToReading = userSettings.value.skip_to_reading_active
   try {
-    loading.value = true
+    refreshing.value = true
+    actionError.value = ''
     userSettings.value.skip_to_reading_active = !userSettings.value.skip_to_reading_active
     const res = await updateUserSettings(userSettings.value)
     if (res && res.error) {
@@ -568,7 +616,7 @@ async function toggleEscapeHatch() {
     userSettings.value.skip_to_reading_active = previousSkipToReading
     actionError.value = 'Failed to toggle escape hatch'
   } finally {
-    loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -581,6 +629,7 @@ async function runFlashcardSyncInline(task) {
     if (res && res.error) {
       actionError.value = `Flashcard Generation Failed: ${res.error}. Please check your connection.`
     } else {
+      actionError.value = ''
       const count = res && typeof res.cards_scheduled === 'number' ? res.cards_scheduled : 0
       flashcardNotice.value = count > 0
         ? `🎉 Successfully generated ${count} flashcards for spaced repetition!`
@@ -650,6 +699,28 @@ function goToNotebooks() {
   gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--outline-variant, #e0e0e0);
+}
+
+.topbar-github-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-container-low, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.topbar-github-icon:hover {
+  background: var(--surface-container-highest);
+  color: var(--on-surface);
+  border-color: var(--outline-variant);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .profile-selector-container {
