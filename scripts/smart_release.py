@@ -109,8 +109,8 @@ def get_all_tags_descending():
         return []
 
 
-def get_commit_history(previous_tag=None):
-    """Return detailed commit history since previous tag."""
+def get_commit_history(previous_tag=None, max_chars=50000):
+    """Return detailed commit history since previous tag, capped at max_chars for LLM safety."""
     cmd = [
         "git",
         "log",
@@ -121,7 +121,10 @@ def get_commit_history(previous_tag=None):
     if previous_tag:
         cmd.append(f"{previous_tag}..HEAD")
 
-    return run_cmd(cmd, capture=True).stdout.strip()
+    history = run_cmd(cmd, capture=True).stdout.strip()
+    if len(history) > max_chars:
+        history = history[:max_chars] + "\n\n... [Commit history truncated due to context size limit]"
+    return history
 
 
 def get_current_version():
@@ -307,6 +310,11 @@ def main():
         help="Perform dry run without modifying files, tags, or executing release commands",
     )
     parser.add_argument(
+        "--skip-release",
+        action="store_true",
+        help="Skip automatic execution of release.py after version bump and build",
+    )
+    parser.add_argument(
         "--revert",
         nargs="?",
         const="LATEST",
@@ -362,32 +370,22 @@ def main():
         print("Error: AI did not return a valid recommended_version.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nDecision: Bump [{bump_type.upper()}] to {rec_version} ({reason})")
+    print(f"\nDecision: Bump [{(bump_type or 'patch').upper()}] to {rec_version} ({reason})")
 
     if args.dry_run:
         print("\n[DRY RUN] Skipping version file updates, git commit/push, build.py, and release.py.")
         return
 
-    # 5. Generate Release Notes & Update RELEASE_NOTES.md before building binary
-    print("\nGenerating AI release notes for local embedding...")
-    try:
-        from release import generate_release_notes
-        notes_text = generate_release_notes(rec_version, commit_history)
-    except Exception as e:
-        print(f"Warning: AI release notes generation skipped: {e}")
-        notes_text = f"# What's New in {rec_version}\n\n" + commit_history
+    # 5. Update VERSION file(s)
+    formatted_new_ver = update_version_files(rec_version)
 
-    notes_file = PROJECT_ROOT / "internal" / "app" / "RELEASE_NOTES.md"
-    notes_file.write_text(notes_text + "\n", encoding="utf-8")
-    print(f"Updated {notes_file.relative_to(PROJECT_ROOT)}")
-
-    print(f"\nCommitting version and release notes updates ({formatted_new_ver})...")
-    run_cmd(["git", "add", "internal/app/VERSION", "internal/app/RELEASE_NOTES.md"], check=True)
+    print(f"\nCommitting version update ({formatted_new_ver})...")
+    run_cmd(["git", "add", "internal/app/VERSION"], check=True)
     root_file = PROJECT_ROOT / "VERSION"
     if root_file.exists():
         run_cmd(["git", "add", "VERSION"], check=True)
 
-    commit_msg = f"chore: version bump to {formatted_new_ver} with release notes"
+    commit_msg = f"chore: version bump to {formatted_new_ver}"
     run_cmd(["git", "commit", "-m", commit_msg], check=True)
 
     print(f"Pushing version bump commit to origin/{branch}...")
@@ -402,7 +400,11 @@ def main():
     print("\n=== Step 1/2: Running scripts/build.py ===")
     run_cmd([sys.executable, str(PROJECT_ROOT / "scripts" / "build.py")], check=True)
 
-    # 7. Run release.py
+    if args.skip_release:
+        print(f"\n[INFO] Skipped release.py (--skip-release). Run 'python scripts/release.py {formatted_new_ver}' manually when ready.")
+        return
+
+    # 7. Run release.py (generates AI release notes and creates GitHub release)
     print("\n=== Step 2/2: Running scripts/release.py ===")
     run_cmd([sys.executable, str(PROJECT_ROOT / "scripts" / "release.py"), formatted_new_ver], check=True)
 
