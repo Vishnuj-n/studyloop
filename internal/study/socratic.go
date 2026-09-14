@@ -205,6 +205,9 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	// 2. Build retrieved material context blocks, citations, and chunk texts
 	blocks, citations, chunkTexts := buildReaderContextBlocksWithText(results)
+	if len(blocks) != len(citations) || len(blocks) != len(chunkTexts) {
+		return nil, fmt.Errorf("context block length mismatch: blocks=%d citations=%d chunkTexts=%d", len(blocks), len(citations), len(chunkTexts))
+	}
 
 	// 3. Generate answer using heavy LLM provider (to ensure high quality guiding responses)
 	llm := s.heavyLLMProvider
@@ -324,17 +327,22 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	citations = newCitations
 	chunkTexts = newChunkTexts
 
-	// Rebuild the final prompt now that contextText may have been truncated
-	socraticPrompt := strings.Join([]string{
+	// Ensure contextText label is omitted when empty
+	promptParts := []string{
 		socraticInstructions,
 		failedQuestionsSummary,
 		"",
 		historyBlock,
-		"Retrieved material:",
-		contextText,
-		"",
-		"Student question: " + question,
-	}, "\n")
+	}
+	if contextText != "" {
+		promptParts = append(promptParts, "Retrieved material:", contextText, "")
+	}
+	promptParts = append(promptParts, "Student question: "+question)
+	socraticPrompt := strings.Join(promptParts, "\n")
+
+	if llm == s.fastLLMProvider && s.heavyLLMProvider == nil {
+		utils.Warnf("[SOCRATIC] heavy LLM provider not configured; falling back to fast LLM provider for topic %s", topicID)
+	}
 
 	answer, err := llm.GenerateAnswer(socraticPrompt)
 	if err != nil {
@@ -347,10 +355,7 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	return map[string]interface{}{
 		"answer":         answer,
-		"cited_sections": citations,
-		"chunk_texts":    chunkTexts,
+		"cited_sections": newCitations,
+		"chunk_texts":    newChunkTexts,
 	}, nil
 }
-
-// Ensure retrieval import is used (the Engine type lives there).
-var _ *retrieval.Engine
