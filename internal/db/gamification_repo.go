@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -11,6 +12,14 @@ import (
 
 	"github.com/google/uuid"
 )
+
+var (
+	ErrInsufficientCoins = errors.New("insufficient coins")
+	ErrNoFreezes         = errors.New("no streak freezes available")
+	ErrBoxNotFound       = errors.New("loot box not found")
+	ErrBoxAlreadyOpened  = errors.New("loot box already opened")
+)
+
 
 // Title milestones: minimum XP required for each title rank
 var TitleTiers = []struct {
@@ -312,13 +321,12 @@ func (r *Repository) ClaimLootBox(boxID string) (*models.PendingLootBox, *models
 	`, boxID)
 	if err := row.Scan(&box.ID, &box.TaskID, &box.BoxTier, &box.RewardType, &box.RewardAmount, &box.Opened, &box.CreatedAt); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, fmt.Errorf("loot box %s not found", boxID)
+			return nil, nil, fmt.Errorf("%w: %s", ErrBoxNotFound, boxID)
 		}
 		return nil, nil, fmt.Errorf("failed to query loot box: %w", err)
 	}
 
 	if box.Opened {
-		_ = tx.Rollback()
 		prof, err := r.GetGamificationProfile()
 		return &box, prof, err
 	}
@@ -348,11 +356,14 @@ func (r *Repository) ClaimLootBox(boxID string) (*models.PendingLootBox, *models
 		}
 	}
 
-	// Refresh title based on updated total_xp
+	// Refresh title based on updated total_xp inside transaction
 	var currentTotalXP int
-	if err := tx.QueryRow(`SELECT total_xp FROM user_gamification WHERE user_id = 1`).Scan(&currentTotalXP); err == nil {
-		newTitle, _, _, _, _ := ComputeTitleInfo(currentTotalXP)
-		_, _ = tx.Exec(`UPDATE user_gamification SET current_title = ? WHERE user_id = 1`, newTitle)
+	if err := tx.QueryRow(`SELECT total_xp FROM user_gamification WHERE user_id = 1`).Scan(&currentTotalXP); err != nil {
+		return nil, nil, fmt.Errorf("failed to scan total_xp for title update: %w", err)
+	}
+	newTitle, _, _, _, _ := ComputeTitleInfo(currentTotalXP)
+	if _, err := tx.Exec(`UPDATE user_gamification SET current_title = ? WHERE user_id = 1`, newTitle); err != nil {
+		return nil, nil, fmt.Errorf("failed to update current_title: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -383,7 +394,7 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 	}
 
 	if coins < cost {
-		return nil, fmt.Errorf("insufficient coins: have %d, require %d", coins, cost)
+		return nil, fmt.Errorf("%w: have %d, require %d", ErrInsufficientCoins, coins, cost)
 	}
 
 	_, err = tx.Exec(`
@@ -438,7 +449,7 @@ func (r *Repository) ConsumeStreakFreeze(dateStr string) (*models.GamificationPr
 	}
 
 	if freezes <= 0 {
-		return nil, fmt.Errorf("no streak freezes available to consume")
+		return nil, fmt.Errorf("%w: user has 0 streak freezes available", ErrNoFreezes)
 	}
 
 	var dates []string
@@ -648,6 +659,35 @@ func (r *Repository) AddDevCoins(amount int) (*models.GamificationProfile, error
 	return r.GetGamificationProfile()
 }
 
+// reconcileAchievementsTx checks achievement thresholds and unlocks rewards.
+func reconcileAchievementsTx(stats map[string]int, unlockedList []string, coins int) ([]string, int, bool) {
+	unlockedMap := make(map[string]bool, len(unlockedList))
+	for _, u := range unlockedList {
+		unlockedMap[u] = true
+	}
+
+	changed := false
+	achievements := getAchievementDefinitions()
+	for _, ach := range achievements {
+		if stats[ach.StatKey] >= ach.TargetValue {
+			claimKey := "achievement:" + ach.ID
+			if !unlockedMap[claimKey] {
+				unlockedList = append(unlockedList, claimKey)
+				unlockedMap[claimKey] = true
+				changed = true
+				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
+					unlockedList = append(unlockedList, ach.RewardItem)
+					unlockedMap[ach.RewardItem] = true
+				}
+				if ach.RewardCoins > 0 {
+					coins += ach.RewardCoins
+				}
+			}
+		}
+	}
+	return unlockedList, coins, changed
+}
+
 // IncrementStat increments a counter in stats_json and auto-unlocks any completed achievements.
 func (r *Repository) IncrementStat(statKey string, delta int) error {
 	if statKey == "" || delta <= 0 {
@@ -678,29 +718,7 @@ func (r *Repository) IncrementStat(statKey string, delta int) error {
 		_ = json.Unmarshal([]byte(unlockedJSON), &unlockedList)
 	}
 
-	// Check achievement auto-unlocks
-	unlockedMap := make(map[string]bool)
-	for _, u := range unlockedList {
-		unlockedMap[u] = true
-	}
-
-	achievements := getAchievementDefinitions()
-	for _, ach := range achievements {
-		if stats[ach.StatKey] >= ach.TargetValue {
-			claimKey := "achievement:" + ach.ID
-			if !unlockedMap[claimKey] {
-				unlockedList = append(unlockedList, claimKey)
-				unlockedMap[claimKey] = true
-				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
-					unlockedList = append(unlockedList, ach.RewardItem)
-					unlockedMap[ach.RewardItem] = true
-				}
-				if ach.RewardCoins > 0 {
-					coins += ach.RewardCoins
-				}
-			}
-		}
-	}
+	unlockedList, coins, _ = reconcileAchievementsTx(stats, unlockedList, coins)
 
 	newStatsBytes, _ := json.Marshal(stats)
 	newUnlockedBytes, _ := json.Marshal(unlockedList)
@@ -857,32 +875,33 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 
 	achDefs := getAchievementDefinitions()
 	coins := prof.Coins
-	for _, ach := range achDefs {
-		if stats[ach.StatKey] >= ach.TargetValue {
-			claimKey := "achievement:" + ach.ID
-			if !unlockedMap[claimKey] {
-				unlockedList = append(unlockedList, claimKey)
-				unlockedMap[claimKey] = true
-				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
-					unlockedList = append(unlockedList, ach.RewardItem)
-					unlockedMap[ach.RewardItem] = true
-				}
-				if ach.RewardCoins > 0 {
-					coins += ach.RewardCoins
-				}
-				changed = true
-			}
-		}
+	var recChanged bool
+	unlockedList, coins, recChanged = reconcileAchievementsTx(stats, unlockedList, coins)
+	if recChanged {
+		changed = true
 	}
 
 	if changed {
+		tx, err := r.db.Begin()
+		if err != nil {
+			return nil, fmt.Errorf("failed to begin reconciliation transaction: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+
 		newStatsBytes, _ := json.Marshal(stats)
 		newUnlockedBytes, _ := json.Marshal(unlockedList)
-		_, _ = r.db.Exec(`
+		_, err = tx.Exec(`
 			UPDATE user_gamification
 			SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE user_id = 1
 		`, string(newStatsBytes), string(newUnlockedBytes), coins)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update reconciled stats: %w", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return nil, fmt.Errorf("failed to commit reconciliation transaction: %w", err)
+		}
 
 		prof, err = r.GetGamificationProfile()
 		if err != nil {
@@ -916,6 +935,9 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 			a.Title = fmt.Sprintf("%s %s", a.Title, toRoman(tier))
 			a.TargetValue = tVal
 			a.Completed = false
+			if tier > 1 {
+				a.RewardItem = ""
+			}
 		} else {
 			a.Completed = curr >= a.TargetValue
 		}

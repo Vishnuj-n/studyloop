@@ -179,4 +179,22 @@ func TestGamificationStoreAutoReconcilesFromSQL(t *testing.T) {
 	if quizStarterAch == nil || quizStarterAch.CurrentValue != 1 || quizStarterAch.TargetValue != 2 || quizStarterAch.Title != "Quiz Starter II" {
 		t.Fatalf("expected Quiz Starter II achievement (1/2), got %+v", quizStarterAch)
 	}
+
+	// Verify Tier II achievements clear RewardItem
+	_ = repo.IncrementStat("reading_sessions", 5)
+	storeAfterTier2, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore after tier 2 failed: %v", err)
+	}
+	for _, a := range storeAfterTier2.Achievements {
+		if a.ID == "night_scholar" {
+			if a.Title != "Night Scholar II" {
+				t.Fatalf("expected Night Scholar II, got %s", a.Title)
+			}
+			if a.RewardItem != "" {
+				t.Fatalf("expected empty RewardItem on Night Scholar II, got %s", a.RewardItem)
+			}
+		}
+	}
 }
+
