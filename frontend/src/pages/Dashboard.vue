@@ -518,6 +518,7 @@ function applyDashboardOverview(overview) {
     streakError.value = ''
     if (overview.streak_state.streak_saved_event) {
       streakSavedEvent.value = overview.streak_state.streak_saved_event
+      window.dispatchEvent(new Event('gamification-updated'))
     }
   }
 

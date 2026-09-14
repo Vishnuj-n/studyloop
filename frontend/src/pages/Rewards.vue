@@ -305,6 +305,11 @@ function onShopClose() {
 
 onMounted(() => {
   loadData()
+  window.addEventListener('gamification-updated', loadData)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('gamification-updated', loadData)
 })
 </script>
 
