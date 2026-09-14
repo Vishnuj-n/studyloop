@@ -64,7 +64,7 @@
                 <button
                   class="primary split-chevron-btn"
                   :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
-                  title="More completion options"
+                  title="More completion options (e.g. Complete & Defer Quiz)"
                   @click.stop="toggleDeferMenu"
                 >
                   ▾
@@ -368,7 +368,7 @@ const routeTaskID = computed(() => {
 // Initialize composables
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
-const { showError } = useToast()
+const { showError, showNotice } = useToast()
 provide('chat', chat)
 
 // Local state for completion
@@ -608,6 +608,7 @@ async function completeSession(deferQuiz = false) {
 
     if (deferQuiz) {
       console.warn('[COMPLETE_SESSION] Quiz deferred to queue. Routing to dashboard.')
+      showNotice('Reading session complete! Quiz saved to your queue for later.', 'Quiz Deferred')
       await router.push('/dashboard')
     } else {
       const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'

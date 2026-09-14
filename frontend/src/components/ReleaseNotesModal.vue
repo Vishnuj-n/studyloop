@@ -1,37 +1,39 @@
 <template>
-  <div v-if="visible" class="release-modal-overlay" @click.self="close">
-    <div class="release-modal" role="dialog" aria-labelledby="release-modal-title">
-      <header class="release-modal-header">
-        <div class="header-badge">
-          <span class="sparkle-icon">✨</span>
-          <span class="version-tag">v{{ version }}</span>
-        </div>
-        <h2 id="release-modal-title">What's New in Studyloop</h2>
-      </header>
-
-      <div class="release-modal-body">
-        <div v-if="formattedNotes.length > 0" class="notes-list">
-          <div v-for="(section, idx) in formattedNotes" :key="idx" class="notes-section">
-            <h3 v-if="section.title" class="section-title">{{ section.title }}</h3>
-            <ul class="bullet-list">
-              <li v-for="(item, i) in section.items" :key="i" class="bullet-item">
-                <span class="bullet-dot">•</span>
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <span class="bullet-text" v-html="formatInlineText(item)"></span>
-              </li>
-            </ul>
+  <Teleport to="body">
+    <div v-if="visible" class="release-modal-overlay" @click.self="close">
+      <div class="release-modal" role="dialog" aria-labelledby="release-modal-title">
+        <header class="release-modal-header">
+          <div class="header-badge">
+            <span class="sparkle-icon">✨</span>
+            <span class="version-tag">v{{ version }}</span>
           </div>
-        </div>
-        <p v-else class="raw-notes">{{ rawNotes }}</p>
-      </div>
+          <h2 id="release-modal-title">What's New in Studyloop</h2>
+        </header>
 
-      <footer class="release-modal-footer">
-        <button type="button" class="btn-ack" @click="close">
-          Got it &mdash; Don't show again
-        </button>
-      </footer>
+        <div class="release-modal-body">
+          <div v-if="formattedNotes.length > 0" class="notes-list">
+            <div v-for="(section, idx) in formattedNotes" :key="idx" class="notes-section">
+              <h3 v-if="section.title" class="section-title">{{ section.title }}</h3>
+              <ul class="bullet-list">
+                <li v-for="(item, i) in section.items" :key="i" class="bullet-item">
+                  <span class="bullet-dot">•</span>
+                  <!-- eslint-disable-next-line vue/no-v-html -->
+                  <span class="bullet-text" v-html="formatInlineText(item)"></span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p v-else class="raw-notes">{{ rawNotes }}</p>
+        </div>
+
+        <footer class="release-modal-footer">
+          <button type="button" class="btn-ack" @click="close">
+            Got it &mdash; Don't show again
+          </button>
+        </footer>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>

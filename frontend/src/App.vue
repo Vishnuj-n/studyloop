@@ -333,31 +333,33 @@ onUnmounted(() => {
 
     <main class="content-shell">
       <!-- Update Alert Modal -->
-      <div v-if="showUpdateModal" class="update-modal-overlay">
-        <div class="update-modal">
-          <div class="update-modal-header">
-            <span class="warning-icon">🚀</span>
-            <h2>Update Available</h2>
-          </div>
-          <div class="update-modal-body">
-            <p class="update-msg">A new update for Studyloop is ready!</p>
-            <div class="version-badge-container">
-              <span class="version-badge current">v{{ currentVersion }}</span>
-              <span class="version-arrow">→</span>
-              <span class="version-badge latest">v{{ latestVersion }}</span>
+      <Teleport to="body">
+        <div v-if="showUpdateModal" class="update-modal-overlay">
+          <div class="update-modal">
+            <div class="update-modal-header">
+              <span class="warning-icon">🚀</span>
+              <h2>Update Available</h2>
             </div>
-            <p class="warning-text">
-              Click "Get Update" to go to the releases repository and download the latest version.
-            </p>
-          </div>
-          <div class="update-modal-footer">
-            <button class="modal-btn secondary" @click="showUpdateModal = false">
-              Remind Me Later
-            </button>
-            <button class="modal-btn primary" @click="goToUpdatePage">Get Update</button>
+            <div class="update-modal-body">
+              <p class="update-msg">A new update for Studyloop is ready!</p>
+              <div class="version-badge-container">
+                <span class="version-badge current">v{{ currentVersion }}</span>
+                <span class="version-arrow">→</span>
+                <span class="version-badge latest">v{{ latestVersion }}</span>
+              </div>
+              <p class="warning-text">
+                Click "Get Update" to go to the releases repository and download the latest version.
+              </p>
+            </div>
+            <div class="update-modal-footer">
+              <button class="modal-btn secondary" @click="showUpdateModal = false">
+                Remind Me Later
+              </button>
+              <button class="modal-btn primary" @click="goToUpdatePage">Get Update</button>
+            </div>
           </div>
         </div>
-      </div>
+      </Teleport>
 
       <!-- Global study reminder banner -->
       <div v-if="banner.show" class="study-alert-banner">
