@@ -416,6 +416,10 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 		}
 	}
 
+	if len(pageWords) == 0 {
+		return maxEndPage
+	}
+
 	for p := startPage; p <= maxEndPage; p++ {
 		w := pageWords[p]
 		if p > startPage && (accumulatedWords+w > int(float64(targetWords)*1.3)) {
@@ -429,9 +433,6 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 }
 
 func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int) (int, int, error) {
-	if startPage > 0 && endPage > 0 && endPage >= startPage {
-		return startPage, endPage, nil
-	}
 	if topicID == "" {
 		return startPage, endPage, nil
 	}
@@ -463,8 +464,10 @@ func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int
 		targetWords = settings.TargetSessionWords
 	}
 
-	if resolvedEnd <= 0 || resolvedEnd < resolvedStart || resolvedEnd > topicEnd {
-		resolvedEnd = topicEnd
+	if resolvedEnd <= 0 || resolvedEnd < resolvedStart || (topicEnd > 0 && resolvedEnd > topicEnd) {
+		if topicEnd > 0 {
+			resolvedEnd = topicEnd
+		}
 	}
 
 	words := r.countWordsInPageRange(topicID, resolvedStart, resolvedEnd)

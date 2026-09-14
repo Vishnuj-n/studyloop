@@ -855,8 +855,8 @@ func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
 				  AND nt.topic_id = study_queue.topic_id
 				LIMIT 1
 			),
-			start_page = COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), start_page),
-			end_page = COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), end_page)
+			start_page = CASE WHEN start_page IS NULL OR start_page <= 0 THEN COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE start_page END,
+			end_page = CASE WHEN end_page IS NULL OR end_page <= 0 THEN COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE end_page END
 			WHERE notebook_id = ?
 			  AND task_type IN ('READING', 'REREAD')
 			  AND status IN ('PENDING', 'ACTIVE')

@@ -1758,3 +1758,53 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 		t.Fatalf("unexpected unexamined attempts: %#v", topicAttemptsAfter)
 	}
 }
+
+func TestReconcileReadingTasksPreservesSubRangeBounds(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-reconcile-test"
+	notebookID := "nb-reconcile-test"
+
+	if err := testRepo.withTx(func(tx *sql.Tx) error {
+		_, err := tx.Exec(`
+			INSERT INTO topics (id, title, start_page, end_page)
+			VALUES (?, 'Topic Reconcile Test', 100, 119)
+		`, topicID)
+		return err
+	}); err != nil {
+		t.Fatalf("insert topic failed: %v", err)
+	}
+
+	if err := testRepo.CreateNotebook(notebookID, "NB Reconcile Test", "/tmp/r.pdf", "pdf", topicID, "", 200, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	// Insert sub-range reading task (100 to 109)
+	subTaskID := "task-sub-range-100-109"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         subTaskID,
+		NotebookID: notebookID,
+		TopicID:    topicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusActive,
+		StartPage:  100,
+		EndPage:    109,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
+
+	// Trigger reconciliation
+	if err := testRepo.ReconcileReadingTasksForNotebook(notebookID); err != nil {
+		t.Fatalf("ReconcileReadingTasksForNotebook failed: %v", err)
+	}
+
+	// Verify that sub-range page bounds (100-109) were NOT overwritten by full topic bounds (100-119)
+	task, err := testRepo.GetTaskByID(subTaskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID failed: %v", err)
+	}
+
+	if task.StartPage != 100 || task.EndPage != 109 {
+		t.Fatalf("regression bug detected! ReconcileReadingTasksForNotebook overwrote sub-range bounds (100-109) with topic bounds (%d-%d)", task.StartPage, task.EndPage)
+	}
+}
