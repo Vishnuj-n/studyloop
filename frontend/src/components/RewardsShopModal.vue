@@ -230,6 +230,7 @@ async function buyItem(item) {
     } else {
       await fetchStore()
       equipTheme(item.id)
+      window.dispatchEvent(new Event('gamification-updated'))
     }
   } catch (err) {
     alert(err.message || 'Purchase failed')
