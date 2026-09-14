@@ -425,3 +425,33 @@ export function clearSession() {
     console.warn('[AUTH] ClearSession bridge error:', err)
   }
 }
+
+export function setLLMPromptLogging(enabled) {
+  try {
+    return appBridge().SetLLMPromptLogging(Boolean(enabled))
+  } catch (err) {
+    console.warn('[DEV] SetLLMPromptLogging bridge error:', err)
+    return false
+  }
+}
+
+export function getLLMPromptLogging() {
+  try {
+    return appBridge().GetLLMPromptLogging()
+  } catch (err) {
+    console.warn('[DEV] GetLLMPromptLogging bridge error:', err)
+    return false
+  }
+}
+
+export function openDataDirectory(subDir = '') {
+  try {
+    return appBridge().OpenDataDirectory(subDir)
+  } catch (err) {
+    console.warn('[DEV] OpenDataDirectory bridge error:', err)
+    return { error: err.message }
+  }
+}
+
+
+

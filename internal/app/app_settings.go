@@ -9,11 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
+	stdruntime "runtime"
 	"strings"
 	"time"
 
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/models"
+	appRuntime "ai-tutor/internal/runtime"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 
@@ -891,3 +895,42 @@ func (a *App) GetCloudConfig() map[string]interface{} {
 		"configured": resolved != "",
 	}
 }
+
+// SetLLMPromptLogging enables or disables runtime LLM prompt logging.
+func (a *App) SetLLMPromptLogging(enabled bool) bool {
+	llm.SetPromptLoggingEnabled(enabled)
+	return llm.IsPromptLoggingEnabled()
+}
+
+// GetLLMPromptLogging returns whether LLM prompt logging is enabled.
+func (a *App) GetLLMPromptLogging() bool {
+	return llm.IsPromptLoggingEnabled()
+}
+
+// OpenDataDirectory opens the active application data directory (or optional subDir like "logs") in File Explorer.
+func (a *App) OpenDataDirectory(subDir string) map[string]interface{} {
+	appDir, err := appRuntime.ResolveAppDir()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	targetDir := appDir
+	if subDir != "" {
+		targetDir = filepath.Join(appDir, filepath.Clean(subDir))
+		_ = os.MkdirAll(targetDir, 0755)
+	}
+	var cmd *exec.Cmd
+	if stdruntime.GOOS == "windows" {
+		cmd = exec.Command("explorer", targetDir)
+	} else if stdruntime.GOOS == "darwin" {
+		cmd = exec.Command("open", targetDir)
+	} else {
+		cmd = exec.Command("xdg-open", targetDir)
+	}
+	if err := cmd.Start(); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "path": targetDir}
+}
+
+
+

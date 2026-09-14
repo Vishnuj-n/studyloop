@@ -1,14 +1,5 @@
 <template>
   <article class="panel form-grid">
-    <div class="header-row">
-      <div>
-        <h2>Developer Mode &amp; Diagnostics</h2>
-        <p class="hint">
-          Enable low-level diagnostic logs, view reading session queues, and verify page ranges.
-        </p>
-      </div>
-    </div>
-
     <!-- Master Developer Mode Toggle -->
     <div class="dev-toggle-card">
       <SettingsToggle
@@ -20,6 +11,31 @@
 
     <!-- Developer Tools & History Panel -->
     <div v-if="devModeEnabled" class="dev-content-box animate-fade-in">
+      <!-- LLM Prompt Logging Toggle Card -->
+      <div class="dev-toggle-card">
+        <SettingsToggle
+          v-model="llmPromptLogEnabled"
+          title="Enable LLM Prompt Logging"
+          hint="Appends raw LLM prompt inputs and model parameters to dev_data/logs/llm_prompt.log in real time."
+        />
+      </div>
+
+      <!-- Quick Developer Actions Card -->
+      <div class="dev-actions-card">
+        <div class="actions-header">
+          <h4>Developer Shortcuts</h4>
+          <p class="hint">Open SQLite database directory (dev_data / %APPDATA%) or logs folder in File Explorer.</p>
+        </div>
+        <div class="actions-buttons">
+          <button type="button" class="action-btn" @click="handleOpenDataDir('')">
+            📁 Open Data Directory
+          </button>
+          <button type="button" class="action-btn secondary" @click="handleOpenDataDir('logs')">
+            📁 Open Logs Directory
+          </button>
+        </div>
+      </div>
+
       <div class="section-title-row">
         <div>
           <h3>Reading Queue &amp; Task History</h3>
@@ -120,11 +136,17 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import SettingsToggle from './SettingsToggle.vue'
-import { getReadingTaskHistory } from '../services/appApi'
+import {
+  getReadingTaskHistory,
+  getLLMPromptLogging,
+  setLLMPromptLogging,
+  openDataDirectory,
+} from '../services/appApi'
 
 const DEV_MODE_STORAGE_KEY = 'studyloop_dev_mode_enabled'
 
 const devModeEnabled = ref(localStorage.getItem(DEV_MODE_STORAGE_KEY) === 'true')
+const llmPromptLogEnabled = ref(false)
 const logs = ref([])
 const totalCount = ref(0)
 const hasMore = ref(false)
@@ -132,6 +154,36 @@ const offset = ref(0)
 const limit = 50
 const loading = ref(false)
 const error = ref('')
+
+async function handleOpenDataDir(subDir = '') {
+  error.value = ''
+  const res = await openDataDirectory(subDir)
+  if (res?.error) {
+    error.value = res.error
+  }
+}
+
+onMounted(async () => {
+  if (devModeEnabled.value) {
+    resetAndFetch()
+  }
+  try {
+    llmPromptLogEnabled.value = await getLLMPromptLogging()
+  } catch (err) {
+    console.warn('Failed fetching LLM prompt logging status:', err)
+  }
+})
+
+watch(llmPromptLogEnabled, async (newVal) => {
+  try {
+    const updated = await setLLMPromptLogging(newVal)
+    if (typeof updated === 'boolean') {
+      llmPromptLogEnabled.value = updated
+    }
+  } catch (err) {
+    console.warn('Failed setting LLM prompt logging:', err)
+  }
+})
 
 watch(devModeEnabled, (newVal) => {
   localStorage.setItem(DEV_MODE_STORAGE_KEY, String(newVal))
@@ -178,12 +230,6 @@ async function fetchMore() {
   offset.value += limit
   await fetchLogs()
 }
-
-onMounted(() => {
-  if (devModeEnabled.value) {
-    resetAndFetch()
-  }
-})
 </script>
 
 <style scoped>
@@ -192,6 +238,59 @@ onMounted(() => {
   background: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
+}
+
+.dev-actions-card {
+  padding: 16px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.actions-header h4 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-family: 'Manrope', sans-serif;
+}
+
+.actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.action-btn.secondary {
+  border-color: var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+}
+
+.action-btn.secondary:hover {
+  background: var(--surface-container-highest);
+  color: var(--primary);
 }
 
 .dev-content-box {
