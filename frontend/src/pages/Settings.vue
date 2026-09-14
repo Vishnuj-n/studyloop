@@ -336,6 +336,7 @@ const isCloudAccount = computed(() => {
 async function loadAllData() {
   loading.value = true
   error.value = ''
+  success.value = ''
   try {
     await Promise.all([loadSettings(), loadLLM(), loadProfiles(), loadNotebooks()])
   } catch (err) {
@@ -346,9 +347,15 @@ async function loadAllData() {
   }
 }
 
-function setActiveProfile(profileID) {
+async function setActiveProfile(profileID) {
+  const prev = settings.value.active_profile_id
   settings.value.active_profile_id = profileID
-  saveUserSettings(true)
+  try {
+    await saveUserSettings(true)
+  } catch (err) {
+    settings.value.active_profile_id = prev
+    error.value = 'Failed to switch profile'
+  }
 }
 
 async function runManualSync() {
@@ -375,7 +382,9 @@ watch(
   () => settings.value.theme,
   (newTheme) => {
     if (newTheme) document.documentElement.setAttribute('data-theme', newTheme)
-  }
+    else document.documentElement.removeAttribute('data-theme')
+  },
+  { immediate: true }
 )
 
 onMounted(async () => {
@@ -388,10 +397,10 @@ onMounted(async () => {
   const [envRes, cfgRes] = await Promise.all([
     getAppEnv().catch(() => null),
     getCloudConfig().catch(() => null),
-    loadAllData(),
   ])
   isDev.value = envRes?.env === 'dev'
   cloudConfigured.value = cfgRes?.configured === true
+  await loadAllData()
 })
 
 onUnmounted(() => {
