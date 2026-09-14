@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"strings"
+	"time"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/models"
@@ -15,27 +16,25 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 	qTask, qErr := repo.GetTaskByID(taskID)
 
 	if qErr != nil {
-		utils.Errorf("InitializeReadingSession loading anomaly: taskID=%s err=%v", taskID, qErr)
-		utils.QueueLogger.Info("queue task pre-activate loading anomaly", "taskID", taskID)
+		utils.QueueLogger.Info("queue task pre-activate loading anomaly", "taskID", taskID, "err", qErr)
 		return map[string]interface{}{"error": "failed to load task: " + qErr.Error()}
 	}
 
 	switch qTask.Status {
 	case models.StudyTaskStatusPending:
 		if err := repo.ActivateTask(taskID); err != nil {
-			utils.Errorf("InitializeReadingSession activation failed: taskID=%s err=%v", taskID, err)
-			utils.QueueLogger.Info("queue task activation failed", "taskID", taskID)
+			utils.QueueLogger.Info("queue task activation failed", "taskID", taskID, "err", err)
 			return map[string]interface{}{"error": "failed to activate task: " + err.Error()}
-		} else {
-			utils.QueueLogger.Info("queue task activated", "taskID", taskID)
 		}
+		utils.QueueLogger.Info("queue task activated", "taskID", taskID)
+		return nil
 	case models.StudyTaskStatusActive:
 		utils.QueueLogger.Debug("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)
+		return nil
 	default:
 		utils.QueueLogger.Info("task terminal", "status", qTask.Status, "taskID", taskID)
 		return map[string]interface{}{"error": "task is in terminal status: " + string(qTask.Status), "code": 409}
 	}
-	return nil
 }
 
 // InitializeReadingSession activates and loads an active or pending reading task from the queue.
@@ -48,7 +47,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 	if taskID == "" {
 		return map[string]interface{}{"error": "task ID is required", "code": 400}
 	}
-	utils.Warnf("[READER_INIT] InitializeReadingSession entry taskID=%s", taskID)
+	utils.Infof("[READER_INIT] InitializeReadingSession entry taskID=%s", taskID)
 
 	if errMap := a.activateReadingSessionTask(taskID); errMap != nil {
 		return errMap
@@ -63,29 +62,33 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		return map[string]interface{}{"error": err.Error()}
 	}
 
+	currentPage := task.CurrentPage
+	if currentPage <= 0 {
+		currentPage = task.StartPage
+	}
+
 	// Get topic bundle for additional metadata
 	bundle, err := repo.GetReaderTopicBundle(task.TopicID, task.NotebookID)
 	if err != nil {
-		// Return task-only response if bundle fails
+		utils.Warnf("[READER_INIT] bundle fetch failed for topic %s notebook %s: %v", task.TopicID, task.NotebookID, err)
 		return map[string]interface{}{
-			"ok":   true,
-			"task": task,
+			"ok":     true,
+			"task":   task,
+			"bundle": nil,
 			"page_bounds": map[string]interface{}{
 				"start_page":   task.StartPage,
 				"end_page":     task.EndPage,
-				"current_page": task.StartPage,
+				"current_page": currentPage,
 				"page_count":   0,
 			},
 			"navigation": map[string]interface{}{
-				"can_go_prev": task.StartPage > 1,
-				"can_go_next": true,
+				"can_go_prev": currentPage > task.StartPage,
+				"can_go_next": currentPage < task.EndPage,
 			},
 		}
 	}
 
-	// Use repository-provided and clamped CurrentPage from GetReadingTask
-	currentPage := task.CurrentPage
-	utils.Warnf("[READER_INIT] InitializeReadingSession response payload canonicalTaskID=%s", task.TaskID)
+	utils.Infof("[READER_INIT] InitializeReadingSession response payload canonicalTaskID=%s", task.TaskID)
 
 	return map[string]interface{}{
 		"ok":     true,
@@ -111,42 +114,35 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	}
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading entry rejected: taskID empty")
 		return map[string]interface{}{"error": "task ID is required", "code": 400}
 	}
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading entry taskID=%s", taskID)
+	utils.Infof("[COMPLETE_SESSION] CompleteReading entry taskID=%s", taskID)
 
-	// Trust-based completion: just validate task exists and is active
 	task, err := repo.GetReadingTask(taskID)
 	if err != nil {
-		switch err {
-		case db.ErrTaskNotFound:
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading GetReadingTask error: task not found taskID=%s", taskID)
+		if err == db.ErrTaskNotFound {
 			return map[string]interface{}{"error": "ErrNotFound", "code": 404}
-		default:
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading GetReadingTask error taskID=%s err=%v", taskID, err)
-			return map[string]interface{}{"error": err.Error()}
 		}
+		return map[string]interface{}{"error": err.Error()}
 	}
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading loaded reading task taskID=%s startPage=%d endPage=%d currentPage=%d", taskID, task.StartPage, task.EndPage, task.CurrentPage)
 
 	queueTask, qErr := repo.GetTaskByID(taskID)
 	if qErr != nil {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading GetTaskByID error taskID=%s err=%v", taskID, qErr)
 		return map[string]interface{}{"error": qErr.Error()}
 	}
 	if queueTask.Status != models.StudyTaskStatusActive {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading task not active taskID=%s status=%s", taskID, queueTask.Status)
 		return map[string]interface{}{"error": "task is not active", "code": 409}
 	}
 
 	if a.studyService == nil {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading error: study service not initialized taskID=%s", taskID)
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
 
+	if task.TopicID == "" && task.NotebookID == "" {
+		return map[string]interface{}{"error": "task has no topic or notebook", "code": 422}
+	}
+
 	// Generate quiz from topic chunks bounded by reading task page range when available.
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading chunk lookup topicID=%q startPage=%d endPage=%d", task.TopicID, task.StartPage, task.EndPage)
 	var chunks []models.Chunk
 	if task.StartPage > 0 && task.EndPage >= task.StartPage {
 		chunks, err = repo.GetChunksForTopicPageRange(task.TopicID, task.StartPage, task.EndPage)
@@ -154,28 +150,22 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		chunks, err = repo.GetChunksForTopic(task.TopicID)
 	}
 	if err != nil {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading chunk lookup error taskID=%s err=%v", taskID, err)
 		return map[string]interface{}{"error": err.Error()}
 	}
 	if len(chunks) == 0 && (task.StartPage > 0 && task.EndPage >= task.StartPage) {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading 0 chunks in page range [%d-%d], falling back to topic chunks topicID=%q", task.StartPage, task.EndPage, task.TopicID)
 		chunks, err = repo.GetChunksForTopic(task.TopicID)
 		if err != nil {
-			utils.Warnf("[COMPLETE_SESSION] CompleteReading fallback chunk lookup error taskID=%s err=%v", taskID, err)
 			return map[string]interface{}{"error": err.Error()}
 		}
 	}
-	if len(chunks) == 0 && task.NotebookID != "" {
-		utils.Warnf("[COMPLETE_SESSION] topic lookup empty; resolving by notebook/page range notebookID=%q", task.NotebookID)
+	if len(chunks) == 0 && task.NotebookID != "" && task.StartPage > 0 && task.EndPage >= task.StartPage {
 		chunks, err = repo.GetChunksForNotebookPageRange(task.NotebookID, task.StartPage, task.EndPage)
 		if err != nil {
 			return map[string]interface{}{"error": err.Error()}
 		}
 	}
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading chunk lookup result: got %d chunks for topicID=%q", len(chunks), task.TopicID)
 
 	if len(chunks) == 0 {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading no chunks found for topicID=%q — notebook content not indexed", task.TopicID)
 		return map[string]interface{}{
 			"error": "notebook content not yet indexed — please re-confirm your syllabus from the notebook page",
 			"code":  422,
@@ -184,30 +174,33 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 
 	chunkIDs := make([]string, 0, len(chunks))
 	chunkTextByID := make(map[string]string, len(chunks))
-	for i, chunk := range chunks {
-		utils.Warnf("[COMPLETE_SESSION] CompleteReading chunk[%d] id=%q topicID=%q textLen=%d", i, chunk.ID, chunk.TopicID, len(chunk.Text))
+	for _, chunk := range chunks {
 		chunkIDs = append(chunkIDs, chunk.ID)
 		chunkTextByID[chunk.ID] = chunk.Text
 	}
 
-	utils.Warnf("[QUIZ] CompleteReading before GenerateQuizSync taskID=%s topicID=%q chunkCount=%d chunkIDs=%v", taskID, task.TopicID, len(chunkIDs), chunkIDs)
 	if reserveErr := repo.ReserveTask(taskID); reserveErr != nil {
-		return map[string]interface{}{"error": "failed to reserve task: " + reserveErr.Error()}
+		return map[string]interface{}{"error": "failed to reserve task: " + reserveErr.Error(), "code": 409}
 	}
 
 	quizPayload, err := a.studyService.GenerateQuizSync(task.TopicID, chunkIDs, chunkTextByID)
 	if err != nil {
-		utils.Warnf("[QUIZ] CompleteReading GenerateQuizSync error taskID=%s err=%v", taskID, err)
-		if revertErr := repo.RevertTaskReservation(taskID); revertErr != nil {
-			utils.Warnf("[QUIZ] failed to revert task reservation for task %s: %v", taskID, revertErr)
-		}
+		_ = repo.RevertTaskReservation(taskID)
 		return map[string]interface{}{"error": err.Error()}
 	}
-	utils.Warnf("[QUIZ] CompleteReading after GenerateQuizSync taskID=%s questionCount=%d", taskID, len(quizPayload.Questions))
 
-	// Complete reading task and generate follow-up quiz via Unified Transition Router
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading before TransitionTask taskID=%s", taskID)
-	transitionRes, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
+	if len(quizPayload.Questions) == 0 {
+		_ = repo.RevertTaskReservation(taskID)
+		return map[string]interface{}{
+			"error": "quiz generation returned no questions; please retry from the reader",
+			"code":  422,
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	transitionRes, err := a.studyService.TransitionTask(ctx, studypkg.TransitionRequest{
 		TaskID:      taskID,
 		Event:       studypkg.EventCompleteReading,
 		TopicID:     task.TopicID,
@@ -215,13 +208,10 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		QuizPayload: &quizPayload,
 	})
 	if err != nil {
-		if revertErr := repo.RevertTaskReservation(taskID); revertErr != nil {
-			utils.Warnf("[QUIZ] failed to revert task reservation on finalization failure for task %s: %v", taskID, revertErr)
-		}
+		_ = repo.RevertTaskReservation(taskID)
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	utils.Warnf("[COMPLETE_SESSION] CompleteReading TransitionTask result taskID=%s quizTaskID=%s", taskID, transitionRes.NextTaskID)
 	return map[string]interface{}{
 		"ok":           true,
 		"quiz_task_id": transitionRes.NextTaskID,
