@@ -55,7 +55,7 @@
             id="wa-generate-btn"
             class="primary-btn"
             :disabled="!canGenerate"
-            @click="generate"
+            @click="generate(false)"
           >
             {{ loading ? 'Generating…' : 'Generate Question' }}
           </button>
@@ -68,7 +68,7 @@
             v-if="canGenerate"
             class="primary-btn retry-generation-btn"
             :disabled="loading"
-            @click="generate"
+            @click="generate(true)"
           >
             Retry Generation
           </button>
@@ -80,9 +80,10 @@
         <!-- Question card -->
         <article class="question-card">
           <p class="question-prompt">{{ question.prompt }}</p>
-          <span class="source-badge"
-            >Pages {{ question.sourcePageStart }}–{{ question.sourcePageEnd }}</span
-          >
+          <span v-if="question.sourcePageStart > 0 && question.sourcePageEnd > 0" class="source-badge">
+            Pages {{ question.sourcePageStart }}–{{ question.sourcePageEnd }}
+          </span>
+          <span v-else class="source-badge">Source: Notebook</span>
         </article>
 
         <!-- Answer textarea -->
@@ -94,6 +95,8 @@
             class="ghost-textarea"
             rows="7"
             placeholder="Write or dictate your answer here…"
+            spellcheck="true"
+            autocomplete="off"
             :disabled="scoring"
           />
         </div>
@@ -102,7 +105,7 @@
         <div class="stt-tip">
           <span class="stt-tip__icon">💡</span>
           <span class="stt-tip__text">
-            Prefer speaking? Use OS dictation (<kbd class="kbd-badge">Win + H</kbd>) or offline tools like
+            Prefer speaking? Use OS dictation (<kbd class="kbd-badge">{{ sttShortcut }}</kbd>) or offline tools like
             <a
               href="https://github.com/cjpais/Handy"
               target="_blank"
@@ -123,7 +126,7 @@
           <button
             id="wa-submit-btn"
             class="primary-btn"
-            :disabled="!userAnswer.trim() || scoring"
+            :disabled="!canSubmit"
             @click="submitAnswer"
           >
             {{ scoring ? 'Scoring…' : 'Submit Answer' }}
@@ -135,7 +138,7 @@
           <p class="state-text">{{ error }}</p>
           <button
             class="primary-btn retry-generation-btn"
-            :disabled="scoring || !userAnswer.trim()"
+            :disabled="!canSubmit"
             @click="submitAnswer"
           >
             Retry Scoring
@@ -144,10 +147,10 @@
       </div>
 
       <!-- Result panel -->
-      <article v-if="result" class="result-panel">
+      <article v-if="result" class="result-panel" aria-live="polite">
         <div class="result-panel__score-row">
           <div class="score-display" :class="scoreClass">
-            <span class="score-num">{{ result.score }}</span>
+            <span class="score-num">{{ formattedScore }}</span>
             <span class="score-denom">/10</span>
           </div>
         </div>
@@ -156,10 +159,17 @@
         <div class="result-panel__feedback" v-html="renderedFeedback"></div>
 
         <div class="form-footer">
-          <button id="wa-dashboard-btn" class="primary-btn" @click="goToDashboard">
-            Back to Dashboard
+          <button
+            id="wa-dashboard-btn"
+            class="primary-btn"
+            :disabled="navigatingAway"
+            @click="goToDashboard"
+          >
+            {{ navigatingAway ? 'Navigating…' : 'Back to Dashboard' }}
           </button>
-          <button id="wa-new-btn" class="ghost-btn" @click="reset">New Question</button>
+          <button id="wa-new-btn" class="ghost-btn" :disabled="navigatingAway" @click="reset">
+            New Question
+          </button>
         </div>
       </article>
     </section>
@@ -169,7 +179,12 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getNotebooks, generateComprehensiveExam, scoreShortAnswer } from '../services/appApi.js'
+import {
+  getNotebooks,
+  generateComprehensiveExam,
+  scoreShortAnswer,
+  generateFlashcardsForQuizTask,
+} from '../services/appApi.js'
 import { renderMarkdown } from '../services/markdown'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 
@@ -182,6 +197,7 @@ const startPage = ref(1)
 const endPage = ref(10)
 const loading = ref(false)
 const scoring = ref(false)
+const navigatingAway = ref(false)
 const error = ref('')
 const question = ref(null)
 const userAnswer = ref('')
@@ -193,7 +209,7 @@ const selectedNotebook = computed(() =>
 
 let isInitialLoad = true
 
-watch(selectedNotebookID, (newID, oldID) => {
+watch(selectedNotebookID, (newID) => {
   if (!newID || isInitialLoad) return
   const nb = notebooks.value.find((n) => n.id === newID)
   if (nb) {
@@ -212,6 +228,14 @@ const canGenerate = computed(
     !loading.value
 )
 
+const canSubmit = computed(() => userAnswer.value.trim().length > 0 && !scoring.value)
+
+const formattedScore = computed(() => {
+  const s = result.value?.score
+  if (typeof s !== 'number' || isNaN(s)) return '0'
+  return Number.isInteger(s) ? String(s) : s.toFixed(1)
+})
+
 const scoreClass = computed(() => {
   const s = result.value?.score ?? 0
   if (s >= 8) return 'score--great'
@@ -224,10 +248,21 @@ const renderedFeedback = computed(() => {
   return renderMarkdown(result.value.feedback)
 })
 
+const sttShortcut = computed(() => {
+  if (typeof navigator === 'undefined') return 'Win + H'
+  const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase()
+  if (platform.includes('mac')) return 'Fn Fn / Cmd + Option + O'
+  return 'Win + H'
+})
+
 onMounted(async () => {
   try {
     const res = await getNotebooks()
-    notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
+    if (!Array.isArray(res)) {
+      error.value = 'Failed to load notebooks.'
+      return
+    }
+    notebooks.value = res.filter((n) => !n.error)
 
     // Read optional query parameters from router (e.g. from Quiz completion or Dashboard)
     const {
@@ -259,9 +294,13 @@ onMounted(async () => {
       endPage.value = Math.min(startPage.value + 5, maxP)
     }
 
-    if (autoGenerate === 'true' && selectedNotebookID.value) {
+    const isAutoGenerate = Array.isArray(autoGenerate)
+      ? autoGenerate.includes('true')
+      : autoGenerate === 'true'
+
+    if (isAutoGenerate && selectedNotebookID.value) {
       await router.replace({ query: { ...route.query, autoGenerate: undefined } })
-      await generate()
+      await generate(false)
     }
   } catch {
     error.value = 'Failed to load notebooks.'
@@ -270,15 +309,41 @@ onMounted(async () => {
   }
 })
 
-function goToDashboard() {
-  router.push('/dashboard')
+async function goToDashboard() {
+  if (navigatingAway.value) return
+  navigatingAway.value = true
+
+  const quizTaskId = String(route.query.quizTaskId || '')
+  const query = {}
+
+  if (quizTaskId) {
+    // Strip quizTaskId from route query to prevent repeat executions on navigation/refresh
+    await router.replace({ query: { ...route.query, quizTaskId: undefined } })
+    try {
+      const genResult = await generateFlashcardsForQuizTask(quizTaskId)
+      if (genResult?.rewards) {
+        window.dispatchEvent(
+          new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+        )
+      }
+      const cardsCount = genResult?.cards_scheduled || 0
+      if (cardsCount > 0) {
+        query.flashcardsCreated = cardsCount
+      }
+    } catch (err) {
+      console.warn('[FLASHCARD_PIPELINE] Deferred flashcard generation failed in WrittenAssessment:', err)
+      error.value = 'Flashcard generation failed. Returning to dashboard...'
+    }
+  }
+
+  router.push({ path: '/dashboard', query })
 }
 
-async function generate() {
+async function generate(isRetry = false) {
   error.value = ''
   question.value = null
   result.value = null
-  userAnswer.value = ''
+  if (!isRetry) userAnswer.value = ''
   loading.value = true
   try {
     const res = await generateComprehensiveExam(
@@ -314,6 +379,7 @@ async function submitAnswer() {
     error.value = 'Invalid question: missing question ID'
     return
   }
+  error.value = ''
   scoring.value = true
   try {
     const res = await scoreShortAnswer(question.value.questionId, userAnswer.value.trim())
@@ -339,6 +405,9 @@ function reset() {
   result.value = null
   userAnswer.value = ''
   error.value = ''
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 </script>
 
