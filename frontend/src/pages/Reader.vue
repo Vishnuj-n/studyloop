@@ -52,14 +52,35 @@
             <span class="page-indicator"
               >Page {{ reader.currentPage.value }} / {{ reader.pageCount.value }}</span
             >
-            <button
-              v-if="isTaskFlow"
-              class="primary"
-              :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
-              @click="completeSession"
-            >
-              {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
-            </button>
+            <div v-if="isTaskFlow" class="split-btn-group">
+              <button
+                class="primary split-main-btn"
+                :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+                @click="completeSession(false)"
+              >
+                {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
+              </button>
+              <div class="split-dropdown-wrapper">
+                <button
+                  class="primary split-chevron-btn"
+                  :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+                  title="More completion options"
+                  @click.stop="toggleDeferMenu"
+                >
+                  ▾
+                </button>
+                <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
+                  <button
+                    class="split-dropdown-item"
+                    :disabled="completingSession"
+                    @click="onDeferQuizClick"
+                  >
+                    <span class="item-title">Complete & Defer Quiz</span>
+                    <span class="item-desc">Save quiz for later, continue reading</span>
+                  </button>
+                </div>
+              </div>
+            </div>
             <button
               class="secondary copy-session-btn"
               :disabled="reader.loadingBundle.value || reader.loadingText.value"
@@ -230,7 +251,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, provide, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   completeReading,
@@ -354,6 +375,30 @@ provide('chat', chat)
 const completingSession = ref(false)
 const completionMessage = ref('')
 const completionError = ref('')
+const showDeferMenu = ref(false)
+
+function toggleDeferMenu() {
+  showDeferMenu.value = !showDeferMenu.value
+}
+
+function onDeferQuizClick() {
+  showDeferMenu.value = false
+  completeSession(true)
+}
+
+function handleDocumentClick() {
+  if (showDeferMenu.value) {
+    showDeferMenu.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleDocumentClick)
+})
 const sessionTask = ref(null)
 const ragEnabled = ref(false)
 const ragQueueStudy = ref(true)
@@ -521,7 +566,7 @@ function onNotebookChange() {
   // Don't call loadBundle() here - let user select a topic first
 }
 
-async function completeSession() {
+async function completeSession(deferQuiz = false) {
   if (completingSession.value || reader.loadingBundle.value || !resolvedTaskID.value) return
 
   completionError.value = ''
@@ -536,6 +581,7 @@ async function completeSession() {
       routeTaskIDComputed: routeTaskID.value,
       resolvedTaskID: resolvedTaskID.value,
       actualArg: taskIDForCompletion,
+      deferQuiz,
     })
     const done = await completeReading(taskIDForCompletion)
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
@@ -554,18 +600,24 @@ async function completeSession() {
       trackAnalyticsEvent('reading_complete', fileHash, reader.currentPage.value, {
         task_id: taskIDForCompletion,
         anonymous_user_id: anonymousUserID.value,
+        deferred_quiz: deferQuiz,
       }).catch((err) => {
         console.error('[READER] trackAnalyticsEvent reading_complete failed:', err)
       })
     }
-    const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'
-    // Completion writes the follow-up quiz into the queue; navigation follows the existing route behavior.
-    console.warn('[COMPLETE_SESSION] completeSession() before router.push', {
-      nextRoute,
-      quizTaskID: done?.quiz_task_id || null,
-    })
-    await router.push(nextRoute)
-    console.warn('[COMPLETE_SESSION] completeSession() router.push resolved', { nextRoute })
+
+    if (deferQuiz) {
+      console.warn('[COMPLETE_SESSION] Quiz deferred to queue. Routing to dashboard.')
+      await router.push('/dashboard')
+    } else {
+      const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'
+      console.warn('[COMPLETE_SESSION] completeSession() before router.push', {
+        nextRoute,
+        quizTaskID: done?.quiz_task_id || null,
+      })
+      await router.push(nextRoute)
+      console.warn('[COMPLETE_SESSION] completeSession() router.push resolved', { nextRoute })
+    }
   } catch (err) {
     console.error('[COMPLETE_SESSION] completeSession() catch', err)
     const errMsg = err?.message || 'Failed to complete session'
@@ -1002,5 +1054,78 @@ button:disabled {
   background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
+/* Split Button for Complete Session */
+.split-btn-group {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  vertical-align: middle;
+}
+
+.split-main-btn {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.split-chevron-btn {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 11px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.split-dropdown-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.split-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 230px;
+  background: var(--surface-bright, #ffffff);
+  border: 1px solid var(--outline-variant, #e0e0e0);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  z-index: 100;
+}
+
+.split-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--on-surface, #1c1b1f);
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.split-dropdown-item:hover:not(:disabled) {
+  background: var(--surface-container-high, rgba(0, 0, 0, 0.06));
+}
+
+.split-dropdown-item .item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--primary, #1a73e8);
+}
+
+.split-dropdown-item .item-desc {
+  font-size: 11px;
+  color: var(--muted-text, #666);
+  margin-top: 2px;
+}
 
 </style>
