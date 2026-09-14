@@ -348,11 +348,6 @@ const currentBookTitle = computed(() => {
   if (!nb?.title) return ''
   return nb.title.replace(/\.(pdf|apkg|anki|zip|epub|txt|md|docx)$/i, '').trim()
 })
-const currentChapterTitle = computed(() => {
-  if (!currentCard.value?.topic_id) return ''
-  const topic = availableTopics.value.find((t) => t.id === currentCard.value.topic_id)
-  return topic?.title || ''
-})
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)

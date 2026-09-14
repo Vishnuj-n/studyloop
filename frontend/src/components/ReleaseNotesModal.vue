@@ -16,6 +16,7 @@
             <ul class="bullet-list">
               <li v-for="(item, i) in section.items" :key="i" class="bullet-item">
                 <span class="bullet-dot">•</span>
+                <!-- eslint-disable-next-line vue/no-v-html -->
                 <span class="bullet-text" v-html="formatInlineText(item)"></span>
               </li>
             </ul>

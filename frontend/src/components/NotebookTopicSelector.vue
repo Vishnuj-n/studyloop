@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { getNotebookTopicTree } from '../services/appApi'
 import { sortNotebookTopics } from '../composables/useReaderBase'
 

@@ -19,7 +19,7 @@ import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
 import { EventsOn } from '../wailsjs/runtime/runtime'
 
-const { toast, hideToast, showNotice, showError } = useToast()
+const { showNotice, showError } = useToast()
 
 const route = useRoute()
 

@@ -90,19 +90,6 @@ const chestRewardAmount = computed(() => props.box?.reward_amount || 50)
 
 const tierClass = computed(() => `tier-${chestTier.value.toLowerCase()}`)
 
-const chestEmoji = computed(() => {
-  switch (chestTier.value) {
-    case 'SILVER':
-      return '🥈'
-    case 'GOLD':
-      return '🎁'
-    case 'MYTHIC':
-      return '👑'
-    default:
-      return '📦'
-  }
-})
-
 const rewardEmoji = computed(() => {
   switch (chestRewardType.value) {
     case 'COINS':

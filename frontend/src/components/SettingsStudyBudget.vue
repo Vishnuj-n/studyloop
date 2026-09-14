@@ -613,18 +613,6 @@ function openOutlookForSlot(slot) {
   openExternalLink(url)
 }
 
-function openGoogle() {
-  const slots = getActiveSlots()
-  const first = slots[0] || { start: '17:00', end: '18:00' }
-  openGoogleForSlot(first)
-}
-
-function openOutlook() {
-  const slots = getActiveSlots()
-  const first = slots[0] || { start: '17:00', end: '18:00' }
-  openOutlookForSlot(first)
-}
-
 function downloadICS() {
   const slots = getActiveSlots()
   downloadRoutineICS(slots)

@@ -286,7 +286,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listExtensions, runExtension, checkExtensionReadiness } from '../services/appApi'
+import { listExtensions, runExtension } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import { useExtensions } from '../composables/useExtensions'
 import ExtensionSetupModal from '../components/ExtensionSetupModal.vue'

@@ -151,11 +151,11 @@ import {
   unlockCosmeticItem,
 } from '../services/appApi'
 
-const props = defineProps({
+defineProps({
   activeTheme: { type: String, default: 'dark-gruvbox' },
 })
 
-const emit = defineEmits(['close', 'theme-changed'])
+const emit = defineEmits(['theme-changed'])
 
 const themePreviewColors = {
   'dark-gruvbox': { bg: '#1d2021', primary: '#d79921', surface: '#282828' },
@@ -171,7 +171,6 @@ const themePreviewColors = {
   'light-monochrome': { bg: '#f8f8f9', primary: '#18181b', surface: '#e8e8ec' },
 }
 
-const visible = ref(true)
 const activeTab = ref('themes')
 const store = ref(null)
 const loading = ref(true)
@@ -242,11 +241,6 @@ async function buyItem(item) {
 function equipTheme(themeId) {
   document.documentElement.setAttribute('data-theme', themeId)
   emit('theme-changed', themeId)
-}
-
-function closeModal() {
-  visible.value = false
-  emit('close')
 }
 </script>
 

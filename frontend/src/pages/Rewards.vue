@@ -156,15 +156,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { getGamificationState, buyStreakFreeze, getUserSettings, updateUserSettings } from '../services/appApi'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import GamificationIcon from '../components/icons/GamificationIcon.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
 import RewardsShopModal from '../components/RewardsShopModal.vue'
-
-const showShopModal = ref(false)
 
 const loading = ref(true)
 const buying = ref(false)
@@ -196,19 +194,6 @@ const progressPercent = computed(() => {
   const pct = ((cur - min) / range) * 100
   return Math.min(100, Math.max(0, Math.round(pct)))
 })
-
-function getChestEmoji(tier) {
-  switch ((tier || '').toUpperCase()) {
-    case 'SILVER':
-      return '🥈'
-    case 'GOLD':
-      return '🎁'
-    case 'MYTHIC':
-      return '👑'
-    default:
-      return '📦'
-  }
-}
 
 function getTitleEmoji(title) {
   const t = (title || '').toLowerCase()
@@ -296,11 +281,6 @@ function scrollToShop() {
   if (el) {
     el.scrollIntoView({ behavior: 'smooth' })
   }
-}
-
-function onShopClose() {
-  showShopModal.value = false
-  loadData()
 }
 
 onMounted(() => {
