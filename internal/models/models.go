@@ -64,6 +64,25 @@ type StudyQueueTask struct {
 	EndPage     int             `json:"end_page,omitempty"`
 }
 
+// ReadingTaskHistoryRecord represents a detailed reading task log item for developer diagnostics.
+type ReadingTaskHistoryRecord struct {
+	TaskID        string `json:"task_id"`
+	NotebookID    string `json:"notebook_id"`
+	NotebookTitle string `json:"notebook_title"`
+	TopicID       string `json:"topic_id"`
+	TopicTitle    string `json:"topic_title"`
+	TaskType      string `json:"task_type"`
+	Status        string `json:"status"`
+	StartPage     int    `json:"start_page"`
+	EndPage       int    `json:"end_page"`
+	CurrentPage   int    `json:"current_page"`
+	CreatedAt     string `json:"created_at"`
+	ActivatedAt   string `json:"activated_at,omitempty"`
+	CompletedAt   string `json:"completed_at,omitempty"`
+	HasAnomaly    bool   `json:"has_anomaly"`
+	AnomalyReason string `json:"anomaly_reason,omitempty"`
+}
+
 // CompletionResult captures explicit completion outcome and optional explicit follow-up inserts.
 type CompletionResult struct {
 	Status    StudyTaskStatus  `json:"status"`

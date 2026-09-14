@@ -236,3 +236,33 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		"rewards":      transitionRes.Rewards,
 	}
 }
+
+// GetReadingTaskHistory returns historical reading tasks with pagination for developer diagnostics.
+func (a *App) GetReadingTaskHistory(notebookID string, limit, offset int) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	records, totalCount, err := repo.GetReadingTaskHistory(notebookID, limit, offset)
+	if err != nil {
+		utils.QueueLogger.Error("failed to fetch reading task history", "err", err)
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	if records == nil {
+		records = []models.ReadingTaskHistoryRecord{}
+	}
+
+	hasMore := (offset + len(records)) < totalCount
+
+	return map[string]interface{}{
+		"ok":          true,
+		"records":     records,
+		"total_count": totalCount,
+		"has_more":    hasMore,
+		"limit":       limit,
+		"offset":      offset,
+	}
+}
+

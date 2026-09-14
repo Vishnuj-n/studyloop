@@ -170,8 +170,23 @@
             <SettingsUpdate />
           </div>
         </div>
+
+        <!-- Developer Mode Category -->
+        <div v-show="activeCategory === 'dev'" class="category-pane">
+          <header class="pane-header">
+            <h2>Developer Mode</h2>
+            <p class="pane-subtitle">
+              Low-level diagnostics, task history logs, and raw reading page range verification.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsDeveloperPanel />
+          </div>
+        </div>
       </div>
     </main>
+
 
     <!-- Add Profile Modal -->
     <SettingsProfileModal
@@ -229,6 +244,7 @@ import SettingsProfilesPanel from '../components/SettingsProfilesPanel.vue'
 import SettingsTextbooksPanel from '../components/SettingsTextbooksPanel.vue'
 import SettingsProfileModal from '../components/SettingsProfileModal.vue'
 import SettingsRagModal from '../components/SettingsRagModal.vue'
+import SettingsDeveloperPanel from '../components/SettingsDeveloperPanel.vue'
 
 const route = useRoute()
 
@@ -238,7 +254,9 @@ const categories = [
   { id: 'profiles', label: 'Profiles & Notebooks', desc: 'Exam goals and book mapping' },
   { id: 'extensions', label: 'Extensions & Tools', desc: 'Podcast voice, simplifier, AI tools' },
   { id: 'system', label: 'System & Account', desc: 'Themes, cloud sync, updates' },
+  { id: 'dev', label: 'Developer Mode', desc: 'Diagnostics, reading history & dev logs' },
 ]
+
 
 const activeCategory = ref('study')
 const isDev = ref(false)

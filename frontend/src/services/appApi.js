@@ -53,6 +53,11 @@ export function initializeReadingSession(taskID, notebookID, topicID, startPage,
   )
 }
 
+export function getReadingTaskHistory(notebookID = '', limit = 50, offset = 0) {
+  return appBridge().GetReadingTaskHistory(notebookID || '', limit, offset)
+}
+
+
 export async function completeReading(taskID) {
   console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID })
   try {
