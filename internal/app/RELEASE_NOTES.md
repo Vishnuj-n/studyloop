@@ -1,56 +1,70 @@
-# v1.5.0 – Release Notes  
+# What's New in **v1.5.0**
 
-## What's New  
+Studyloop 1.5.0 brings a richer gamified experience, smarter study tools, and a polished UI. Highlights include a new loot‑box reward system, expanded theme options, real‑time streak protection, and a one‑time release‑notes modal to keep you informed.
 
-### ✨ Features
-- **Gamification overhaul**
-  - Real‑time rewards updates via a new `gamification‑updated` event, keeping the Dashboard and Rewards pages in sync.  
-  - Introduced a loot‑box system with tiered rewards (Bronze → Mythic) and new progression models (XP elixirs, luck charms, wager support).  
-  - Rebalanced rank progression with numeric levels and sub‑tiers, plus achievement reconciliation logic.  
-- **Assessment & Socratic enhancements**
-  - Refined Quiz and Written Assessment components with better state handling, retry mechanisms, and accessibility (ARIA live regions, improved inputs).  
-  - Added distinct instruction sets for Socratic “rescue” mode vs. general tutoring, plus context‑length validation for prompts.  
-- **Study workflow upgrades**
-  - Expanded task tracking to include all completed study‑queue tasks.  
-  - Added partial‑quiz recovery parsing and assessment updates.  
-  - Optimized notebook ingestion with explicit chunk handling and safer deletions.  
-- **User Interface & Theming**
-  - New premium themes: Dark Academia, Neon Cyberpunk, Zen Minimalist, with updated global CSS variables.  
-  - Replaced static icons with scalable SVGs; added custom scrollbars and a top‑bar GitHub button with a dismissable star CTA.  
-  - Enhanced StatusBanner for GitHub star call‑out and introduced a one‑time Release Notes modal that appears on first launch of a new version.  
-  - Updated Groq link text and added a GitHub star toast for community engagement.  
+## ✨ Features
+
+- **Gamification upgrades**
+  - Real‑time rewards updates via a `gamification‑updated` event, keeping the Dashboard and Rewards pages in sync.
+  - Robust streak‑protection loop that automatically applies streak freezes across missed days.
+  - New loot‑box system with tiered rewards (Bronze, Silver, Gold, Mythic) and expanded progression models (XP elixirs, luck charms, user wagers).
+  - Rebalanced rank progression with numerical levels and sub‑tiers for clearer advancement.
+  - Achievement reconciliation logic to ensure earned milestones are correctly recorded.
+
+- **Study workflow enhancements**
+  - Expanded task tracking now includes all completed study‑queue tasks.
+  - Optimized notebook ingestion with explicit chunk handling and safer deletions.
+  - Partial quiz‑recovery parsing and assessment updates for smoother resume after interruptions.
+
+- **Assessment UI improvements**
+  - Refined Quiz component with a new `isCorrect` helper, retry mechanisms, and automatic state reset on task changes.
+  - Written Assessment now features better button states, dynamic shortcut hints, and enhanced accessibility (ARIA live regions).
+
+- **Socratic tutoring**
+  - Distinct instruction sets for “rescue” (remedial) and general tutoring modes.
+  - Context‑block length validation and smarter prompt construction for more reliable answers.
+
+- **User interface & experience**
+  - Three brand‑new visual themes: **Dark Academia**, **Neon Cyberpunk**, and **Zen Minimalist**.
+  - Updated gamification sidebar with level chips and XP text.
+  - SVG‑based icons for crisp scaling across devices.
+  - Top‑bar GitHub button, polished star call‑to‑action, and custom scrollbars.
+  - Dismissable GitHub‑star banner and toast notifications to celebrate community support.
+  - One‑time release‑notes modal that appears after each version upgrade.
+
 - **LLM output**
-  - Enabled free‑flow generation and removed hard caps on maximum output tokens.  
+  - Free‑flow generation mode with removed token caps for more natural responses.
 
-### 🚀 Improvements
-- **Reading session & logging**
-  - More robust session activation with detailed structured logs and consistent payloads.  
-  - Adjusted navigation logic to correctly reflect page bounds and loading states.  
-- **PDF viewer & chat**
-  - Stabilized PDF container width to cut down costly canvas re‑renders; refined page‑jump handling.  
-  - Added ARIA attributes to ReaderChat for better screen‑reader support.  
-- **Error handling & reliability**
-  - Strengthened streak protection with an auto‑protection loop that can span multiple missed days.  
-  - Added validation for time parsing in daily study‑minute calculations and warning logs for failed review session creation.  
-  - Improved queue transition tasks with clearer error handling and score management.  
-- **Settings & Dashboard**
-  - Safer profile switching with enhanced error handling and smoother data loading.  
-  - Refactored GitHub repo link logic and improved dashboard state management.  
+## 🚀 Improvements
 
-### 🐛 Bug Fixes
-- Removed redundant CSS selectors in `RewardsShopModal`.  
-- Fixed page navigation edge cases when topic bundles fail to load.  
-- Cleaned up unused state variables, imports, and dead code across multiple UI components.  
+- Reading session initialization now logs structured error details and provides consistent navigation state.
+- PDF viewer performance boosted by stabilizing container width, reducing canvas re‑renders.
+- ReaderChat component gains ARIA attributes for better screen‑reader support.
+- Transition‑task handling in the queue includes stronger error handling and score management.
+- Settings profile switching now includes graceful error handling and faster data loading.
+- Dashboard GitHub repository link refactored for reliability.
+- StatusBanner enhancements for clearer GitHub star prompts.
+- Groq link text clarified and UI refined.
+- Global CSS variables updated to support the new themes.
+- Miscellaneous UI polish: custom scrollbars, improved typography on Notebook cards, and streamlined key‑down handling on the Socratic composer.
 
-### 🧹 Maintenance
-- Comprehensive frontend cleanup: eliminated dead code, unused functions, and stale CSS.  
-- Refactored numerous components for clearer logic and reduced bundle size.  
-- Added integration tests for notebook repository fixes and chunk deletion.  
-- Updated test expectations to match new streak‑completion logic.  
+## 🐛 Bug Fixes
+
+- Removed redundant CSS selectors in `RewardsShopModal` to prevent styling conflicts.
+- Fixed page navigation calculations to correctly reflect the current reading position even when topic bundles fail to load.
+
+## 🧹 Maintenance
+
+- Cleaned up unused component logic, dead code, and obsolete imports across the frontend.
+- Added a skip‑release option and enhanced commit‑history retrieval for smoother release automation.
+- Integrated integration tests for notebook repository fixes and chunk deletion.
+- Updated release scripts to automatically generate and embed `RELEASE_NOTES.md`.
+- Removed unused onboarding CSS styles and lock‑overlay assets.
 
 ## 📦 Full Changelog
-[View the complete commit history for v1.5.0](#)  
 
----  
+[View all changes between v1.4.0 and v1.5.0](https://github.com/your-repo/Studyloop/compare/v1.4.0...v1.5.0)
 
-Thanks for using Studyloop!
+---
+
+Thanks for using **Studyloop**!
