@@ -252,6 +252,14 @@ func (a *App) SaveLLMAPIKey(tier string, key string) map[string]interface{} {
 	if err := repo.MarkLLMKeyStored(tier, true); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+	if tier == "fast" {
+		if settings, err := repo.GetLLMSettings(); err == nil && settings != nil {
+			if settings.UseSameForHeavy || strings.EqualFold(settings.Heavy.Provider, settings.Fast.Provider) {
+				_ = llm.SaveAPIKey("heavy", key)
+				_ = repo.MarkLLMKeyStored("heavy", true)
+			}
+		}
+	}
 	if err := a.reloadLLMProviders(); err != nil {
 		return map[string]interface{}{"error": "key saved but LLM reload failed: " + err.Error()}
 	}
@@ -351,7 +359,9 @@ func (a *App) reloadLLMProviders() error {
 
 	fastKey, _ := llm.GetAPIKey("fast")
 	heavyKey, _ := llm.GetAPIKey("heavy")
-	if settings.UseSameForHeavy && heavyKey == "" {
+	if settings.UseSameForHeavy {
+		heavyKey = fastKey
+	} else if heavyKey == "" && fastKey != "" && strings.EqualFold(settings.Heavy.Provider, settings.Fast.Provider) {
 		heavyKey = fastKey
 	}
 	fastProvider := llm.NewProvider(llm.LoadConfigFromSettingsForPrefix("FAST_LLM", settings.Fast, fastKey))

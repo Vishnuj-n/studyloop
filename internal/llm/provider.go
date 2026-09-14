@@ -303,8 +303,20 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	if p == nil || p.config == nil || p.config.BaseURL == "" {
 		return "", fmt.Errorf("LLM config not configured")
 	}
-	if strings.TrimSpace(p.config.APIKey) == "" {
+	apiKey := strings.TrimSpace(p.config.APIKey)
+	if apiKey == "" {
 		return "", fmt.Errorf("LLM API key not configured")
+	}
+
+	baseURLCheck := strings.ToLower(p.config.BaseURL)
+	if strings.Contains(baseURLCheck, "googleapis.com") {
+		if strings.HasPrefix(apiKey, "gsk_") {
+			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings.")
+		}
+	} else if strings.Contains(baseURLCheck, "groq.com") {
+		if strings.HasPrefix(apiKey, "AIza") {
+			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings.")
+		}
 	}
 
 	words := len(strings.Fields(prompt))

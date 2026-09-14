@@ -182,3 +182,27 @@ func TestDefaultBaseURLAndModelForGemini(t *testing.T) {
 		t.Fatalf("unexpected Gemini model: %s", got)
 	}
 }
+
+func TestKeyFormatValidation(t *testing.T) {
+	geminiCfg := &Config{
+		BaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+		APIKey:  "gsk_invalid_groq_key_sent_to_gemini",
+		Model:   "gemini-flash-lite-latest",
+	}
+	pGemini := NewProvider(geminiCfg)
+	_, errGemini := pGemini.GenerateAnswer("hi")
+	if errGemini == nil || !strings.Contains(errGemini.Error(), "invalid API key for Gemini provider") {
+		t.Fatalf("expected Gemini key validation error, got: %v", errGemini)
+	}
+
+	groqCfg := &Config{
+		BaseURL: "https://api.groq.com/openai/v1",
+		APIKey:  "AIza_invalid_gemini_key_sent_to_groq",
+		Model:   "openai/gpt-oss-120b",
+	}
+	pGroq := NewProvider(groqCfg)
+	_, errGroq := pGroq.GenerateAnswer("hi")
+	if errGroq == nil || !strings.Contains(errGroq.Error(), "invalid API key for Groq provider") {
+		t.Fatalf("expected Groq key validation error, got: %v", errGroq)
+	}
+}

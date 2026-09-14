@@ -88,7 +88,8 @@ export function useLLM(loading, errorRef, successRef) {
           errorRef.value = keyRes.error
           return
         }
-        if (llmSettings.value.use_same_for_heavy) {
+        const sameProvider = (llmSettings.value.heavy?.provider || '').toLowerCase() === (llmSettings.value.fast?.provider || '').toLowerCase()
+        if (llmSettings.value.use_same_for_heavy || sameProvider) {
           const heavyKeyRes = await saveLLMAPIKey('heavy', llmFastKey.value.trim())
           if (heavyKeyRes.error) {
             errorRef.value = heavyKeyRes.error
