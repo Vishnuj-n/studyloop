@@ -436,6 +436,9 @@ function goToIngestBook(notebookId) {
 }
 
 const completedSessionsToday = computed(() => {
+  if (streakState.value?.completed_reading_today !== undefined) {
+    return Number(streakState.value.completed_reading_today) || 0
+  }
   return Number(streakState.value?.completed_today) || 0
 })
 

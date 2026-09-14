@@ -669,15 +669,26 @@ func (r *Repository) GetPassedQuizAttempts(notebookID string) ([]QuizAttemptWith
 	return scanQuizAttemptsWithPayload(rows)
 }
 
-// GetCompletedTaskTimes returns a list of completion times in UTC for all completed study queue tasks.
-func (r *Repository) GetCompletedTaskTimes() ([]time.Time, error) {
-	rows, err := r.db.Query(`
+// GetCompletedTaskTimes returns a list of completion times in UTC for completed study queue tasks, optionally filtered by task types.
+func (r *Repository) GetCompletedTaskTimes(taskTypes ...string) ([]time.Time, error) {
+	query := `
 		SELECT completed_at
 		FROM study_queue
 		WHERE status = 'COMPLETED' 
 		  AND completed_at IS NOT NULL 
 		  AND completed_at != ''
-	`)
+	`
+	var args []interface{}
+	if len(taskTypes) > 0 {
+		placeholders := make([]string, len(taskTypes))
+		for i, tt := range taskTypes {
+			placeholders[i] = "?"
+			args = append(args, tt)
+		}
+		query += fmt.Sprintf(" AND task_type IN (%s)", strings.Join(placeholders, ","))
+	}
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("GetCompletedTaskTimes query: %w", err)
 	}

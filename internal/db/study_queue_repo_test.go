@@ -905,6 +905,34 @@ func TestGetCompletedTaskTimes(t *testing.T) {
 	if timeDiff > 1*time.Minute {
 		t.Fatalf("expected completed time to be close to now, but diff is %v (completed time: %v, now: %v)", timeDiff, completions[0], time.Now().UTC())
 	}
+
+	// Fetch reading-only completions (task1 is READING, should be 1)
+	readingCompletions, err := testRepo.GetCompletedTaskTimes("READING", "REREAD")
+	if err != nil {
+		t.Fatalf("GetCompletedTaskTimes reading failed: %v", err)
+	}
+	if len(readingCompletions) != 1 {
+		t.Fatalf("expected 1 reading completion, got %d", len(readingCompletions))
+	}
+
+	// Complete task2 (QUIZ)
+	if err := testRepo.ActivateTask(task2.ID); err != nil {
+		t.Fatalf("ActivateTask task2 failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(task2.ID, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("CompleteTask task2 failed: %v", err)
+	}
+
+	// Total completions should be 2, but reading completions must still be 1!
+	allCompletions, _ := testRepo.GetCompletedTaskTimes()
+	if len(allCompletions) != 2 {
+		t.Fatalf("expected 2 total completions, got %d", len(allCompletions))
+	}
+
+	readingCompletions, _ = testRepo.GetCompletedTaskTimes("READING", "REREAD")
+	if len(readingCompletions) != 1 {
+		t.Fatalf("expected 1 reading completion after quiz completion, got %d", len(readingCompletions))
+	}
 }
 
 func TestMilestoneExamRepoHelpersCountOnlyPassedQuizzes(t *testing.T) {
