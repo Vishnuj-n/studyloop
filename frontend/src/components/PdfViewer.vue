@@ -41,7 +41,7 @@ const props = defineProps({
   /** Page to open on initial mount (1-indexed) */
   initialPage: { type: Number, default: 1 },
   /** Zoom scale (1.0 = 100%) */
-  zoomScale: { type: Number, default: 0.7 },
+  zoomScale: { type: Number, default: 1 },
 })
 
 const emit = defineEmits(['update:currentPage', 'load-error', 'rendered'])

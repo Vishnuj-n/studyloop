@@ -439,7 +439,7 @@ watch([resolvedTaskID, () => reader.selectedTopicID.value], (next, prev) => {
 
 // PDF Viewer ref and zoom
 const pdfViewerRef = ref(null)
-const zoomScale = ref(0.7)
+const zoomScale = ref(1.0)
 
 const isTaskFlow = computed(() => {
   // Once context is settled, read mode from the context object.

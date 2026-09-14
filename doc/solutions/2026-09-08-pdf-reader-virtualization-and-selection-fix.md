@@ -7,7 +7,7 @@ Resolved fundamental text selection misalignment, circular scroll thrashing, GPU
 2. **Synchronized Text Selection (`PdfPage.vue`)**: Removed destructive CSS `!important` overrides (`.vue-pdf-embed__page canvas { width: 100% !important; }`). Instead, pass computed exact `:width` directly to `<vue-pdf-embed>`, ensuring the canvas bitmap and PDF.js invisible textLayer spans are scaled using the identical transform matrix.
 3. **Canvas Concurrency Collision Guard**: Prevented `Cannot use the same canvas during multiple render() operations` errors during rapid scrolling by binding unique dynamic keys (`:key="${source}-p${pageNum}-w${width}"`) and ignoring superseded/cancelled render operations.
 4. **Resilient Backend Bundle Fallback (`internal/db/reader_repo.go`)**: Fixed `GetReaderTopicBundle` failing when a task's topic slug in `study_queue` drifted from `topics.id`. Added automatic fallback to match via `notebook_topics` or fall back directly to the notebook record by `selectedNotebookID`, preventing `NULL_BUNDLE` failures.
-5. **Ergonomic Defaults**: Configured default zoom scale to 70% (`zoomScale = 0.7`) across reader components with smooth instant jump math using pre-calculated placeholder heights.
+5. **Ergonomic Defaults**: Configured default zoom scale to 100% (`zoomScale = 1.0`) across reader components with smooth instant jump math using pre-calculated placeholder heights.
 
 ---
 
@@ -26,7 +26,7 @@ Resolved fundamental text selection misalignment, circular scroll thrashing, GPU
   - Removed ~400 lines of complex scroll state machines, IntersectionObserver, ResizeObserver, and timeout guards.
   - Replaced inline canvas v-for loop with `<PdfViewer>`.
   - Removed obsolete CSS rules and duplicate `.fatal-error` definitions.
-  - Set default `zoomScale = 0.7`.
+  - Set default `zoomScale = 1.0`.
 - **[frontend/src/pages/Reader.spec.js](../../frontend/src/pages/Reader.spec.js)**:
   - Added component mock for `PdfViewer`.
 
