@@ -312,16 +312,39 @@ func (r *Repository) IngestNotebookContentByTopic(notebookID string, groups []No
 			return err
 		}
 
-		if _, err := tx.Exec(`
-			DELETE FROM chunks WHERE id IN (
-				SELECT chunk_id FROM notebook_chunks WHERE notebook_id = ?
-			)
-		`, notebookID); err != nil {
+		var chunkIDs []string
+		rows, err := tx.Query(`SELECT chunk_id FROM notebook_chunks WHERE notebook_id = ?`, notebookID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var cid string
+			if err := rows.Scan(&cid); err != nil {
+				rows.Close()
+				return err
+			}
+			chunkIDs = append(chunkIDs, cid)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
 			return err
 		}
 
 		if _, err := tx.Exec("DELETE FROM notebook_chunks WHERE notebook_id = ?", notebookID); err != nil {
 			return err
+		}
+
+		if len(chunkIDs) > 0 {
+			placeholders := make([]string, len(chunkIDs))
+			args := make([]interface{}, len(chunkIDs))
+			for i, cid := range chunkIDs {
+				placeholders[i] = "?"
+				args[i] = cid
+			}
+			query := fmt.Sprintf("DELETE FROM chunks WHERE id IN (%s)", strings.Join(placeholders, ","))
+			if _, err := tx.Exec(query, args...); err != nil {
+				return err
+			}
 		}
 
 		totalChunks := 0

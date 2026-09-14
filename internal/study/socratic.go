@@ -362,8 +362,6 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	}
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
-	citations = newCitations
-	chunkTexts = newChunkTexts
 
 	// Ensure contextText label is omitted when empty
 	promptParts := []string{
