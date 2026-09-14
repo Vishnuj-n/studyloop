@@ -263,10 +263,6 @@ import {
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
 
-function openGitHubRepo() {
-  openURLInBrowser('https://github.com/Vishnuj-n/studyloop')
-}
-
 import StatusBanner from '../components/StatusBanner.vue'
 import ReviewHeroCard from '../components/ReviewHeroCard.vue'
 import FocusHeroCard from '../components/FocusHeroCard.vue'
@@ -277,6 +273,9 @@ import StreakCalendar from '../components/StreakCalendar.vue'
 import ForecastChart from '../components/ForecastChart.vue'
 import StudyPaceModal from '../components/StudyPaceModal.vue'
 
+function openGitHubRepo() {
+  openURLInBrowser('https://github.com/Vishnuj-n/studyloop')
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -320,6 +319,7 @@ function dismissGitHubStarToast() {
 
 // --- Reactive State ---
 const loading = ref(true)
+const refreshing = ref(false)
 const error = ref('')
 const actionError = ref('')
 const flashcardNotice = ref('')
@@ -328,12 +328,15 @@ const tasks = ref([])
 const hasActiveStudyContent = ref(false)
 const dueReviewCards = ref(0)
 const totalDueReviewCards = ref(0)
+const flashcardsJustCreated = ref(0)
 
 const profiles = ref([])
 const userSettings = ref({
   max_flashcards_per_session: 30,
   study_start_time: '17:00',
   study_end_time: '18:00',
+  study_slots_json: '[]',
+  classroom_code: '',
   reminders_enabled: true,
   active_profile_id: '',
   skip_to_reading_active: false,
@@ -350,24 +353,6 @@ const activeProfilePace = ref(null)
 const lastPersistedProfile = ref('')
 const showPaceModal = ref(false)
 
-async function handleSaveStudySlots(newSlotsJson) {
-  try {
-    userSettings.value.study_slots_json = newSlotsJson
-    const res = await updateUserSettings({
-      ...userSettings.value,
-      study_slots_json: newSlotsJson,
-    })
-    if (res && res.error) {
-      actionError.value = res.error
-      return
-    }
-    window.dispatchEvent(new CustomEvent('settings-updated'))
-    await loadAgenda()
-  } catch (err) {
-    actionError.value = 'Failed to save study schedule'
-  }
-}
-
 const timelineData = ref([])
 
 const streakState = ref({
@@ -382,29 +367,23 @@ const isSyncing = ref(false)
 const profileMenuOpen = ref(false)
 
 // --- Calendar computeds ---
-const currentDate = new Date()
-const currentYear = currentDate.getFullYear()
-const currentMonth = currentDate.getMonth()
+const now = ref(new Date())
 
 const currentMonthLabel = computed(() => {
-  return `${MONTH_NAMES[currentMonth]} ${currentYear}`
+  return `${MONTH_NAMES[now.value.getMonth()]} ${now.value.getFullYear()}`
 })
 
 const calendarDays = computed(() => {
-  return buildCalendarDays(currentYear, currentMonth, streakState.value?.active_dates || [])
+  return buildCalendarDays(now.value.getFullYear(), now.value.getMonth(), streakState.value?.active_dates || [])
 })
 
 // --- Task computeds ---
-const maxFlashcardsLimit = computed(() => {
-  return userSettings.value.max_flashcards_per_session || 30
-})
-
 const reviewTask = computed(() => {
-  return tasks.value.find((t) => t.id === 'task-review-daily')
+  return tasks.value.find((t) => (t.action_type || '').toLowerCase() === 'flashcard_review' || t.id === 'task-review-daily')
 })
 
 const nonReviewTasks = computed(() => {
-  return tasks.value.filter((t) => t.id !== 'task-review-daily')
+  return tasks.value.filter((t) => (t.action_type || '').toLowerCase() !== 'flashcard_review' && t.id !== 'task-review-daily')
 })
 
 const isReviewHero = computed(() => {
@@ -425,11 +404,6 @@ const queueTasks = computed(() => {
   return nonReviewTasks.value.slice(1)
 })
 
-const flashcardsJustCreated = computed(() => {
-  const created = Number.parseInt(route.query.flashcardsCreated, 10)
-  return isNaN(created) || created <= 0 ? 0 : created
-})
-
 const activeProfileName = computed(() => {
   const p = profiles.value.find((pr) => pr.id === userSettings.value.active_profile_id)
   return p ? p.name : 'Unknown'
@@ -446,7 +420,7 @@ function profileDeadlineLabel(profile) {
 }
 
 const hasSocraticRescueTask = computed(() => {
-  return tasks.value.some((t) => t.action_type === 'socratic_remedial')
+  return tasks.value.some((t) => (t.action_type || '').toLowerCase() === 'socratic_remedial')
 })
 
 // ponytail: pending ingestion notification state
@@ -468,11 +442,15 @@ const completedSessionsToday = computed(() => {
 // --- Lifecycle ---
 onMounted(async () => {
   window.addEventListener('click', closeProfileMenu)
-  if (flashcardsJustCreated.value > 0) {
+  
+  const created = Number.parseInt(route.query.flashcardsCreated, 10)
+  if (created > 0) {
+    flashcardsJustCreated.value = created
     const newQuery = { ...route.query }
     delete newQuery.flashcardsCreated
     await router.replace({ query: newQuery })
   }
+
   await loadAgenda()
 })
 
@@ -587,7 +565,8 @@ async function selectProfile(newProfileID) {
   profileMenuOpen.value = false
   const oldProfileID = lastPersistedProfile.value
   try {
-    loading.value = true
+    refreshing.value = true
+    actionError.value = ''
     const res = await updateUserSettings({
       ...userSettings.value,
       active_profile_id: newProfileID,
@@ -604,7 +583,7 @@ async function selectProfile(newProfileID) {
     userSettings.value.active_profile_id = oldProfileID
     actionError.value = 'Failed to switch active profile'
   } finally {
-    loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -621,7 +600,8 @@ function goToProfileOverview() {
 async function toggleEscapeHatch() {
   const previousSkipToReading = userSettings.value.skip_to_reading_active
   try {
-    loading.value = true
+    refreshing.value = true
+    actionError.value = ''
     userSettings.value.skip_to_reading_active = !userSettings.value.skip_to_reading_active
     const res = await updateUserSettings(userSettings.value)
     if (res && res.error) {
@@ -635,7 +615,7 @@ async function toggleEscapeHatch() {
     userSettings.value.skip_to_reading_active = previousSkipToReading
     actionError.value = 'Failed to toggle escape hatch'
   } finally {
-    loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -648,6 +628,7 @@ async function runFlashcardSyncInline(task) {
     if (res && res.error) {
       actionError.value = `Flashcard Generation Failed: ${res.error}. Please check your connection.`
     } else {
+      actionError.value = ''
       const count = res && typeof res.cards_scheduled === 'number' ? res.cards_scheduled : 0
       flashcardNotice.value = count > 0
         ? `🎉 Successfully generated ${count} flashcards for spaced repetition!`
