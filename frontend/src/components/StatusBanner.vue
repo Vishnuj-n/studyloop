@@ -1,29 +1,42 @@
 <template>
   <article :class="['banner', `banner--${variant}`, 'card']">
     <div class="banner-content">
-      <span class="banner-icon">{{ icon }}</span>
+      <span class="banner-icon"><slot name="icon">{{ icon }}</slot></span>
       <div class="banner-text">
         <p class="banner-title">{{ title }}</p>
         <p v-if="subtitle" class="banner-subtitle">{{ subtitle }}</p>
       </div>
-      <button v-if="actionLabel" class="banner-action-btn" @click="$emit('action')">
-        {{ actionLabel }}
-      </button>
+      <div class="banner-actions">
+        <button v-if="actionLabel" class="banner-action-btn" @click="$emit('action')">
+          {{ actionLabel }}
+        </button>
+        <button
+          v-if="dismissable"
+          type="button"
+          class="banner-close-btn"
+          title="Dismiss"
+          aria-label="Dismiss banner"
+          @click="$emit('dismiss')"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   </article>
 </template>
 
 <script setup>
 defineProps({
-  /** 'info' | 'rescue' | 'success' | 'error' | 'warning' */
+  /** 'info' | 'rescue' | 'success' | 'error' | 'warning' | 'star' */
   variant: { type: String, required: true },
   icon: { type: String, required: true },
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
   actionLabel: { type: String, default: '' },
+  dismissable: { type: Boolean, default: false },
 })
 
-defineEmits(['action'])
+defineEmits(['action', 'dismiss'])
 </script>
 
 <style scoped>
@@ -37,7 +50,7 @@ defineEmits(['action'])
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px;
+  padding: 12px 16px;
 }
 
 .banner-icon {
@@ -57,21 +70,49 @@ defineEmits(['action'])
   margin-right: auto;
 }
 
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .banner-action-btn {
   background: var(--primary, #4f46e5);
   color: white;
   border: none;
   padding: 8px 16px;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .banner-action-btn:hover {
-  opacity: 0.9;
+  opacity: 0.92;
+}
+
+.banner-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  font-size: 15px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.banner-close-btn:hover {
+  background: var(--surface-container-high, rgba(255, 255, 255, 0.08));
+  color: var(--on-surface);
 }
 
 .banner-title {
@@ -83,6 +124,35 @@ defineEmits(['action'])
 .banner-subtitle {
   margin: 0;
   font-size: 13px;
+  color: var(--muted-text);
+}
+
+/* --- Variant: star (GitHub Star callout - 100% dynamic theme token system) --- */
+.banner--star {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--on-surface) 4%, transparent);
+}
+.banner--star .banner-icon {
+  background: linear-gradient(135deg, var(--primary-dim, var(--primary)), var(--primary));
+  color: var(--on-primary, #ffffff);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.banner--star .banner-title {
+  color: var(--on-surface);
+}
+.banner--star .banner-subtitle {
+  color: var(--muted-text);
+}
+.banner--star .banner-action-btn {
+  background: linear-gradient(135deg, var(--primary-dim, var(--primary)), var(--primary));
+  color: var(--on-primary, #ffffff);
+  font-weight: 700;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.banner--star .banner-action-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
 /* --- Variant: info (escape hatch) --- */
