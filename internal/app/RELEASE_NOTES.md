@@ -1,70 +1,51 @@
-# What's New in **v1.5.0**
-
-Studyloop 1.5.0 brings a richer gamified experience, smarter study tools, and a polished UI. Highlights include a new loot‑box reward system, expanded theme options, real‑time streak protection, and a one‑time release‑notes modal to keep you informed.
+# What's New – v1.6.0
 
 ## ✨ Features
+- **Continuous Reading & Deferred Quiz**  
+  - Readers can now finish a session without being forced into an immediate quiz. Selecting **“Complete & Defer Quiz”** queues the generated quiz as a pending task, keeping the reading flow uninterrupted.  
+  - Backend now auto‑seeds and fetches the next reading task for a notebook, preserving momentum across sessions.
 
-- **Gamification upgrades**
-  - Real‑time rewards updates via a `gamification‑updated` event, keeping the Dashboard and Rewards pages in sync.
-  - Robust streak‑protection loop that automatically applies streak freezes across missed days.
-  - New loot‑box system with tiered rewards (Bronze, Silver, Gold, Mythic) and expanded progression models (XP elixirs, luck charms, user wagers).
-  - Rebalanced rank progression with numerical levels and sub‑tiers for clearer advancement.
-  - Achievement reconciliation logic to ensure earned milestones are correctly recorded.
+- **Expanded Study‑Queue Task Types**  
+  - The queue now recognises `QUIZ`, `MILESTONE_EXAM`, and `SOCRATIC_REMEDIAL` tasks when checking for pending reading work, preventing duplicate task creation.  
+  - Added `scripts/inspect_db.py` for quick database inspection.
 
-- **Study workflow enhancements**
-  - Expanded task tracking now includes all completed study‑queue tasks.
-  - Optimized notebook ingestion with explicit chunk handling and safer deletions.
-  - Partial quiz‑recovery parsing and assessment updates for smoother resume after interruptions.
+- **Developer Mode & Diagnostics**  
+  - New panel in Settings provides:  
+    - Real‑time LLM prompt logging toggle.  
+    - Quick shortcuts to open the app’s data and logs folders.  
+    - Reading Task History diagnostics and a modular DB split option.
 
-- **Assessment UI improvements**
-  - Refined Quiz component with a new `isCorrect` helper, retry mechanisms, and automatic state reset on task changes.
-  - Written Assessment now features better button states, dynamic shortcut hints, and enhanced accessibility (ARIA live regions).
+- **LLM Provider Key Synchronisation & Validation**  
+  - Heavy‑tier API key automatically mirrors the fast‑tier key when the providers match or when “use same for heavy” is enabled.  
+  - Basic validation now warns about mismatched key prefixes (e.g., Groq vs. Gemini).
 
-- **Socratic tutoring**
-  - Distinct instruction sets for “rescue” (remedial) and general tutoring modes.
-  - Context‑block length validation and smarter prompt construction for more reliable answers.
+- **Reading Bounds by Word Budget**  
+  - Reading sessions respect the user‑defined `TargetSessionWords` setting.  
+  - Word‑count‑based calculations cap session length with a 30 % buffer, ensuring sessions stay within the desired size.
 
-- **User interface & experience**
-  - Three brand‑new visual themes: **Dark Academia**, **Neon Cyberpunk**, and **Zen Minimalist**.
-  - Updated gamification sidebar with level chips and XP text.
-  - SVG‑based icons for crisp scaling across devices.
-  - Top‑bar GitHub button, polished star call‑to‑action, and custom scrollbars.
-  - Dismissable GitHub‑star banner and toast notifications to celebrate community support.
-  - One‑time release‑notes modal that appears after each version upgrade.
-
-- **LLM output**
-  - Free‑flow generation mode with removed token caps for more natural responses.
+- **Reader UI Enhancements**  
+  - Added a split‑button for **“Complete”** vs. **“Complete & Defer Quiz”**.  
+  - Updated default PDF zoom to 100 % for a more natural view.
 
 ## 🚀 Improvements
-
-- Reading session initialization now logs structured error details and provides consistent navigation state.
-- PDF viewer performance boosted by stabilizing container width, reducing canvas re‑renders.
-- ReaderChat component gains ARIA attributes for better screen‑reader support.
-- Transition‑task handling in the queue includes stronger error handling and score management.
-- Settings profile switching now includes graceful error handling and faster data loading.
-- Dashboard GitHub repository link refactored for reliability.
-- StatusBanner enhancements for clearer GitHub star prompts.
-- Groq link text clarified and UI refined.
-- Global CSS variables updated to support the new themes.
-- Miscellaneous UI polish: custom scrollbars, improved typography on Notebook cards, and streamlined key‑down handling on the Socratic composer.
+- **Session Completion Flow** – Streamlined UI consistency across the reader and rewards shop.  
+- **Chunk Payload Limits** – Enforced word‑count caps on chunk responses, reducing data transfer and aligning with user session preferences.  
+- **Dashboard Telemetry** – Daily reading session stats now include completed `READING` tasks for better insight.
 
 ## 🐛 Bug Fixes
-
-- Removed redundant CSS selectors in `RewardsShopModal` to prevent styling conflicts.
-- Fixed page navigation calculations to correctly reflect the current reading position even when topic bundles fail to load.
+- Fixed missing `gamification-updated` event after item purchases, allowing UI components to react correctly.  
+- Preserved sub‑session reading bounds and enforced the target session word‑budget ceiling.  
+- Corrected PDF default zoom from 70 % to 100 %.  
+- Adjusted release‑notes modal layout to prevent scrollbar shifts.  
+- Updated UI to dispatch proper events and maintain layout stability.
 
 ## 🧹 Maintenance
-
-- Cleaned up unused component logic, dead code, and obsolete imports across the frontend.
-- Added a skip‑release option and enhanced commit‑history retrieval for smoother release automation.
-- Integrated integration tests for notebook repository fixes and chunk deletion.
-- Updated release scripts to automatically generate and embed `RELEASE_NOTES.md`.
-- Removed unused onboarding CSS styles and lock‑overlay assets.
+- Version bump to **v1.6.0**.  
+- Updated release notes for the previous v1.5.0 release.  
 
 ## 📦 Full Changelog
-
-[View all changes between v1.4.0 and v1.5.0](https://github.com/your-repo/Studyloop/compare/v1.4.0...v1.5.0)
+[View all changes on GitHub](#)
 
 ---
 
-Thanks for using **Studyloop**!
+Thanks for using Studyloop!
