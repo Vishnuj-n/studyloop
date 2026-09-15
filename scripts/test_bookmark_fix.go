@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -141,7 +143,8 @@ func main() {
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Extracted %d Bookmark Nodes from %s:\n", len(chapters), filepath.Base(absPath))
-	sb.WriteString(strings.Repeat("-", 60) + "\n")
+	sb.WriteString(strings.Repeat("-", 60))
+	sb.WriteByte('\n')
 
 	fmt.Println("Extracted Bookmark Nodes:")
 	for i, ch := range chapters {
