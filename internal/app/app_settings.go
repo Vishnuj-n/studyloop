@@ -38,7 +38,9 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"max_flashcards_per_session": s.MaxFlashcardsPerSession,
 		"study_start_time":           s.StudyStartTime,
 		"study_end_time":             s.StudyEndTime,
+		"study_slots_json":           s.StudySlotsJSON,
 		"reminders_enabled":          s.RemindersEnabled,
+		"show_reward_notifications":  s.ShowRewardNotifications,
 		"active_profile_id":          s.ActiveProfileID,
 		"skip_to_reading_active":     s.SkipToReadingActive,
 		"cloud_sync_url":             s.CloudSyncURL,
@@ -56,6 +58,9 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"target_session_words":       s.TargetSessionWords,
 		"min_session_words":          s.MinSessionWords,
 		"max_active_notebooks":       s.MaxActiveNotebooks,
+		"quiz_question_count":        s.QuizQuestionCount,
+		"quiz_passing_score":         s.QuizPassingScore,
+		"tutor_style":                s.TutorStyle,
 	}
 }
 
@@ -102,6 +107,12 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	}
 	if s.DefaultRemedialStrategy != "FAST" && s.DefaultRemedialStrategy != "CLASSIC" {
 		return map[string]interface{}{"error": "default remedial strategy must be CLASSIC or FAST"}
+	}
+	if s.QuizQuestionCount > 0 && (s.QuizQuestionCount < 3 || s.QuizQuestionCount > 15) {
+		return map[string]interface{}{"error": "quiz question count must be between 3 and 15"}
+	}
+	if s.QuizPassingScore > 0 && (s.QuizPassingScore < 50 || s.QuizPassingScore > 100) {
+		return map[string]interface{}{"error": "quiz passing score must be between 50 and 100"}
 	}
 	// Persist settings first so SQLite is never stale if runtime mutation fails.
 	if err := repo.UpdateUserSettings(s); err != nil {

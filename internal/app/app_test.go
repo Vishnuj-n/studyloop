@@ -963,4 +963,57 @@ func TestApp_TestLLMConnection(t *testing.T) {
 	}
 }
 
+func TestApp_GetUserSettings_IncludesAllConfiguredFields(t *testing.T) {
+	app := newTestApp(t)
+
+	// Update settings with specific non-default values
+	updateRes := app.UpdateUserSettings(models.UserSettings{
+		MaxFlashcardsPerSession: 45,
+		StudyStartTime:          "09:00",
+		StudyEndTime:            "10:30",
+		StudySlotsJSON:          `[{"name":"Morning","start":"09:00","end":"10:30"}]`,
+		RemindersEnabled:        true,
+		ShowRewardNotifications: false,
+		DefaultRemedialStrategy: "CLASSIC",
+		TargetSessionWords:      4000,
+		MinSessionWords:         2500,
+		MaxActiveNotebooks:      6,
+		QuizQuestionCount:       6,
+		QuizPassingScore:        80,
+		TutorStyle:              "direct",
+	})
+	if updateRes["error"] != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", updateRes["error"])
+	}
+
+	// Fetch via RPC handler GetUserSettings
+	fetched := app.GetUserSettings()
+	if fetched["error"] != nil {
+		t.Fatalf("GetUserSettings failed: %v", fetched["error"])
+	}
+
+	if fetched["quiz_question_count"] != 6 {
+		t.Errorf("expected quiz_question_count 6, got %v", fetched["quiz_question_count"])
+	}
+	if fetched["quiz_passing_score"] != 80 {
+		t.Errorf("expected quiz_passing_score 80, got %v", fetched["quiz_passing_score"])
+	}
+	if fetched["tutor_style"] != "direct" {
+		t.Errorf("expected tutor_style direct, got %v", fetched["tutor_style"])
+	}
+	if fetched["show_reward_notifications"] != false {
+		t.Errorf("expected show_reward_notifications false, got %v", fetched["show_reward_notifications"])
+	}
+	if fetched["study_slots_json"] != `[{"name":"Morning","start":"09:00","end":"10:30"}]` {
+		t.Errorf("expected study_slots_json populated, got %v", fetched["study_slots_json"])
+	}
+	if fetched["target_session_words"] != 4000 {
+		t.Errorf("expected target_session_words 4000, got %v", fetched["target_session_words"])
+	}
+	if fetched["min_session_words"] != 2500 {
+		t.Errorf("expected min_session_words 2500, got %v", fetched["min_session_words"])
+	}
+}
+
+
 
