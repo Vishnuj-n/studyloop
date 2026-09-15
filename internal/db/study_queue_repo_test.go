@@ -1176,6 +1176,56 @@ func TestEnsurePendingReadingTasksForActiveNotebooks(t *testing.T) {
 	}
 }
 
+func TestEnsurePendingReadingTasks_IgnoresPendingFlashcardReview(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	profileID := "prof-test-fc-review"
+	nbActive := "nb-fc-review-active"
+	topicActive := "topic-fc-review-active"
+
+	_ = testRepo.EnsureTopic(topicActive, "Active Topic With Review")
+	_ = testRepo.UpdateTopicPageBounds(topicActive, 1, 10)
+	_ = testRepo.CreateNotebook(nbActive, "Active Book With Review", "/tmp/active_rev.pdf", "pdf", topicActive, profileID, 10, "")
+	_ = testRepo.LinkNotebookTopics(nbActive, []string{topicActive})
+	_ = testRepo.UpdateNotebookStatus(nbActive, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbActive, "active")
+
+	// Insert a PENDING FLASHCARD_REVIEW task for this notebook
+	reviewTask := models.StudyQueueTask{
+		ID:         "task-rev-test-1",
+		NotebookID: nbActive,
+		TopicID:    topicActive,
+		TaskType:   models.StudyTaskTypeFlashcardReview,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   0,
+	}
+	if err := testRepo.InsertStudyTask(reviewTask); err != nil {
+		t.Fatalf("InsertStudyTask for review task failed: %v", err)
+	}
+
+	// Ensure reading tasks are seeded
+	if err := testRepo.EnsurePendingReadingTasksForActiveNotebooks(profileID); err != nil {
+		t.Fatalf("EnsurePendingReadingTasksForActiveNotebooks failed: %v", err)
+	}
+
+	tasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+
+	var hasReadingTask bool
+	for _, task := range tasks {
+		if task.NotebookID == nbActive && task.TaskType == models.StudyTaskTypeReading {
+			hasReadingTask = true
+		}
+	}
+
+	if !hasReadingTask {
+		t.Fatalf("expected active notebook to receive a PENDING READING task despite having a PENDING FLASHCARD_REVIEW task")
+	}
+}
+
+
 func TestMarkTopicCompletedTx(t *testing.T) {
 	initDBForTest(t, false, 0)
 	topicID := "topic-test-mark-completed"
