@@ -42,13 +42,9 @@ func SendHeartbeat(repo *db.Repository, appVersion string) {
 
 		endpoint := os.Getenv("TELEMETRY_ENDPOINT_URL")
 		if endpoint == "" {
-			endpoint = os.Getenv("RESEARCH_ANALYTICS_URL")
-		}
-		if endpoint == "" {
 			endpoint = DefaultTelemetryEndpoint
 		}
 		if endpoint == "" {
-			// Resolve from Supabase URL if provided
 			if sbURL := os.Getenv("SUPABASE_URL"); sbURL != "" {
 				endpoint = strings.TrimSuffix(sbURL, "/") + "/rest/v1/app_telemetry"
 			}

@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -80,3 +82,37 @@ func TestPingRagAssetsDownloadURL(t *testing.T) {
 	}
 	t.Logf("Successfully verified asset download URL (Status: %s)", resp.Status)
 }
+
+func TestCopyFile_Idempotent(t *testing.T) {
+	tempDir := t.TempDir()
+	srcFile := filepath.Join(tempDir, "src.dll")
+	dstFile := filepath.Join(tempDir, "dst.dll")
+
+	content := []byte("mock binary library content for testing")
+	if err := os.WriteFile(srcFile, content, 0o644); err != nil {
+		t.Fatalf("failed to write src file: %v", err)
+	}
+
+	// 1. First copy should succeed
+	if err := copyFile(srcFile, dstFile); err != nil {
+		t.Fatalf("first copyFile failed: %v", err)
+	}
+
+	// 2. Second copy to existing identical destination should succeed without error
+	if err := copyFile(srcFile, dstFile); err != nil {
+		t.Fatalf("second copyFile failed: %v", err)
+	}
+
+	// 3. copyFileWithProgress to existing identical destination should also succeed
+	called := false
+	err := copyFileWithProgress(srcFile, dstFile, 0, 100, "testing", "detail", func(s string, p int, m, d string) {
+		called = true
+	})
+	if err != nil {
+		t.Fatalf("copyFileWithProgress failed on identical file: %v", err)
+	}
+	if !called {
+		t.Errorf("expected progress callback to be called")
+	}
+}
+
