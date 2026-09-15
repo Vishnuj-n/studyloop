@@ -230,9 +230,61 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	return map[string]interface{}{
+	resp := map[string]interface{}{
 		"ok":           true,
 		"quiz_task_id": transitionRes.NextTaskID,
 		"rewards":      transitionRes.Rewards,
 	}
+
+	// Auto-seed and return the next continuous reading task for this notebook if available
+	if task.NotebookID != "" {
+		targetWords := 600
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+		if seedErr := repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords); seedErr != nil {
+			utils.Warnf("[COMPLETE_SESSION] EnsurePendingReadingTaskForNotebook err: %v", seedErr)
+		} else if nextTask, err := repo.GetPendingReadingTaskForNotebook(task.NotebookID); err == nil && nextTask.ID != "" {
+			resp["next_reading_task"] = map[string]interface{}{
+				"id":          nextTask.ID,
+				"notebook_id": nextTask.NotebookID,
+				"topic_id":    nextTask.TopicID,
+				"start_page":  nextTask.StartPage,
+				"end_page":    nextTask.EndPage,
+			}
+			utils.Infof("[COMPLETE_SESSION] Next continuous reading task seeded: id=%s topicID=%s pages=%d-%d", nextTask.ID, nextTask.TopicID, nextTask.StartPage, nextTask.EndPage)
+		}
+	}
+
+	return resp
 }
+
+// GetReadingTaskHistory returns historical reading tasks with pagination for developer diagnostics.
+func (a *App) GetReadingTaskHistory(notebookID string, limit, offset int) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	records, totalCount, err := repo.GetReadingTaskHistory(notebookID, limit, offset)
+	if err != nil {
+		utils.QueueLogger.Error("failed to fetch reading task history", "err", err)
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	if records == nil {
+		records = []models.ReadingTaskHistoryRecord{}
+	}
+
+	hasMore := (offset + len(records)) < totalCount
+
+	return map[string]interface{}{
+		"ok":          true,
+		"records":     records,
+		"total_count": totalCount,
+		"has_more":    hasMore,
+		"limit":       limit,
+		"offset":      offset,
+	}
+}
+

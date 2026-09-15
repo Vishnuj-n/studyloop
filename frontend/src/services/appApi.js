@@ -53,6 +53,11 @@ export function initializeReadingSession(taskID, notebookID, topicID, startPage,
   )
 }
 
+export function getReadingTaskHistory(notebookID = '', limit = 50, offset = 0) {
+  return appBridge().GetReadingTaskHistory(notebookID || '', limit, offset)
+}
+
+
 export async function completeReading(taskID) {
   console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID })
   try {
@@ -420,3 +425,33 @@ export function clearSession() {
     console.warn('[AUTH] ClearSession bridge error:', err)
   }
 }
+
+export function setLLMPromptLogging(enabled) {
+  try {
+    return appBridge().SetLLMPromptLogging(Boolean(enabled))
+  } catch (err) {
+    console.warn('[DEV] SetLLMPromptLogging bridge error:', err)
+    return false
+  }
+}
+
+export function getLLMPromptLogging() {
+  try {
+    return appBridge().GetLLMPromptLogging()
+  } catch (err) {
+    console.warn('[DEV] GetLLMPromptLogging bridge error:', err)
+    return false
+  }
+}
+
+export function openDataDirectory(subDir = '') {
+  try {
+    return appBridge().OpenDataDirectory(subDir)
+  } catch (err) {
+    console.warn('[DEV] OpenDataDirectory bridge error:', err)
+    return { error: err.message }
+  }
+}
+
+
+

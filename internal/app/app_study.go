@@ -442,6 +442,15 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	}
 	todayCompleted := completedToday > 0
 
+	completedReadingToday := 0
+	if readingTimes, rErr := repo.GetCompletedTaskTimes("READING", "REREAD"); rErr == nil {
+		for _, t := range readingTimes {
+			if t.In(loc).Format(dateFormatYYYYMMDD) == todayStr {
+				completedReadingToday++
+			}
+		}
+	}
+
 	// ponytail: load persistent frozen dates from sqlite
 	if frozenDates, err := repo.GetStreakFreezeUsageDates(); err == nil {
 		for _, fd := range frozenDates {
@@ -515,13 +524,14 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 	}
 
 	res := map[string]interface{}{
-		"current_streak":       currentStreak,
-		"longest_streak":       longestStreak,
-		"active_dates":         activeDates,
-		"today_completed":      todayCompleted,
-		"completed_today":      completedToday,
-		"shield_active":        shieldActive,
-		"streak_freezes_owned": streakFreezes,
+		"current_streak":          currentStreak,
+		"longest_streak":          longestStreak,
+		"active_dates":            activeDates,
+		"today_completed":         todayCompleted,
+		"completed_today":         completedToday,
+		"completed_reading_today": completedReadingToday,
+		"shield_active":           shieldActive,
+		"streak_freezes_owned":    streakFreezes,
 	}
 	if streakSavedEvent != nil {
 		res["streak_saved_event"] = streakSavedEvent

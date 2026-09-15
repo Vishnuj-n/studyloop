@@ -416,6 +416,10 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 		}
 	}
 
+	if len(pageWords) == 0 {
+		return maxEndPage
+	}
+
 	for p := startPage; p <= maxEndPage; p++ {
 		w := pageWords[p]
 		if p > startPage && (accumulatedWords+w > int(float64(targetWords)*1.3)) {
@@ -429,9 +433,6 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 }
 
 func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int) (int, int, error) {
-	if startPage > 0 && endPage > 0 && endPage >= startPage {
-		return startPage, endPage, nil
-	}
 	if topicID == "" {
 		return startPage, endPage, nil
 	}
@@ -463,8 +464,10 @@ func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int
 		targetWords = settings.TargetSessionWords
 	}
 
-	if resolvedEnd <= 0 || resolvedEnd < resolvedStart || resolvedEnd > topicEnd {
-		resolvedEnd = topicEnd
+	if resolvedEnd <= 0 || resolvedEnd < resolvedStart || (topicEnd > 0 && resolvedEnd > topicEnd) {
+		if topicEnd > 0 {
+			resolvedEnd = topicEnd
+		}
 	}
 
 	words := r.countWordsInPageRange(topicID, resolvedStart, resolvedEnd)
@@ -669,15 +672,26 @@ func (r *Repository) GetPassedQuizAttempts(notebookID string) ([]QuizAttemptWith
 	return scanQuizAttemptsWithPayload(rows)
 }
 
-// GetCompletedTaskTimes returns a list of completion times in UTC for all completed study queue tasks.
-func (r *Repository) GetCompletedTaskTimes() ([]time.Time, error) {
-	rows, err := r.db.Query(`
+// GetCompletedTaskTimes returns a list of completion times in UTC for completed study queue tasks, optionally filtered by task types.
+func (r *Repository) GetCompletedTaskTimes(taskTypes ...string) ([]time.Time, error) {
+	query := `
 		SELECT completed_at
 		FROM study_queue
 		WHERE status = 'COMPLETED' 
 		  AND completed_at IS NOT NULL 
 		  AND completed_at != ''
-	`)
+	`
+	var args []interface{}
+	if len(taskTypes) > 0 {
+		placeholders := make([]string, len(taskTypes))
+		for i, tt := range taskTypes {
+			placeholders[i] = "?"
+			args = append(args, tt)
+		}
+		query += fmt.Sprintf(" AND task_type IN (%s)", strings.Join(placeholders, ","))
+	}
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("GetCompletedTaskTimes query: %w", err)
 	}
@@ -764,137 +778,40 @@ func (r *Repository) GetProfileCompletedReadingStatsPastNDays(profileID string, 
 	return totalWords, sessionCount, nil
 }
 
-// GetLatestQuizAttemptDetailsByTopic retrieves the payload and answers for the latest quiz attempt of a topic.
-func (r *Repository) GetLatestQuizAttemptDetailsByTopic(topicID string) (string, string, error) {
-	var payloadJSON, answersJSON string
-	err := r.db.QueryRow(`
-		SELECT sq.payload_json, qa.answers_json
-		FROM quiz_attempts qa
-		JOIN study_queue sq ON qa.task_id = sq.id
-		WHERE sq.topic_id = ? AND sq.task_type = 'QUIZ'
-		ORDER BY qa.completed_at DESC LIMIT 1
-	`, strings.TrimSpace(topicID)).Scan(&payloadJSON, &answersJSON)
-	return payloadJSON, answersJSON, err
-}
-
-// GetActiveRemedialTaskPayloadByTopic retrieves the payload_json of the active SOCRATIC_REMEDIAL task for a topic.
-func (r *Repository) GetActiveRemedialTaskPayloadByTopic(topicID string) (string, error) {
-	var payloadJSON string
-	err := r.db.QueryRow(`
-		SELECT COALESCE(payload_json, '')
-		FROM study_queue
-		WHERE topic_id = ? AND task_type = 'SOCRATIC_REMEDIAL' AND status = 'ACTIVE' LIMIT 1
-	`, strings.TrimSpace(topicID)).Scan(&payloadJSON)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return payloadJSON, err
-}
-
-// GetQuestionsForQuizAttempts compiles all quiz questions from the original study_queue payload_json for the given quiz attempt IDs.
-func (r *Repository) GetQuestionsForQuizAttempts(attemptIDs []string) ([]models.QuizTaskQuestion, error) {
-	if len(attemptIDs) == 0 {
-		return nil, nil
-	}
-	query := fmt.Sprintf(`
-		SELECT COALESCE(sq.payload_json, '')
-		FROM quiz_attempts qa
-		JOIN study_queue sq ON qa.task_id = sq.id
-		WHERE qa.id IN (%s)
-	`, strings.Repeat("?,", len(attemptIDs)-1)+"?")
-	args := make([]interface{}, len(attemptIDs))
-	for i, id := range attemptIDs {
-		args[i] = id
-	}
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var allQuestions []models.QuizTaskQuestion
-	for rows.Next() {
-		var payloadJSON string
-		if err := rows.Scan(&payloadJSON); err != nil {
-			return nil, err
-		}
-		if payloadJSON != "" {
-			var payload models.QuizTaskPayload
-			if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-				return nil, fmt.Errorf("failed to decode quiz payload: %w", err)
-			}
-			allQuestions = append(allQuestions, payload.Questions...)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return allQuestions, nil
-}
-
-// GetUnexaminedPassedQuizAttemptsByTopic returns passed quiz attempts for a topic that have not yet been included in any MILESTONE_EXAM task for the given notebook.
-func (r *Repository) GetUnexaminedPassedQuizAttemptsByTopic(notebookID, topicID string) ([]QuizAttemptWithPayload, error) {
+// GetPendingReadingTaskForNotebook finds the earliest pending reading task for a notebook.
+func (r *Repository) GetPendingReadingTaskForNotebook(notebookID string) (models.StudyQueueTask, error) {
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
-		return nil, fmt.Errorf("notebook ID is required")
+		return models.StudyQueueTask{}, fmt.Errorf("notebook id is required")
 	}
-	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
-		return nil, fmt.Errorf("topic ID is required")
-	}
-
-	// Verify topic belongs to notebook
-	var exists int
+	var task models.StudyQueueTask
+	var topicTitle, notebookTitle string
+	var notebookPriority int
 	err := r.db.QueryRow(`
-		SELECT 1 FROM notebook_topics
-		WHERE notebook_id = ? AND topic_id = ?
-		LIMIT 1
-	`, notebookID, topicID).Scan(&exists)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("topic %s not found in notebook %s", topicID, notebookID)
-		}
-		return nil, fmt.Errorf("failed to verify notebook topic: %w", err)
-	}
-
-	rows, err := r.db.Query(`
 		SELECT
-			qa.id,
-			qa.score,
-			qa.passed,
-			qa.answers_json,
-			qa.completed_at,
-			COALESCE(sq.payload_json, '')
-		FROM quiz_attempts qa
-		JOIN study_queue sq ON qa.task_id = sq.id
-		WHERE sq.notebook_id = ?
-		  AND sq.topic_id = ?
-		  AND sq.task_type = 'QUIZ'
-		  AND qa.passed = 1
-		ORDER BY qa.completed_at ASC
-	`, notebookID, topicID)
+			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
+			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
+			COALESCE(sq.payload_json, ''),
+			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
+			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
+			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		LEFT JOIN topics t ON sq.topic_id = t.id
+		WHERE sq.notebook_id = ? AND sq.task_type = 'READING' AND sq.status = 'PENDING'
+		ORDER BY sq.start_page ASC, sq.created_at ASC
+		LIMIT 1
+	`, notebookID).Scan(
+		&task.ID, &task.NotebookID, &task.TopicID, &task.TaskType, &task.Status, &task.Priority,
+		&task.CreatedAt, &task.ActivatedAt, &task.CompletedAt, &task.PayloadJSON,
+		&task.StartPage, &task.EndPage, &topicTitle, &notebookTitle, &notebookPriority,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.StudyQueueTask{}, ErrNoPendingTasks
+	}
 	if err != nil {
-		return nil, err
+		return models.StudyQueueTask{}, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	allAttempts, err := scanQuizAttemptsWithPayload(rows)
-	if err != nil {
-		return nil, err
-	}
-
-	unexamined := make([]QuizAttemptWithPayload, 0, len(allAttempts))
-	for _, attempt := range allAttempts {
-		hasMilestone, err := r.HasMilestoneExamForAttemptID(notebookID, attempt.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed checking milestone for attempt %s: %w", attempt.ID, err)
-		}
-		if hasMilestone {
-			continue
-		}
-		unexamined = append(unexamined, attempt)
-	}
-
-	return unexamined, nil
+	assignTaskTitle(&task, topicTitle, notebookTitle)
+	return task, nil
 }
-
-

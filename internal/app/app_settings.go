@@ -9,11 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
+	stdruntime "runtime"
 	"strings"
 	"time"
 
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/models"
+	appRuntime "ai-tutor/internal/runtime"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 
@@ -252,6 +256,14 @@ func (a *App) SaveLLMAPIKey(tier string, key string) map[string]interface{} {
 	if err := repo.MarkLLMKeyStored(tier, true); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+	if tier == "fast" {
+		if settings, err := repo.GetLLMSettings(); err == nil && settings != nil {
+			if settings.UseSameForHeavy || strings.EqualFold(settings.Heavy.Provider, settings.Fast.Provider) {
+				_ = llm.SaveAPIKey("heavy", key)
+				_ = repo.MarkLLMKeyStored("heavy", true)
+			}
+		}
+	}
 	if err := a.reloadLLMProviders(); err != nil {
 		return map[string]interface{}{"error": "key saved but LLM reload failed: " + err.Error()}
 	}
@@ -351,7 +363,9 @@ func (a *App) reloadLLMProviders() error {
 
 	fastKey, _ := llm.GetAPIKey("fast")
 	heavyKey, _ := llm.GetAPIKey("heavy")
-	if settings.UseSameForHeavy && heavyKey == "" {
+	if settings.UseSameForHeavy {
+		heavyKey = fastKey
+	} else if heavyKey == "" && fastKey != "" && strings.EqualFold(settings.Heavy.Provider, settings.Fast.Provider) {
 		heavyKey = fastKey
 	}
 	fastProvider := llm.NewProvider(llm.LoadConfigFromSettingsForPrefix("FAST_LLM", settings.Fast, fastKey))
@@ -881,3 +895,42 @@ func (a *App) GetCloudConfig() map[string]interface{} {
 		"configured": resolved != "",
 	}
 }
+
+// SetLLMPromptLogging enables or disables runtime LLM prompt logging.
+func (a *App) SetLLMPromptLogging(enabled bool) bool {
+	llm.SetPromptLoggingEnabled(enabled)
+	return llm.IsPromptLoggingEnabled()
+}
+
+// GetLLMPromptLogging returns whether LLM prompt logging is enabled.
+func (a *App) GetLLMPromptLogging() bool {
+	return llm.IsPromptLoggingEnabled()
+}
+
+// OpenDataDirectory opens the active application data directory (or optional subDir like "logs") in File Explorer.
+func (a *App) OpenDataDirectory(subDir string) map[string]interface{} {
+	appDir, err := appRuntime.ResolveAppDir()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	targetDir := appDir
+	if subDir != "" {
+		targetDir = filepath.Join(appDir, filepath.Clean(subDir))
+		_ = os.MkdirAll(targetDir, 0755)
+	}
+	var cmd *exec.Cmd
+	if stdruntime.GOOS == "windows" {
+		cmd = exec.Command("explorer", targetDir)
+	} else if stdruntime.GOOS == "darwin" {
+		cmd = exec.Command("open", targetDir)
+	} else {
+		cmd = exec.Command("xdg-open", targetDir)
+	}
+	if err := cmd.Start(); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "path": targetDir}
+}
+
+
+

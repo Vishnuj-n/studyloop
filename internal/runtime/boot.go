@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"ai-tutor/internal/db"
@@ -132,7 +133,9 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 		if err != nil {
 			utils.Warnf("HEAVY_LLM keyring lookup failed or missing: %v", err)
 		}
-		if heavyKey == "" && fastKey != "" && llmSettings.UseSameForHeavy {
+		if llmSettings.UseSameForHeavy {
+			heavyKey = fastKey
+		} else if heavyKey == "" && fastKey != "" && strings.EqualFold(llmSettings.Heavy.Provider, llmSettings.Fast.Provider) {
 			heavyKey = fastKey
 		}
 		fastLLMProvider = llm.NewProvider(llm.LoadConfigFromSettingsForPrefix("FAST_LLM", llmSettings.Fast, fastKey))

@@ -668,13 +668,15 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		var count int
 		err := tx.QueryRow(`
 			SELECT COUNT(*) FROM study_queue
-			WHERE notebook_id = ? AND status IN ('PENDING', 'ACTIVE')
+			WHERE notebook_id = ? 
+			  AND task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL')
+			  AND status IN ('PENDING', 'ACTIVE')
 		`, notebookID).Scan(&count)
 		if err != nil {
 			return err
 		}
 		if count > 0 {
-			return nil // Task already exists in queue
+			return nil // Reading task already exists in queue
 		}
 
 		var topicID, topicTitle, notebookTitle string
@@ -855,8 +857,8 @@ func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
 				  AND nt.topic_id = study_queue.topic_id
 				LIMIT 1
 			),
-			start_page = COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), start_page),
-			end_page = COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), end_page)
+			start_page = CASE WHEN start_page IS NULL OR start_page <= 0 THEN COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE start_page END,
+			end_page = CASE WHEN end_page IS NULL OR end_page <= 0 THEN COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE end_page END
 			WHERE notebook_id = ?
 			  AND task_type IN ('READING', 'REREAD')
 			  AND status IN ('PENDING', 'ACTIVE')
@@ -903,6 +905,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 		  AND NOT EXISTS (
 			SELECT 1 FROM study_queue sq
 			WHERE sq.notebook_id = n.id
+			  AND sq.task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL')
 			  AND sq.status IN ('PENDING', 'ACTIVE')
 		  )
 	`, activeProfileID, activeProfileID)

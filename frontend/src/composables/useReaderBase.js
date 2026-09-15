@@ -190,7 +190,8 @@ export function useReaderBase(taskID) {
   }
 
   async function initializeSession(query = {}) {
-    if (!taskID.value) {
+    const effectiveTaskID = query.taskId ?? query.task_id ?? taskID?.value ?? ''
+    if (!effectiveTaskID) {
       globalError.value = 'Task ID required for reading session'
       return null
     }
@@ -230,7 +231,7 @@ export function useReaderBase(taskID) {
 
       console.time('[PERF] initializeReadingSession (Wails→Go→SQLite)')
       const result = await initializeReadingSession(
-        taskID.value,
+        effectiveTaskID,
         notebookId,
         topicId,
         startPage,

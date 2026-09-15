@@ -52,14 +52,35 @@
             <span class="page-indicator"
               >Page {{ reader.currentPage.value }} / {{ reader.pageCount.value }}</span
             >
-            <button
-              v-if="isTaskFlow"
-              class="primary"
-              :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
-              @click="completeSession"
-            >
-              {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
-            </button>
+            <div v-if="isTaskFlow" class="split-btn-group">
+              <button
+                class="primary split-main-btn"
+                :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+                @click="completeSession(false)"
+              >
+                {{ completingSession ? 'Completing Session...' : 'Complete Session' }}
+              </button>
+              <div class="split-dropdown-wrapper">
+                <button
+                  class="primary split-chevron-btn"
+                  :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
+                  title="More completion options (e.g. Complete & Defer Quiz)"
+                  @click.stop="toggleDeferMenu"
+                >
+                  ▾
+                </button>
+                <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
+                  <button
+                    class="split-dropdown-item"
+                    :disabled="completingSession"
+                    @click="onDeferQuizClick"
+                  >
+                    <span class="item-title">Complete & Defer Quiz</span>
+                    <span class="item-desc">Save quiz for later, continue reading</span>
+                  </button>
+                </div>
+              </div>
+            </div>
             <button
               class="secondary copy-session-btn"
               :disabled="reader.loadingBundle.value || reader.loadingText.value"
@@ -230,7 +251,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, provide, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   completeReading,
@@ -347,13 +368,37 @@ const routeTaskID = computed(() => {
 // Initialize composables
 const reader = useReaderBase(routeTaskID)
 const chat = useChat()
-const { showError } = useToast()
+const { showError, showNotice } = useToast()
 provide('chat', chat)
 
 // Local state for completion
 const completingSession = ref(false)
 const completionMessage = ref('')
 const completionError = ref('')
+const showDeferMenu = ref(false)
+
+function toggleDeferMenu() {
+  showDeferMenu.value = !showDeferMenu.value
+}
+
+function onDeferQuizClick() {
+  showDeferMenu.value = false
+  completeSession(true)
+}
+
+function handleDocumentClick() {
+  if (showDeferMenu.value) {
+    showDeferMenu.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleDocumentClick)
+})
 const sessionTask = ref(null)
 const ragEnabled = ref(false)
 const ragQueueStudy = ref(true)
@@ -394,7 +439,7 @@ watch([resolvedTaskID, () => reader.selectedTopicID.value], (next, prev) => {
 
 // PDF Viewer ref and zoom
 const pdfViewerRef = ref(null)
-const zoomScale = ref(0.7)
+const zoomScale = ref(1.0)
 
 const isTaskFlow = computed(() => {
   // Once context is settled, read mode from the context object.
@@ -521,7 +566,7 @@ function onNotebookChange() {
   // Don't call loadBundle() here - let user select a topic first
 }
 
-async function completeSession() {
+async function completeSession(deferQuiz = false) {
   if (completingSession.value || reader.loadingBundle.value || !resolvedTaskID.value) return
 
   completionError.value = ''
@@ -536,6 +581,7 @@ async function completeSession() {
       routeTaskIDComputed: routeTaskID.value,
       resolvedTaskID: resolvedTaskID.value,
       actualArg: taskIDForCompletion,
+      deferQuiz,
     })
     const done = await completeReading(taskIDForCompletion)
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
@@ -554,18 +600,55 @@ async function completeSession() {
       trackAnalyticsEvent('reading_complete', fileHash, reader.currentPage.value, {
         task_id: taskIDForCompletion,
         anonymous_user_id: anonymousUserID.value,
+        deferred_quiz: deferQuiz,
       }).catch((err) => {
         console.error('[READER] trackAnalyticsEvent reading_complete failed:', err)
       })
     }
-    const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'
-    // Completion writes the follow-up quiz into the queue; navigation follows the existing route behavior.
-    console.warn('[COMPLETE_SESSION] completeSession() before router.push', {
-      nextRoute,
-      quizTaskID: done?.quiz_task_id || null,
-    })
-    await router.push(nextRoute)
-    console.warn('[COMPLETE_SESSION] completeSession() router.push resolved', { nextRoute })
+
+    if (deferQuiz) {
+      if (done?.next_reading_task) {
+        const next = done.next_reading_task
+        console.warn('[COMPLETE_SESSION] Quiz deferred. Continuing to next reading task in current book:', next)
+        showNotice('Quiz saved to queue! Continuing with next reading session...', 'Quiz Deferred')
+        // Update URL query seamlessly to reflect next task
+        await router.replace({
+          query: {
+            ...route.query,
+            taskId: next.id,
+            task_id: next.id,
+            notebookId: next.notebook_id,
+            notebook_id: next.notebook_id,
+            topicId: next.topic_id,
+            topic_id: next.topic_id,
+            startPage: next.start_page,
+            start_page: next.start_page,
+            endPage: next.end_page,
+            end_page: next.end_page,
+          },
+        })
+        await resolveTaskContext({
+          taskId: next.id,
+          task_id: next.id,
+          notebookId: next.notebook_id,
+          topicId: next.topic_id,
+          startPage: next.start_page,
+          endPage: next.end_page,
+        })
+      } else {
+        console.warn('[COMPLETE_SESSION] Quiz deferred to queue. All book reading complete. Routing to dashboard.')
+        showNotice('Reading complete for this book! Quiz saved to your queue for later.', 'Quiz Deferred')
+        await router.push('/dashboard')
+      }
+    } else {
+      const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'
+      console.warn('[COMPLETE_SESSION] completeSession() before router.push', {
+        nextRoute,
+        quizTaskID: done?.quiz_task_id || null,
+      })
+      await router.push(nextRoute)
+      console.warn('[COMPLETE_SESSION] completeSession() router.push resolved', { nextRoute })
+    }
   } catch (err) {
     console.error('[COMPLETE_SESSION] completeSession() catch', err)
     const errMsg = err?.message || 'Failed to complete session'
@@ -751,19 +834,34 @@ h3 {
   gap: 10px;
 }
 
-.stage-head-left {
+.stage-head-left,
+.stage-head-right {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   color: var(--muted-text);
+  line-height: 1;
+}
+
+.stage-head button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .skip-session-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 9px;
+  height: 32px;
+  padding: 0 9px;
+  box-sizing: border-box;
   color: #ef4444;
   background: color-mix(in srgb, #ef4444 12%, var(--surface-container-low));
   border: 1px solid color-mix(in srgb, #ef4444 28%, transparent);
@@ -789,21 +887,17 @@ h3 {
   stroke: currentColor;
 }
 
-.stage-head-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted-text);
-}
-
-.reading-window-info {
+.reading-window-info,
+.page-indicator {
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  line-height: 1;
 }
 
 .page-indicator {
   font-weight: 600;
-  white-space: nowrap;
 }
 
 
@@ -1002,5 +1096,90 @@ button:disabled {
   background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
+/* Split Button for Complete Session */
+.split-btn-group {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  height: 32px;
+  vertical-align: middle;
+}
+
+.split-main-btn {
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+}
+
+.split-chevron-btn {
+  height: 32px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 11px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+}
+
+.split-dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+}
+
+.split-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  background: var(--surface-container-highest, #282828);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.15));
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.split-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--on-surface, #ebdbb2);
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.split-dropdown-item:hover:not(:disabled) {
+  background: var(--surface-bright, rgba(255, 255, 255, 0.1));
+}
+
+.split-dropdown-item .item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--primary, #d79921);
+}
+
+.split-dropdown-item .item-desc {
+  font-size: 11px;
+  color: var(--muted-text, #a89984);
+  margin-top: 2px;
+}
 
 </style>

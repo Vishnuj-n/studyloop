@@ -10,11 +10,24 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
 )
+
+var promptLoggingEnabled atomic.Bool
+
+// SetPromptLoggingEnabled sets whether LLM prompt logging to file is active.
+func SetPromptLoggingEnabled(enabled bool) {
+	promptLoggingEnabled.Store(enabled)
+}
+
+// IsPromptLoggingEnabled returns true if prompt logging is enabled at runtime or via APP_ENV=dev.
+func IsPromptLoggingEnabled() bool {
+	return promptLoggingEnabled.Load() || os.Getenv("APP_ENV") == "dev"
+}
 
 // RateLimitError indicates an HTTP 429 rate limit / TPM exceeded error from the provider.
 type RateLimitError struct {
@@ -303,8 +316,20 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	if p == nil || p.config == nil || p.config.BaseURL == "" {
 		return "", fmt.Errorf("LLM config not configured")
 	}
-	if strings.TrimSpace(p.config.APIKey) == "" {
+	apiKey := strings.TrimSpace(p.config.APIKey)
+	if apiKey == "" {
 		return "", fmt.Errorf("LLM API key not configured")
+	}
+
+	baseURLCheck := strings.ToLower(p.config.BaseURL)
+	if strings.Contains(baseURLCheck, "googleapis.com") {
+		if strings.HasPrefix(apiKey, "gsk_") {
+			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings.")
+		}
+	} else if strings.Contains(baseURLCheck, "groq.com") {
+		if strings.HasPrefix(apiKey, "AIza") {
+			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings.")
+		}
 	}
 
 	words := len(strings.Fields(prompt))
@@ -327,7 +352,7 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		},
 	}
 
-	if os.Getenv("APP_ENV") == "dev" {
+	if IsPromptLoggingEnabled() {
 		_ = os.MkdirAll("dev_data/logs", 0755)
 		debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
 			time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)

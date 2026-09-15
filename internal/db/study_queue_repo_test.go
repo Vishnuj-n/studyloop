@@ -905,6 +905,34 @@ func TestGetCompletedTaskTimes(t *testing.T) {
 	if timeDiff > 1*time.Minute {
 		t.Fatalf("expected completed time to be close to now, but diff is %v (completed time: %v, now: %v)", timeDiff, completions[0], time.Now().UTC())
 	}
+
+	// Fetch reading-only completions (task1 is READING, should be 1)
+	readingCompletions, err := testRepo.GetCompletedTaskTimes("READING", "REREAD")
+	if err != nil {
+		t.Fatalf("GetCompletedTaskTimes reading failed: %v", err)
+	}
+	if len(readingCompletions) != 1 {
+		t.Fatalf("expected 1 reading completion, got %d", len(readingCompletions))
+	}
+
+	// Complete task2 (QUIZ)
+	if err := testRepo.ActivateTask(task2.ID); err != nil {
+		t.Fatalf("ActivateTask task2 failed: %v", err)
+	}
+	if err := testRepo.CompleteTask(task2.ID, models.CompletionResult{Status: models.StudyTaskStatusCompleted}); err != nil {
+		t.Fatalf("CompleteTask task2 failed: %v", err)
+	}
+
+	// Total completions should be 2, but reading completions must still be 1!
+	allCompletions, _ := testRepo.GetCompletedTaskTimes()
+	if len(allCompletions) != 2 {
+		t.Fatalf("expected 2 total completions, got %d", len(allCompletions))
+	}
+
+	readingCompletions, _ = testRepo.GetCompletedTaskTimes("READING", "REREAD")
+	if len(readingCompletions) != 1 {
+		t.Fatalf("expected 1 reading completion after quiz completion, got %d", len(readingCompletions))
+	}
 }
 
 func TestMilestoneExamRepoHelpersCountOnlyPassedQuizzes(t *testing.T) {
@@ -1147,6 +1175,56 @@ func TestEnsurePendingReadingTasksForActiveNotebooks(t *testing.T) {
 		t.Fatalf("expected ineligible dormant notebook not to receive pending task")
 	}
 }
+
+func TestEnsurePendingReadingTasks_IgnoresPendingFlashcardReview(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	profileID := "prof-test-fc-review"
+	nbActive := "nb-fc-review-active"
+	topicActive := "topic-fc-review-active"
+
+	_ = testRepo.EnsureTopic(topicActive, "Active Topic With Review")
+	_ = testRepo.UpdateTopicPageBounds(topicActive, 1, 10)
+	_ = testRepo.CreateNotebook(nbActive, "Active Book With Review", "/tmp/active_rev.pdf", "pdf", topicActive, profileID, 10, "")
+	_ = testRepo.LinkNotebookTopics(nbActive, []string{topicActive})
+	_ = testRepo.UpdateNotebookStatus(nbActive, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbActive, "active")
+
+	// Insert a PENDING FLASHCARD_REVIEW task for this notebook
+	reviewTask := models.StudyQueueTask{
+		ID:         "task-rev-test-1",
+		NotebookID: nbActive,
+		TopicID:    topicActive,
+		TaskType:   models.StudyTaskTypeFlashcardReview,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   0,
+	}
+	if err := testRepo.InsertStudyTask(reviewTask); err != nil {
+		t.Fatalf("InsertStudyTask for review task failed: %v", err)
+	}
+
+	// Ensure reading tasks are seeded
+	if err := testRepo.EnsurePendingReadingTasksForActiveNotebooks(profileID); err != nil {
+		t.Fatalf("EnsurePendingReadingTasksForActiveNotebooks failed: %v", err)
+	}
+
+	tasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+
+	var hasReadingTask bool
+	for _, task := range tasks {
+		if task.NotebookID == nbActive && task.TaskType == models.StudyTaskTypeReading {
+			hasReadingTask = true
+		}
+	}
+
+	if !hasReadingTask {
+		t.Fatalf("expected active notebook to receive a PENDING READING task despite having a PENDING FLASHCARD_REVIEW task")
+	}
+}
+
 
 func TestMarkTopicCompletedTx(t *testing.T) {
 	initDBForTest(t, false, 0)
@@ -1728,5 +1806,55 @@ func TestGetUnexaminedPassedQuizAttempts(t *testing.T) {
 	}
 	if topicAttemptsAfter[0].ID != "quiz-attempt-3" || topicAttemptsAfter[1].ID != "quiz-attempt-4" {
 		t.Fatalf("unexpected unexamined attempts: %#v", topicAttemptsAfter)
+	}
+}
+
+func TestReconcileReadingTasksPreservesSubRangeBounds(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-reconcile-test"
+	notebookID := "nb-reconcile-test"
+
+	if err := testRepo.withTx(func(tx *sql.Tx) error {
+		_, err := tx.Exec(`
+			INSERT INTO topics (id, title, start_page, end_page)
+			VALUES (?, 'Topic Reconcile Test', 100, 119)
+		`, topicID)
+		return err
+	}); err != nil {
+		t.Fatalf("insert topic failed: %v", err)
+	}
+
+	if err := testRepo.CreateNotebook(notebookID, "NB Reconcile Test", "/tmp/r.pdf", "pdf", topicID, "", 200, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	// Insert sub-range reading task (100 to 109)
+	subTaskID := "task-sub-range-100-109"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         subTaskID,
+		NotebookID: notebookID,
+		TopicID:    topicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusActive,
+		StartPage:  100,
+		EndPage:    109,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
+
+	// Trigger reconciliation
+	if err := testRepo.ReconcileReadingTasksForNotebook(notebookID); err != nil {
+		t.Fatalf("ReconcileReadingTasksForNotebook failed: %v", err)
+	}
+
+	// Verify that sub-range page bounds (100-109) were NOT overwritten by full topic bounds (100-119)
+	task, err := testRepo.GetTaskByID(subTaskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID failed: %v", err)
+	}
+
+	if task.StartPage != 100 || task.EndPage != 109 {
+		t.Fatalf("regression bug detected! ReconcileReadingTasksForNotebook overwrote sub-range bounds (100-109) with topic bounds (%d-%d)", task.StartPage, task.EndPage)
 	}
 }
