@@ -7,6 +7,7 @@ import MysteryChestModal from './components/MysteryChestModal.vue'
 import RewardToast from './components/RewardToast.vue'
 import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
+import PrivacyNoticeModal from './components/PrivacyNoticeModal.vue'
 import {
   getUserSettings,
   updateUserSettings,
@@ -305,6 +306,20 @@ function handleDismissReleaseNotes() {
   showReleaseNotesPopup.value = false
 }
 
+const showPrivacyNoticePopup = ref(false)
+
+function checkOneTimePrivacyNotice() {
+  const seenPrivacy = localStorage.getItem('studyloop_seen_privacy_notice_v1')
+  if (!seenPrivacy) {
+    showPrivacyNoticePopup.value = true
+  }
+}
+
+function handleDismissPrivacyNotice() {
+  localStorage.setItem('studyloop_seen_privacy_notice_v1', 'true')
+  showPrivacyNoticePopup.value = false
+}
+
 let cancelIngestionListener = null
 
 onMounted(() => {
@@ -312,6 +327,7 @@ onMounted(() => {
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
   checkOneTimeReleaseNotes()
+  checkOneTimePrivacyNotice()
   cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
   window.addEventListener('study-reward-earned', handleStudyReward)
 })
@@ -434,6 +450,12 @@ onUnmounted(() => {
         :version="releaseNotesVersion"
         :raw-notes="releaseNotesText"
         @close="handleDismissReleaseNotes"
+      />
+
+      <!-- One-time Privacy Notice Modal -->
+      <PrivacyNoticeModal
+        :visible="showPrivacyNoticePopup"
+        @close="handleDismissPrivacyNotice"
       />
 
       <!-- Global Toaster -->

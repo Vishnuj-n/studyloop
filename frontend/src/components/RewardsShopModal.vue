@@ -32,18 +32,6 @@
           </button>
         </div>
 
-        <!-- Loot Box Purchased Toast Modal -->
-        <div v-if="purchasedChest" class="chest-unboxed-overlay" @click="purchasedChest = null">
-          <div class="chest-unboxed-card" @click.stop>
-            <div class="unboxed-icon">📦</div>
-            <h3>Chest Purchased!</h3>
-            <p class="unboxed-reward">
-              A {{ purchasedChest.box_tier }} Mystery Chest was added to your vault.
-            </p>
-            <button class="equip-btn" type="button" @click="purchasedChest = null">Got It!</button>
-          </div>
-        </div>
-
         <!-- Loading / Error States -->
         <div v-if="loading" class="empty-state">Loading Store...</div>
         <div v-else-if="error" class="error-state">{{ error }}</div>
@@ -575,42 +563,4 @@ function equipTheme(themeId) {
   padding: 3rem 1rem;
   color: var(--muted-text);
 }
-
-
-.chest-unboxed-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(6px);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.chest-unboxed-card {
-  background: var(--surface-container);
-  border: 1px solid var(--primary);
-  border-radius: 16px;
-  padding: 2rem;
-  text-align: center;
-  max-width: 320px;
-  width: 100%;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.unboxed-icon {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
-}
-
-.unboxed-reward {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: #f59e0b;
-  margin: 0.5rem 0 1.25rem;
-}
-
-
 </style>
