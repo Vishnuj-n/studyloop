@@ -1225,6 +1225,66 @@ func TestEnsurePendingReadingTasks_IgnoresPendingFlashcardReview(t *testing.T) {
 	}
 }
 
+func TestEnsurePendingReadingTasks_BlocksOnPendingFlashcardGenerate(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	profileID := "prof-test-fc-gen"
+	nbActive := "nb-fc-gen-active"
+	topicActive := "topic-fc-gen-active"
+
+	_ = testRepo.EnsureTopic(topicActive, "Active Topic With Flashcard Generate")
+	_ = testRepo.UpdateTopicPageBounds(topicActive, 1, 10)
+	_ = testRepo.CreateNotebook(nbActive, "Active Book With Flashcard Generate", "/tmp/active_fcgen.pdf", "pdf", topicActive, profileID, 10, "")
+	_ = testRepo.LinkNotebookTopics(nbActive, []string{topicActive})
+	_ = testRepo.UpdateNotebookStatus(nbActive, "chunked")
+	_ = testRepo.UpdateNotebookStudyStatus(nbActive, "active")
+
+	// Insert a PENDING FLASHCARD_GENERATE task for this notebook
+	genTask := models.StudyQueueTask{
+		ID:         "task-gen-test-1",
+		NotebookID: nbActive,
+		TopicID:    topicActive,
+		TaskType:   models.StudyTaskTypeFlashcardGenerate,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   0,
+	}
+	if err := testRepo.InsertStudyTask(genTask); err != nil {
+		t.Fatalf("InsertStudyTask for flashcard generate task failed: %v", err)
+	}
+
+	// Ensure reading tasks are checked
+	if err := testRepo.EnsurePendingReadingTasksForActiveNotebooks(profileID); err != nil {
+		t.Fatalf("EnsurePendingReadingTasksForActiveNotebooks failed: %v", err)
+	}
+
+	tasks, err := testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+
+	for _, task := range tasks {
+		if task.NotebookID == nbActive && task.TaskType == models.StudyTaskTypeReading {
+			t.Fatalf("expected active notebook with PENDING FLASHCARD_GENERATE NOT to receive a duplicate READING task")
+		}
+	}
+
+	// Also directly call EnsurePendingReadingTaskForNotebook and verify it does not seed duplicate
+	if err := testRepo.EnsurePendingReadingTaskForNotebook(nbActive, 5000); err != nil {
+		t.Fatalf("EnsurePendingReadingTaskForNotebook failed: %v", err)
+	}
+
+	tasks, err = testRepo.GetAllPendingTasks()
+	if err != nil {
+		t.Fatalf("GetAllPendingTasks failed: %v", err)
+	}
+
+	for _, task := range tasks {
+		if task.NotebookID == nbActive && task.TaskType == models.StudyTaskTypeReading {
+			t.Fatalf("expected EnsurePendingReadingTaskForNotebook NOT to seed READING task when FLASHCARD_GENERATE is pending")
+		}
+	}
+}
+
 
 func TestMarkTopicCompletedTx(t *testing.T) {
 	initDBForTest(t, false, 0)

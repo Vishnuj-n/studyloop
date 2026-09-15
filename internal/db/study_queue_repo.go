@@ -669,7 +669,7 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		err := tx.QueryRow(`
 			SELECT COUNT(*) FROM study_queue
 			WHERE notebook_id = ? 
-			  AND task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL')
+			  AND task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL', 'FLASHCARD_GENERATE')
 			  AND status IN ('PENDING', 'ACTIVE')
 		`, notebookID).Scan(&count)
 		if err != nil {
@@ -905,7 +905,7 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 		  AND NOT EXISTS (
 			SELECT 1 FROM study_queue sq
 			WHERE sq.notebook_id = n.id
-			  AND sq.task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL')
+			  AND sq.task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL', 'FLASHCARD_GENERATE')
 			  AND sq.status IN ('PENDING', 'ACTIVE')
 		  )
 	`, activeProfileID, activeProfileID)
