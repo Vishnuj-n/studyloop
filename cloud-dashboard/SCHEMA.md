@@ -152,8 +152,31 @@ Telemetry table for optional analytics collection.
 
 ---
 
+### `app_telemetry`
+
+Mandatory minimal anonymous heartbeat telemetry table (ping on app start).
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | `UUID` | No | `gen_random_uuid()` | Event ID (Primary Key) |
+| `installation_id` | `UUID` | No | — | Random UUID assigned locally |
+| `event` | `TEXT` | No | — | Event name (`app_started`, `app_updated`, `app_crashed`) |
+| `app_version` | `TEXT` | No | — | Semantic version (e.g. `1.4.1`) |
+| `platform` | `TEXT` | No | — | OS platform (`windows`, `darwin`, `linux`) |
+| `architecture` | `TEXT` | No | — | Architecture (`amd64`, `arm64`) |
+| `created_at` | `TIMESTAMPTZ` | No | `now()` | Ping logged timestamp |
+
+* **Indexes:**
+  - `idx_app_telemetry_created_at` ON `created_at`
+  - `idx_app_telemetry_installation_id` ON `installation_id`
+  - `idx_app_telemetry_platform` ON `platform`
+  - `idx_app_telemetry_version` ON `app_version`
+
+---
+
 ## Related Files
 
 * Master Setup Script: [`cloud-dashboard/supabase/setup_all.sql`](file:///c:/Users/vishn/PROJECT/ai-tutor/cloud-dashboard/supabase/setup_all.sql)
 * Table Definitions: [`cloud-dashboard/supabase/01_tables.sql`](file:///c:/Users/vishn/PROJECT/ai-tutor/cloud-dashboard/supabase/01_tables.sql)
+* Telemetry Definitions: [`cloud-dashboard/supabase/telemetry_schema.sql`](file:///c:/Users/vishn/PROJECT/ai-tutor/cloud-dashboard/supabase/telemetry_schema.sql)
 * RLS Policies: [`cloud-dashboard/supabase/04_rls_and_storage.sql`](file:///c:/Users/vishn/PROJECT/ai-tutor/cloud-dashboard/supabase/04_rls_and_storage.sql)

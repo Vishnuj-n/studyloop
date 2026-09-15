@@ -179,9 +179,9 @@
               class="checkbox-input"
             />
             <div class="check-label">
-              <strong>Help improve the app by sharing anonymous usage data</strong>
+              <strong>Help make Studyloop better</strong>
               <p class="hint">
-                Telemetry events are anonymized. No personal information is ever collected.
+                Share lightweight, anonymous study activity (like quiz completion rates) to help improve study tools. Zero personal data, files, or notes ever leave your device.
               </p>
             </div>
           </label>

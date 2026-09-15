@@ -62,6 +62,20 @@
           </button>
         </div>
 
+        <div class="community-card">
+          <div class="card-header">
+            <svg class="card-icon-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <h3>Privacy & Telemetry</h3>
+          </div>
+          <p>Studyloop is completely private. Only a tiny anonymous launch ping (OS and app version) is sent to know active installs. No files or notes ever leave your device.</p>
+          <button type="button" class="btn-outline" @click="openRepoPrivacy">
+            <span>Learn More</span>
+            <span class="arrow-icon">↗</span>
+          </button>
+        </div>
+
         <div class="community-card highlight">
           <div class="card-header">
             <svg class="card-icon-svg github-star-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
@@ -164,6 +178,10 @@ function reportBug() {
 
 function starRepo() {
   openURLInBrowser('https://github.com/Vishnuj-n/studyloop')
+}
+
+function openRepoPrivacy() {
+  openURLInBrowser('https://github.com/Vishnuj-n/studyloop#privacy')
 }
 
 onMounted(() => {
