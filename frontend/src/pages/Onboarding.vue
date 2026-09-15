@@ -11,261 +11,232 @@
         <div class="progress-fill" :style="{ width: `${(step - 1) * 20}%` }"></div>
       </div>
 
-      <!-- Step 1: Profile and Goal -->
-      <div v-if="step === 1" class="step-container">
-        <h2>1. Create Your Study Profile</h2>
-        <p class="description">
-          Profiles group your textbooks and deadlines. E.g. "UPSC Prep" or "Semester Finals".
-        </p>
-
-        <div class="form-group">
-          <label for="profile-name">Profile Name</label>
-          <input
-            id="profile-name"
-            v-model="profileName"
-            type="text"
-            placeholder="e.g. UPSC Prep, College Sem 3"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="profile-deadline">Target Exam Deadline</label>
-          <input id="profile-deadline" v-model="profileDeadline" type="date" required />
-        </div>
-
-        <div class="time-range-section">
-          <div class="time-range-header">
-            <label>Study Schedule</label>
-            <span v-if="studyDuration" class="duration-badge">{{ studyDuration }}</span>
-          </div>
-
-          <div class="time-range-container">
-            <div class="time-input-group">
-              <label for="study-start-time" class="time-label">Start</label>
-              <div class="time-input-wrapper">
-                <input
-                  id="study-start-time"
-                  v-model="studyStartTime"
-                  type="time"
-                  class="time-input"
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="time-connector">
-              <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M0 4 L20 4 M16 1 L20 4 L16 7" />
-              </svg>
-            </div>
-
-            <div class="time-input-group">
-              <label for="study-end-time" class="time-label">End</label>
-              <div class="time-input-wrapper">
-                <input
-                  id="study-end-time"
-                  v-model="studyEndTime"
-                  type="time"
-                  class="time-input"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="quick-durations">
-            <button
-              v-for="preset in durationPresets"
-              :key="preset.label"
-              type="button"
-              class="duration-preset"
-              :class="{ active: studyDuration === preset.label }"
-              @click="applyDurationPreset(preset)"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
-        </div>
-
-        <button class="action-button" :disabled="!isStep1Valid" @click="step = 2">Next Step</button>
-      </div>
-
-      <!-- Step 2: Study & Remediation Preferences -->
-      <div v-else-if="step === 2" class="step-container">
-        <h2>2. Study Preferences</h2>
-        <p class="description">
-          Configure spaced repetition limits and your quiz remediation rescue track.
-        </p>
-
-        <div class="form-group">
-          <label for="max-flashcards">Max Flashcards per Session</label>
-          <input
-            id="max-flashcards"
-            v-model.number="maxFlashcards"
-            type="number"
-            min="5"
-            max="200"
-            step="5"
-            required
-          />
-          <p
-            class="hint"
-            style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2"
-          >
-            Caps spaced repetition reviews active in any single study session.
+      <div class="steps-deck">
+        <!-- Step 1: Profile and Goal -->
+        <div class="step-container" :class="{ 'is-active': step === 1, 'is-hidden': step !== 1 }">
+          <h2>1. Create Your Study Profile</h2>
+          <p class="description">
+            Profiles group your textbooks and deadlines. E.g. "UPSC Prep" or "Semester Finals".
           </p>
-        </div>
 
-        <fieldset class="form-group" style="border: none; padding: 0; margin: 0 0 16px 0;">
-          <legend style="border: 0; padding: 0; margin: 0 0 4px; display: block;">Quiz Failure Rescue</legend>
-          <p class="hint" style="margin-top: 2px; font-size: 0.75rem; opacity: 0.7; line-height: 1.2; margin-bottom: 8px">
-            Choose what happens when you fail a quiz. Customize the remediation track to match your study style.
-          </p>
-          <div class="strategy-options">
-            <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
-              <input
-                id="strategy-fast"
-                v-model="defaultRemedialStrategy"
-                name="defaultRemedialStrategy"
-                type="radio"
-                value="FAST"
-                style="cursor: pointer"
-              />
-              <label for="strategy-fast" class="option-content">
-                <span class="option-title">Fast Track</span>
-                <span class="option-desc">Go directly to Socratic AI tutor (deeper encoding, conceptual topics)</span>
-              </label>
-            </div>
-
-            <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
-              <input
-                id="strategy-classic"
-                v-model="defaultRemedialStrategy"
-                name="defaultRemedialStrategy"
-                type="radio"
-                value="CLASSIC"
-                style="cursor: pointer"
-              />
-              <label for="strategy-classic" class="option-content">
-                <span class="option-title">Classic Track</span>
-                <span class="option-desc">Reread first, then Socratic tutor if you fail again (dense text, sequential learning)</span>
-              </label>
-            </div>
-          </div>
-        </fieldset>
-
-        <div class="form-group check-group">
-          <label class="checkbox-container" for="reminders-enabled">
-            <input
-              id="reminders-enabled"
-              v-model="remindersEnabled"
-              type="checkbox"
-              class="checkbox-input"
-            />
-            <div class="check-label">
-              <strong>Enable Study Reminders</strong>
-              <p class="hint">Notify when daily study time starts and ends.</p>
-            </div>
-          </label>
-        </div>
-
-        <div class="form-group check-group">
-          <label class="checkbox-container" for="analytics-enabled">
-            <input
-              id="analytics-enabled"
-              v-model="analyticsEnabled"
-              type="checkbox"
-              class="checkbox-input"
-            />
-            <div class="check-label">
-              <strong>Help make Studyloop better</strong>
-              <p class="hint">
-                Share lightweight, anonymous study activity (like quiz completion rates) to help improve study tools. Zero personal data, files, or notes ever leave your device.
-              </p>
-            </div>
-          </label>
-        </div>
-
-        <div class="button-row">
-          <button class="secondary-button" @click="step = 1">Back</button>
-          <button class="action-button" :disabled="!isStep2Valid" @click="step = 3">Next Step</button>
-        </div>
-      </div>
-
-      <!-- Step 3: LLM Provider -->
-      <div v-else-if="step === 3" class="step-container">
-        <h2>3. AI Provider</h2>
-        <p class="description">
-          Choose an OpenAI-compatible provider. API keys are stored in your OS credential manager,
-          not SQLite.
-        </p>
-
-        <div class="form-group">
-          <label for="llm-provider">Provider</label>
-          <select
-            id="llm-provider"
-            v-model="llmFast.provider"
-            @change="applyProviderPreset('fast')"
-          >
-            <option value="gemini">Google Gemini (AI Studio)</option>
-            <option value="groq">Groq</option>
-            <option value="openai">ChatGPT / OpenAI</option>
-            <option value="openrouter">OpenRouter</option>
-            <option value="custom">Custom OpenAI-compatible</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="llm-base-url">Base URL</label>
-          <input
-            id="llm-base-url"
-            v-model="llmFast.base_url"
-            type="url"
-            placeholder="https://api.groq.com/openai/v1"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="llm-model">Model</label>
-          <input
-            id="llm-model"
-            v-model="llmFast.model"
-            type="text"
-            placeholder="openai/gpt-oss-120b"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="llm-api-key">API Key</label>
-          <input
-            id="llm-api-key"
-            v-model="llmFastKey"
-            type="password"
-            placeholder="Paste key to save in OS credential manager"
-          />
-          <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
-            Get free key:
-            <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio ↗</a> ·
-            <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq ↗</a> ·
-            <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
-          </p>
-        </div>
-
-        <label class="checkbox-container inline-check">
-          <input v-model="useSameLLMForHeavy" type="checkbox" class="checkbox-input" />
-          <div class="check-label">
-            <strong>Use same provider and model for heavy AI tasks</strong>
-          </div>
-        </label>
-
-        <div v-if="!useSameLLMForHeavy" class="advanced-box">
           <div class="form-group">
-            <label for="heavy-provider">Heavy Provider</label>
+            <label for="profile-name">Profile Name</label>
+            <input
+              id="profile-name"
+              v-model="profileName"
+              type="text"
+              placeholder="e.g. UPSC Prep, College Sem 3"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="profile-deadline">Target Exam Deadline</label>
+            <input id="profile-deadline" v-model="profileDeadline" type="date" required />
+          </div>
+
+          <div class="time-range-section">
+            <div class="time-range-header">
+              <label>Study Schedule</label>
+              <span v-if="studyDuration" class="duration-badge">{{ studyDuration }}</span>
+            </div>
+
+            <div class="time-range-container">
+              <div class="time-input-group">
+                <label for="study-start-time" class="time-label">Start</label>
+                <div class="time-input-wrapper">
+                  <input
+                    id="study-start-time"
+                    v-model="studyStartTime"
+                    type="time"
+                    class="time-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="time-connector">
+                <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M0 4 L20 4 M16 1 L20 4 L16 7" />
+                </svg>
+              </div>
+
+              <div class="time-input-group">
+                <label for="study-end-time" class="time-label">End</label>
+                <div class="time-input-wrapper">
+                  <input
+                    id="study-end-time"
+                    v-model="studyEndTime"
+                    type="time"
+                    class="time-input"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="quick-durations">
+              <button
+                v-for="preset in durationPresets"
+                :key="preset.label"
+                type="button"
+                class="duration-preset"
+                :class="{ active: studyDuration === preset.label }"
+                @click="applyDurationPreset(preset)"
+              >
+                {{ preset.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="action-button" :disabled="!isStep1Valid" @click="step = 2">Next Step</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Study & Remediation Preferences -->
+        <div class="step-container" :class="{ 'is-active': step === 2, 'is-hidden': step !== 2 }">
+          <h2>2. Study Preferences</h2>
+          <p class="description">
+            Configure spaced repetition review limits and your quiz remediation rescue track.
+          </p>
+
+          <div class="form-group">
+            <label for="max-flashcards">Max Flashcards per Session</label>
+            <input
+              id="max-flashcards"
+              v-model.number="maxFlashcards"
+              type="number"
+              min="5"
+              max="200"
+              step="5"
+              required
+            />
+            <p class="hint">
+              Caps spaced repetition reviews active in any single study session.
+            </p>
+          </div>
+
+          <fieldset class="form-group" style="border: none; padding: 0; margin: 0 0 12px 0;">
+            <legend style="border: 0; padding: 0; margin: 0 0 4px; display: block;">Quiz Failure Rescue Track</legend>
+            <p class="hint" style="margin-bottom: 8px">
+              Choose what happens when you fail a quiz. Customize the remediation track to match your study style.
+            </p>
+            <div class="strategy-options">
+              <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'FAST' }">
+                <input
+                  id="strategy-fast"
+                  v-model="defaultRemedialStrategy"
+                  name="defaultRemedialStrategy"
+                  type="radio"
+                  value="FAST"
+                  style="cursor: pointer"
+                />
+                <label for="strategy-fast" class="option-content">
+                  <span class="option-title">Fast Track</span>
+                  <span class="option-desc">Go directly to Socratic AI tutor (deeper conceptual encoding)</span>
+                </label>
+              </div>
+
+              <div class="strategy-option" :class="{ active: defaultRemedialStrategy === 'CLASSIC' }">
+                <input
+                  id="strategy-classic"
+                  v-model="defaultRemedialStrategy"
+                  name="defaultRemedialStrategy"
+                  type="radio"
+                  value="CLASSIC"
+                  style="cursor: pointer"
+                />
+                <label for="strategy-classic" class="option-content">
+                  <span class="option-title">Classic Track</span>
+                  <span class="option-desc">Reread text first, then Socratic tutor if you fail again</span>
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="routine-card">
+            <label class="checkbox-container" for="reminders-enabled">
+              <input
+                id="reminders-enabled"
+                v-model="remindersEnabled"
+                type="checkbox"
+                class="checkbox-input"
+              />
+              <div class="check-label">
+                <span class="check-title">In-App Study Session Alerts</span>
+                <p class="hint">Play a gentle chime and show a banner when your scheduled study time ({{ studyStartTime }} – {{ studyEndTime }}) starts or ends while using StudyLoop.</p>
+              </div>
+            </label>
+
+            <div class="cal-sync-row">
+              <span class="cal-sync-label">Sync to Calendar:</span>
+              <div class="cal-btn-group">
+                <button
+                  type="button"
+                  class="onboarding-cal-btn"
+                  title="Add recurring daily study session to Google Calendar"
+                  @click="addGoogleCalendar"
+                >
+                  + Google
+                </button>
+                <button
+                  type="button"
+                  class="onboarding-cal-btn"
+                  title="Add recurring daily study session to Outlook Web"
+                  @click="addOutlookCalendar"
+                >
+                  + Outlook
+                </button>
+                <button
+                  type="button"
+                  class="onboarding-cal-btn"
+                  title="Download standard .ics file for Apple Calendar, Windows, or Thunderbird"
+                  @click="downloadCalendarICS"
+                >
+                  Download .ics
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="check-group">
+            <label class="checkbox-container" for="analytics-enabled">
+              <input
+                id="analytics-enabled"
+                v-model="analyticsEnabled"
+                type="checkbox"
+                class="checkbox-input"
+              />
+              <div class="check-label">
+                <span class="check-title">Help make StudyLoop better</span>
+                <p class="hint">
+                  Share lightweight, anonymous study metrics (like quiz completion rates) to help improve study tools. Zero personal data, files, or notes ever leave your device.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button class="secondary-button" @click="step = 1">Back</button>
+            <button class="action-button" :disabled="!isStep2Valid" @click="step = 3">Next Step</button>
+          </div>
+        </div>
+
+        <!-- Step 3: LLM Provider -->
+        <div class="step-container" :class="{ 'is-active': step === 3, 'is-hidden': step !== 3 }">
+          <h2>3. AI Provider</h2>
+          <p class="description">
+            Choose an OpenAI-compatible provider. API keys are stored in your OS credential manager,
+            not SQLite.
+          </p>
+
+          <div class="form-group">
+            <label for="llm-provider">Provider</label>
             <select
-              id="heavy-provider"
-              v-model="llmHeavy.provider"
-              @change="applyProviderPreset('heavy')"
+              id="llm-provider"
+              v-model="llmFast.provider"
+              @change="applyProviderPreset('fast')"
             >
               <option value="gemini">Google Gemini (AI Studio)</option>
               <option value="groq">Groq</option>
@@ -274,238 +245,298 @@
               <option value="custom">Custom OpenAI-compatible</option>
             </select>
           </div>
+
           <div class="form-group">
-            <label for="heavy-base-url">Heavy Base URL</label>
+            <label for="llm-base-url">Base URL</label>
             <input
-              id="heavy-base-url"
-              v-model="llmHeavy.base_url"
+              id="llm-base-url"
+              v-model="llmFast.base_url"
               type="url"
               placeholder="https://api.groq.com/openai/v1"
             />
           </div>
+
           <div class="form-group">
-            <label for="heavy-model">Heavy Model</label>
+            <label for="llm-model">Model</label>
             <input
-              id="heavy-model"
-              v-model="llmHeavy.model"
+              id="llm-model"
+              v-model="llmFast.model"
               type="text"
               placeholder="openai/gpt-oss-120b"
             />
           </div>
+
           <div class="form-group">
-            <label for="heavy-api-key">Heavy API Key</label>
+            <label for="llm-api-key">API Key</label>
             <input
-              id="heavy-api-key"
-              v-model="llmHeavyKey"
+              id="llm-api-key"
+              v-model="llmFastKey"
               type="password"
               placeholder="Paste key to save in OS credential manager"
             />
             <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
               Get free key:
-              <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio (Recommended Heavy) ↗</a> ·
+              <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio ↗</a> ·
+              <a href="#" @click.prevent="openExternalLink('https://console.groq.com/keys')">Groq ↗</a> ·
               <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
             </p>
           </div>
-        </div>
 
-        <div v-if="presetLoading" class="notice-info">Loading provider preset...</div>
-        <div v-if="error" class="error-banner">{{ error }}</div>
+          <label class="checkbox-container inline-check">
+            <input v-model="useSameLLMForHeavy" type="checkbox" class="checkbox-input" />
+            <div class="check-label">
+              <strong>Use same provider and model for heavy AI tasks</strong>
+            </div>
+          </label>
 
-        <div class="test-connection-section">
-          <div class="test-btn-group">
-            <button
-              class="test-connection-btn"
-              :class="{
-                'is-loading': isTestingLLM,
-                'is-success': testStatus === 'success',
-                'is-error': testStatus === 'error'
-              }"
-              type="button"
-              :disabled="presetLoading || isTestingLLM"
-              @click="testLLMConnection"
-            >
-              <span v-if="testStatus === 'success'">✓ {{ useSameLLMForHeavy ? 'Connected' : 'Fast Connected' }}</span>
-              <span v-else-if="testStatus === 'error'">✕ {{ useSameLLMForHeavy ? 'Connection Failed' : 'Fast Connection Failed' }}</span>
-              <span v-else-if="isTestingLLM">Testing {{ useSameLLMForHeavy ? 'Connection...' : 'Fast Connection...' }}</span>
-              <span v-else>{{ useSameLLMForHeavy ? 'Test Connection' : 'Test Fast Connection' }}</span>
-            </button>
-
-            <button
-              v-if="!useSameLLMForHeavy"
-              class="test-connection-btn"
-              :class="{
-                'is-loading': isTestingHeavyLLM,
-                'is-success': heavyTestStatus === 'success',
-                'is-error': heavyTestStatus === 'error'
-              }"
-              type="button"
-              :disabled="presetLoading || isTestingHeavyLLM"
-              @click="testHeavyLLMConnection"
-            >
-              <span v-if="heavyTestStatus === 'success'">✓ Heavy Connected</span>
-              <span v-else-if="heavyTestStatus === 'error'">✕ Heavy Connection Failed</span>
-              <span v-else-if="isTestingHeavyLLM">Testing Heavy Connection...</span>
-              <span v-else>Test Heavy Connection</span>
-            </button>
-          </div>
-
-          <span v-if="testStatusMsg" :class="['test-status-msg', testStatus]">
-            {{ testStatusMsg }}
-          </span>
-          <span v-if="!useSameLLMForHeavy && heavyTestStatusMsg" :class="['test-status-msg', heavyTestStatus]">
-            {{ heavyTestStatusMsg }}
-          </span>
-        </div>
-
-        <div class="button-row">
-          <button class="secondary-button" @click="step = 2">Back</button>
-          <button
-            class="action-button"
-            :disabled="llmSaving || presetLoading || !isLLMStepValid"
-            @click="saveLLMAndContinue"
-          >
-            {{ llmSaving ? 'Saving AI Settings...' : 'Next Step' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 4: Cloud Sync Settings -->
-      <div v-else-if="step === 4" class="step-container">
-        <h2>4. Teacher Cloud Sync (Optional)</h2>
-        <p class="description">
-          If your teacher sends assigned books and tracks progress, enter the sync details below.
-        </p>
-
-        <div class="form-group">
-          <label for="cloud-url">Cloud Server URL</label>
-          <input
-            id="cloud-url"
-            v-model="cloudSyncURL"
-            type="url"
-            placeholder="e.g. https://school-tutor.cloud/api/sync"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="api-token">Authorization API Token</label>
-          <input
-            id="api-token"
-            v-model="apiToken"
-            type="password"
-            placeholder="Enter your auth token"
-          />
-        </div>
-
-        <div class="button-row">
-          <button class="secondary-button" @click="step = 3">Back</button>
-          <button class="action-button" @click="step = 5">Next Step</button>
-        </div>
-      </div>
-
-      <!-- Step 5: RAG Settings -->
-      <div v-else-if="step === 5" class="step-container">
-        <h2>5. Local AI Retrieval</h2>
-        <p class="description">
-          Enable smart, context-aware helper tools. This sets up a local search and query system to
-          ask questions about your textbooks completely offline.
-        </p>
-
-        <div class="rag-options">
-          <label class="rag-option-card" :class="{ active: wantRag }">
-            <input v-model="wantRag" type="radio" :value="true" :disabled="isSettingUpRag" />
-            <div class="option-info">
-              <strong>Yes, Enable Local AI Search (Recommended)</strong>
-              <p>
-                Download and configure the offline search system (~152 MB). Requires Windows x64.
+          <div v-if="!useSameLLMForHeavy" class="advanced-box">
+            <div class="form-group">
+              <label for="heavy-provider">Heavy Provider</label>
+              <select
+                id="heavy-provider"
+                v-model="llmHeavy.provider"
+                @change="applyProviderPreset('heavy')"
+              >
+                <option value="gemini">Google Gemini (AI Studio)</option>
+                <option value="groq">Groq</option>
+                <option value="openai">ChatGPT / OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="custom">Custom OpenAI-compatible</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="heavy-base-url">Heavy Base URL</label>
+              <input
+                id="heavy-base-url"
+                v-model="llmHeavy.base_url"
+                type="url"
+                placeholder="https://api.groq.com/openai/v1"
+              />
+            </div>
+            <div class="form-group">
+              <label for="heavy-model">Heavy Model</label>
+              <input
+                id="heavy-model"
+                v-model="llmHeavy.model"
+                type="text"
+                placeholder="openai/gpt-oss-120b"
+              />
+            </div>
+            <div class="form-group">
+              <label for="heavy-api-key">Heavy API Key</label>
+              <input
+                id="heavy-api-key"
+                v-model="llmHeavyKey"
+                type="password"
+                placeholder="Paste key to save in OS credential manager"
+              />
+              <p class="hint" style="margin-top: 4px; font-size: 0.8rem; opacity: 0.85">
+                Get free key:
+                <a href="#" @click.prevent="openExternalLink('https://aistudio.google.com/app/apikey')">Google AI Studio (Recommended Heavy) ↗</a> ·
+                <a href="#" @click.prevent="openExternalLink('https://openrouter.ai/keys')">OpenRouter ↗</a>
               </p>
             </div>
-          </label>
-
-          <label class="rag-option-card" :class="{ active: !wantRag }">
-            <input v-model="wantRag" type="radio" :value="false" :disabled="isSettingUpRag" />
-            <div class="option-info">
-              <strong>No, Skip Offline Search</strong>
-              <p>AI Q&A will be limited in the reader, falling back to simple keyword matching.</p>
-            </div>
-          </label>
-        </div>
-
-        <!-- Progress block during setup -->
-        <div v-if="isSettingUpRag || ragSetupCompleted || ragError" class="rag-setup-box">
-          <div class="setup-header">
-            <span class="status-badge" :class="ragStatus">{{ ragStatus.toUpperCase() }}</span>
-            <span class="setup-msg">{{ ragMessage }}</span>
           </div>
 
-          <div class="progress-bar-mini">
-            <div class="progress-fill-mini" :style="{ width: ragPercent + '%' }"></div>
+          <div v-if="presetLoading" class="notice-info">Loading provider preset...</div>
+          <div v-if="error" class="error-banner">{{ error }}</div>
+
+          <div class="test-connection-section">
+            <div class="test-btn-group">
+              <button
+                class="test-connection-btn"
+                :class="{
+                  'is-loading': isTestingLLM,
+                  'is-success': testStatus === 'success',
+                  'is-error': testStatus === 'error'
+                }"
+                type="button"
+                :disabled="presetLoading || isTestingLLM"
+                @click="testLLMConnection"
+              >
+                <span v-if="testStatus === 'success'">✓ {{ useSameLLMForHeavy ? 'Connected' : 'Fast Connected' }}</span>
+                <span v-else-if="testStatus === 'error'">✕ {{ useSameLLMForHeavy ? 'Connection Failed' : 'Fast Connection Failed' }}</span>
+                <span v-else-if="isTestingLLM">Testing {{ useSameLLMForHeavy ? 'Connection...' : 'Fast Connection...' }}</span>
+                <span v-else>{{ useSameLLMForHeavy ? 'Test Connection' : 'Test Fast Connection' }}</span>
+              </button>
+
+              <button
+                v-if="!useSameLLMForHeavy"
+                class="test-connection-btn"
+                :class="{
+                  'is-loading': isTestingHeavyLLM,
+                  'is-success': heavyTestStatus === 'success',
+                  'is-error': heavyTestStatus === 'error'
+                }"
+                type="button"
+                :disabled="presetLoading || isTestingHeavyLLM"
+                @click="testHeavyLLMConnection"
+              >
+                <span v-if="heavyTestStatus === 'success'">✓ Heavy Connected</span>
+                <span v-else-if="heavyTestStatus === 'error'">✕ Heavy Connection Failed</span>
+                <span v-else-if="isTestingHeavyLLM">Testing Heavy Connection...</span>
+                <span v-else>Test Heavy Connection</span>
+              </button>
+            </div>
+
+            <span v-if="testStatusMsg" :class="['test-status-msg', testStatus]">
+              {{ testStatusMsg }}
+            </span>
+            <span v-if="!useSameLLMForHeavy && heavyTestStatusMsg" :class="['test-status-msg', heavyTestStatus]">
+              {{ heavyTestStatusMsg }}
+            </span>
           </div>
 
-          <p class="setup-detail">{{ ragDetail }}</p>
-
-          <div v-if="ragError" class="error-banner">{{ ragError }}</div>
+          <div class="button-row">
+            <button class="secondary-button" @click="step = 2">Back</button>
+            <button
+              class="action-button"
+              :disabled="llmSaving || presetLoading || !isLLMStepValid"
+              @click="saveLLMAndContinue"
+            >
+              {{ llmSaving ? 'Saving AI Settings...' : 'Next Step' }}
+            </button>
+          </div>
         </div>
 
-        <div class="button-row">
-          <button class="secondary-button" :disabled="isSettingUpRag" @click="step = 4">
-            Back
-          </button>
+        <!-- Step 4: Cloud Sync Settings -->
+        <div class="step-container" :class="{ 'is-active': step === 4, 'is-hidden': step !== 4 }">
+          <h2>4. Teacher Cloud Sync (Optional)</h2>
+          <p class="description">
+            If your teacher sends assigned books and tracks progress, enter the sync details below.
+          </p>
 
-          <button
-            v-if="wantRag && !ragSetupCompleted"
-            class="action-button"
-            :disabled="isSettingUpRag"
-            @click="startRagSetup"
-          >
-            {{ isSettingUpRag ? 'Setting Up...' : 'Initialize Local AI' }}
-          </button>
+          <div class="form-group">
+            <label for="cloud-url">Cloud Server URL</label>
+            <input
+              id="cloud-url"
+              v-model="cloudSyncURL"
+              type="url"
+              placeholder="e.g. https://school-tutor.cloud/api/sync"
+            />
+          </div>
 
-          <button v-else class="action-button" @click="step = 6">Next Step</button>
+          <div class="form-group">
+            <label for="api-token">Authorization API Token</label>
+            <input
+              id="api-token"
+              v-model="apiToken"
+              type="password"
+              placeholder="Enter your auth token"
+            />
+          </div>
+
+          <div class="button-row">
+            <button class="secondary-button" @click="step = 3">Back</button>
+            <button class="action-button" @click="step = 5">Next Step</button>
+          </div>
         </div>
-      </div>
 
-      <!-- Step 6: Aesthetics -->
-      <div v-else-if="step === 6" class="step-container">
-        <h2>6. Choose Workspace Aesthetic</h2>
-        <p class="description">
-          Select a visual theme. Changing themes alters the colors of your study desk in real-time.
-        </p>
+        <!-- Step 5: RAG Settings -->
+        <div class="step-container" :class="{ 'is-active': step === 5, 'is-hidden': step !== 5 }">
+          <h2>5. Local AI Retrieval</h2>
+          <p class="description">
+            Enable smart, context-aware helper tools. This sets up a local search and query system to
+            ask questions about your textbooks completely offline.
+          </p>
 
-        <div class="theme-grid">
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'dark-gruvbox' }"
-            @click="selectTheme('dark-gruvbox')"
-          >
-            <div class="theme-preview dark-gruvbox">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
+          <div class="rag-options">
+            <label class="rag-option-card" :class="{ active: wantRag }">
+              <input v-model="wantRag" type="radio" :value="true" :disabled="isSettingUpRag" />
+              <div class="option-info">
+                <strong>Yes, Enable Local AI Search (Recommended)</strong>
+                <p>
+                  Download and configure the offline search system (~152 MB). Requires Windows x64.
+                </p>
+              </div>
+            </label>
+
+            <label class="rag-option-card" :class="{ active: !wantRag }">
+              <input v-model="wantRag" type="radio" :value="false" :disabled="isSettingUpRag" />
+              <div class="option-info">
+                <strong>No, Skip Offline Search</strong>
+                <p>AI Q&A will be limited in the reader, falling back to simple keyword matching.</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Progress block during setup -->
+          <div v-if="isSettingUpRag || ragSetupCompleted || ragError" class="rag-setup-box">
+            <div class="setup-header">
+              <span class="status-badge" :class="ragStatus">{{ ragStatus.toUpperCase() }}</span>
+              <span class="setup-msg">{{ ragMessage }}</span>
             </div>
-            <span class="theme-label">Gruvbox Dark</span>
-          </button>
 
-          <button
-            type="button"
-            class="theme-card"
-            :class="{ active: selectedTheme === 'light-classic' }"
-            @click="selectTheme('light-classic')"
-          >
-            <div class="theme-preview light-classic">
-              <span class="preview-dot primary"></span>
-              <span class="preview-dot surface"></span>
+            <div class="progress-bar-mini">
+              <div class="progress-fill-mini" :style="{ width: ragPercent + '%' }"></div>
             </div>
-            <span class="theme-label">Light Classic</span>
-          </button>
+
+            <p class="setup-detail">{{ ragDetail }}</p>
+
+            <div v-if="ragError" class="error-banner">{{ ragError }}</div>
+          </div>
+
+          <div class="button-row">
+            <button class="secondary-button" :disabled="isSettingUpRag" @click="step = 4">
+              Back
+            </button>
+
+            <button
+              v-if="wantRag && !ragSetupCompleted"
+              class="action-button"
+              :disabled="isSettingUpRag"
+              @click="startRagSetup"
+            >
+              {{ isSettingUpRag ? 'Setting Up...' : 'Initialize Local AI' }}
+            </button>
+
+            <button v-else class="action-button" @click="step = 6">Next Step</button>
+          </div>
         </div>
 
-        <div v-if="error" class="error-banner">{{ error }}</div>
+        <!-- Step 6: Aesthetics -->
+        <div class="step-container" :class="{ 'is-active': step === 6, 'is-hidden': step !== 6 }">
+          <h2>6. Choose Workspace Aesthetic</h2>
+          <p class="description">
+            Select a visual theme. Changing themes alters the colors of your study desk in real-time.
+          </p>
 
-        <div class="button-row">
-          <button class="secondary-button" @click="step = 5">Back</button>
-          <button class="action-button" :disabled="loading" @click="completeOnboarding">
-            {{ loading ? 'Configuring...' : 'Initialize Workspace' }}
-          </button>
+          <div class="theme-grid">
+            <button
+              type="button"
+              class="theme-card"
+              :class="{ active: selectedTheme === 'dark-gruvbox' }"
+              @click="selectTheme('dark-gruvbox')"
+            >
+              <div class="theme-preview dark-gruvbox">
+                <span class="preview-dot primary"></span>
+                <span class="preview-dot surface"></span>
+              </div>
+              <span class="theme-label">Gruvbox Dark</span>
+            </button>
+
+            <button
+              type="button"
+              class="theme-card"
+              :class="{ active: selectedTheme === 'light-classic' }"
+              @click="selectTheme('light-classic')"
+            >
+              <div class="theme-preview light-classic">
+                <span class="preview-dot primary"></span>
+                <span class="preview-dot surface"></span>
+              </div>
+              <span class="theme-label">Light Classic</span>
+            </button>
+          </div>
+
+          <div v-if="error" class="error-banner">{{ error }}</div>
+
+          <div class="button-row">
+            <button class="secondary-button" @click="step = 5">Back</button>
+            <button class="action-button" :disabled="loading" @click="completeOnboarding">
+              {{ loading ? 'Configuring...' : 'Initialize Workspace' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -526,6 +557,11 @@ import {
   testLLMConnection as testLLMConnectionApi,
   openURLInBrowser,
 } from '../services/appApi'
+import {
+  getGoogleCalendarUrl,
+  getOutlookCalendarUrl,
+  downloadRoutineICS,
+} from '../services/calendarService'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 
 const router = useRouter()
@@ -545,6 +581,20 @@ async function openExternalLink(url) {
   } catch {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
+}
+
+function addGoogleCalendar() {
+  const url = getGoogleCalendarUrl(studyStartTime.value || '17:00', studyEndTime.value || '18:00')
+  openExternalLink(url)
+}
+
+function addOutlookCalendar() {
+  const url = getOutlookCalendarUrl(studyStartTime.value || '17:00', studyEndTime.value || '18:00', 'Study Session')
+  openExternalLink(url)
+}
+
+function downloadCalendarICS() {
+  downloadRoutineICS(studyStartTime.value || '17:00', studyEndTime.value || '18:00')
 }
 
 const appInitials = computed(() => {
@@ -581,8 +631,9 @@ const studyDuration = computed(() => {
   const [endH, endM] = studyEndTime.value.split(':').map(Number)
   const startMinutes = startH * 60 + startM
   const endMinutes = endH * 60 + endM
-  const diff = endMinutes - startMinutes
-  if (diff <= 0) return ''
+  let diff = endMinutes - startMinutes
+  if (diff < 0) diff += 1440
+  if (diff === 0) return ''
 
   if (diff < 60) return `${diff} min`
   const hours = Math.floor(diff / 60)
@@ -646,7 +697,7 @@ const isStep1Valid = computed(() => {
     profileDeadline.value !== '' &&
     studyStartTime.value !== '' &&
     studyEndTime.value !== '' &&
-    studyStartTime.value < studyEndTime.value
+    studyStartTime.value !== studyEndTime.value
   )
 })
 
@@ -680,6 +731,7 @@ async function applyProviderPreset(tier) {
   }
 }
 
+const fastTestRevision = ref(0)
 const heavyTestRevision = ref(0)
 
 watch(
@@ -690,6 +742,7 @@ watch(
     () => llmFastKey.value,
   ],
   () => {
+    fastTestRevision.value++
     testStatus.value = null
     testStatusMsg.value = ''
   }
@@ -715,6 +768,7 @@ async function testLLMConnection() {
   testStatus.value = null
   testStatusMsg.value = ''
   error.value = ''
+  const reqRev = fastTestRevision.value
 
   try {
     const res = await testLLMConnectionApi(
@@ -725,18 +779,24 @@ async function testLLMConnection() {
       llmFastKey.value.trim()
     )
 
-    if (res.error) {
-      testStatus.value = 'error'
-      testStatusMsg.value = res.error
-    } else {
-      testStatus.value = 'success'
-      testStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+    if (reqRev === fastTestRevision.value) {
+      if (res.error) {
+        testStatus.value = 'error'
+        testStatusMsg.value = res.error
+      } else {
+        testStatus.value = 'success'
+        testStatusMsg.value = 'Connected successfully (' + (res.response || 'OK') + ')'
+      }
     }
   } catch (err) {
-    testStatus.value = 'error'
-    testStatusMsg.value = err.message || 'Connection test failed.'
+    if (reqRev === fastTestRevision.value) {
+      testStatus.value = 'error'
+      testStatusMsg.value = err.message || 'Connection test failed.'
+    }
   } finally {
-    isTestingLLM.value = false
+    if (reqRev === fastTestRevision.value) {
+      isTestingLLM.value = false
+    }
   }
 }
 
@@ -960,16 +1020,26 @@ onMounted(() => {
 
 .onboarding-card {
   width: 100%;
-  max-width: 480px; /* slightly narrower */
-  max-height: calc(100vh - 48px); /* Keep 24px margin top and bottom */
+  max-width: 620px;
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
-  border-radius: 16px; /* 2 * 8px - more compact */
-  padding: 16px 20px; /* reduced padding for a tighter fit */
-  box-shadow: 0 16px 32px rgba(45, 51, 56, 0.08);
+  border-radius: 20px;
+  padding: 24px 28px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   box-sizing: border-box;
   background: var(--surface-container-lowest);
   transition: background 0.3s ease;
-  border: none; /* No-line rule */
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  flex-direction: column;
+}
+
+.steps-deck {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Custom scrollbar for premium look */
@@ -1038,9 +1108,23 @@ h1 {
 }
 
 .step-container {
+  grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
   gap: 12px; /* 8px grid */
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.step-container.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.step-container.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 h2 {
@@ -1065,7 +1149,8 @@ h2 {
 
 /* Password wrapper styles removed in favor of native browser toggles */
 
-label, legend {
+.form-group > label:not(.checkbox-container),
+legend {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1077,8 +1162,8 @@ label, legend {
 .strategy-option label {
   font-size: inherit;
   font-weight: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
+  text-transform: none;
+  letter-spacing: normal;
   color: inherit;
   display: block;
   cursor: pointer;
@@ -1139,35 +1224,36 @@ select:focus {
   align-items: flex-start;
   gap: 10px;
   cursor: pointer;
+  text-transform: none !important;
 }
 
 .check-group {
   margin-bottom: 12px;
 }
 
-.check-label strong {
+.check-label,
+.check-label *,
+.check-label strong,
+.check-label .check-title {
   display: block;
   font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 600;
   color: var(--on-surface);
+  letter-spacing: normal;
+  text-transform: none !important;
 }
 
-.check-label .hint {
-  margin: 2px 0 0;
-  font-size: 0.75rem;
-  opacity: 0.7;
-  line-height: 1.2;
+.check-label .hint,
+.check-label p {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  line-height: 1.35;
+  text-transform: none !important;
 }
 
 .inline-check {
   margin-bottom: 12px;
-}
-
-.inline-check .check-label strong {
-  text-transform: none;
-  font-weight: 600;
 }
 
 .advanced-box {
@@ -1210,8 +1296,9 @@ select:focus {
 
 .button-row {
   display: flex;
-  gap: 16px; /* 8px grid */
-  margin-top: 8px; /* 8px grid */
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .secondary-button {
@@ -1266,10 +1353,6 @@ select:focus {
   width: 100%;
   color: var(--on-surface);
   position: relative;
-}
-
-.theme-card.locked {
-  opacity: 0.75;
 }
 
 .theme-card:hover {
@@ -1552,5 +1635,73 @@ select:focus {
 
 .test-status-msg.error {
   color: #ef4444;
+}
+
+.notice-info {
+  font-size: 12px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 4px 0 8px;
+}
+
+.test-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.routine-card {
+  background: var(--surface-container-low);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.cal-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--outline-variant) 60%, transparent);
+}
+
+.cal-sync-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cal-btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.onboarding-cal-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.onboarding-cal-btn:hover {
+  background: var(--surface-container-highest);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 </style>

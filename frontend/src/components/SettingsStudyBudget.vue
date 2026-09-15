@@ -192,8 +192,8 @@
       <SettingsToggle
         v-model="settings.reminders_enabled"
         :disabled="disabled"
-        title="Enable Study Time Chimes & Banners"
-        hint="Notify when your scheduled study session begins and concludes."
+        title="In-App Session Alerts"
+        hint="Play an audio chime and display a banner alert when your study window starts or ends while StudyLoop is open."
       />
 
       <SettingsToggle
