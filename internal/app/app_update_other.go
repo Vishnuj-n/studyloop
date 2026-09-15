@@ -3,7 +3,6 @@
 package app
 
 import (
-	"fmt"
 	"os/exec"
 )
 

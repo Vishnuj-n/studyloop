@@ -15,6 +15,7 @@ vi.mock('../services/appApi', () => ({
   getReviewSession: vi.fn(),
   recordCardReview: vi.fn(),
   getUserSettings: vi.fn(),
+  getAvailableTopics: vi.fn(),
 }))
 
 // Mock vue-router hooks

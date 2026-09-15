@@ -71,8 +71,9 @@ function handleAcknowledge() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(8px);
+  background: rgba(10, 15, 29, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 10001;
   display: flex;
   align-items: center;
@@ -87,13 +88,15 @@ function handleAcknowledge() {
 }
 
 .privacy-modal {
-  background: var(--surface-container-lowest, #0f172a);
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--surface-container-lowest, #0f172a) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.12));
   border-radius: 20px;
   padding: 28px 32px;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
   gap: 20px;
