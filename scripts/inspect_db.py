@@ -137,9 +137,14 @@ def inspect_db(db_path):
         else:
             print("\n  [!] Queue is empty and no reading tasks were generated.")
     else:
-        print("\n  [✓] Queue state healthy.")
+        print("\n  [OK] Queue state healthy.")
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="Inspect StudyLoop SQLite database state (default: %APPDATA%\\Studyloop\\Studyloop.db)")
     parser.add_argument("--dev", action="store_true", help="Inspect local development database at dev_data/Studyloop.db")
     parser.add_argument("--db", type=str, default=None, help="Custom path to Studyloop.db file")

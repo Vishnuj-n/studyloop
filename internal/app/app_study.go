@@ -216,14 +216,33 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 
 	actualReviewCards := materializedCards
 	actualReviewMinutes := safeReviewBudget
-	if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, now, materializedCards); ok {
-		queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
-		actionCounts["flashcard_review"]++
-		actualReviewCards = cards
-		actualReviewMinutes = mins
+
+	// ponytail: sum cards from existing review tasks in queueTasks
+	existingReviewCards := 0
+	for _, task := range queueTasks {
+		if task.ActionType == "flashcard_review" {
+			cards := int(math.Round(float64(task.EstimateMinutes) / scheduler.ReviewMinutesPerCard))
+			if cards <= 0 {
+				cards = 1
+			}
+			existingReviewCards += cards
+		}
 	}
 
-	deferredCards := dueCards - actualReviewCards
+	if actionCounts["flashcard_review"] == 0 && materializedCards > 0 {
+		if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, now, materializedCards); ok {
+			queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
+			actionCounts["flashcard_review"]++
+			actualReviewCards = cards
+			actualReviewMinutes = mins
+		}
+	} else if actionCounts["flashcard_review"] > 0 {
+		actualReviewCards = existingReviewCards
+		actualReviewMinutes = int(math.Ceil(float64(existingReviewCards) * scheduler.ReviewMinutesPerCard))
+	}
+
+	totalDueCards := dueCards + existingReviewCards
+	deferredCards := totalDueCards - actualReviewCards
 	if deferredCards < 0 {
 		deferredCards = 0
 	}
@@ -235,7 +254,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		ReviewMinutes:       actualReviewMinutes,
 		LearningMinutes:     learningMinutes,
 		DueReviewCards:      actualReviewCards,
-		TotalDueReviewCards: dueCards,
+		TotalDueReviewCards: totalDueCards,
 		DeferredReviewCards: deferredCards,
 		ActiveTopics:        activeTopics,
 		Tasks:               queueTasks,
@@ -346,6 +365,7 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 		var payload models.ReviewSessionPayload
 		if err := json.Unmarshal([]byte(task.PayloadJSON), &payload); err == nil && payload.CardCount > 0 {
 			estimateMinutes = int(math.Ceil(float64(payload.CardCount) * scheduler.ReviewMinutesPerCard))
+			meta = fmt.Sprintf("Spaced repetition review (%d cards)", payload.CardCount)
 		}
 	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
 		// Word-count based estimation (words / 200 WPM).

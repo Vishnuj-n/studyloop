@@ -388,7 +388,7 @@ const nonReviewTasks = computed(() => {
 
 const isReviewHero = computed(() => {
   return (
-    !!reviewTask.value && !userSettings.value.skip_to_reading_active && dueReviewCards.value > 0
+    !!reviewTask.value && !userSettings.value.skip_to_reading_active
   )
 })
 
@@ -399,7 +399,7 @@ const focusHeroTask = computed(() => {
 
 const queueTasks = computed(() => {
   if (isReviewHero.value) {
-    return nonReviewTasks.value
+    return tasks.value.filter((t) => t.id !== reviewTask.value.id)
   }
   return nonReviewTasks.value.slice(1)
 })

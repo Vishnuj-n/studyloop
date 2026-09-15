@@ -73,6 +73,7 @@ func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error)
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
+			sq.priority DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
@@ -109,6 +110,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
+			sq.priority DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
@@ -232,6 +234,7 @@ func (r *Repository) getNextTaskNoProfile(notebookID string) (models.StudyQueueT
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
+			sq.priority DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
@@ -275,6 +278,7 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
 			END DESC,
 			COALESCE(n.priority, 5) DESC,
+			sq.priority DESC,
 			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
 			COALESCE(sq.created_at, '') ASC, sq.id ASC
 		LIMIT 1
