@@ -778,7 +778,40 @@ func (r *Repository) GetProfileCompletedReadingStatsPastNDays(profileID string, 
 	return totalWords, sessionCount, nil
 }
 
-
-
-
-
+// GetPendingReadingTaskForNotebook finds the earliest pending reading task for a notebook.
+func (r *Repository) GetPendingReadingTaskForNotebook(notebookID string) (models.StudyQueueTask, error) {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return models.StudyQueueTask{}, fmt.Errorf("notebook id is required")
+	}
+	var task models.StudyQueueTask
+	var topicTitle, notebookTitle string
+	var notebookPriority int
+	err := r.db.QueryRow(`
+		SELECT
+			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
+			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
+			COALESCE(sq.payload_json, ''),
+			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
+			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
+			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		LEFT JOIN topics t ON sq.topic_id = t.id
+		WHERE sq.notebook_id = ? AND sq.task_type = 'READING' AND sq.status = 'PENDING'
+		ORDER BY sq.start_page ASC, sq.created_at ASC
+		LIMIT 1
+	`, notebookID).Scan(
+		&task.ID, &task.NotebookID, &task.TopicID, &task.TaskType, &task.Status, &task.Priority,
+		&task.CreatedAt, &task.ActivatedAt, &task.CompletedAt, &task.PayloadJSON,
+		&task.StartPage, &task.EndPage, &topicTitle, &notebookTitle, &notebookPriority,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.StudyQueueTask{}, ErrNoPendingTasks
+	}
+	if err != nil {
+		return models.StudyQueueTask{}, err
+	}
+	assignTaskTitle(&task, topicTitle, notebookTitle)
+	return task, nil
+}

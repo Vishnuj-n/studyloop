@@ -668,13 +668,15 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 		var count int
 		err := tx.QueryRow(`
 			SELECT COUNT(*) FROM study_queue
-			WHERE notebook_id = ? AND status IN ('PENDING', 'ACTIVE')
+			WHERE notebook_id = ? 
+			  AND task_type IN ('READING', 'REREAD')
+			  AND status IN ('PENDING', 'ACTIVE')
 		`, notebookID).Scan(&count)
 		if err != nil {
 			return err
 		}
 		if count > 0 {
-			return nil // Task already exists in queue
+			return nil // Reading task already exists in queue
 		}
 
 		var topicID, topicTitle, notebookTitle string

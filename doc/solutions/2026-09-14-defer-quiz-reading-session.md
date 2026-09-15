@@ -1,48 +1,67 @@
-# Deferred Quiz Reading Session Flow ("Complete & Defer Quiz")
+# Deferred Quiz & Continuous In-Book Reading Flow
 
 **Date:** 2026-09-14  
-**Module:** Reader (`frontend/src/pages/Reader.vue`), Queue & Study (`internal/app/app_study_reading.go`)
+**Module:** Reader (`frontend/src/pages/Reader.vue`), Queue & Study (`internal/app/app_study_reading.go`, `internal/db/study_queue_queries.go`)
 
 ---
 
 ## Problem & Context
 
-1. **Interrupted Flow State**: Standard queue completion in `Reader.vue` forces an immediate transition to the generated `QUIZ` view after every reading session. For users engaged in deep, continuous reading (e.g. multi-chapter books), this forces high-frequency context switching.
-2. **Architecture & Queue Constraints**: 
-   - Holding un-taken quiz states in frontend memory violates the **Thin Frontend** invariant (UI holds only ephemeral state; all mutations live in Go backend).
-   - Aggregating $N$ deferred sessions into a single composite mega-quiz at the end introduces heavy LLM token latency, RAG context explosion, and question deduplication overhead.
+1. **Interrupted Flow State**: 
+   Standard queue completion in `Reader.vue` forces an immediate transition to the generated `QUIZ` view after every reading session. When users clicked "Complete & Defer Quiz", the reader previously routed to `/dashboard`, which broke continuous focused reading for multi-chapter books.
+2. **Multi-Book Interleaving vs Continuous Reading**:
+   The study queue uses round-robin multi-book balancing and ranks `QUIZ` tasks above `READING` tasks. When a user is in the zone reading Book A, they want to read consecutive chapters of Book A without being interrupted by other books or forced quizzes.
+3. **Architecture Invariants**:
+   - UI holds only ephemeral state; all state mutations live in SQLite backend.
+   - Preserves queue multi-book round-robin balancing for when studying from the dashboard, while supporting focused in-book sprints directly in the reader.
 
 ---
 
 ## Key Solutions Implemented
 
 ### 1. Discrete Queue Tasks for Deferred Sessions
-- Instead of complex multi-session quiz merging or custom DB states, each deferred session enqueues its standard generated `QUIZ` task as `PENDING` into `study_queue` in SQLite (`dev_data/Studyloop.db`).
-- Fits the core **Deterministic Queue Progression** invariant. The queue handles Quiz 1, Quiz 2, and Quiz 3 naturally via task priority and FIFO ordering.
-- If the application closes or crashes during a reading spree, no quiz state is lost.
+- Each deferred session generates its `QUIZ` task and enqueues it as `PENDING` into `study_queue` in SQLite.
+- Fits the **Deterministic Queue Progression** invariant. The queue accumulates quizzes naturally for review later.
 
-### 2. Split Button UI (`Reader.vue`)
-- Converted the single `[ Complete Session ]` button into a split button:
-  - **Primary Button**: `[ Complete Session ]` (default: completes session and immediately starts quiz).
-  - **Chevron Button (`▾`)**: Opens a dropdown menu containing `"Complete & Defer Quiz"`.
-- Handled dropdown toggle with auto-closing on outside clicks (`handleDocumentClick`).
+### 2. Automatic In-Book Next-Task Seeding (`internal/app/app_study_reading.go`)
+- On `CompleteReading(taskID)`:
+  - Seeds the next reading range for the current notebook via `EnsurePendingReadingTaskForNotebook(notebookID, targetWords)`.
+  - Fetches the next reading task with `repo.GetPendingReadingTaskForNotebook(notebookID)` and returns `next_reading_task` in the RPC response:
+    ```json
+    {
+      "ok": true,
+      "quiz_task_id": "...",
+      "next_reading_task": {
+        "id": "task-read-...",
+        "notebook_id": "...",
+        "topic_id": "...",
+        "start_page": 11,
+        "end_page": 20
+      }
+    }
+    ```
 
-### 3. Navigation & Error Resilience
-- When `"Complete & Defer Quiz"` is selected:
-  - `completeReading(taskID)` generates the quiz and persists it as `PENDING` in SQLite.
-  - The frontend redirects to `/dashboard` so the user can continue their study queue without taking the quiz immediately.
-  - If quiz generation fails (e.g. LLM timeout), `RevertTaskReservation(taskID)` is invoked in Go backend, returning the reading task to `ACTIVE` state without losing progress, and an inline toast displays the error for retry.
+### 3. Seamless In-Reader Progression (`frontend/src/pages/Reader.vue`)
+- In `completeSession(deferQuiz = true)`:
+  - If `next_reading_task` is returned:
+    - Shows notice: *"Quiz saved to queue! Continuing with next reading session..."*
+    - Updates route query and triggers `resolveTaskContext()` for the next section.
+    - User stays inside the reader without page reload or dashboard kickout.
+  - If all reading for the book is complete:
+    - Shows notice and navigates to `/dashboard`.
 
 ---
 
-## Architecture & Design Rationale
+## Architecture & Invariants Preserved
 
-- **Zero DB Schema Mutations**: Reuses existing `study_queue` table and task lifecycle events (`COMPLETE_READING`).
-- **Thin Frontend Compliance**: Enqueued quiz items are written directly to SQLite by the Go backend before navigation.
-- **Unbroken Reading Flow**: Reader can complete multiple sessions in succession while building a clean backlog of active recall quizzes in the study queue.
+- **Zero Schema Mutations**: Uses existing `study_queue` and task lifecycle events (`COMPLETE_READING`).
+- **Thin Frontend Compliance**: State transitions and next-task seeding are handled transactionally in the Go backend.
+- **Queue Interleaving Untouched**: Global multi-book queue balance remains intact for normal dashboard study.
 
 ---
 
 ## Verification
 
-- **Go Backend Test Verification**: `go test -short ./internal/...` → **PASS** (100% success across `internal/app`, `internal/db`, `internal/study`).
+- **Go Backend Tests**: `go test -short ./internal/...` → **PASS** (100% across `internal/app`, `internal/db`, `internal/study`).
+- **Frontend Integration Tests**: `npm test` → **PASS** (14 test files, 49 tests passed).
+

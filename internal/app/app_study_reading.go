@@ -230,11 +230,33 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	return map[string]interface{}{
+	resp := map[string]interface{}{
 		"ok":           true,
 		"quiz_task_id": transitionRes.NextTaskID,
 		"rewards":      transitionRes.Rewards,
 	}
+
+	// Auto-seed and return the next continuous reading task for this notebook if available
+	if task.NotebookID != "" {
+		targetWords := 600
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
+			targetWords = settings.TargetSessionWords
+		}
+		if seedErr := repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords); seedErr != nil {
+			utils.Warnf("[COMPLETE_SESSION] EnsurePendingReadingTaskForNotebook err: %v", seedErr)
+		} else if nextTask, err := repo.GetPendingReadingTaskForNotebook(task.NotebookID); err == nil && nextTask.ID != "" {
+			resp["next_reading_task"] = map[string]interface{}{
+				"id":          nextTask.ID,
+				"notebook_id": nextTask.NotebookID,
+				"topic_id":    nextTask.TopicID,
+				"start_page":  nextTask.StartPage,
+				"end_page":    nextTask.EndPage,
+			}
+			utils.Infof("[COMPLETE_SESSION] Next continuous reading task seeded: id=%s topicID=%s pages=%d-%d", nextTask.ID, nextTask.TopicID, nextTask.StartPage, nextTask.EndPage)
+		}
+	}
+
+	return resp
 }
 
 // GetReadingTaskHistory returns historical reading tasks with pagination for developer diagnostics.
