@@ -1,50 +1,36 @@
-# What's New – v1.6.0
+# What's New – v1.7.0
 
 ## ✨ Features
-- **Continuous Reading & Deferred Quiz**  
-  - Readers can now finish a session without being forced into an immediate quiz. Selecting **“Complete & Defer Quiz”** queues the generated quiz as a pending task, keeping the reading flow uninterrupted.  
-  - Backend now auto‑seeds and fetches the next reading task for a notebook, preserving momentum across sessions.
+- **Seamless in‑app auto‑updater**  
+  Users can now download and install the latest version directly from the application. The updater streams the installer with real‑time progress, uses a detached PowerShell worker on Windows to avoid file‑lock issues, and falls back gracefully on other platforms. UI components in Settings and the startup modal show download status and let users trigger updates.
 
-- **Expanded Study‑Queue Task Types**  
-  - The queue now recognises `QUIZ`, `MILESTONE_EXAM`, and `SOCRATIC_REMEDIAL` tasks when checking for pending reading work, preventing duplicate task creation.  
-  - Added `scripts/inspect_db.py` for quick database inspection.
+- **Anonymous usage telemetry**  
+  A lightweight, fire‑and‑forget heartbeat now reports version, platform, and architecture information to help the team understand adoption patterns. All data is anonymized, stored with row‑level security, and automatically purged after 90 days.
 
-- **Developer Mode & Diagnostics**  
-  - New panel in Settings provides:  
-    - Real‑time LLM prompt logging toggle.  
-    - Quick shortcuts to open the app’s data and logs folders.  
-    - Reading Task History diagnostics and a modular DB split option.
+- **Contributing guide & updated README**  
+  New `CONTRIBUTING.md` and refreshed documentation sections make it easier for newcomers to get involved and understand the project’s workflow.
 
-- **LLM Provider Key Synchronisation & Validation**  
-  - Heavy‑tier API key automatically mirrors the fast‑tier key when the providers match or when “use same for heavy” is enabled.  
-  - Basic validation now warns about mismatched key prefixes (e.g., Groq vs. Gemini).
-
-- **Reading Bounds by Word Budget**  
-  - Reading sessions respect the user‑defined `TargetSessionWords` setting.  
-  - Word‑count‑based calculations cap session length with a 30 % buffer, ensuring sessions stay within the desired size.
-
-- **Reader UI Enhancements**  
-  - Added a split‑button for **“Complete”** vs. **“Complete & Defer Quiz”**.  
-  - Updated default PDF zoom to 100 % for a more natural view.
+- **Privacy policy & transparency**  
+  Added a comprehensive `PRIVACY.md` that explains the app’s local‑first design and telemetry practices. A one‑time privacy notice modal is shown to new users, and settings now use “Privacy & Data” terminology.
 
 ## 🚀 Improvements
-- **Session Completion Flow** – Streamlined UI consistency across the reader and rewards shop.  
-- **Chunk Payload Limits** – Enforced word‑count caps on chunk responses, reducing data transfer and aligning with user session preferences.  
-- **Dashboard Telemetry** – Daily reading session stats now include completed `READING` tasks for better insight.
+- **Privacy modal redesign** – Updated styling with `color-mix` for smoother transparency effects and refined backdrop filters.
+- **Onboarding flow revamp** – Switched to a deck‑based step system for smoother transitions and clearer navigation.
+- **Settings UI polish** – Updated labels (e.g., “In‑App Session Alerts”) and clarified alert behavior hints.
+- **Asset manager performance** – Added SHA‑256 checksum verification to make file copying idempotent, reducing unnecessary disk I/O.
+- **Telemetry endpoint resolution** – Simplified logic in the heartbeat module for faster execution.
+- **Startup backup resilience** – Backup mechanism now uses a timestamped ring buffer retaining the last three backups, protecting against data loss during repeated crashes.
+- **Test suite enhancements** – Expanded frontend mocks for gamification and topic services; cleaned up backend test utilities.
 
 ## 🐛 Bug Fixes
-- Fixed missing `gamification-updated` event after item purchases, allowing UI components to react correctly.  
-- Preserved sub‑session reading bounds and enforced the target session word‑budget ceiling.  
-- Corrected PDF default zoom from 70 % to 100 %.  
-- Adjusted release‑notes modal layout to prevent scrollbar shifts.  
-- Updated UI to dispatch proper events and maintain layout stability.
+*No critical bugs were reported in this release.*
 
 ## 🧹 Maintenance
-- Version bump to **v1.6.0**.  
-- Updated release notes for the previous v1.5.0 release.  
+- Clarified the `.gitignore` comment regarding Wails‑generated bindings.
+- Minor code clean‑ups and refactoring across UI and backend components.
 
 ## 📦 Full Changelog
-[View all changes on GitHub](#)
+For a complete list of changes, see the repository’s commit history.
 
 ---
 
