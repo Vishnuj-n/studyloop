@@ -36,3 +36,24 @@ func TestCheckForUpdates(t *testing.T) {
 		t.Errorf("Expected current_version to be populated in CheckForUpdates response, got %v", res["current_version"])
 	}
 }
+
+func TestAssetSelection(t *testing.T) {
+	assets := []gitHubAsset{
+		{Name: "rag-assets.zip", BrowserDownloadURL: "https://example.com/rag.zip", Size: 100},
+		{Name: "Studyloop-Setup.exe", BrowserDownloadURL: "https://example.com/setup.exe", Size: 200},
+	}
+
+	var downloadURL, assetName string
+	for _, asset := range assets {
+		lower := strings.ToLower(asset.Name)
+		if strings.HasSuffix(lower, ".exe") || strings.HasSuffix(lower, "-setup.exe") || strings.HasSuffix(lower, "-installer.exe") {
+			downloadURL = asset.BrowserDownloadURL
+			assetName = asset.Name
+			break
+		}
+	}
+
+	if downloadURL != "https://example.com/setup.exe" || assetName != "Studyloop-Setup.exe" {
+		t.Fatalf("Asset selection failed, got url=%s name=%s", downloadURL, assetName)
+	}
+}

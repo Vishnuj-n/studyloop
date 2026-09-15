@@ -1,9 +1,26 @@
 package embeddings
 
 import (
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+func tokenizerAssetPath(t *testing.T) string {
+	t.Helper()
+
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("failed to resolve caller path")
+	}
+	path := filepath.Join(filepath.Dir(file), "testdata", "tokenizer.json")
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("failed to resolve tokenizer path: %v", err)
+	}
+	return absPath
+}
 
 func TestCountTokensUsesTokenizer(t *testing.T) {
 	if err := InitPromptTokenizer(tokenizerAssetPath(t)); err != nil {

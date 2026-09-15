@@ -160,8 +160,9 @@ wails build -tags sqlite_extension
 	- On macOS/Linux: Install Xcode Command Line Tools or build-essential
 	- On Windows: Windows builds do not require a C compiler or CGO; ensure build uses `db/extension_nocgo.go`
 
-## Documentation
+## Documentation & Contributing
 
+- Contributing Guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Developer Onboarding & Handover: [doc/DEVELOPER_ONBOARDING.md](doc/DEVELOPER_ONBOARDING.md)
 - System design & Invariants: [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md)
 - App flow and user interactions: [doc/APP_FLOW.md](doc/APP_FLOW.md)

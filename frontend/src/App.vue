@@ -7,6 +7,7 @@ import MysteryChestModal from './components/MysteryChestModal.vue'
 import RewardToast from './components/RewardToast.vue'
 import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
+import PrivacyNoticeModal from './components/PrivacyNoticeModal.vue'
 import {
   getUserSettings,
   updateUserSettings,
@@ -14,6 +15,7 @@ import {
   checkForUpdates,
   getReleaseNotes,
   openRepoURL,
+  downloadAndApplyUpdate,
 } from './services/appApi'
 import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
@@ -231,6 +233,9 @@ function closeBanner() {
 const showUpdateModal = ref(false)
 const currentVersion = ref('')
 const latestVersion = ref('')
+const updatingModal = ref(false)
+const updateModalProgress = ref(0)
+const updateModalStatus = ref('')
 
 const pendingReward = ref(null)
 const activeChest = ref(null)
@@ -272,6 +277,25 @@ async function checkAppUpdates() {
   }
 }
 
+async function performModalAutoUpdate() {
+  updatingModal.value = true
+  updateModalProgress.value = 0
+  updateModalStatus.value = 'Downloading update...'
+  try {
+    const res = await downloadAndApplyUpdate()
+    if (res?.error) {
+      showError(res.error, 'Update Failed')
+      updatingModal.value = false
+    } else {
+      updateModalStatus.value = 'Restarting to apply update...'
+      updateModalProgress.value = 100
+    }
+  } catch (err) {
+    showError(err.message || 'Update failed', 'Update Error')
+    updatingModal.value = false
+  }
+}
+
 function goToUpdatePage() {
   showUpdateModal.value = false
   openRepoURL()
@@ -305,6 +329,20 @@ function handleDismissReleaseNotes() {
   showReleaseNotesPopup.value = false
 }
 
+const showPrivacyNoticePopup = ref(false)
+
+function checkOneTimePrivacyNotice() {
+  const seenPrivacy = localStorage.getItem('studyloop_seen_privacy_notice_v1')
+  if (!seenPrivacy) {
+    showPrivacyNoticePopup.value = true
+  }
+}
+
+function handleDismissPrivacyNotice() {
+  localStorage.setItem('studyloop_seen_privacy_notice_v1', 'true')
+  showPrivacyNoticePopup.value = false
+}
+
 let cancelIngestionListener = null
 
 onMounted(() => {
@@ -312,6 +350,7 @@ onMounted(() => {
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()
   checkOneTimeReleaseNotes()
+  checkOneTimePrivacyNotice()
   cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
   window.addEventListener('study-reward-earned', handleStudyReward)
 })
@@ -347,15 +386,43 @@ onUnmounted(() => {
                 <span class="version-arrow">→</span>
                 <span class="version-badge latest">v{{ latestVersion }}</span>
               </div>
-              <p class="warning-text">
-                Click "Get Update" to go to the releases repository and download the latest version.
+              <p v-if="!updatingModal" class="warning-text">
+                Click "Update Now" to download and install automatically, or open GitHub to download manually.
               </p>
+
+              <!-- Modal Update Progress -->
+              <div v-if="updatingModal" class="modal-progress-container">
+                <div class="modal-progress-header">
+                  <span>{{ updateModalStatus }}</span>
+                  <span class="modal-progress-pct">{{ updateModalProgress.toFixed(0) }}%</span>
+                </div>
+                <div class="modal-progress-track">
+                  <div class="modal-progress-fill" :style="{ width: updateModalProgress + '%' }"></div>
+                </div>
+              </div>
             </div>
             <div class="update-modal-footer">
-              <button class="modal-btn secondary" @click="showUpdateModal = false">
+              <button
+                v-if="!updatingModal"
+                class="modal-btn secondary"
+                @click="showUpdateModal = false"
+              >
                 Remind Me Later
               </button>
-              <button class="modal-btn primary" @click="goToUpdatePage">Get Update</button>
+              <button
+                v-if="!updatingModal"
+                class="modal-btn secondary"
+                @click="goToUpdatePage"
+              >
+                GitHub
+              </button>
+              <button
+                v-if="!updatingModal"
+                class="modal-btn primary"
+                @click="performModalAutoUpdate"
+              >
+                Update Now
+              </button>
             </div>
           </div>
         </div>
@@ -434,6 +501,12 @@ onUnmounted(() => {
         :version="releaseNotesVersion"
         :raw-notes="releaseNotesText"
         @close="handleDismissReleaseNotes"
+      />
+
+      <!-- One-time Privacy Notice Modal -->
+      <PrivacyNoticeModal
+        :visible="showPrivacyNoticePopup"
+        @close="handleDismissPrivacyNotice"
       />
 
       <!-- Global Toaster -->
@@ -750,5 +823,43 @@ onUnmounted(() => {
 .modal-btn.secondary:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--on-surface, #ffffff);
+}
+
+.modal-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.modal-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.modal-progress-pct {
+  color: var(--primary, #6366f1);
+  font-family: monospace;
+}
+
+.modal-progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.1));
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.modal-progress-fill {
+  height: 100%;
+  background: var(--primary, #6366f1);
+  border-radius: 99px;
+  transition: width 0.15s ease-out;
 }
 </style>

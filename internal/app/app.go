@@ -17,6 +17,7 @@ import (
 	"ai-tutor/internal/runtime"
 	"ai-tutor/internal/scheduler"
 	"ai-tutor/internal/study"
+	"ai-tutor/internal/telemetry"
 	"ai-tutor/internal/utils"
 	pomoevents "ai-tutor/internal/pomodoro/infra/events"
 	pomoaudio "ai-tutor/internal/pomodoro/services/audio"
@@ -165,6 +166,9 @@ func (a *App) startup(ctx context.Context) {
 	a.aiInitError = boot.AiInitError
 
 	a.initIndexQueue(ctx, boot.Repo)
+
+	// Send minimal anonymous heartbeat ping asynchronously on launch
+	telemetry.SendHeartbeat(boot.Repo, getAppVersion())
 
 	if ctx != nil {
 		emitter := pomoevents.NewWailsEmitter(ctx)

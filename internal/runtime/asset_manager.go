@@ -607,17 +607,28 @@ func copyFileWithProgress(src, dst string, startPct, endPct int, msg, detail str
 		return nil
 	}
 
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	totalSize := srcInfo.Size()
+
+	if dstInfo, err := os.Stat(dst); err == nil {
+		if srcInfo.Size() == dstInfo.Size() {
+			srcHash, err1 := computeSHA256(src)
+			dstHash, err2 := computeSHA256(dst)
+			if err1 == nil && err2 == nil && srcHash == dstHash {
+				cb("acquiring", endPct, msg, detail)
+				return nil
+			}
+		}
+	}
+
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
-
-	stat, err := in.Stat()
-	if err != nil {
-		return err
-	}
-	totalSize := stat.Size()
 
 	out, err := os.Create(dst)
 	if err != nil {
@@ -665,6 +676,16 @@ func copyFile(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
+	}
+
+	if dstInfo, err := os.Stat(dst); err == nil {
+		if srcInfo.Size() == dstInfo.Size() {
+			srcHash, err1 := computeSHA256(src)
+			dstHash, err2 := computeSHA256(dst)
+			if err1 == nil && err2 == nil && srcHash == dstHash {
+				return nil
+			}
+		}
 	}
 
 	in, err := os.Open(src)

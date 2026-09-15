@@ -270,6 +270,16 @@ Data chain: `reference_id → flashcards.id → chunks.id → notebook_topics.to
 
 ---
 
+## App Lifecycle & Update API
+
+### CheckForUpdates
+Checks latest version tag from repository and returns whether update is available.
+
+### DownloadAndApplyUpdate
+Downloads latest release installer binary to temporary directory, emits `update:progress` events to frontend, launches detached installer process waiting on main application PID exit, and terminates current application instance cleanly.
+
+---
+
 ## Error Handling
 
 | Error | Code | Description |

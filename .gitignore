@@ -9,7 +9,8 @@ asset/vec0.dll
 .env
 .gocache/
 .gomodcache/
-# Wails generated bindings
+# Wails generated bindings at root only
+/wailsjs/
 wailsjs/
 test_notes/
 build/

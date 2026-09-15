@@ -3,8 +3,6 @@
 package embeddings
 
 import (
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -136,21 +134,6 @@ func TestMeanPoolBatch(t *testing.T) {
 
 	res1 := meanPool(data[4:8], 2, 2, mask[2:4])
 	assertFloat32SliceClose(t, res1, []float32{6, 7})
-}
-
-func tokenizerAssetPath(t *testing.T) string {
-	t.Helper()
-
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatalf("failed to resolve caller path")
-	}
-	path := filepath.Join(filepath.Dir(file), "testdata", "tokenizer.json")
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		t.Fatalf("failed to resolve tokenizer path: %v", err)
-	}
-	return absPath
 }
 
 func assertFloat32SliceClose(t *testing.T, got, want []float32) {
