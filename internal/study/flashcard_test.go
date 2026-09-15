@@ -54,3 +54,49 @@ func TestBuildMarathonFlashcardPromptWithBudget_EmptyChunks(t *testing.T) {
 		t.Errorf("expected no chunk lines for empty context, got:\n%s", prompt)
 	}
 }
+
+func TestBuildMarathonFlashcardPromptWithBudget_MitigatesMisconceptionBias(t *testing.T) {
+	chunks := []models.ChunkWithContext{
+		{ChunkID: "c1", PageNum: 1, Text: "Matrix operations definition."},
+		{ChunkID: "c2", PageNum: 2, Text: "Eigenvectors and eigenvalues properties."},
+		{ChunkID: "c3", PageNum: 3, Text: "Singular Value Decomposition applications."},
+	}
+
+	failed := []models.FailedQuestionDetail{
+		{
+			Prompt:        "What is an Eigenvector?",
+			CorrectAnswer: "A vector whose direction does not change under linear transform.",
+			UserAnswer:    "A zero vector with constant magnitude.",
+		},
+	}
+
+	prompt, _, includedIDs := buildMarathonFlashcardPromptWithBudget("Linear Algebra", 1, 3, chunks, 5, 8000, failed)
+
+	if len(includedIDs) != 3 {
+		t.Errorf("expected 3 included chunk IDs, got %d", len(includedIDs))
+	}
+
+	// Verify misconception section header
+	if !strings.Contains(prompt, "=== TARGETED REVIEW: TOPICS NEEDING REINFORCEMENT ===") {
+		t.Errorf("prompt missing topics needing reinforcement section")
+	}
+
+	// Verify tested concept and correct answer are included
+	if !strings.Contains(prompt, "What is an Eigenvector?") || !strings.Contains(prompt, "A vector whose direction does not change under linear transform.") {
+		t.Errorf("prompt missing correct concept or ground truth")
+	}
+
+	// Verify false distractor (user answer) is omitted to avoid negative prompting
+	if strings.Contains(prompt, "User's wrong selection:") || strings.Contains(prompt, "A zero vector with constant magnitude.") {
+		t.Errorf("prompt contains distractor or user wrong selection, which introduces negative priming")
+	}
+
+	// Verify balanced coverage instructions
+	if !strings.Contains(prompt, "Ensure balanced concept coverage evenly distributed") {
+		t.Errorf("prompt missing balanced concept coverage rule")
+	}
+	if !strings.Contains(prompt, "Generate up to 6 flashcards total: 5 balanced coverage cards across pages 1-3, plus 1 targeted reinforcement card(s)") {
+		t.Errorf("prompt missing explicit quota breakdown instruction, got:\n%s", prompt)
+	}
+}
+

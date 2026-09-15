@@ -273,6 +273,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 		availableBudget = 1000 // Minimum budget for meaningful content
 	}
 
+	baseTargetCount := targetCount
 	// ponytail: increment target count by failed questions count to generate extra targeted corrective cards
 	if len(failedQuestions) > 0 {
 		targetCount += len(failedQuestions)
@@ -285,12 +286,12 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
 
 	if len(failedQuestions) > 0 {
-		b.WriteString("\n=== TARGETED REVIEW: MISCONCEPTIONS ===\n")
-		b.WriteString("The user recently took a quiz and got these questions wrong. You MUST generate targeted corrective flashcards (at least 1 per misconception) specifically addressing the concepts, definitions, or facts tested in these incorrect questions to correct their understanding:\n")
+		b.WriteString("\n=== TARGETED REVIEW: TOPICS NEEDING REINFORCEMENT ===\n")
+		b.WriteString("The user recently took a quiz and missed questions on the following concepts. Generate targeted corrective flashcards (1 per concept) addressing the core principles tested below:\n")
 		for _, q := range failedQuestions {
-			fmt.Fprintf(&b, "- Quiz Question: %s | Correct Answer: %s | User's wrong selection: %s\n", q.Prompt, q.CorrectAnswer, q.UserAnswer)
+			fmt.Fprintf(&b, "- Tested Concept: %s | Correct Ground Truth: %s\n", q.Prompt, q.CorrectAnswer)
 		}
-		b.WriteString("\n")
+		b.WriteString("CRITICAL: Do NOT allow these targeted topics to crowd out or replace baseline coverage for the remaining pages.\n\n")
 	}
 
 	b.WriteString("\n=== JSON FORMAT (FOLLOW EXACTLY) ===\n")
@@ -299,6 +300,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	b.WriteString("- Use ONLY the information contained in the provided source material.\n")
 	b.WriteString("- Do not use outside knowledge or invent information.\n")
 	b.WriteString("- Generate cards from important, learnable concepts rather than minor details.\n")
+	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
 	b.WriteString("- Concepts may be synthesized across multiple source chunks.\n")
 	b.WriteString("- The cards belong to the requested page range; exact chunk attribution is not required.\n")
 	b.WriteString("\n=== ADAPTIVE CONTENT RULES ===\n")
@@ -319,7 +321,11 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	b.WriteString("- Preserve the terminology and meaning of the source.\n")
 	b.WriteString("- Do not add information that is not supported by the source.\n")
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "Generate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	if len(failedQuestions) > 0 {
+		fmt.Fprintf(&b, "Generate up to %d flashcards total: %d balanced coverage cards across pages %d-%d, plus %d targeted reinforcement card(s) for the missed concepts above.\n", targetCount, baseTargetCount, startPage, endPage, len(failedQuestions))
+	} else {
+		fmt.Fprintf(&b, "Generate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	}
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 
@@ -378,11 +384,11 @@ func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targ
 	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
 
 	if len(failedQuestions) > 0 {
-		b.WriteString("\n=== TARGETED REVIEW: MISCONCEPTIONS ===\n")
+		b.WriteString("\n=== TARGETED REVIEW: TOPICS NEEDING REINFORCEMENT ===\n")
 		for _, q := range failedQuestions {
-			fmt.Fprintf(&b, "- Quiz Question: %s | Correct Answer: %s | User's wrong selection: %s\n", q.Prompt, q.CorrectAnswer, q.UserAnswer)
+			fmt.Fprintf(&b, "- Tested Concept: %s | Correct Ground Truth: %s\n", q.Prompt, q.CorrectAnswer)
 		}
-		b.WriteString("\n")
+		b.WriteString("CRITICAL: Do NOT allow these targeted topics to crowd out or replace baseline coverage for the remaining pages.\n\n")
 	}
 
 	b.WriteString("\n=== JSON FORMAT (FOLLOW EXACTLY) ===\n")
@@ -391,6 +397,7 @@ func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targ
 	b.WriteString("- Use ONLY the information contained in the provided source material.\n")
 	b.WriteString("- Do not use outside knowledge or invent information.\n")
 	b.WriteString("- Generate cards from important, learnable concepts rather than minor details.\n")
+	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
 	b.WriteString("- Concepts may be synthesized across multiple source chunks.\n")
 	b.WriteString("- The cards belong to the requested page range; exact chunk attribution is not required.\n")
 	b.WriteString("\n=== ADAPTIVE CONTENT RULES ===\n")
