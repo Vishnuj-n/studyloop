@@ -607,9 +607,39 @@ async function completeSession(deferQuiz = false) {
     }
 
     if (deferQuiz) {
-      console.warn('[COMPLETE_SESSION] Quiz deferred to queue. Routing to dashboard.')
-      showNotice('Reading session complete! Quiz saved to your queue for later.', 'Quiz Deferred')
-      await router.push('/dashboard')
+      if (done?.next_reading_task) {
+        const next = done.next_reading_task
+        console.warn('[COMPLETE_SESSION] Quiz deferred. Continuing to next reading task in current book:', next)
+        showNotice('Quiz saved to queue! Continuing with next reading session...', 'Quiz Deferred')
+        // Update URL query seamlessly to reflect next task
+        await router.replace({
+          query: {
+            ...route.query,
+            taskId: next.id,
+            task_id: next.id,
+            notebookId: next.notebook_id,
+            notebook_id: next.notebook_id,
+            topicId: next.topic_id,
+            topic_id: next.topic_id,
+            startPage: next.start_page,
+            start_page: next.start_page,
+            endPage: next.end_page,
+            end_page: next.end_page,
+          },
+        })
+        await resolveTaskContext({
+          taskId: next.id,
+          task_id: next.id,
+          notebookId: next.notebook_id,
+          topicId: next.topic_id,
+          startPage: next.start_page,
+          endPage: next.end_page,
+        })
+      } else {
+        console.warn('[COMPLETE_SESSION] Quiz deferred to queue. All book reading complete. Routing to dashboard.')
+        showNotice('Reading complete for this book! Quiz saved to your queue for later.', 'Quiz Deferred')
+        await router.push('/dashboard')
+      }
     } else {
       const nextRoute = done?.quiz_task_id ? `/quiz?taskId=${done.quiz_task_id}` : '/dashboard'
       console.warn('[COMPLETE_SESSION] completeSession() before router.push', {
@@ -804,19 +834,34 @@ h3 {
   gap: 10px;
 }
 
-.stage-head-left {
+.stage-head-left,
+.stage-head-right {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   color: var(--muted-text);
+  line-height: 1;
+}
+
+.stage-head button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .skip-session-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 9px;
+  height: 32px;
+  padding: 0 9px;
+  box-sizing: border-box;
   color: #ef4444;
   background: color-mix(in srgb, #ef4444 12%, var(--surface-container-low));
   border: 1px solid color-mix(in srgb, #ef4444 28%, transparent);
@@ -842,21 +887,17 @@ h3 {
   stroke: currentColor;
 }
 
-.stage-head-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted-text);
-}
-
-.reading-window-info {
+.reading-window-info,
+.page-indicator {
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  line-height: 1;
 }
 
 .page-indicator {
   font-weight: 600;
-  white-space: nowrap;
 }
 
 
@@ -1060,42 +1101,54 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   position: relative;
+  height: 32px;
   vertical-align: middle;
 }
 
 .split-main-btn {
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
   border-right: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
 }
 
 .split-chevron-btn {
+  height: 32px !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   padding-left: 8px !important;
   padding-right: 8px !important;
   font-size: 11px !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
 }
 
 .split-dropdown-wrapper {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
 }
 
 .split-dropdown-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 230px;
-  background: var(--surface-bright, #ffffff);
-  border: 1px solid var(--outline-variant, #e0e0e0);
+  min-width: 240px;
+  background: var(--surface-container-highest, #282828);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.15));
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
   padding: 6px;
   z-index: 100;
+  backdrop-filter: blur(8px);
 }
 
 .split-dropdown-item {
@@ -1106,7 +1159,7 @@ button:disabled {
   padding: 8px 12px;
   border: none;
   background: transparent;
-  color: var(--on-surface, #1c1b1f);
+  color: var(--on-surface, #ebdbb2);
   text-align: left;
   border-radius: 8px;
   cursor: pointer;
@@ -1114,18 +1167,18 @@ button:disabled {
 }
 
 .split-dropdown-item:hover:not(:disabled) {
-  background: var(--surface-container-high, rgba(0, 0, 0, 0.06));
+  background: var(--surface-bright, rgba(255, 255, 255, 0.1));
 }
 
 .split-dropdown-item .item-title {
   font-weight: 600;
   font-size: 13px;
-  color: var(--primary, #1a73e8);
+  color: var(--primary, #d79921);
 }
 
 .split-dropdown-item .item-desc {
   font-size: 11px;
-  color: var(--muted-text, #666);
+  color: var(--muted-text, #a89984);
   margin-top: 2px;
 }
 
