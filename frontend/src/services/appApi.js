@@ -329,6 +329,10 @@ export function openRepoURL() {
   return appBridge().OpenRepoURL()
 }
 
+export function downloadAndApplyUpdate() {
+  return appBridge().DownloadAndApplyUpdate()
+}
+
 export function startTopicAudioOverview(topicID, notebookID = '', startPage = 0, endPage = 0, voice = 'en-US-ChristopherNeural') {
   return appBridge().StartTopicAudioOverview(topicID, notebookID, startPage, endPage, voice)
 }

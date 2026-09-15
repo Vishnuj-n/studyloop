@@ -21,13 +21,38 @@
             View Release Notes
           </button>
 
-          <button type="button" class="btn-check" :disabled="checking" @click="performCheck">
+          <button type="button" class="btn-check" :disabled="checking || updating" @click="performCheck">
             {{ checking ? 'Checking...' : 'Check for Updates' }}
           </button>
 
-          <button v-if="updateAvailable" type="button" class="btn-redirect" @click="redirectToRepo">
-            Get Update (Redirect to Repository)
+          <button
+            v-if="updateAvailable && !updating"
+            type="button"
+            class="btn-install"
+            @click="startAutoUpdate"
+          >
+            Download & Install Update
           </button>
+
+          <button
+            v-if="updateAvailable && !updating"
+            type="button"
+            class="btn-redirect"
+            @click="redirectToRepo"
+          >
+            Manual Download (GitHub)
+          </button>
+        </div>
+
+        <!-- Update Download Progress -->
+        <div v-if="updating" class="update-progress-box">
+          <div class="progress-bar-header">
+            <span>{{ updateStatusText }}</span>
+            <span class="progress-pct">{{ updateProgress.toFixed(0) }}%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" :style="{ width: updateProgress + '%' }"></div>
+          </div>
         </div>
       </div>
     </article>
@@ -109,8 +134,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { checkForUpdates, getReleaseNotes, openRepoURL, openURLInBrowser } from '../services/appApi'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { checkForUpdates, getReleaseNotes, openRepoURL, openURLInBrowser, downloadAndApplyUpdate } from '../services/appApi'
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import ReleaseNotesModal from './ReleaseNotesModal.vue'
 
 const checking = ref(false)
@@ -119,6 +145,10 @@ const updateAvailable = ref(false)
 const currentVersion = ref('1.4.1')
 const latestVersion = ref('')
 const error = ref('')
+
+const updating = ref(false)
+const updateProgress = ref(0)
+const updateStatusText = ref('')
 
 const showNotesModal = ref(false)
 const notesVersion = ref('')
@@ -168,6 +198,27 @@ async function performCheck() {
   }
 }
 
+async function startAutoUpdate() {
+  updating.value = true
+  updateProgress.value = 0
+  updateStatusText.value = 'Connecting and downloading update...'
+  error.value = ''
+
+  try {
+    const res = await downloadAndApplyUpdate()
+    if (res?.error) {
+      error.value = res.error
+      updating.value = false
+    } else {
+      updateStatusText.value = 'Download complete! Launching installer and restarting...'
+      updateProgress.value = 100
+    }
+  } catch (err) {
+    error.value = err.message || 'Failed to install update'
+    updating.value = false
+  }
+}
+
 function redirectToRepo() {
   openRepoURL()
 }
@@ -184,6 +235,8 @@ function openRepoPrivacy() {
   openURLInBrowser('https://github.com/Vishnuj-n/studyloop#privacy')
 }
 
+let unlistenProgress = null
+
 onMounted(() => {
   fetchNotes()
   checkForUpdates()
@@ -196,6 +249,25 @@ onMounted(() => {
       }
     })
     .catch(() => {})
+
+  if (EventsOn) {
+    unlistenProgress = EventsOn('update:progress', (data) => {
+      if (data && typeof data.percentage === 'number') {
+        updateProgress.value = Math.min(100, Math.max(0, data.percentage))
+        if (data.total > 0) {
+          const mbDownloaded = (data.downloaded / (1024 * 1024)).toFixed(1)
+          const mbTotal = (data.total / (1024 * 1024)).toFixed(1)
+          updateStatusText.value = `Downloading update: ${mbDownloaded} MB / ${mbTotal} MB`
+        }
+      }
+    })
+  }
+})
+
+onUnmounted(() => {
+  if (unlistenProgress && EventsOff) {
+    EventsOff('update:progress')
+  }
 })
 </script>
 
@@ -296,6 +368,18 @@ button {
   cursor: not-allowed;
 }
 
+.btn-install {
+  background: linear-gradient(135deg, var(--primary, #6366f1) 0%, #4f46e5 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.btn-install:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
 .btn-redirect {
   background: var(--surface-container-high);
   color: var(--primary);
@@ -304,6 +388,45 @@ button {
 
 .btn-redirect:hover {
   background: var(--surface-container-highest);
+}
+
+.update-progress-box {
+  margin-top: 8px;
+  background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.progress-pct {
+  color: var(--primary);
+  font-family: monospace;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.1));
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary, #6366f1);
+  border-radius: 99px;
+  transition: width 0.15s ease-out;
 }
 
 /* Community Grid */
