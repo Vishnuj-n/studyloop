@@ -1,29 +1,21 @@
-# What's New – v1.8.0
+# What's New
 
 ## ✨ Features
-- **Quiz Settings & Study Slots**  
-  Users can now customize quiz behavior and allocate dedicated study slots directly from the settings page, giving finer control over their learning sessions.
+- **Benchmark suite for flashcards** – Added a new benchmark suite to evaluate flashcard generation performance and quality.
 
 ## 🚀 Improvements
-- **Reading Task Coordination**  
-  The system now treats pending `FLASHCARD_GENERATE` tasks as blockers for new reading tasks. This prevents the creation of redundant reading jobs while flashcard generation is in progress, ensuring a cleaner task queue and more efficient resource usage.
-
-- **Review Task Scheduling & Priority**  
-  - Refactored the study‑plan generation logic to correctly aggregate existing flashcard review tasks, eliminating duplicate reviews.  
-  - Updated SQL ordering to include `study_queue.priority`, delivering more accurate task prioritization.  
-  - Fixed Dashboard filtering so the review hero component no longer shows duplicate entries.  
-  - Enhanced the database inspection script to handle various file encodings reliably.
+- **Cross‑platform OpenDataDirectory** – The command now works reliably on Windows, macOS, and Linux.
+- **Test script hygiene** – Added `go:build` ignore directives and resolved lint warnings in test scripts, improving CI stability.
 
 ## 🐛 Bug Fixes
-- Resolved an issue where duplicate review tasks could appear in the queue, leading to inflated card/minute counts.
+- **Flashcard bias mitigation** – Fixed a misconception bias in flashcard generation that could produce misleading study material.
+- **OpenDataDirectory edge‑case handling** – Resolved failures caused by platform‑specific edge cases.
 
 ## 🧹 Maintenance
-- Version bump to **v1.8.0**.  
-- Updated release notes for the previous **v1.7.0** release.
+- Updated release notes for the previous v1.8.0 release.
+- Version bump to **v1.8.1**.
 
 ## 📦 Full Changelog
-[View the full commit history on GitHub](#)
-
----
+[View all changes in the repository](#)
 
 Thanks for using Studyloop!
