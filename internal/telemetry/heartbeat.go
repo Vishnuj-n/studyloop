@@ -3,6 +3,7 @@ package telemetry
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"net/http"
 	"os"
 	"runtime"
@@ -42,6 +43,10 @@ func SendHeartbeat(repo *db.Repository, appVersion string) {
 
 		endpoint := os.Getenv("TELEMETRY_ENDPOINT_URL")
 		if endpoint == "" {
+			// Never transmit telemetry to default production targets during tests or CI
+			if flag.Lookup("test.v") != nil || os.Getenv("CI") != "" {
+				return
+			}
 			endpoint = DefaultTelemetryEndpoint
 		}
 		if endpoint == "" {

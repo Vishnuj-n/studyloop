@@ -95,3 +95,23 @@ func TestSendHeartbeat_ServerDownFailSilent(t *testing.T) {
 	SendHeartbeat(repo, "1.4.1")
 	time.Sleep(50 * time.Millisecond)
 }
+
+func TestSendHeartbeat_NoEndpointInTestsSkipsProductionTarget(t *testing.T) {
+	// Ensure no custom endpoint is set
+	os.Unsetenv("TELEMETRY_ENDPOINT_URL")
+
+	tempDB := "test_heartbeat_skip.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := db.Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("failed to init test db: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// Calling SendHeartbeat without TELEMETRY_ENDPOINT_URL in test mode should exit early and not reach production
+	SendHeartbeat(repo, "1.4.1")
+	time.Sleep(50 * time.Millisecond)
+}
+
