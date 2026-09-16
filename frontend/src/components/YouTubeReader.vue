@@ -53,7 +53,6 @@
         autoplay
         playsinline
         @loadedmetadata="onVideoMetadata"
-        @canplay="onVideoMetadata"
         @timeupdate="onTimeUpdate"
       >
         <track
@@ -187,36 +186,36 @@ const endSeconds = computed(() => {
   }
 })
 
-let userInteractedPastEnd = false
+const hasInitializedStart = ref(false)
+const hasAutoPausedAtEnd = ref(false)
 
 function onVideoMetadata() {
-  if (videoRef.value) {
-    userInteractedPastEnd = false
-    if (startSeconds.value > 0 && Math.abs(videoRef.value.currentTime - startSeconds.value) > 1) {
+  if (videoRef.value && !hasInitializedStart.value) {
+    if (startSeconds.value > 0) {
       videoRef.value.currentTime = startSeconds.value
     }
+    hasInitializedStart.value = true
   }
 }
 
-// ponytail: Auto-pause when chapter ends; user can press play again if they wish to continue
+// ponytail: Soft-stop pause once when crossing chapter end; user can press play to keep watching or scrub anywhere
 function onTimeUpdate() {
   if (!videoRef.value) return
   const current = videoRef.value.currentTime
 
   if (endSeconds.value > 0 && current >= endSeconds.value) {
-    if (!videoRef.value.paused && !userInteractedPastEnd) {
+    if (!videoRef.value.paused && !hasAutoPausedAtEnd.value) {
       videoRef.value.pause()
-      userInteractedPastEnd = true
+      hasAutoPausedAtEnd.value = true
     }
-  } else if (current < endSeconds.value) {
-    userInteractedPastEnd = false
   }
 }
 
 watch(
   [() => startSeconds.value, () => sourceMode.value],
   async () => {
-    userInteractedPastEnd = false
+    hasInitializedStart.value = false
+    hasAutoPausedAtEnd.value = false
     await nextTick()
     if (sourceMode.value === 'local' && videoRef.value) {
       if (startSeconds.value > 0) {
@@ -224,6 +223,7 @@ watch(
       } else {
         videoRef.value.currentTime = 0
       }
+      hasInitializedStart.value = true
     }
   }
 )

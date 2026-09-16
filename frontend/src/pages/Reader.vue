@@ -152,6 +152,8 @@
           v-else-if="reader.isYouTube.value"
           :embed-url="reader.youtubeEmbedUrl.value"
           :cached-video-url="reader.cachedVideoUrl.value"
+          :video-start-seconds="reader.videoStartSeconds.value"
+          :video-end-seconds="reader.videoEndSeconds.value"
           :transcript-content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
           :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"

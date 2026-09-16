@@ -762,7 +762,9 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 					if ch.Idx == 0 && len(meta.Chapters) > 0 {
 						ch = meta.Chapters[0]
 					}
-					bundle.NotebookURL = fmt.Sprintf("https://www.youtube-nocookie.com/embed/%s?enablejsapi=1&start=%d&end=%d", meta.VideoID, ch.Start, ch.End)
+					bundle.VideoStartSeconds = ch.Start
+					bundle.VideoEndSeconds = ch.End
+					bundle.NotebookURL = fmt.Sprintf("https://www.youtube-nocookie.com/embed/%s?enablejsapi=1&start=%d", meta.VideoID, ch.Start)
 					if ch.Text != "" {
 						bundle.RawContent = ch.Text
 					}
