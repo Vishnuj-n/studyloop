@@ -143,6 +143,24 @@ func (r *Repository) scanPendingTaskRows(rows *sql.Rows) ([]models.StudyQueueTas
 	return tasks, rows.Err()
 }
 
+// GetProfilePendingTaskCount counts pending study queue tasks scoped to a specific profile.
+func (r *Repository) GetProfilePendingTaskCount(profileID string) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		WHERE sq.status = 'PENDING'
+		  AND ( ? = '' OR n.profile_id = ? )
+		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
+	`
+	var count int
+	err := r.db.QueryRow(query, profileID, profileID, profileID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("GetProfilePendingTaskCount: %w", err)
+	}
+	return count, nil
+}
+
 // GetAllActiveTasks returns all active tasks ordered by activation time.
 func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 	activeProfileID, err := r.readActiveProfileID()

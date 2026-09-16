@@ -428,6 +428,13 @@ func sameLLMSettingsForUI(a, b models.LLMTierSettings) bool {
 		a.HasAPIKey == b.HasAPIKey
 }
 
+// ProfileWithSummary enriches StudyProfile with live pacing telemetry and pending task counts.
+type ProfileWithSummary struct {
+	models.StudyProfile
+	Pace         map[string]interface{} `json:"pace,omitempty"`
+	PendingTasks int                    `json:"pending_tasks"`
+}
+
 func (a *App) GetProfiles() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
@@ -437,7 +444,18 @@ func (a *App) GetProfiles() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"profiles": profiles}
+
+	enriched := make([]ProfileWithSummary, 0, len(profiles))
+	for _, p := range profiles {
+		pace := a.GetProfileDailyPace(p.ID)
+		pendingCount, _ := repo.GetProfilePendingTaskCount(p.ID)
+		enriched = append(enriched, ProfileWithSummary{
+			StudyProfile: p,
+			Pace:         pace,
+			PendingTasks: pendingCount,
+		})
+	}
+	return map[string]interface{}{"profiles": enriched}
 }
 
 func (a *App) CreateProfile(name string, deadlineStr string) map[string]interface{} {
