@@ -38,34 +38,219 @@
       </div>
     </template>
 
-    <!-- Top Assessment Metrics Panel -->
-    <section class="diagnostic-summary">
-      <div class="summary-metric">
-        <span class="metric-label">Overall Score</span>
-        <div class="metric-value-row">
-          <span class="metric-value" :class="overallPassed ? 'val--pass' : 'val--fail'">
-            {{ overallScore }}%
-          </span>
-          <span class="metric-badge" :class="overallPassed ? 'badge--pass' : 'badge--fail'">
+    <!-- Top Visual Telemetry & Metrics Row -->
+    <section class="telemetry-hero-grid">
+      <!-- Retention Donut Gauge -->
+      <div class="gauge-card">
+        <div class="gauge-visual">
+          <svg class="gauge-svg" viewBox="0 0 100 100" width="84" height="84">
+            <circle
+              class="gauge-bg"
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke-width="8"
+            />
+            <circle
+              class="gauge-meter"
+              :class="overallPassed ? 'meter--pass' : 'meter--fail'"
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke-width="8"
+              stroke-dasharray="251.2"
+              :stroke-dashoffset="gaugeDashOffset"
+              stroke-linecap="round"
+            />
+          </svg>
+          <div class="gauge-text">
+            <span class="gauge-pct">{{ overallScore }}%</span>
+          </div>
+        </div>
+        <div class="gauge-info">
+          <span class="gauge-label">Retention Depth</span>
+          <span class="gauge-status-badge" :class="overallPassed ? 'badge--pass' : 'badge--fail'">
             {{ overallPassed ? 'Passed' : 'Needs Review' }}
           </span>
+          <span class="gauge-meta">{{ totalCorrect }} of {{ totalQuestions }} correct</span>
         </div>
       </div>
 
-      <div class="summary-metric">
-        <span class="metric-label">Questions Evaluated</span>
-        <div class="metric-value-row">
-          <span class="metric-value">{{ totalCorrect }} / {{ totalQuestions }}</span>
-          <span class="metric-subtext">correct</span>
+      <!-- Sub-concept Telemetry Bars -->
+      <div class="concepts-telemetry-card">
+        <div class="card-head-row">
+          <span class="telemetry-title">Concept Mastery Breakdown</span>
+          <span class="telemetry-counter">{{ masteredClustersCount }}/{{ clusters.length }} Chapters Mastered</span>
+        </div>
+
+        <div v-if="telemetrySubConcepts.length > 0" class="subconcepts-list">
+          <div
+            v-for="sc in telemetrySubConcepts"
+            :key="sc.name"
+            class="subconcept-row"
+          >
+            <div class="subconcept-header">
+              <span class="subconcept-name">{{ sc.name }}</span>
+              <span class="subconcept-score" :class="getSubconceptClass(sc.mastery_score)">
+                {{ sc.mastery_score }}% — {{ sc.status }}
+              </span>
+            </div>
+            <div class="subconcept-track">
+              <div
+                class="subconcept-fill"
+                :class="getSubconceptFillClass(sc.mastery_score)"
+                :style="{ width: `${sc.mastery_score}%` }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="subconcepts-fallback">
+          <div
+            v-for="cluster in clusters"
+            :key="cluster.topicId + cluster.startPage"
+            class="subconcept-row"
+          >
+            <div class="subconcept-header">
+              <span class="subconcept-name">{{ cluster.topicTitle || `Pages ${cluster.startPage}-${cluster.endPage}` }}</span>
+              <span class="subconcept-score" :class="cluster.passed ? 'val--pass' : 'val--fail'">
+                {{ cluster.scorePercent }}% — {{ cluster.passed ? 'Mastered' : 'Needs Review' }}
+              </span>
+            </div>
+            <div class="subconcept-track">
+              <div
+                class="subconcept-fill"
+                :class="cluster.passed ? 'fill--pass' : 'fill--fail'"
+                :style="{ width: `${cluster.scorePercent}%` }"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Tutor Root-Cause Diagnosis Card -->
+    <section v-if="allFailedQuestions.length > 0" class="ai-diagnostic-card">
+      <header class="ai-card-header">
+        <div class="ai-card-badge">
+          <svg
+            class="ai-card-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          </svg>
+          <span class="ai-card-title">AI Root-Cause Diagnosis</span>
+        </div>
+
+        <!-- Book Text Context Toggle -->
+        <button
+          type="button"
+          class="context-toggle-btn"
+          :class="{ 'context-toggle-btn--active': includeBookText }"
+          :disabled="loadingDiagnostic"
+          @click="toggleBookContext"
+        >
+          <svg
+            class="btn-svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          <span>{{ includeBookText ? 'Book Context Active' : 'Include Book Context' }}</span>
+        </button>
+      </header>
+
+      <!-- Loading Skeleton -->
+      <div v-if="loadingDiagnostic" class="ai-loading-skeleton">
+        <div class="skeleton-line skeleton-line--title" />
+        <div class="skeleton-line skeleton-line--body" />
+        <div class="skeleton-line skeleton-line--body skeleton-line--short" />
+      </div>
+
+      <!-- Diagnostic Content -->
+      <div v-else-if="diagnosticResult" class="ai-diagnostic-content">
+        <!-- Core Misconception -->
+        <div class="diagnostic-block diagnostic-block--misconception">
+          <div class="block-label">
+            <svg
+              class="block-icon"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>Core Misconception Detected</span>
+          </div>
+          <p class="block-text">{{ diagnosticResult.core_misconception }}</p>
+        </div>
+
+        <!-- Golden Rule -->
+        <div v-if="diagnosticResult.golden_rule" class="diagnostic-block diagnostic-block--rule">
+          <div class="block-label">
+            <svg
+              class="block-icon"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            <span>Key Takeaway Rule</span>
+          </div>
+          <p class="block-text">{{ diagnosticResult.golden_rule }}</p>
+        </div>
+
+        <!-- Actionable Tip -->
+        <div v-if="diagnosticResult.actionable_tip" class="diagnostic-tip-bar">
+          <span class="tip-label">Study Advice:</span>
+          <span class="tip-text">{{ diagnosticResult.actionable_tip }}</span>
         </div>
       </div>
 
-      <div class="summary-metric">
-        <span class="metric-label">Concept Chapters</span>
-        <div class="metric-value-row">
-          <span class="metric-value">{{ masteredClustersCount }} / {{ clusters.length }}</span>
-          <span class="metric-subtext">mastered</span>
-        </div>
+      <!-- Diagnostic Error / Offline Fallback -->
+      <div v-else-if="diagnosticError" class="ai-diagnostic-fallback">
+        <p class="fallback-text">AI diagnostic could not be synthesized: {{ diagnosticError }}</p>
+        <button
+          type="button"
+          class="ghost-action-btn"
+          @click="fetchDiagnostic(includeBookText)"
+        >
+          Retry AI Analysis
+        </button>
       </div>
     </section>
 
@@ -318,7 +503,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import { generateFlashcardsForQuizTask, getTask } from '../services/appApi'
+import { analyzeQuizFailure, generateFlashcardsForQuizTask, getTask } from '../services/appApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -333,6 +518,12 @@ const flashcardsPending = ref(false)
 const processingExit = ref(false)
 const activeFilter = ref('all')
 const copiedClusterId = ref('')
+
+// AI Diagnostic state
+const includeBookText = ref(false)
+const loadingDiagnostic = ref(false)
+const diagnosticResult = ref(null)
+const diagnosticError = ref('')
 
 onMounted(async () => {
   // Load analysis payload from sessionStorage or query
@@ -365,6 +556,11 @@ onMounted(async () => {
       console.warn('Failed to fallback load task context:', err)
     }
   }
+
+  // Auto-fetch AI Diagnostic if there are missed questions
+  if (allFailedQuestions.value.length > 0) {
+    fetchDiagnostic(false)
+  }
 })
 
 const totalQuestions = computed(() => {
@@ -387,6 +583,26 @@ const masteredClustersCount = computed(() => {
   return masteredClusters.value.length
 })
 
+const allFailedQuestions = computed(() => {
+  const list = []
+  for (const c of clusters.value) {
+    if (Array.isArray(c.failedQuestions)) {
+      list.push(...c.failedQuestions)
+    }
+  }
+  return list
+})
+
+const telemetrySubConcepts = computed(() => {
+  return diagnosticResult.value?.sub_concepts || []
+})
+
+const gaugeDashOffset = computed(() => {
+  const circumference = 251.2
+  const score = Math.max(0, Math.min(100, overallScore.value))
+  return circumference - (score / 100) * circumference
+})
+
 const visibleClusters = computed(() => {
   if (activeFilter.value === 'weak') {
     return weakClusters.value
@@ -396,6 +612,54 @@ const visibleClusters = computed(() => {
   }
   return clusters.value
 })
+
+function getSubconceptClass(score) {
+  if (score >= 70) return 'val--pass'
+  if (score >= 50) return 'val--review'
+  return 'val--fail'
+}
+
+function getSubconceptFillClass(score) {
+  if (score >= 70) return 'fill--pass'
+  if (score >= 50) return 'fill--review'
+  return 'fill--fail'
+}
+
+async function fetchDiagnostic(withBookText) {
+  if (allFailedQuestions.value.length === 0) return
+  loadingDiagnostic.value = true
+  diagnosticError.value = ''
+
+  const startP = clusters.value[0]?.startPage || 1
+  const endP = clusters.value[clusters.value.length - 1]?.endPage || startP
+  const topicID = clusters.value[0]?.topicId || ''
+
+  try {
+    const res = await analyzeQuizFailure(
+      notebookID.value,
+      topicID,
+      startP,
+      endP,
+      JSON.stringify(allFailedQuestions.value),
+      withBookText
+    )
+
+    if (res?.error) {
+      diagnosticError.value = res.error
+    } else if (res?.result) {
+      diagnosticResult.value = res.result
+    }
+  } catch (err) {
+    diagnosticError.value = err?.message || 'Failed to generate diagnostic'
+  } finally {
+    loadingDiagnostic.value = false
+  }
+}
+
+function toggleBookContext() {
+  includeBookText.value = !includeBookText.value
+  fetchDiagnostic(includeBookText.value)
+}
 
 function getClusterKey(cluster) {
   return `${cluster.topicId}-${cluster.startPage}-${cluster.endPage}`
@@ -522,55 +786,92 @@ async function handleExit(shouldGenerateFlashcards) {
   transform: scale(0.97);
 }
 
-.diagnostic-summary {
+/* ── Telemetry Hero Grid ────────────────────────── */
+.telemetry-hero-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: 260px 1fr;
   gap: 16px;
   margin-bottom: 24px;
 }
 
-.summary-metric {
+@media (max-width: 860px) {
+  .telemetry-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gauge-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px 20px;
 }
 
-.metric-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted-text);
-  margin-bottom: 8px;
+.gauge-visual {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
 }
 
-.metric-value-row {
+.gauge-svg {
+  transform: rotate(-90deg);
+}
+
+.gauge-bg {
+  stroke: var(--surface-container-low);
+}
+
+.gauge-meter {
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.meter--pass {
+  stroke: #10b981;
+}
+
+.meter--fail {
+  stroke: #f59e0b;
+}
+
+.gauge-text {
+  position: absolute;
+  inset: 0;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
 
-.metric-value {
-  font-size: 1.5rem;
+.gauge-pct {
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--on-surface);
 }
 
-.val--pass {
-  color: #10b981;
+.gauge-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.val--fail {
-  color: #f59e0b;
+.gauge-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
 }
 
-.metric-badge {
+.gauge-status-badge {
+  display: inline-block;
   font-size: 0.75rem;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
+  width: fit-content;
 }
 
 .badge--pass {
@@ -583,11 +884,285 @@ async function handleExit(shouldGenerateFlashcards) {
   color: #f59e0b;
 }
 
-.metric-subtext {
+.gauge-meta {
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+
+/* ── Concept Telemetry Card ─────────────────────── */
+.concepts-telemetry-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.card-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.telemetry-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-text);
+}
+
+.telemetry-counter {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-text);
+}
+
+.subconcepts-list,
+.subconcepts-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subconcept-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subconcept-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+
+.subconcept-name {
+  font-weight: 500;
+  color: var(--on-surface);
+}
+
+.subconcept-score {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.subconcept-track {
+  width: 100%;
+  height: 6px;
+  background: var(--surface-container-low);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.subconcept-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.fill--pass {
+  background: #10b981;
+}
+
+.fill--review {
+  background: #6366f1;
+}
+
+.fill--fail {
+  background: #f59e0b;
+}
+
+.val--pass {
+  color: #10b981;
+}
+
+.val--review {
+  color: #6366f1;
+}
+
+.val--fail {
+  color: #f59e0b;
+}
+
+/* ── AI Root-Cause Diagnostic Card ───────────────── */
+.ai-diagnostic-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-diagnostic-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary) 0%, #6366f1 100%);
+}
+
+.ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.ai-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.ai-card-icon {
+  color: var(--primary);
+}
+
+.context-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.context-toggle-btn:hover:not(:disabled) {
+  color: var(--on-surface);
+  border-color: var(--muted-text);
+}
+
+.context-toggle-btn--active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: #6366f1;
+  color: #6366f1;
+}
+
+.ai-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.skeleton-line {
+  height: 14px;
+  background: var(--surface-container-low);
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.skeleton-line--title {
+  width: 40%;
+  height: 18px;
+}
+
+.skeleton-line--body {
+  width: 100%;
+}
+
+.skeleton-line--short {
+  width: 70%;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+  100% { opacity: 0.5; }
+}
+
+.ai-diagnostic-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.diagnostic-block {
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.diagnostic-block--misconception {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.diagnostic-block--rule {
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.block-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.diagnostic-block--misconception .block-label {
+  color: #f59e0b;
+}
+
+.diagnostic-block--rule .block-label {
+  color: #6366f1;
+}
+
+.block-text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--on-surface);
+}
+
+.diagnostic-tip-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--muted-text);
+  padding: 8px 12px;
+  background: var(--surface-container-low);
+  border-radius: 6px;
+}
+
+.tip-label {
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.ai-diagnostic-fallback {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface-container-low);
+  border-radius: 6px;
   font-size: 0.8125rem;
   color: var(--muted-text);
 }
 
+/* ── Filter Nav & Clusters ──────────────────────── */
 .cluster-filter-nav {
   display: flex;
   gap: 8px;

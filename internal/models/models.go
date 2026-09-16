@@ -121,6 +121,19 @@ type FailedQuestionDetail struct {
 	UserAnswer    string   `json:"user_answer"`
 }
 
+type DiagnosticSubConcept struct {
+	Name         string `json:"name"`
+	MasteryScore int    `json:"mastery_score"`
+	Status       string `json:"status"` // "Mastered", "Needs Review", "Vulnerable"
+}
+
+type QuizDiagnosticResult struct {
+	CoreMisconception string                 `json:"core_misconception"`
+	GoldenRule        string                 `json:"golden_rule"`
+	ActionableTip     string                 `json:"actionable_tip"`
+	SubConcepts       []DiagnosticSubConcept `json:"sub_concepts"`
+}
+
 type QuizAttemptRecord struct {
 	ID          string `json:"id"`
 	TaskID      string `json:"task_id"`

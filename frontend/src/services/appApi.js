@@ -100,6 +100,24 @@ export function retryFlashcardGeneration(taskID) {
   return appBridge().RetryFlashcardGeneration(taskID)
 }
 
+export function analyzeQuizFailure(
+  notebookID,
+  topicID,
+  startPage,
+  endPage,
+  failedQuestionsJSON,
+  includeBookText = false
+) {
+  return appBridge().AnalyzeQuizFailure(
+    notebookID || '',
+    topicID || '',
+    startPage || 0,
+    endPage || 0,
+    failedQuestionsJSON || '[]',
+    !!includeBookText
+  )
+}
+
 export function getTodayPlan() {
   return appBridge().GetTodayPlan()
 }
