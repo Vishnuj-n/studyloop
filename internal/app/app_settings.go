@@ -930,11 +930,12 @@ func (a *App) OpenDataDirectory(subDir string) map[string]interface{} {
 		_ = os.MkdirAll(targetDir, 0755)
 	}
 	var cmd *exec.Cmd
-	if stdruntime.GOOS == "windows" {
+	switch stdruntime.GOOS {
+	case "windows":
 		cmd = exec.Command("explorer", targetDir)
-	} else if stdruntime.GOOS == "darwin" {
+	case "darwin":
 		cmd = exec.Command("open", targetDir)
-	} else {
+	default:
 		cmd = exec.Command("xdg-open", targetDir)
 	}
 	if err := cmd.Start(); err != nil {
