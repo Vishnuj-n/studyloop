@@ -169,8 +169,12 @@ func (r *Repository) GetNextDueReviewNotebook(now int64) (string, int, error) {
 	return notebookID, dueCount, nil
 }
 
-func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueTask, bool, error) {
+// ponytail: support optional dueCutoff timestamp for day-boundary review scheduling
+func (r *Repository) CreateReviewSession(notebookID string, dueCutoff ...int64) (*models.StudyQueueTask, bool, error) {
 	now := reviewSessionNow()
+	if len(dueCutoff) > 0 && dueCutoff[0] > 0 {
+		now = dueCutoff[0]
+	}
 	utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation start notebookID=%s now=%d", notebookID, now)
 	if existing, err := r.fetchExistingReviewTask(r.db, notebookID); err != nil {
 		return nil, false, err
