@@ -143,6 +143,24 @@ func (r *Repository) scanPendingTaskRows(rows *sql.Rows) ([]models.StudyQueueTas
 	return tasks, rows.Err()
 }
 
+// GetProfilePendingTaskCount counts pending study queue tasks scoped to a specific profile.
+func (r *Repository) GetProfilePendingTaskCount(profileID string) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM study_queue sq
+		JOIN notebooks n ON sq.notebook_id = n.id
+		WHERE sq.status = 'PENDING'
+		  AND ( ? = '' OR n.profile_id = ? )
+		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
+	`
+	var count int
+	err := r.db.QueryRow(query, profileID, profileID, profileID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("GetProfilePendingTaskCount: %w", err)
+	}
+	return count, nil
+}
+
 // GetAllActiveTasks returns all active tasks ordered by activation time.
 func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 	activeProfileID, err := r.readActiveProfileID()
@@ -394,6 +412,9 @@ func (r *Repository) countWordsInPageRange(topicID string, startPage, endPage in
 			totalWords += len(strings.Fields(text))
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return 0
+	}
 	return totalWords
 }
 
@@ -418,6 +439,9 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 		if err := rows.Scan(&pNum, &text); err == nil {
 			pageWords[pNum] += len(strings.Fields(text))
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return maxEndPage
 	}
 
 	if len(pageWords) == 0 {
@@ -818,4 +842,130 @@ func (r *Repository) GetPendingReadingTaskForNotebook(notebookID string) (models
 	}
 	assignTaskTitle(&task, topicTitle, notebookTitle)
 	return task, nil
+}
+
+func (r *Repository) queryDueReviewCardsHelper(dueCondition string, dueArgs ...interface{}) (int, error) {
+	var activeProfileID sql.NullString
+	if err := r.db.QueryRow(`
+		SELECT COALESCE(active_profile_id, '') FROM user_settings WHERE id = 1
+	`).Scan(&activeProfileID); err != nil && err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	activeProfileStr := ""
+	if activeProfileID.Valid {
+		activeProfileStr = activeProfileID.String
+	}
+
+	var count int
+	query := `
+		SELECT COUNT(DISTINCT fc.id)
+		FROM fsrs_cards fc
+		JOIN topics t ON t.id = fc.topic_id
+		JOIN notebooks n ON (
+			n.topic_id = t.id
+			OR EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = n.id AND nt.topic_id = t.id
+			)
+		)
+		WHERE fc.suspended = 0
+		  AND fc.due_at IS NOT NULL
+		  ` + dueCondition + `
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM review_task_cards rtc
+			JOIN study_queue sq ON sq.id = rtc.task_id
+			WHERE rtc.card_id = fc.id
+			  AND sq.task_type = 'FLASHCARD_REVIEW'
+			  AND sq.status IN ('PENDING', 'ACTIVE')
+		  )
+	`
+	args := append([]interface{}{}, dueArgs...)
+	if activeProfileStr != "" {
+		query += ` AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
+		args = append(args, activeProfileStr)
+	}
+
+	err := r.db.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
+// QueryDueReviewCards counts cards due by the given time, scoped to existing topics.
+// Excludes cards already linked to pending/active review tasks to avoid double-counting.
+func (r *Repository) QueryDueReviewCards(now int64) (int, error) {
+	count, err := r.queryDueReviewCardsHelper("AND fc.due_at <= ?", now)
+	if err != nil {
+		return 0, fmt.Errorf("QueryDueReviewCards: reading active_profile_id: %w", err)
+	}
+	return count, nil
+}
+
+// QueryDueReviewCardsForRange counts cards due within a specific time range (start, end], scoped to the active profile.
+// Excludes cards already linked to pending/active review tasks to avoid double-counting.
+func (r *Repository) QueryDueReviewCardsForRange(start int64, end int64) (int, error) {
+	count, err := r.queryDueReviewCardsHelper("AND fc.due_at > ? AND fc.due_at <= ?", start, end)
+	if err != nil {
+		return 0, fmt.Errorf("QueryDueReviewCardsForRange: reading active_profile_id: %w", err)
+	}
+	return count, nil
+}
+
+// QueryDueReviewCardsTimeline counts cards due across a 7-day timeline in a single query.
+// Returns an array of 7 counts corresponding to Day 0 (<= endOfToday) and Days 1-6.
+func (r *Repository) QueryDueReviewCardsTimeline(endOfToday int64) ([]int, error) {
+	var activeProfileID sql.NullString
+	err := r.db.QueryRow(`SELECT active_profile_id FROM user_settings WHERE id = 1`).Scan(&activeProfileID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("QueryDueReviewCardsTimeline: reading active_profile_id: %w", err)
+	}
+
+	activeProfileStr := ""
+	if activeProfileID.Valid {
+		activeProfileStr = activeProfileID.String
+	}
+
+	query := `
+		SELECT
+			COUNT(DISTINCT CASE WHEN fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END),
+			COUNT(DISTINCT CASE WHEN fc.due_at > ? AND fc.due_at <= ? THEN fc.id END)
+		FROM fsrs_cards fc
+		JOIN topics t ON t.id = fc.topic_id
+		JOIN notebooks n ON (
+			n.topic_id = t.id
+			OR EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = n.id AND nt.topic_id = t.id
+			)
+		)
+		WHERE fc.suspended = 0
+		  AND fc.due_at IS NOT NULL
+	`
+	args := []interface{}{
+		endOfToday,
+		endOfToday, endOfToday + 1*86400,
+		endOfToday + 1*86400, endOfToday + 2*86400,
+		endOfToday + 2*86400, endOfToday + 3*86400,
+		endOfToday + 3*86400, endOfToday + 4*86400,
+		endOfToday + 4*86400, endOfToday + 5*86400,
+		endOfToday + 5*86400, endOfToday + 6*86400,
+	}
+	if activeProfileStr != "" {
+		query += ` AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
+		args = append(args, activeProfileStr)
+	}
+
+	counts := make([]int, 7)
+	err = r.db.QueryRow(query, args...).Scan(
+		&counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5], &counts[6],
+	)
+	if err != nil {
+		return nil, fmt.Errorf("QueryDueReviewCardsTimeline: %w", err)
+	}
+	return counts, nil
 }

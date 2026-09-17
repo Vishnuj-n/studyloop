@@ -41,6 +41,11 @@ const routes = [
     name: 'rewards',
     component: () => import('../pages/Rewards.vue'),
   },
+  {
+    path: '/quiz-analysis',
+    name: 'quiz-analysis',
+    component: () => import('../pages/QuizAnalysis.vue'),
+  },
   { path: '/settings', name: 'settings', component: Settings },
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
 ]

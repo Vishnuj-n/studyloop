@@ -29,7 +29,7 @@ func TestBackupDatabase_RingBufferKeep3(t *testing.T) {
 
 	// Create 5 iterations of DB content and trigger backup
 	for i := 1; i <= 5; i++ {
-		content := []byte(fmt.Sprintf("sqlite database revision %d", i))
+		content := fmt.Appendf(nil, "sqlite database revision %d", i)
 		if err := os.WriteFile(dbPath, content, 0644); err != nil {
 			t.Fatalf("failed to write db revision %d: %v", i, err)
 		}

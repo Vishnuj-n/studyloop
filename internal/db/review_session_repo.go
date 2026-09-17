@@ -169,9 +169,14 @@ func (r *Repository) GetNextDueReviewNotebook(now int64) (string, int, error) {
 	return notebookID, dueCount, nil
 }
 
-func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueTask, bool, error) {
-	now := reviewSessionNow()
-	utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation start notebookID=%s now=%d", notebookID, now)
+// ponytail: support optional dueCutoff timestamp for day-boundary review scheduling
+func (r *Repository) CreateReviewSession(notebookID string, dueCutoff ...int64) (*models.StudyQueueTask, bool, error) {
+	createdAt := reviewSessionNow()
+	cardDueCutoff := createdAt
+	if len(dueCutoff) > 0 && dueCutoff[0] > 0 {
+		cardDueCutoff = dueCutoff[0]
+	}
+	utils.Warnf("[FLASHCARD_PIPELINE] review_task_creation start notebookID=%s cardDueCutoff=%d", notebookID, cardDueCutoff)
 	if existing, err := r.fetchExistingReviewTask(r.db, notebookID); err != nil {
 		return nil, false, err
 	} else if existing != nil {
@@ -187,7 +192,7 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 			if limit <= 0 {
 				limit = 30
 			}
-			cards, err := r.GetDueReviewCardsForNotebook(notebookID, now, limit)
+			cards, err := r.GetDueReviewCardsForNotebook(notebookID, cardDueCutoff, limit)
 			if err != nil {
 				return nil, false, err
 			}
@@ -214,7 +219,7 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 		limit = 30
 	}
 
-	cards, err := r.GetDueReviewCardsForNotebook(notebookID, now, limit)
+	cards, err := r.GetDueReviewCardsForNotebook(notebookID, cardDueCutoff, limit)
 	if err != nil {
 		return nil, false, err
 	}
@@ -237,7 +242,7 @@ func (r *Repository) CreateReviewSession(notebookID string) (*models.StudyQueueT
 
 		payloadBytes, err := json.Marshal(models.ReviewSessionPayload{
 			CardCount:     len(cards),
-			CreatedAtUnix: now,
+			CreatedAtUnix: createdAt,
 		})
 		if err != nil {
 			return err

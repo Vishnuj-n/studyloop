@@ -18,13 +18,15 @@ vi.mock('../services/appApi', () => ({
   getUserSettings: vi.fn(),
 }))
 
+const pushMock = vi.fn()
+
 // Mock vue-router hooks
 vi.mock('vue-router', () => ({
   useRoute: () => ({
     query: routeQuery.value,
   }),
   useRouter: () => ({
-    push: vi.fn(),
+    push: pushMock,
   }),
 }))
 
@@ -142,5 +144,73 @@ describe('Quiz.vue Integration & State', () => {
 
     expect(wrapper.find('.state-panel--error').exists()).toBe(true)
     expect(wrapper.find('.state-text').text()).toBe('System overload')
+  })
+
+  it('navigates to quiz-analysis with proper cluster payload when clicking Detailed Analysis button', async () => {
+    routeQuery.value = { task_id: 'task-diag' }
+
+    appApi.getNotebooks.mockResolvedValue([])
+    appApi.activateTask.mockResolvedValue({ error: null })
+    appApi.getTask.mockResolvedValue({
+      task: {
+        id: 'task-diag',
+        task_type: 'QUIZ',
+        notebook_id: 'nb-101',
+        payload_json: JSON.stringify({
+          questions: [
+            {
+              id: 'q1',
+              prompt: 'Question 1',
+              options: ['A', 'B'],
+              correct_answer: 'A',
+              source_page_start: 10,
+            },
+            {
+              id: 'q2',
+              prompt: 'Question 2',
+              options: ['C', 'D'],
+              correct_answer: 'D',
+              source_page_start: 11,
+            },
+          ],
+          passing_score: 70,
+        }),
+      },
+    })
+
+    appApi.submitQuizAttempt.mockResolvedValue({
+      result: {
+        task_id: 'task-diag',
+        score: 50,
+        passed: false,
+        passing_score: 70,
+        feedback: 'Need review',
+      },
+    })
+
+    const wrapper = mount(Quiz)
+    await flushPromises()
+
+    // Answer Q1 correctly ('A') and Q2 incorrectly ('C')
+    await wrapper.find('input[type="radio"][value="A"]').setValue(true)
+    await wrapper.find('input[type="radio"][value="C"]').setValue(true)
+
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const analysisBtn = wrapper.find('.analysis-link-btn')
+    expect(analysisBtn.exists()).toBe(true)
+
+    await analysisBtn.trigger('click')
+    await flushPromises()
+
+    const storedData = JSON.parse(sessionStorage.getItem('studyloop_quiz_analysis') || '{}')
+    expect(storedData.taskId).toBe('task-diag')
+    expect(storedData.notebookId).toBe('nb-101')
+    expect(storedData.clusters).toHaveLength(2)
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/quiz-analysis',
+      query: { taskId: 'task-diag' },
+    })
   })
 })

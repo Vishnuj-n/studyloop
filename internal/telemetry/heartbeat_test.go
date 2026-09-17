@@ -95,3 +95,58 @@ func TestSendHeartbeat_ServerDownFailSilent(t *testing.T) {
 	SendHeartbeat(repo, "1.4.1")
 	time.Sleep(50 * time.Millisecond)
 }
+
+type recordingRoundTripper struct {
+	reqCount int
+}
+
+func (r *recordingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.reqCount++
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       http.NoBody,
+		Header:     make(http.Header),
+	}, nil
+}
+
+func TestSendHeartbeat_NoEndpointInTestsSkipsProductionTarget(t *testing.T) {
+	// Ensure no custom endpoint is set
+	os.Unsetenv("TELEMETRY_ENDPOINT_URL")
+
+	tempDB := "test_heartbeat_skip.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := db.Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("failed to init test db: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// Ensure known AnonymousUserID is present
+	settings := models.UserSettings{
+		AnonymousUserID: "test-uuid-skip-production",
+	}
+	if err := repo.UpdateUserSettings(settings); err != nil {
+		t.Fatalf("failed to update user settings: %v", err)
+	}
+
+	recorder := &recordingRoundTripper{}
+	oldClient := telemetryHTTPClient
+	telemetryHTTPClient = &http.Client{
+		Transport: recorder,
+		Timeout:   3 * time.Second,
+	}
+	defer func() {
+		telemetryHTTPClient = oldClient
+	}()
+
+	// Calling SendHeartbeat without TELEMETRY_ENDPOINT_URL in test mode should exit early and not reach production
+	SendHeartbeat(repo, "1.4.1")
+	time.Sleep(50 * time.Millisecond)
+
+	if recorder.reqCount != 0 {
+		t.Errorf("expected 0 HTTP requests when TELEMETRY_ENDPOINT_URL is unset in test mode, got %d", recorder.reqCount)
+	}
+}
+

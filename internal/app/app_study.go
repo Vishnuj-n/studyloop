@@ -165,9 +165,16 @@ func requireRepo(a *App) (*db.Repository, map[string]interface{}) {
 	return repo, nil
 }
 
-// ---------- Main App Methods ----------
+// ponytail: computes client local end-of-day cutoff for day-boundary review scheduling
+func clientEndOfDayUnix(timezoneOffsetMinutes int) int64 {
+	loc := time.FixedZone("ClientZone", -timezoneOffsetMinutes*60)
+	now := time.Now().In(loc)
+	y, m, d := now.Date()
+	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
+	return midnight.AddDate(0, 0, 1).Unix()
+}
 
-func (a *App) GetTodayPlan() map[string]interface{} {
+func (a *App) GetTodayPlan(timezoneOffsetMinutes ...int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -176,6 +183,11 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		return map[string]interface{}{"error": "scheduler not initialized"}
 	}
 	now := time.Now()
+	tzOffset := 0
+	if len(timezoneOffsetMinutes) > 0 {
+		tzOffset = timezoneOffsetMinutes[0]
+	}
+	dueCutoff := clientEndOfDayUnix(tzOffset)
 	activeProfileID, err := repo.GetActiveProfileID()
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
@@ -196,8 +208,8 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	// ponytail: rely 100% on study_queue and due cards, no synthetic scheduler fallback
-	dueCards, err := repo.QueryDueReviewCards(now.Unix())
+	// ponytail: day-boundary due cutoff matches forecast widget and standard spaced repetition rules
+	dueCards, err := repo.QueryDueReviewCards(dueCutoff)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
@@ -230,7 +242,7 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 
 	if actionCounts["flashcard_review"] == 0 && materializedCards > 0 {
-		if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, now, materializedCards); ok {
+		if reviewTask, cards, mins, ok := buildReviewTaskForPlan(repo, dueCutoff, materializedCards); ok {
 			queueTasks = append([]models.ScheduledTask{reviewTask}, queueTasks...)
 			actionCounts["flashcard_review"]++
 			actualReviewCards = cards
@@ -287,18 +299,18 @@ func (a *App) GetTodayPlan() map[string]interface{} {
 	}
 }
 
-func buildReviewTaskForPlan(repo *db.Repository, now time.Time, materializedCards int) (models.ScheduledTask, int, int, bool) {
+func buildReviewTaskForPlan(repo *db.Repository, dueCutoff int64, materializedCards int) (models.ScheduledTask, int, int, bool) {
 	if materializedCards <= 0 {
 		return models.ScheduledTask{}, 0, 0, false
 	}
-	bestNotebookID, _, err := repo.GetNextDueReviewNotebook(now.Unix())
+	bestNotebookID, _, err := repo.GetNextDueReviewNotebook(dueCutoff)
 	if err != nil || bestNotebookID == "" {
 		if err != nil {
 			utils.Warnf("failed to get next due review notebook: %v", err)
 		}
 		return models.ScheduledTask{}, 0, 0, false
 	}
-	task, _, err := repo.CreateReviewSession(bestNotebookID)
+	task, _, err := repo.CreateReviewSession(bestNotebookID, dueCutoff)
 	if err != nil || task == nil {
 		if err != nil {
 			utils.Warnf("failed to create review session for notebook %s: %v", bestNotebookID, err)
@@ -564,7 +576,7 @@ func (a *App) getStreakState(timezoneOffsetMinutes int) map[string]interface{} {
 func (a *App) GetDashboardOverview(timezoneOffsetMinutes int) map[string]interface{} {
 	settings := a.GetUserSettings()
 	profiles := a.GetProfiles()
-	todayPlan := a.GetTodayPlan()
+	todayPlan := a.GetTodayPlan(timezoneOffsetMinutes)
 	streakState := a.getStreakState(timezoneOffsetMinutes)
 
 	var pendingNotebook map[string]interface{}
@@ -635,7 +647,7 @@ func (a *App) GetFlashcardDueTimeline(timezoneOffsetMinutes int) map[string]inte
 	now := time.Now().In(loc)
 	y, m, d := now.Date()
 	midnight := time.Date(y, m, d, 0, 0, 0, 0, loc)
-	endOfToday := midnight.AddDate(0, 0, 1).Unix()
+	endOfToday := clientEndOfDayUnix(timezoneOffsetMinutes)
 
 	counts, err := repo.QueryDueReviewCardsTimeline(endOfToday)
 	if err != nil {
