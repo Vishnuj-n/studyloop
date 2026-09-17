@@ -2,9 +2,7 @@ package db
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // InitSchema creates all tables and indexes with a single clean schema.
@@ -139,6 +137,8 @@ func InitSchema(tx *sql.Tx) error {
 			quiz_question_count INTEGER NOT NULL DEFAULT 8,
 			quiz_passing_score INTEGER NOT NULL DEFAULT 70,
 			tutor_style TEXT NOT NULL DEFAULT 'socratic',
+			analytics_enabled BOOLEAN DEFAULT 0,
+			anonymous_user_id TEXT DEFAULT '',
 			extension_settings TEXT DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (active_profile_id) REFERENCES study_profiles(id) ON DELETE SET NULL
@@ -307,6 +307,12 @@ func InitSchema(tx *sql.Tx) error {
 		}
 	}
 
+	// Apply migrations, deduplication, and seed defaults before index creation
+	// so that all columns referenced by indexes exist on older upgraded databases.
+	if err := RunMigrations(tx); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
 	// Create indexes
 	indexes := []string{
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_fsrs_cards_topic_prompt ON fsrs_cards(topic_id, prompt)`,
@@ -333,210 +339,5 @@ func InitSchema(tx *sql.Tx) error {
 		}
 	}
 
-	// Ensure uniqueness of (notebook_id, chunk_id) for existing databases.
-	// For DBs created earlier without the UNIQUE constraint, dedupe existing
-	// rows first, then create a unique index. This avoids adding the constraint
-	// directly which would fail if duplicates exist.
-	{
-		rows, err := tx.Query(`
-			SELECT id, notebook_id, chunk_id, created_at
-			FROM notebook_chunks
-			ORDER BY notebook_id, chunk_id, created_at ASC
-		`)
-		if err != nil {
-			return fmt.Errorf("failed to query notebook_chunks for dedupe: %w", err)
-		}
-		defer func() {
-			_ = rows.Close()
-		}()
-		seen := make(map[string]bool)
-		var idsToDelete []string
-		for rows.Next() {
-			var id, nb, cid string
-			var createdAt string
-			if err := rows.Scan(&id, &nb, &cid, &createdAt); err != nil {
-				return fmt.Errorf("failed to scan notebook_chunks dedupe row id=%s notebook_id=%s chunk_id=%s: %w", id, nb, cid, err)
-			}
-			key := nb + "::" + cid
-			if seen[key] {
-				idsToDelete = append(idsToDelete, id)
-				continue
-			}
-			seen[key] = true
-		}
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("failed while iterating notebook_chunks dedupe rows: %w", err)
-		}
-
-		for _, id := range idsToDelete {
-			if _, err := tx.Exec(`DELETE FROM notebook_chunks WHERE id = ?`, id); err != nil {
-				return fmt.Errorf("failed to delete duplicate notebook_chunks row id=%s: %w", id, err)
-			}
-		}
-
-		// Create unique index (works on SQLite/Postgres with IF NOT EXISTS semantics for sqlite)
-		if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notebook_chunk_unique ON notebook_chunks(notebook_id, chunk_id)`); err != nil {
-			// Ignore duplicate index errors where they indicate index already exists.
-			if !strings.Contains(strings.ToLower(err.Error()), "already exists") {
-				return fmt.Errorf("failed to create unique index on notebook_chunks: %w", err)
-			}
-		}
-	}
-
-	// Run alterStatements migration before seeding defaults so existing databases have all columns
-	for _, alter := range alterStatements {
-		exists, err := columnExists(tx, alter.Table, alter.Column)
-		if err != nil {
-			return fmt.Errorf("failed to check column %s in table %s: %w", alter.Column, alter.Table, err)
-		}
-		if !exists {
-			if _, err := tx.Exec(alter.SQL); err != nil {
-				return fmt.Errorf("failed to execute alter statement for %s.%s: %w", alter.Table, alter.Column, err)
-			}
-		}
-	}
-
-	// Initialize default user settings
-	if _, err := tx.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled)
-		VALUES (1, 30, '17:00', '18:00', 1)
-		ON CONFLICT(id) DO NOTHING
-	`); err != nil {
-		return fmt.Errorf("failed to initialize user settings: %w", err)
-	}
-
-	if _, err := tx.Exec(`
-		INSERT INTO llm_settings (tier, provider, base_url, model, timeout_ms, max_input_tokens, max_output_tokens, api_key_source, has_api_key)
-		VALUES
-			('fast', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 4000, 2500, 'keyring', 0),
-			('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 4000, 2500, 'keyring', 0)
-		ON CONFLICT(tier) DO NOTHING
-	`); err != nil {
-		return fmt.Errorf("failed to initialize llm settings: %w", err)
-	}
-
-	// Upgrade legacy llm_settings max_output_tokens from 1000 to 2500 to match full quiz output budget
-	if _, err := tx.Exec(`
-		UPDATE llm_settings
-		SET max_output_tokens = 2500
-		WHERE max_output_tokens = 1000
-	`); err != nil {
-		return fmt.Errorf("failed to update legacy max_output_tokens: %w", err)
-	}
-
-	// Upgrade any previously seeded groq base_url that missed /v1
-	if _, err := tx.Exec(`
-		UPDATE llm_settings
-		SET base_url = 'https://api.groq.com/openai/v1'
-		WHERE provider = 'groq' AND (base_url = 'https://api.groq.com/openai' OR base_url = 'https://api.groq.com/openai/')
-	`); err != nil {
-		return fmt.Errorf("failed to update legacy groq base_url: %w", err)
-	}
-
-	// Initialize default gamification state
-	if _, err := tx.Exec(`
-		INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, unlocked_cosmetics_json, stats_json)
-		VALUES (1, 0, 0, 'The Apprentice', 1, '["dark-gruvbox", "light-classic"]', '{}')
-		ON CONFLICT(user_id) DO NOTHING
-	`); err != nil {
-		return fmt.Errorf("failed to initialize user gamification: %w", err)
-	}
-
-	// Migration: backfill missing starter cosmetics (dark-gruvbox, light-classic) into existing user profiles without removing current values
-	var currentUnlockedJSON string
-	err := tx.QueryRow(`SELECT unlocked_cosmetics_json FROM user_gamification WHERE user_id = 1`).Scan(&currentUnlockedJSON)
-	if err == nil && currentUnlockedJSON != "" {
-		var unlocked []string
-		if jsonErr := json.Unmarshal([]byte(currentUnlockedJSON), &unlocked); jsonErr == nil {
-			hasGruvbox := false
-			hasClassic := false
-			for _, id := range unlocked {
-				if id == "dark-gruvbox" {
-					hasGruvbox = true
-				}
-				if id == "light-classic" {
-					hasClassic = true
-				}
-			}
-			changed := false
-			if !hasGruvbox {
-				unlocked = append(unlocked, "dark-gruvbox")
-				changed = true
-			}
-			if !hasClassic {
-				unlocked = append(unlocked, "light-classic")
-				changed = true
-			}
-			if changed {
-				newBytes, _ := json.Marshal(unlocked)
-				_, _ = tx.Exec(`UPDATE user_gamification SET unlocked_cosmetics_json = ? WHERE user_id = 1`, string(newBytes))
-			}
-		}
-	}
-
 	return nil
-}
-
-var alterStatements = []struct {
-	Table  string
-	Column string
-	SQL    string
-}{
-	{"user_settings", "max_flashcards_per_session", "ALTER TABLE user_settings ADD COLUMN max_flashcards_per_session INTEGER NOT NULL DEFAULT 30"},
-	{"user_settings", "study_start_time", "ALTER TABLE user_settings ADD COLUMN study_start_time TEXT DEFAULT '17:00'"},
-	{"user_settings", "study_end_time", "ALTER TABLE user_settings ADD COLUMN study_end_time TEXT DEFAULT '18:00'"},
-	{"user_settings", "reminders_enabled", "ALTER TABLE user_settings ADD COLUMN reminders_enabled BOOLEAN DEFAULT 1"},
-	{"user_settings", "show_reward_notifications", "ALTER TABLE user_settings ADD COLUMN show_reward_notifications BOOLEAN DEFAULT 1"},
-	{"user_settings", "default_remedial_strategy", "ALTER TABLE user_settings ADD COLUMN default_remedial_strategy TEXT DEFAULT 'FAST'"},
-	{"user_settings", "classroom_code", "ALTER TABLE user_settings ADD COLUMN classroom_code TEXT DEFAULT ''"},
-	{"user_settings", "student_username", "ALTER TABLE user_settings ADD COLUMN student_username TEXT DEFAULT ''"},
-	{"user_settings", "last_synced_at", "ALTER TABLE user_settings ADD COLUMN last_synced_at INTEGER DEFAULT 0"},
-	{"notebooks", "file_hash", "ALTER TABLE notebooks ADD COLUMN file_hash TEXT DEFAULT ''"},
-	{"notebooks", "extraction_engine", "ALTER TABLE notebooks ADD COLUMN extraction_engine TEXT DEFAULT 'standard'"},
-	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
-	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
-	{"user_settings", "target_session_words", "ALTER TABLE user_settings ADD COLUMN target_session_words INTEGER NOT NULL DEFAULT 3000"},
-	{"user_settings", "min_session_words", "ALTER TABLE user_settings ADD COLUMN min_session_words INTEGER NOT NULL DEFAULT 0"},
-	{"user_settings", "max_active_notebooks", "ALTER TABLE user_settings ADD COLUMN max_active_notebooks INTEGER NOT NULL DEFAULT 4"},
-	{"user_settings", "quiz_question_count", "ALTER TABLE user_settings ADD COLUMN quiz_question_count INTEGER NOT NULL DEFAULT 8"},
-	{"user_settings", "quiz_passing_score", "ALTER TABLE user_settings ADD COLUMN quiz_passing_score INTEGER NOT NULL DEFAULT 70"},
-	{"user_settings", "tutor_style", "ALTER TABLE user_settings ADD COLUMN tutor_style TEXT NOT NULL DEFAULT 'socratic'"},
-	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
-	{"user_settings", "study_slots_json", "ALTER TABLE user_settings ADD COLUMN study_slots_json TEXT DEFAULT '[]'"},
-	{"study_profiles", "classroom_code", "ALTER TABLE study_profiles ADD COLUMN classroom_code TEXT DEFAULT ''"},
-	{"study_profiles", "student_username", "ALTER TABLE study_profiles ADD COLUMN student_username TEXT DEFAULT ''"},
-	{"study_profiles", "cloud_api_token", "ALTER TABLE study_profiles ADD COLUMN cloud_api_token TEXT DEFAULT ''"},
-	{"study_profiles", "pomo_duration_sec", "ALTER TABLE study_profiles ADD COLUMN pomo_duration_sec INTEGER NOT NULL DEFAULT 1500"},
-	{"study_profiles", "pomo_break_sec", "ALTER TABLE study_profiles ADD COLUMN pomo_break_sec INTEGER NOT NULL DEFAULT 300"},
-	{"study_profiles", "pomo_music_path", "ALTER TABLE study_profiles ADD COLUMN pomo_music_path TEXT DEFAULT ''"},
-	{"study_profiles", "pomo_shuffle", "ALTER TABLE study_profiles ADD COLUMN pomo_shuffle BOOLEAN DEFAULT 0"},
-	{"llm_settings", "max_input_tokens", "ALTER TABLE llm_settings ADD COLUMN max_input_tokens INTEGER NOT NULL DEFAULT 4000"},
-	{"llm_settings", "max_output_tokens", "ALTER TABLE llm_settings ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 2500"},
-	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
-	{"study_queue", "current_page", "ALTER TABLE study_queue ADD COLUMN current_page INTEGER"},
-}
-
-func columnExists(tx *sql.Tx, table, column string) (bool, error) {
-	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var cid int
-		var name, typeStr string
-		var notnull int
-		var dfltValue interface{}
-		var pk int
-		if err := rows.Scan(&cid, &name, &typeStr, &notnull, &dfltValue, &pk); err != nil {
-			return false, err
-		}
-		if strings.EqualFold(name, column) {
-			return true, nil
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return false, err
-	}
-	return false, nil
 }
