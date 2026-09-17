@@ -163,7 +163,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	}
 	strategy := s.DefaultRemedialStrategy
 	if strategy == "" {
-		strategy = "CLASSIC"
+		strategy = "FAST"
 	}
 	targetWords := s.TargetSessionWords
 	if targetWords <= 0 {

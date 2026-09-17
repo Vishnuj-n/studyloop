@@ -82,7 +82,40 @@ func (s *StudyService) AnalyzeQuizFailure(bookContent string, failedQuestions []
 		return nil, fmt.Errorf("failed to parse diagnostic JSON: %w (raw response: %s)", err, rawResponse)
 	}
 
+	if err := validateQuizDiagnosticResult(&result); err != nil {
+		return nil, fmt.Errorf("invalid diagnostic response: %w", err)
+	}
+
 	return &result, nil
+}
+
+func validateQuizDiagnosticResult(r *models.QuizDiagnosticResult) error {
+	if r == nil {
+		return fmt.Errorf("result is nil")
+	}
+	if strings.TrimSpace(r.CoreMisconception) == "" {
+		return fmt.Errorf("core_misconception is required")
+	}
+	if strings.TrimSpace(r.GoldenRule) == "" {
+		return fmt.Errorf("golden_rule is required")
+	}
+	if strings.TrimSpace(r.ActionableTip) == "" {
+		return fmt.Errorf("actionable_tip is required")
+	}
+	for i, sc := range r.SubConcepts {
+		if strings.TrimSpace(sc.Name) == "" {
+			return fmt.Errorf("sub_concept[%d] name is required", i)
+		}
+		if sc.MasteryScore < 0 || sc.MasteryScore > 100 {
+			return fmt.Errorf("sub_concept[%d] mastery_score %d out of valid range [0, 100]", i, sc.MasteryScore)
+		}
+		switch sc.Status {
+		case "Mastered", "Needs Review", "Vulnerable":
+		default:
+			return fmt.Errorf("sub_concept[%d] unsupported status %q", i, sc.Status)
+		}
+	}
+	return nil
 }
 
 func cleanDiagnosticJSON(raw string) string {

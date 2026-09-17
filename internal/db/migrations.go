@@ -123,7 +123,7 @@ func dedupeNotebookChunks(tx *sql.Tx) error {
 	}
 
 	rows, err := tx.Query(`
-		SELECT id, notebook_id, chunk_id, created_at
+		SELECT id, notebook_id, chunk_id
 		FROM notebook_chunks
 		ORDER BY notebook_id, chunk_id, created_at ASC
 	`)
@@ -138,8 +138,7 @@ func dedupeNotebookChunks(tx *sql.Tx) error {
 	var idsToDelete []string
 	for rows.Next() {
 		var id, nb, cid string
-		var createdAt string
-		if err := rows.Scan(&id, &nb, &cid, &createdAt); err != nil {
+		if err := rows.Scan(&id, &nb, &cid); err != nil {
 			return fmt.Errorf("failed to scan notebook_chunks dedupe row id=%s notebook_id=%s chunk_id=%s: %w", id, nb, cid, err)
 		}
 		key := nb + "::" + cid
@@ -242,7 +241,9 @@ func seedDefaults(tx *sql.Tx) error {
 			}
 			if changed {
 				newBytes, _ := json.Marshal(unlocked)
-				_, _ = tx.Exec(`UPDATE user_gamification SET unlocked_cosmetics_json = ? WHERE user_id = 1`, string(newBytes))
+				if _, err := tx.Exec(`UPDATE user_gamification SET unlocked_cosmetics_json = ? WHERE user_id = 1`, string(newBytes)); err != nil {
+					return fmt.Errorf("failed to backfill default cosmetics: %w", err)
+				}
 			}
 		}
 	}

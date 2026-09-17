@@ -18,6 +18,7 @@ import (
 var (
 	DefaultTelemetryEndpoint = "https://rptpauakhdsqinpcnebw.supabase.co/rest/v1/app_telemetry"
 	DefaultTelemetryAnonKey  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwdHBhdWFraGRzcWlucGNuZWJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NTE1NjgsImV4cCI6MjA5OTUyNzU2OH0.yj7dpHIHcL3eEHo5NHCnjGmtxr9rGWjfvxNKcGBFzw8"
+	telemetryHTTPClient      = &http.Client{Timeout: 3 * time.Second}
 )
 
 type HeartbeatPayload struct {
@@ -98,7 +99,7 @@ func SendHeartbeat(repo *db.Repository, appVersion string) {
 			return
 		}
 
-		client := &http.Client{Timeout: 3 * time.Second}
+		client := telemetryHTTPClient
 		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(data))
 		if err != nil {
 			return

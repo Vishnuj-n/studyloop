@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"ai-tutor/internal/models"
@@ -40,7 +41,10 @@ func (a *App) AnalyzeQuizFailure(notebookID, topicID string, startPage, endPage 
 	bookContent := ""
 	if includeBookText && notebookID != "" && startPage > 0 && endPage >= startPage {
 		chunks, err := repo.GetChunksForNotebookPageRange(notebookID, startPage, endPage)
-		if err == nil && len(chunks) > 0 {
+		if err != nil {
+			return map[string]interface{}{"error": fmt.Sprintf("failed to load textbook chunks: %v", err)}
+		}
+		if len(chunks) > 0 {
 			var sb strings.Builder
 			for _, c := range chunks {
 				text := strings.TrimSpace(c.Text)

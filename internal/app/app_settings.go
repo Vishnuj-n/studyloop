@@ -428,11 +428,20 @@ func sameLLMSettingsForUI(a, b models.LLMTierSettings) bool {
 		a.HasAPIKey == b.HasAPIKey
 }
 
-// ProfileWithSummary enriches StudyProfile with live pacing telemetry and pending task counts.
+// ProfileWithSummary enriches StudyProfile summary with live pacing telemetry and pending task counts.
 type ProfileWithSummary struct {
-	models.StudyProfile
-	Pace         map[string]interface{} `json:"pace,omitempty"`
-	PendingTasks int                    `json:"pending_tasks"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	DeadlineAt      int64                  `json:"deadline_at"`
+	CreatedAt       string                 `json:"created_at,omitempty"`
+	ClassroomCode   string                 `json:"classroom_code,omitempty"`
+	StudentUsername string                 `json:"student_username,omitempty"`
+	PomoDurationSec int                    `json:"pomo_duration_sec"`
+	PomoBreakSec    int                    `json:"pomo_break_sec"`
+	PomoMusicPath   string                 `json:"pomo_music_path"`
+	PomoShuffle     bool                   `json:"pomo_shuffle"`
+	Pace            map[string]interface{} `json:"pace,omitempty"`
+	PendingTasks    *int                   `json:"pending_tasks"`
 }
 
 func (a *App) GetProfiles() map[string]interface{} {
@@ -448,11 +457,23 @@ func (a *App) GetProfiles() map[string]interface{} {
 	enriched := make([]ProfileWithSummary, 0, len(profiles))
 	for _, p := range profiles {
 		pace := a.GetProfileDailyPace(p.ID)
-		pendingCount, _ := repo.GetProfilePendingTaskCount(p.ID)
+		var pendingTasks *int
+		if count, countErr := repo.GetProfilePendingTaskCount(p.ID); countErr == nil {
+			pendingTasks = &count
+		}
 		enriched = append(enriched, ProfileWithSummary{
-			StudyProfile: p,
-			Pace:         pace,
-			PendingTasks: pendingCount,
+			ID:              p.ID,
+			Name:            p.Name,
+			DeadlineAt:      p.DeadlineAt,
+			CreatedAt:       p.CreatedAt,
+			ClassroomCode:   p.ClassroomCode,
+			StudentUsername: p.StudentUsername,
+			PomoDurationSec: p.PomoDurationSec,
+			PomoBreakSec:    p.PomoBreakSec,
+			PomoMusicPath:   p.PomoMusicPath,
+			PomoShuffle:     p.PomoShuffle,
+			Pace:            pace,
+			PendingTasks:    pendingTasks,
 		})
 	}
 	return map[string]interface{}{"profiles": enriched}

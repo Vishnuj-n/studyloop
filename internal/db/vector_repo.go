@@ -383,6 +383,22 @@ func (r *Repository) createVectorTable() error {
 		return fmt.Errorf("embedding dimension not initialized")
 	}
 
+	var existingSQL string
+	err := r.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='chunk_vectors'`).Scan(&existingSQL)
+	if err == nil && existingSQL != "" {
+		expectedCol := fmt.Sprintf("float[%d]", r.embeddingDimension)
+		if !strings.Contains(existingSQL, expectedCol) {
+			utils.Warnf("chunk_vectors table dimension mismatch, rebuilding table for dimension %d", r.embeddingDimension)
+			if _, dropErr := r.db.Exec(`DROP TABLE IF EXISTS chunk_vectors`); dropErr != nil {
+				return fmt.Errorf("failed to drop existing chunk_vectors table: %w", dropErr)
+			}
+			// Reset embedding refs so stored vectors are reindexed
+			if _, resetErr := r.db.Exec(`UPDATE chunks SET embedding_ref = NULL`); resetErr != nil {
+				utils.Warnf("failed to reset chunk embedding_refs: %v", resetErr)
+			}
+		}
+	}
+
 	// Create vec0 virtual table for vector search
 	schema := fmt.Sprintf(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors USING vec0(
@@ -390,7 +406,7 @@ func (r *Repository) createVectorTable() error {
 		);
 	`, r.embeddingDimension)
 
-	_, err := r.db.Exec(schema)
+	_, err = r.db.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("failed to create vec0 table: %w", err)
 	}
@@ -401,10 +417,20 @@ func (r *Repository) createVectorTable() error {
 
 // UpdateChunkEmbedding updates the embedding_ref (hash) for a chunk to track changes.
 func (r *Repository) UpdateChunkEmbedding(chunkID string, hash string) error {
-	_, err := r.db.Exec(`
+	res, err := r.db.Exec(`
 		UPDATE chunks SET embedding_ref = ? WHERE id = ?
 	`, hash, chunkID)
-	return err
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows inserted for chunk_id %s", chunkID)
+	}
+	return nil
 }
 
 // ChunkEmbeddingBatchItem represents a chunk embedding update to be processed in batch

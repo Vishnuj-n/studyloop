@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"ai-tutor/internal/models"
 )
@@ -54,8 +55,9 @@ func TestDayBoundaryReviewScheduling(t *testing.T) {
 	// Verify clientEndOfDayUnix calculates a future cutoff for today
 	tzOffset := -330 // IST is UTC+5:30 -> offset -330
 	cutoff := clientEndOfDayUnix(tzOffset)
-	if cutoff <= 0 {
-		t.Fatalf("expected positive cutoff timestamp, got %d", cutoff)
+	nowUnix := time.Now().Unix()
+	if cutoff <= nowUnix {
+		t.Fatalf("expected cutoff %d to be strictly in future relative to %d", cutoff, nowUnix)
 	}
 
 	// Create notebook and cards with due_at set within today's window
@@ -69,9 +71,12 @@ func TestDayBoundaryReviewScheduling(t *testing.T) {
 		t.Fatalf("EnsureNotebookTopic failed: %v", err)
 	}
 
-	// Card due later today (e.g. cutoff - 3600)
+	// Card due strictly between current Unix time and cutoff
 	cardID := "card-day-boundary-1"
-	cardDue := cutoff - 3600
+	cardDue := nowUnix + (cutoff-nowUnix)/2
+	if cardDue <= nowUnix {
+		cardDue = nowUnix + 1
+	}
 	_, err := testRepo.ExecForTest(`
 		INSERT INTO fsrs_cards (id, topic_id, prompt, answer, due_at, state_json)
 		VALUES (?, ?, ?, ?, ?, ?)
