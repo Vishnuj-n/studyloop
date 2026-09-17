@@ -126,7 +126,7 @@ export function useReaderBase(taskID) {
   const effectiveMinPage = computed(() => navigationMinPage.value || topicStartPage.value || 1)
 
   const effectiveMaxPage = computed(
-    () => navigationMaxPage.value || topicEndPage.value || pageCount.value || effectiveMinPage.value
+    () => navigationMaxPage.value || topicEndPage.value || pageCount.value
   )
 
   const hasNavigationBounds = computed(
