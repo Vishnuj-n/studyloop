@@ -417,7 +417,13 @@ function profileDeadlineLabel(profile) {
 
 function profilePaceBadge(profile) {
   const pace = profile?.pace
-  if (!pace || pace.error) return null
+  if (!pace) return null
+  if (pace.error) {
+    return {
+      text: 'Pace unavailable',
+      class: 'pace-unavailable',
+    }
+  }
 
   const status = pace.feasibility_status
   if (status === 'BEHIND' && pace.days_gap !== undefined) {
@@ -917,6 +923,11 @@ function goToNotebooks() {
 .profile-pace-badge.pace-ontrack {
   background: rgba(59, 130, 246, 0.12);
   color: #3b82f6;
+}
+
+.profile-pace-badge.pace-unavailable {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-text, #64707d);
 }
 
 .profile-menu-subtitle {

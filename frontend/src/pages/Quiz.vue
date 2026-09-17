@@ -766,7 +766,12 @@ function handleGoToDetailedAnalysis() {
   for (const q of questions.value) {
     const topicId = q.topic_id || taskMeta.value?.topic_id || 'default'
     const startP = q.source_page_start || taskMeta.value?.start_page || startPage.value || 1
-    const endP = taskMeta.value?.end_page || endPage.value || startP
+    const rawEndP =
+      q.source_page_end ||
+      taskMeta.value?.end_page ||
+      (!taskID.value ? endPage.value : startP) ||
+      startP
+    const endP = Math.max(startP, rawEndP)
     const key = `${topicId}-${startP}-${endP}`
 
     if (!clusterMap.has(key)) {
@@ -829,6 +834,8 @@ function handleGoToDetailedAnalysis() {
     sessionStorage.setItem('studyloop_quiz_analysis', JSON.stringify(analysisPayload))
   } catch (e) {
     console.warn('Failed to save quiz analysis to sessionStorage:', e)
+    error.value = 'Failed to save quiz analysis data. Storage is unavailable.'
+    return
   }
 
   router.push({

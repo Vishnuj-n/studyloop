@@ -100,7 +100,7 @@ export function retryFlashcardGeneration(taskID) {
   return appBridge().RetryFlashcardGeneration(taskID)
 }
 
-export function analyzeQuizFailure(
+export async function analyzeQuizFailure(
   notebookID,
   topicID,
   startPage,

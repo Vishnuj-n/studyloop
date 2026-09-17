@@ -38,464 +38,481 @@
       </div>
     </template>
 
-    <!-- Top Visual Telemetry & Metrics Row -->
-    <section class="telemetry-hero-grid">
-      <!-- Retention Donut Gauge -->
-      <div class="gauge-card">
-        <div class="gauge-visual">
-          <svg class="gauge-svg" viewBox="0 0 100 100" width="84" height="84">
-            <circle
-              class="gauge-bg"
-              cx="50"
-              cy="50"
-              r="40"
-              fill="none"
-              stroke-width="8"
-            />
-            <circle
-              class="gauge-meter"
-              :class="overallPassed ? 'meter--pass' : 'meter--fail'"
-              cx="50"
-              cy="50"
-              r="40"
-              fill="none"
-              stroke-width="8"
-              stroke-dasharray="251.2"
-              :stroke-dashoffset="gaugeDashOffset"
-              stroke-linecap="round"
-            />
-          </svg>
-          <div class="gauge-text">
-            <span class="gauge-pct">{{ overallScore }}%</span>
-          </div>
-        </div>
-        <div class="gauge-info">
-          <span class="gauge-label">Retention Depth</span>
-          <span class="gauge-status-badge" :class="overallPassed ? 'badge--pass' : 'badge--fail'">
-            {{ overallPassed ? 'Passed' : 'Needs Review' }}
-          </span>
-          <span class="gauge-meta">{{ totalCorrect }} of {{ totalQuestions }} correct</span>
-        </div>
-      </div>
+    <!-- Unavailable state -->
+    <article v-if="initError || clusters.length === 0" class="state-panel state-panel--error">
+      <p class="state-text">{{ initError || 'Quiz analysis details are unavailable.' }}</p>
+      <button
+        type="button"
+        class="primary-btn"
+        @click="router.push('/dashboard')"
+      >
+        Return to Dashboard
+      </button>
+    </article>
 
-      <!-- Sub-concept Telemetry Bars -->
-      <div class="concepts-telemetry-card">
-        <div class="card-head-row">
-          <span class="telemetry-title">Concept Mastery Breakdown</span>
-          <span class="telemetry-counter">{{ masteredClustersCount }}/{{ clusters.length }} Chapters Mastered</span>
-        </div>
-
-        <div v-if="telemetrySubConcepts.length > 0" class="subconcepts-list">
-          <div
-            v-for="sc in telemetrySubConcepts"
-            :key="sc.name"
-            class="subconcept-row"
-          >
-            <div class="subconcept-header">
-              <span class="subconcept-name">{{ sc.name }}</span>
-              <span class="subconcept-score" :class="getSubconceptClass(sc.mastery_score)">
-                {{ sc.mastery_score }}% — {{ sc.status }}
-              </span>
-            </div>
-            <div class="subconcept-track">
-              <div
-                class="subconcept-fill"
-                :class="getSubconceptFillClass(sc.mastery_score)"
-                :style="{ width: `${sc.mastery_score}%` }"
+    <template v-else>
+      <!-- Top Visual Telemetry & Metrics Row -->
+      <section class="telemetry-hero-grid">
+        <!-- Retention Donut Gauge -->
+        <div class="gauge-card">
+          <div class="gauge-visual">
+            <svg class="gauge-svg" viewBox="0 0 100 100" width="84" height="84">
+              <circle
+                class="gauge-bg"
+                cx="50"
+                cy="50"
+                r="40"
+                fill="none"
+                stroke-width="8"
               />
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="subconcepts-fallback">
-          <div
-            v-for="cluster in clusters"
-            :key="cluster.topicId + cluster.startPage"
-            class="subconcept-row"
-          >
-            <div class="subconcept-header">
-              <span class="subconcept-name">{{ cluster.topicTitle || `Pages ${cluster.startPage}-${cluster.endPage}` }}</span>
-              <span class="subconcept-score" :class="cluster.passed ? 'val--pass' : 'val--fail'">
-                {{ cluster.scorePercent }}% — {{ cluster.passed ? 'Mastered' : 'Needs Review' }}
-              </span>
-            </div>
-            <div class="subconcept-track">
-              <div
-                class="subconcept-fill"
-                :class="cluster.passed ? 'fill--pass' : 'fill--fail'"
-                :style="{ width: `${cluster.scorePercent}%` }"
+              <circle
+                class="gauge-meter"
+                :class="overallPassed ? 'meter--pass' : 'meter--fail'"
+                cx="50"
+                cy="50"
+                r="40"
+                fill="none"
+                stroke-width="8"
+                stroke-dasharray="251.2"
+                :stroke-dashoffset="gaugeDashOffset"
+                stroke-linecap="round"
               />
+            </svg>
+            <div class="gauge-text">
+              <span class="gauge-pct">{{ overallScore }}%</span>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- AI Tutor Root-Cause Diagnosis Card -->
-    <section v-if="allFailedQuestions.length > 0" class="ai-diagnostic-card">
-      <header class="ai-card-header">
-        <div class="ai-card-badge">
-          <svg
-            class="ai-card-icon"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-          </svg>
-          <span class="ai-card-title">AI Root-Cause Diagnosis</span>
-        </div>
-
-        <!-- Book Text Context Toggle -->
-        <button
-          type="button"
-          class="context-toggle-btn"
-          :class="{ 'context-toggle-btn--active': includeBookText }"
-          :disabled="loadingDiagnostic"
-          @click="toggleBookContext"
-        >
-          <svg
-            class="btn-svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-          </svg>
-          <span>{{ includeBookText ? 'Book Context Active' : 'Include Book Context' }}</span>
-        </button>
-      </header>
-
-      <!-- Loading Skeleton -->
-      <div v-if="loadingDiagnostic" class="ai-loading-skeleton">
-        <div class="skeleton-line skeleton-line--title" />
-        <div class="skeleton-line skeleton-line--body" />
-        <div class="skeleton-line skeleton-line--body skeleton-line--short" />
-      </div>
-
-      <!-- Diagnostic Content -->
-      <div v-else-if="diagnosticResult" class="ai-diagnostic-content">
-        <!-- Core Misconception -->
-        <div class="diagnostic-block diagnostic-block--misconception">
-          <div class="block-label">
-            <svg
-              class="block-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>Core Misconception Detected</span>
-          </div>
-          <p class="block-text">{{ diagnosticResult.core_misconception }}</p>
-        </div>
-
-        <!-- Golden Rule -->
-        <div v-if="diagnosticResult.golden_rule" class="diagnostic-block diagnostic-block--rule">
-          <div class="block-label">
-            <svg
-              class="block-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span>Key Takeaway Rule</span>
-          </div>
-          <p class="block-text">{{ diagnosticResult.golden_rule }}</p>
-        </div>
-
-        <!-- Actionable Tip -->
-        <div v-if="diagnosticResult.actionable_tip" class="diagnostic-tip-bar">
-          <span class="tip-label">Study Advice:</span>
-          <span class="tip-text">{{ diagnosticResult.actionable_tip }}</span>
-        </div>
-      </div>
-
-      <!-- Diagnostic Error / Offline Fallback -->
-      <div v-else-if="diagnosticError" class="ai-diagnostic-fallback">
-        <p class="fallback-text">AI diagnostic could not be synthesized: {{ diagnosticError }}</p>
-        <button
-          type="button"
-          class="ghost-action-btn"
-          @click="fetchDiagnostic(includeBookText)"
-        >
-          Retry AI Analysis
-        </button>
-      </div>
-    </section>
-
-    <!-- Diagnostic Filter Tabs (when multiple clusters) -->
-    <div v-if="clusters.length > 1" class="cluster-filter-nav">
-      <button
-        type="button"
-        class="filter-chip"
-        :class="{ 'filter-chip--active': activeFilter === 'all' }"
-        @click="activeFilter = 'all'"
-      >
-        All Chapters ({{ clusters.length }})
-      </button>
-      <button
-        type="button"
-        class="filter-chip"
-        :class="{ 'filter-chip--active': activeFilter === 'weak' }"
-        @click="activeFilter = 'weak'"
-      >
-        Needs Attention ({{ weakClusters.length }})
-      </button>
-      <button
-        type="button"
-        class="filter-chip"
-        :class="{ 'filter-chip--active': activeFilter === 'strong' }"
-        @click="activeFilter = 'strong'"
-      >
-        Mastered ({{ masteredClusters.length }})
-      </button>
-    </div>
-
-    <!-- Cluster Performance List -->
-    <div class="clusters-container">
-      <article
-        v-for="cluster in visibleClusters"
-        :key="cluster.topicId + cluster.startPage"
-        class="cluster-card"
-        :class="cluster.passed ? 'cluster-card--pass' : 'cluster-card--fail'"
-      >
-        <!-- Cluster Header -->
-        <header class="cluster-header">
-          <div class="cluster-title-wrap">
-            <h3 class="cluster-title">
-              {{ cluster.topicTitle || 'Concept Module' }}
-            </h3>
-            <span class="cluster-pages-tag">
-              Pages {{ cluster.startPage }}–{{ cluster.endPage }}
+          <div class="gauge-info">
+            <span class="gauge-label">Retention Depth</span>
+            <span class="gauge-status-badge" :class="overallPassed ? 'badge--pass' : 'badge--fail'">
+              {{ overallPassed ? 'Passed' : 'Needs Review' }}
             </span>
+            <span class="gauge-meta">{{ totalCorrect }} of {{ totalQuestions }} correct</span>
           </div>
-
-          <div class="cluster-score-pill" :class="cluster.passed ? 'pill--pass' : 'pill--fail'">
-            <span class="score-fraction"
-              >{{ cluster.correctCount }}/{{ cluster.totalQuestions }} Correct</span
-            >
-            <span class="score-percent">({{ cluster.scorePercent }}%)</span>
-          </div>
-        </header>
-
-        <!-- Mastered State Banner (No Mistakes) -->
-        <div v-if="cluster.failedQuestions.length === 0" class="cluster-mastered-note">
-          <svg
-            class="note-svg note-svg--success"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          <span>All questions answered correctly for this section.</span>
         </div>
 
-        <!-- Weakness / Remedial Section -->
-        <div v-else class="cluster-weakness-section">
-          <div class="weakness-summary-bar">
-            <div class="weakness-summary-text">
-              <span class="weakness-count">
-                {{ cluster.failedQuestions.length }} question{{
-                  cluster.failedQuestions.length > 1 ? 's' : ''
-                }}
-                missed
-              </span>
-              <span class="weakness-hint">— Recommended active-recall remediation available</span>
-            </div>
-
-            <div class="cluster-actions">
-              <button
-                type="button"
-                class="cluster-action-btn"
-                :class="{ 'btn--copied': copiedClusterId === getClusterKey(cluster) }"
-                @click="copySocraticPrompt(cluster)"
-              >
-                <svg
-                  v-if="copiedClusterId === getClusterKey(cluster)"
-                  class="btn-svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <svg
-                  v-else
-                  class="btn-svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-                <span>{{
-                  copiedClusterId === getClusterKey(cluster)
-                    ? 'Prompt Copied'
-                    : 'Copy Socratic Prompt'
-                }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="cluster-action-btn"
-                @click="openInTutor(cluster)"
-              >
-                <svg
-                  class="btn-svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                <span>Launch Socratic Tutor</span>
-              </button>
-
-              <button
-                type="button"
-                class="cluster-action-btn cluster-action-btn--secondary"
-                @click="openInReader(cluster)"
-              >
-                <svg
-                  class="btn-svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                </svg>
-                <span>Open Reader (p. {{ cluster.startPage }})</span>
-              </button>
-            </div>
+        <!-- Sub-concept Telemetry Bars -->
+        <div class="concepts-telemetry-card">
+          <div class="card-head-row">
+            <span class="telemetry-title">Concept Mastery Breakdown</span>
+            <span class="telemetry-counter">{{ masteredClustersCount }}/{{ clusters.length }} Chapters Mastered</span>
           </div>
 
-          <!-- Failed Questions Detail List -->
-          <div class="failed-questions-list">
+          <div v-if="telemetrySubConcepts.length > 0" class="subconcepts-list">
             <div
-              v-for="(fq, fqIdx) in cluster.failedQuestions"
-              :key="fq.id || fqIdx"
-              class="failed-question-item"
+              v-for="sc in telemetrySubConcepts"
+              :key="sc.name"
+              class="subconcept-row"
             >
-              <div class="failed-question-header">
-                <span class="question-index-tag">Question {{ fqIdx + 1 }}</span>
-                <span v-if="fq.sourcePageStart" class="question-page-tag">
-                  Page {{ fq.sourcePageStart }}
+              <div class="subconcept-header">
+                <span class="subconcept-name">{{ sc.name }}</span>
+                <span class="subconcept-score" :class="getSubconceptClass(sc.mastery_score)">
+                  {{ sc.mastery_score }}% — {{ sc.status }}
                 </span>
               </div>
+              <div class="subconcept-track">
+                <div
+                  class="subconcept-fill"
+                  :class="getSubconceptFillClass(sc.mastery_score)"
+                  :style="{ width: `${sc.mastery_score}%` }"
+                />
+              </div>
+            </div>
+          </div>
 
-              <p class="failed-question-prompt">{{ fq.prompt }}</p>
-
-              <div class="answers-comparison-grid">
-                <div class="answer-box answer-box--user">
-                  <span class="answer-box-label">Your Response</span>
-                  <p class="answer-box-text">{{ fq.userAnswer || 'No answer selected' }}</p>
-                </div>
-                <div class="answer-box answer-box--correct">
-                  <span class="answer-box-label">Expected Answer</span>
-                  <p class="answer-box-text">{{ fq.correctAnswer }}</p>
-                </div>
+          <div v-else class="subconcepts-fallback">
+            <div
+              v-for="cluster in clusters"
+              :key="cluster.topicId + cluster.startPage"
+              class="subconcept-row"
+            >
+              <div class="subconcept-header">
+                <span class="subconcept-name">{{ cluster.topicTitle || `Pages ${cluster.startPage}-${cluster.endPage}` }}</span>
+                <span class="subconcept-score" :class="cluster.passed ? 'val--pass' : 'val--fail'">
+                  {{ cluster.scorePercent }}% — {{ cluster.passed ? 'Mastered' : 'Needs Review' }}
+                </span>
+              </div>
+              <div class="subconcept-track">
+                <div
+                  class="subconcept-fill"
+                  :class="cluster.passed ? 'fill--pass' : 'fill--fail'"
+                  :style="{ width: `${cluster.scorePercent}%` }"
+                />
               </div>
             </div>
           </div>
         </div>
-      </article>
-    </div>
+      </section>
 
-    <!-- Bottom Actions Panel -->
-    <footer class="analysis-footer">
-      <div class="footer-status-text">
-        <span v-if="flashcardsPending" class="status-indicator-dot" />
-        <span v-if="flashcardsPending">
-          Review flashcards will be scheduled when returning to Dashboard.
-        </span>
-      </div>
+      <!-- AI Tutor Root-Cause Diagnosis Card -->
+      <section v-if="allFailedQuestions.length > 0" class="ai-diagnostic-card">
+        <header class="ai-card-header">
+          <div class="ai-card-badge">
+            <svg
+              class="ai-card-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+            <span class="ai-card-title">AI Root-Cause Diagnosis</span>
+          </div>
 
-      <div class="footer-button-group">
+          <!-- Book Text Context Toggle -->
+          <button
+            type="button"
+            class="context-toggle-btn"
+            :class="{ 'context-toggle-btn--active': includeBookText }"
+            :disabled="loadingDiagnostic"
+            @click="toggleBookContext"
+          >
+            <svg
+              class="btn-svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+            <span>{{ includeBookText ? 'Book Context Active' : 'Include Book Context' }}</span>
+          </button>
+        </header>
+
+        <!-- Loading Skeleton -->
+        <div v-if="loadingDiagnostic" class="ai-loading-skeleton">
+          <div class="skeleton-line skeleton-line--title" />
+          <div class="skeleton-line skeleton-line--body" />
+          <div class="skeleton-line skeleton-line--body skeleton-line--short" />
+        </div>
+
+        <!-- Diagnostic Content -->
+        <div v-else-if="diagnosticResult" class="ai-diagnostic-content">
+          <!-- Core Misconception -->
+          <div class="diagnostic-block diagnostic-block--misconception">
+            <div class="block-label">
+              <svg
+                class="block-icon"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>Core Misconception Detected</span>
+            </div>
+            <p class="block-text">{{ diagnosticResult.core_misconception }}</p>
+          </div>
+
+          <!-- Golden Rule -->
+          <div v-if="diagnosticResult.golden_rule" class="diagnostic-block diagnostic-block--rule">
+            <div class="block-label">
+              <svg
+                class="block-icon"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span>Key Takeaway Rule</span>
+            </div>
+            <p class="block-text">{{ diagnosticResult.golden_rule }}</p>
+          </div>
+
+          <!-- Actionable Tip -->
+          <div v-if="diagnosticResult.actionable_tip" class="diagnostic-tip-bar">
+            <span class="tip-label">Study Advice:</span>
+            <span class="tip-text">{{ diagnosticResult.actionable_tip }}</span>
+          </div>
+        </div>
+
+        <!-- Diagnostic Error / Offline Fallback -->
+        <div v-else-if="diagnosticError" class="ai-diagnostic-fallback">
+          <p class="fallback-text">AI diagnostic could not be synthesized: {{ diagnosticError }}</p>
+          <button
+            type="button"
+            class="ghost-action-btn"
+            @click="fetchDiagnostic(includeBookText)"
+          >
+            Retry AI Analysis
+          </button>
+        </div>
+      </section>
+
+      <!-- Diagnostic Filter Tabs (when multiple clusters) -->
+      <div v-if="clusters.length > 1" class="cluster-filter-nav">
         <button
-          v-if="flashcardsPending"
           type="button"
-          class="ghost-btn"
-          :disabled="processingExit"
-          @click="handleExit(false)"
+          class="filter-chip"
+          :class="{ 'filter-chip--active': activeFilter === 'all' }"
+          @click="activeFilter = 'all'"
         >
-          Skip Card Generation
+          All Chapters ({{ clusters.length }})
         </button>
         <button
           type="button"
-          class="primary-btn complete-btn"
-          :disabled="processingExit"
-          @click="handleExit(true)"
+          class="filter-chip"
+          :class="{ 'filter-chip--active': activeFilter === 'weak' }"
+          @click="activeFilter = 'weak'"
         >
-          <span v-if="processingExit">Scheduling flashcards…</span>
-          <span v-else>Done & Return to Dashboard →</span>
+          Needs Attention ({{ weakClusters.length }})
+        </button>
+        <button
+          type="button"
+          class="filter-chip"
+          :class="{ 'filter-chip--active': activeFilter === 'strong' }"
+          @click="activeFilter = 'strong'"
+        >
+          Mastered ({{ masteredClusters.length }})
         </button>
       </div>
-    </footer>
+
+      <!-- Cluster Performance List -->
+      <div class="clusters-container">
+        <article
+          v-for="cluster in visibleClusters"
+          :key="cluster.topicId + cluster.startPage"
+          class="cluster-card"
+          :class="cluster.passed ? 'cluster-card--pass' : 'cluster-card--fail'"
+        >
+          <!-- Cluster Header -->
+          <header class="cluster-header">
+            <div class="cluster-title-wrap">
+              <h3 class="cluster-title">
+                {{ cluster.topicTitle || 'Concept Module' }}
+              </h3>
+              <span class="cluster-pages-tag">
+                Pages {{ cluster.startPage }}–{{ cluster.endPage }}
+              </span>
+            </div>
+
+            <div class="cluster-score-pill" :class="cluster.passed ? 'pill--pass' : 'pill--fail'">
+              <span class="score-fraction"
+                >{{ cluster.correctCount }}/{{ cluster.totalQuestions }} Correct</span
+              >
+              <span class="score-percent">({{ cluster.scorePercent }}%)</span>
+            </div>
+          </header>
+
+          <!-- Mastered State Banner (No Mistakes) -->
+          <div v-if="cluster.failedQuestions.length === 0" class="cluster-mastered-note">
+            <svg
+              class="note-svg note-svg--success"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>All questions answered correctly for this section.</span>
+          </div>
+
+          <!-- Weakness / Remedial Section -->
+          <div v-else class="cluster-weakness-section">
+            <div class="weakness-summary-bar">
+              <div class="weakness-summary-text">
+                <span class="weakness-count">
+                  {{ cluster.failedQuestions.length }} question{{
+                    cluster.failedQuestions.length > 1 ? 's' : ''
+                  }}
+                  missed
+                </span>
+                <span class="weakness-hint">— Recommended active-recall remediation available</span>
+              </div>
+
+              <div class="cluster-actions">
+                <button
+                  type="button"
+                  class="cluster-action-btn"
+                  :class="{ 'btn--copied': copiedClusterId === getClusterKey(cluster) }"
+                  @click="copySocraticPrompt(cluster)"
+                >
+                  <svg
+                    v-if="copiedClusterId === getClusterKey(cluster)"
+                    class="btn-svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <svg
+                    v-else
+                    class="btn-svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  <span>{{
+                    copiedClusterId === getClusterKey(cluster)
+                      ? 'Prompt Copied'
+                      : 'Copy Socratic Prompt'
+                  }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="cluster-action-btn"
+                  @click="openInTutor(cluster)"
+                >
+                  <svg
+                    class="btn-svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>Launch Socratic Tutor</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="cluster-action-btn cluster-action-btn--secondary"
+                  @click="openInReader(cluster)"
+                >
+                  <svg
+                    class="btn-svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                  </svg>
+                  <span>Open Reader (p. {{ cluster.startPage }})</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Failed Questions Detail List -->
+            <div class="failed-questions-list">
+              <div
+                v-for="(fq, fqIdx) in cluster.failedQuestions"
+                :key="fq.id || fqIdx"
+                class="failed-question-item"
+              >
+                <div class="failed-question-header">
+                  <span class="question-index-tag">Question {{ fqIdx + 1 }}</span>
+                  <span v-if="fq.sourcePageStart" class="question-page-tag">
+                    Page {{ fq.sourcePageStart }}
+                  </span>
+                </div>
+
+                <p class="failed-question-prompt">{{ fq.prompt }}</p>
+
+                <div class="answers-comparison-grid">
+                  <div class="answer-box answer-box--user">
+                    <span class="answer-box-label">Your Response</span>
+                    <p class="answer-box-text">{{ fq.userAnswer || 'No answer selected' }}</p>
+                  </div>
+                  <div class="answer-box answer-box--correct">
+                    <span class="answer-box-label">Expected Answer</span>
+                    <p class="answer-box-text">{{ fq.correctAnswer }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Bottom Actions Panel -->
+      <footer class="analysis-footer">
+        <div class="footer-status-text">
+          <p v-if="exitError" class="footer-error-text">{{ exitError }}</p>
+          <template v-else>
+            <span v-if="flashcardsPending" class="status-indicator-dot" />
+            <span v-if="flashcardsPending">
+              Review flashcards will be scheduled when returning to Dashboard.
+            </span>
+          </template>
+        </div>
+
+        <div class="footer-button-group">
+          <button
+            v-if="flashcardsPending"
+            type="button"
+            class="ghost-btn"
+            :disabled="processingExit"
+            @click="handleExit(false)"
+          >
+            Skip Card Generation
+          </button>
+          <button
+            type="button"
+            class="primary-btn complete-btn"
+            :disabled="processingExit"
+            @click="handleExit(true)"
+          >
+            <span v-if="processingExit">Scheduling flashcards…</span>
+            <span v-else>Done & Return to Dashboard →</span>
+          </button>
+        </div>
+      </footer>
+    </template>
   </StudyPageLayout>
 </template>
 
@@ -503,7 +520,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
-import { analyzeQuizFailure, generateFlashcardsForQuizTask, getTask } from '../services/appApi'
+import {
+  analyzeQuizFailure,
+  generateFlashcardsForQuizTask,
+  GetTaskContext,
+} from '../services/appApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -518,6 +539,8 @@ const flashcardsPending = ref(false)
 const processingExit = ref(false)
 const activeFilter = ref('all')
 const copiedClusterId = ref('')
+const initError = ref('')
+const exitError = ref('')
 
 // AI Diagnostic state
 const includeBookText = ref(false)
@@ -547,14 +570,19 @@ onMounted(async () => {
   if (clusters.value.length === 0 && route.query.taskId) {
     taskID.value = String(route.query.taskId)
     try {
-      const taskData = await getTask(taskID.value)
-      if (taskData) {
-        notebookID.value = taskData.notebook_id || ''
-        isMilestone.value = taskData.task_type === 'MILESTONE_EXAM'
+      const ctx = await GetTaskContext(taskID.value)
+      if (ctx?.task) {
+        notebookID.value = ctx.task.notebook_id || ctx.notebook?.id || ''
+        isMilestone.value = ctx.task.task_type === 'MILESTONE_EXAM'
       }
     } catch (err) {
       console.warn('Failed to fallback load task context:', err)
     }
+  }
+
+  if (clusters.value.length === 0) {
+    initError.value = 'Quiz analysis data is unavailable.'
+    return
   }
 
   // Auto-fetch AI Diagnostic if there are missed questions
@@ -629,25 +657,55 @@ async function fetchDiagnostic(withBookText) {
   if (allFailedQuestions.value.length === 0) return
   loadingDiagnostic.value = true
   diagnosticError.value = ''
+  diagnosticResult.value = null
 
-  const startP = clusters.value[0]?.startPage || 1
-  const endP = clusters.value[clusters.value.length - 1]?.endPage || startP
-  const topicID = clusters.value[0]?.topicId || ''
+  const targetClusters = clusters.value.filter(
+    (c) => Array.isArray(c.failedQuestions) && c.failedQuestions.length > 0
+  )
+  if (targetClusters.length === 0) {
+    loadingDiagnostic.value = false
+    return
+  }
 
   try {
-    const res = await analyzeQuizFailure(
-      notebookID.value,
-      topicID,
-      startP,
-      endP,
-      JSON.stringify(allFailedQuestions.value),
-      withBookText
+    const requests = targetClusters.map((cluster) =>
+      analyzeQuizFailure(
+        notebookID.value,
+        '',
+        cluster.startPage,
+        cluster.endPage,
+        JSON.stringify(cluster.failedQuestions),
+        withBookText
+      )
     )
+    const responses = await Promise.all(requests)
 
-    if (res?.error) {
-      diagnosticError.value = res.error
-    } else if (res?.result) {
-      diagnosticResult.value = res.result
+    const misconceptions = []
+    const goldenRules = []
+    const tips = []
+    const subConcepts = []
+
+    for (const res of responses) {
+      if (res?.result) {
+        if (res.result.core_misconception) misconceptions.push(res.result.core_misconception)
+        if (res.result.golden_rule) goldenRules.push(res.result.golden_rule)
+        if (res.result.actionable_tip) tips.push(res.result.actionable_tip)
+        if (Array.isArray(res.result.sub_concepts)) {
+          subConcepts.push(...res.result.sub_concepts)
+        }
+      }
+    }
+
+    if (misconceptions.length > 0 || subConcepts.length > 0) {
+      diagnosticResult.value = {
+        core_misconception: misconceptions.join(' '),
+        golden_rule: goldenRules.join(' '),
+        actionable_tip: tips.join(' '),
+        sub_concepts: subConcepts,
+      }
+    } else {
+      const firstErr = responses.find((r) => r?.error)?.error
+      diagnosticError.value = firstErr || 'Failed to generate diagnostic'
     }
   } catch (err) {
     diagnosticError.value = err?.message || 'Failed to generate diagnostic'
@@ -729,6 +787,7 @@ function openInTutor(cluster) {
 
 async function handleExit(shouldGenerateFlashcards) {
   if (processingExit.value) return
+  exitError.value = ''
   processingExit.value = true
 
   const query = {}
@@ -736,6 +795,11 @@ async function handleExit(shouldGenerateFlashcards) {
   if (shouldGenerateFlashcards && flashcardsPending.value && taskID.value) {
     try {
       const genResult = await generateFlashcardsForQuizTask(taskID.value)
+      if (genResult?.error) {
+        exitError.value = genResult.error
+        processingExit.value = false
+        return
+      }
       if (genResult?.rewards) {
         window.dispatchEvent(
           new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
@@ -746,6 +810,9 @@ async function handleExit(shouldGenerateFlashcards) {
       }
     } catch (err) {
       console.warn('Deferred flashcard generation failed on exit from analysis:', err)
+      exitError.value = err?.message || 'Failed to generate flashcards.'
+      processingExit.value = false
+      return
     }
   }
 
@@ -1467,5 +1534,29 @@ async function handleExit(shouldGenerateFlashcards) {
   font-size: 0.875rem;
   font-weight: 600;
   border-radius: 6px;
+}
+
+.footer-error-text {
+  color: #ef4444;
+  font-size: 13px;
+  margin: 0;
+}
+
+.state-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.state-panel--error .state-text {
+  color: #ef4444;
 }
 </style>
