@@ -153,11 +153,6 @@
         >
           {{ userSettings.skip_to_reading_active ? 'Disable Escape Hatch' : 'Skip to Reading' }}
         </button>
-
-        <div v-if="dueReviewCards > 0" class="review-stats">
-          <p class="review-count">{{ dueReviewCards }} cards due for review</p>
-          <p class="review-hint">Spaced repetition strengthens long-term retention</p>
-        </div>
       </div>
     </article>
 
@@ -1014,24 +1009,6 @@ function goToNotebooks() {
   border-color: #d35400;
   color: white;
   box-shadow: 0 0 12px rgba(230, 126, 34, 0.3);
-}
-
-.review-stats {
-  text-align: right;
-}
-
-.review-count {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--primary);
-  font-family: 'Manrope', sans-serif;
-}
-
-.review-hint {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--muted-text, #777);
 }
 
 .card {

@@ -119,7 +119,6 @@ describe('Dashboard.vue Integration', () => {
 
     expect(wrapper.find('.status-strip h1').text()).toBe("Today's Tasks")
     expect(wrapper.text()).toContain('Introduction to Calculus')
-    expect(wrapper.find('.review-count').text()).toContain('5 cards due for review')
   })
 
   it('toggles escape hatch status when clicked', async () => {

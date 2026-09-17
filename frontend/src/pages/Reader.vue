@@ -177,8 +177,8 @@
           :video-end-seconds="reader.videoEndSeconds.value"
           :transcript-content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
-          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :start-page="reader.effectiveMinPage.value"
+          :end-page="reader.effectiveMaxPage.value"
           :is-task-flow="isTaskFlow"
           :completing="completingSession"
           :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
@@ -188,8 +188,8 @@
           v-else-if="reader.isMarkdown.value"
           :content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
-          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :start-page="reader.effectiveMinPage.value"
+          :end-page="reader.effectiveMaxPage.value"
           :is-task-flow="isTaskFlow"
           :completing="completingSession"
           :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
@@ -305,16 +305,8 @@ async function handleSimplify() {
   if (simplifying.value) return
   simplifying.value = true
   try {
-    const startPage =
-      reader.navigationMinPage.value ||
-      reader.topicStartPage.value ||
-      reader.currentPage.value ||
-      1
-    const endPage =
-      reader.navigationMaxPage.value ||
-      reader.topicEndPage.value ||
-      reader.pageCount.value ||
-      startPage
+    const startPage = reader.effectiveMinPage.value
+    const endPage = reader.effectiveMaxPage.value
     const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
     const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
     const topicTitle = cleanTopicTitle(rawTopic)
@@ -414,8 +406,8 @@ const showAudioMenu = ref(false)
 const audioStartPage = ref(0)
 const audioEndPage = ref(0)
 
-const defaultAudioStart = computed(() => reader.navigationMinPage.value || reader.topicStartPage.value || 1)
-const defaultAudioEnd = computed(() => reader.navigationMaxPage.value || reader.topicEndPage.value || reader.pageCount.value || defaultAudioStart.value)
+const defaultAudioStart = computed(() => reader.effectiveMinPage.value)
+const defaultAudioEnd = computed(() => reader.effectiveMaxPage.value)
 
 function startAudio(mode = 'session') {
   if (mode === 'toggle') {
@@ -736,16 +728,8 @@ const copiedSession = ref(false)
 const copyError = ref('')
 
 async function copySessionContent() {
-  const startPage =
-    reader.navigationMinPage.value ||
-    reader.topicStartPage.value ||
-    reader.currentPage.value ||
-    1
-  const endPage =
-    reader.navigationMaxPage.value ||
-    reader.topicEndPage.value ||
-    reader.pageCount.value ||
-    startPage
+  const startPage = reader.effectiveMinPage.value
+  const endPage = reader.effectiveMaxPage.value
   const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
   const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
   const topicTitle = cleanTopicTitle(rawTopic)

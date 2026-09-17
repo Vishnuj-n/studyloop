@@ -123,6 +123,12 @@ export function useReaderBase(taskID) {
 
   const pdfVisible = computed(() => isPdf.value && notebookUrl.value !== '')
 
+  const effectiveMinPage = computed(() => navigationMinPage.value || topicStartPage.value || 1)
+
+  const effectiveMaxPage = computed(
+    () => navigationMaxPage.value || topicEndPage.value || pageCount.value || effectiveMinPage.value
+  )
+
   const hasNavigationBounds = computed(
     () => navigationMinPage.value > 0 && navigationMaxPage.value >= navigationMinPage.value
   )
@@ -493,6 +499,8 @@ export function useReaderBase(taskID) {
     cachedVideoUrl,
     isPdf,
     pdfVisible,
+    effectiveMinPage,
+    effectiveMaxPage,
     hasNavigationBounds,
     canGoPrev,
     canGoNext,
