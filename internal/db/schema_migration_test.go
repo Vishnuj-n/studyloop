@@ -339,6 +339,9 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 				tableNames = append(tableNames, name)
 			}
 		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("rows iteration error: %v", err)
+		}
 
 		for _, tbl := range tableNames {
 			infoRows, err := db.Query("PRAGMA table_info(" + tbl + ")")
@@ -355,6 +358,9 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 				if err := infoRows.Scan(&cid, &colName, &colType, &notnull, &dfltVal, &pk); err == nil {
 					cols = append(cols, strings.ToLower(colName))
 				}
+			}
+			if err := infoRows.Err(); err != nil {
+				t.Fatalf("infoRows iteration error for %s: %v", tbl, err)
 			}
 			infoRows.Close()
 			sort.Strings(cols)
