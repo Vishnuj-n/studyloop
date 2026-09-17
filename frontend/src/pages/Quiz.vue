@@ -244,6 +244,48 @@
           <span v-else>Continue →</span>
         </button>
       </div>
+
+      <div class="result-panel__analysis-action">
+        <button
+          type="button"
+          class="analysis-link-btn"
+          :disabled="generatingFlashcards"
+          @click="handleGoToDetailedAnalysis"
+        >
+          <svg
+            class="analysis-svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 20V10" />
+            <path d="M12 20V4" />
+            <path d="M6 20v-6" />
+          </svg>
+          <span>Detailed Performance Breakdown & Socratic Prompts</span>
+          <svg
+            class="analysis-arrow-svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14" />
+            <path d="M12 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
     </article>
 
     <!-- Empty state: no questions -->
@@ -712,6 +754,95 @@ async function handleGoToExaminer() {
   router.push({
     path: '/examiner',
     query,
+  })
+}
+
+function handleGoToDetailedAnalysis() {
+  const nbID = taskMeta.value?.notebook_id || selectedNotebookID.value || ''
+  const isMilestone = taskMeta.value?.task_type === 'MILESTONE_EXAM'
+
+  // Cluster grouping logic
+  const clusterMap = new Map()
+  for (const q of questions.value) {
+    const topicId = q.topic_id || taskMeta.value?.topic_id || 'default'
+    const startP = q.source_page_start || taskMeta.value?.start_page || startPage.value || 1
+    const rawEndP =
+      q.source_page_end ||
+      taskMeta.value?.end_page ||
+      (!taskID.value ? endPage.value : startP) ||
+      startP
+    const endP = Math.max(startP, rawEndP)
+    const key = `${topicId}-${startP}-${endP}`
+
+    if (!clusterMap.has(key)) {
+      clusterMap.set(key, {
+        topicId,
+        topicTitle: q.source_heading || taskMeta.value?.topic_title || '',
+        startPage: startP,
+        endPage: endP,
+        questions: [],
+      })
+    }
+    clusterMap.get(key).questions.push(q)
+  }
+
+  const clusters = []
+  for (const item of clusterMap.values()) {
+    const failed = []
+    let correct = 0
+    for (const q of item.questions) {
+      if (isCorrect(q)) {
+        correct++
+      } else {
+        failed.push({
+          id: q.id,
+          prompt: q.prompt,
+          options: q.options || [],
+          userAnswer: answers.value[q.id] || '',
+          correctAnswer: q.correct_answer,
+          sourcePageStart: q.source_page_start,
+          sourceSnippet: q.source_snippet,
+        })
+      }
+    }
+    const scorePct =
+      item.questions.length > 0 ? Math.round((correct / item.questions.length) * 100) : 0
+    clusters.push({
+      topicId: item.topicId,
+      topicTitle: item.topicTitle,
+      startPage: item.startPage,
+      endPage: item.endPage,
+      totalQuestions: item.questions.length,
+      correctCount: correct,
+      scorePercent: scorePct,
+      passed: scorePct >= (result.value?.passing_score || 70),
+      failedQuestions: failed,
+    })
+  }
+
+  const analysisPayload = {
+    taskId: result.value?.task_id || taskID.value || '',
+    notebookId: nbID,
+    isMilestone,
+    overallScore: result.value?.score || 0,
+    overallPassed: !!result.value?.passed,
+    flashcardsPending: !!(result.value?.passed && result.value?.flashcards_pending),
+    clusters,
+  }
+
+  try {
+    sessionStorage.setItem('studyloop_quiz_analysis', JSON.stringify(analysisPayload))
+  } catch (e) {
+    console.warn('Failed to save quiz analysis to sessionStorage:', e)
+    error.value = 'Failed to save quiz analysis data. Storage is unavailable.'
+    return
+  }
+
+  router.push({
+    path: '/quiz-analysis',
+    query: {
+      taskId: analysisPayload.taskId || undefined,
+    },
   })
 }
 </script>
@@ -1316,5 +1447,41 @@ async function handleGoToExaminer() {
   .viva-challenge-btn {
     width: 100%;
   }
+}
+
+.result-panel__analysis-action {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.analysis-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analysis-link-btn:hover:not(:disabled) {
+  color: var(--on-surface);
+  border-color: var(--muted-text);
+  background: var(--surface-container-low);
+}
+
+.analysis-link-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.analysis-svg,
+.analysis-arrow-svg {
+  flex-shrink: 0;
 }
 </style>

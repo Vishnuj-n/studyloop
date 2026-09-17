@@ -30,20 +30,21 @@
           >
             <span class="profile-menu-dot" aria-hidden="true"></span>
             <span class="profile-menu-copy">
-              <strong>{{ p.name }}</strong>
-              <small>{{ profileDeadlineLabel(p) }}</small>
+              <span class="profile-menu-title-row">
+                <strong class="profile-menu-name">{{ p.name }}</strong>
+                <span v-if="profilePaceBadge(p)" class="profile-pace-badge" :class="profilePaceBadge(p).class">
+                  {{ profilePaceBadge(p).text }}
+                </span>
+              </span>
+              <small class="profile-menu-subtitle">{{ profileTaskSubtitle(p) }}</small>
             </span>
             <span v-if="p.id === userSettings.active_profile_id" class="profile-menu-current">Active</span>
           </button>
 
           <div class="profile-menu-divider" aria-hidden="true"></div>
-          <button type="button" class="profile-menu-action" @click="goToProfileSettings">
-            <span aria-hidden="true">⚙</span>
-            Manage profiles
-          </button>
           <button type="button" class="profile-menu-action" @click="goToProfileOverview">
-            <span aria-hidden="true">◈</span>
-            View all profiles
+            <span aria-hidden="true">⚙</span>
+            Manage profiles &amp; notebooks
           </button>
         </div>
       </div>
@@ -152,11 +153,6 @@
         >
           {{ userSettings.skip_to_reading_active ? 'Disable Escape Hatch' : 'Skip to Reading' }}
         </button>
-
-        <div v-if="dueReviewCards > 0" class="review-stats">
-          <p class="review-count">{{ dueReviewCards }} cards due for review</p>
-          <p class="review-hint">Spaced repetition strengthens long-term retention</p>
-        </div>
       </div>
     </article>
 
@@ -411,12 +407,53 @@ const activeProfileName = computed(() => {
 
 function profileDeadlineLabel(profile) {
   const deadlineAt = Number(profile?.deadline_at)
-  if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'No deadline set'
+  if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'No deadline'
 
   const daysLeft = Math.ceil((deadlineAt * 1000 - Date.now()) / 86400000)
   if (daysLeft < 0) return 'Deadline passed'
   if (daysLeft === 0) return 'Due today'
   return `${daysLeft}d left`
+}
+
+function profilePaceBadge(profile) {
+  const pace = profile?.pace
+  if (!pace) return null
+  if (pace.error) {
+    return {
+      text: 'Pace unavailable',
+      class: 'pace-unavailable',
+    }
+  }
+
+  const status = pace.feasibility_status
+  if (status === 'BEHIND' && pace.days_gap !== undefined) {
+    const lateDays = Math.abs(pace.days_gap)
+    return {
+      text: `${lateDays}d behind`,
+      class: 'pace-behind',
+    }
+  }
+  if (status === 'AHEAD' && pace.days_gap !== undefined) {
+    return {
+      text: `${pace.days_gap}d ahead`,
+      class: 'pace-ahead',
+    }
+  }
+  if (status === 'ON_TRACK') {
+    return {
+      text: 'On track',
+      class: 'pace-ontrack',
+    }
+  }
+  return null
+}
+
+function profileTaskSubtitle(profile) {
+  const deadline = profileDeadlineLabel(profile)
+  const count = typeof profile?.pending_tasks === 'number' ? profile.pending_tasks : null
+  if (count === null) return deadline
+  if (count === 0) return `${deadline} · 0 tasks left`
+  return `${deadline} · ${count} task${count === 1 ? '' : 's'} left`
 }
 
 const hasSocraticRescueTask = computed(() => {
@@ -589,11 +626,6 @@ async function selectProfile(newProfileID) {
   } finally {
     refreshing.value = false
   }
-}
-
-function goToProfileSettings() {
-  profileMenuOpen.value = false
-  router.push('/settings')
 }
 
 function goToProfileOverview() {
@@ -804,7 +836,7 @@ function goToNotebooks() {
   top: calc(100% + 8px);
   left: 66px;
   z-index: 20;
-  width: 280px;
+  width: 320px;
   padding: 7px;
   border: 1px solid var(--outline-variant, #e0e0e0);
   border-radius: 14px;
@@ -850,19 +882,60 @@ function goToNotebooks() {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
-.profile-menu-copy strong {
+.profile-menu-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-menu-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  font-weight: 700;
 }
 
-.profile-menu-copy small {
+.profile-pace-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.profile-pace-badge.pace-behind {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.profile-pace-badge.pace-ahead {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.profile-pace-badge.pace-ontrack {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.profile-pace-badge.pace-unavailable {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--muted-text, #64707d);
+}
+
+.profile-menu-subtitle {
   color: var(--muted-text, #64707d);
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-menu-current {
@@ -947,24 +1020,6 @@ function goToNotebooks() {
   border-color: #d35400;
   color: white;
   box-shadow: 0 0 12px rgba(230, 126, 34, 0.3);
-}
-
-.review-stats {
-  text-align: right;
-}
-
-.review-count {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--primary);
-  font-family: 'Manrope', sans-serif;
-}
-
-.review-hint {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--muted-text, #777);
 }
 
 .card {

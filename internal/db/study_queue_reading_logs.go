@@ -108,6 +108,9 @@ func (r *Repository) GetReadingTaskHistory(notebookID string, limit, offset int)
 
 		records = append(records, rec)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("reading history rows iteration error: %w", err)
+	}
 
 	return records, totalCount, nil
 }

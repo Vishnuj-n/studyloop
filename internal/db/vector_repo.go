@@ -376,3 +376,136 @@ func isVectorUnavailableError(err error) bool {
 		return false
 	}
 }
+
+// createVectorTable creates the vec0 virtual table with the discovered embedding dimension.
+func (r *Repository) createVectorTable() error {
+	if r.embeddingDimension <= 0 {
+		return fmt.Errorf("embedding dimension not initialized")
+	}
+
+	var existingSQL string
+	err := r.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='chunk_vectors'`).Scan(&existingSQL)
+	if err == nil && existingSQL != "" {
+		expectedCol := fmt.Sprintf("float[%d]", r.embeddingDimension)
+		if !strings.Contains(existingSQL, expectedCol) {
+			utils.Warnf("chunk_vectors table dimension mismatch, rebuilding table for dimension %d", r.embeddingDimension)
+			if _, dropErr := r.db.Exec(`DROP TABLE IF EXISTS chunk_vectors`); dropErr != nil {
+				return fmt.Errorf("failed to drop existing chunk_vectors table: %w", dropErr)
+			}
+			// Reset embedding refs so stored vectors are reindexed
+			if _, resetErr := r.db.Exec(`UPDATE chunks SET embedding_ref = NULL`); resetErr != nil {
+				utils.Warnf("failed to reset chunk embedding_refs: %v", resetErr)
+			}
+		}
+	}
+
+	// Create vec0 virtual table for vector search
+	schema := fmt.Sprintf(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS chunk_vectors USING vec0(
+			embedding float[%d]
+		);
+	`, r.embeddingDimension)
+
+	_, err = r.db.Exec(schema)
+	if err != nil {
+		return fmt.Errorf("failed to create vec0 table: %w", err)
+	}
+
+	utils.Infof("Created vec0 virtual table with embedding dimension %d", r.embeddingDimension)
+	return nil
+}
+
+// UpdateChunkEmbedding updates the embedding_ref (hash) for a chunk to track changes.
+func (r *Repository) UpdateChunkEmbedding(chunkID string, hash string) error {
+	res, err := r.db.Exec(`
+		UPDATE chunks SET embedding_ref = ? WHERE id = ?
+	`, hash, chunkID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows inserted for chunk_id %s", chunkID)
+	}
+	return nil
+}
+
+// ChunkEmbeddingBatchItem represents a chunk embedding update to be processed in batch
+type ChunkEmbeddingBatchItem struct {
+	ChunkID string
+	Hash    string
+}
+
+// UpdateChunkEmbeddingsBatch updates embedding metadata for multiple chunks in a single transaction
+func (r *Repository) UpdateChunkEmbeddingsBatch(items []ChunkEmbeddingBatchItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	return r.withTx(func(tx *sql.Tx) error {
+		stmt, err := tx.Prepare(`
+			UPDATE chunks SET embedding_ref = ? WHERE id = ?
+		`)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = stmt.Close()
+		}()
+
+		for _, item := range items {
+			if item.ChunkID == "" {
+				return fmt.Errorf("chunk id is required for all batch items")
+			}
+
+			res, err := stmt.Exec(item.Hash, item.ChunkID)
+			if err != nil {
+				return err
+			}
+			rowsAffected, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if rowsAffected == 0 {
+				return fmt.Errorf("no rows inserted for chunk_id %s", item.ChunkID)
+			}
+		}
+		return nil
+	})
+}
+
+// GetChunkEmbeddingRefsForTopic returns embedding_ref values for all chunks in a topic.
+func (r *Repository) GetChunkEmbeddingRefsForTopic(topicID string) (map[string]string, error) {
+	rows, err := r.db.Query(`
+		SELECT id, COALESCE(embedding_ref, '')
+		FROM chunks
+		WHERE topic_id = ?
+	`, topicID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			utils.Warnf("failed to close chunk embedding refs rows: %v", closeErr)
+		}
+	}()
+
+	refs := make(map[string]string)
+	for rows.Next() {
+		var chunkID string
+		var hash string
+		if err := rows.Scan(&chunkID, &hash); err != nil {
+			return nil, err
+		}
+		refs[chunkID] = hash
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return refs, nil
+}

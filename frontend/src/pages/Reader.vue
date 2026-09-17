@@ -89,16 +89,37 @@
             >
               {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
             </button>
-            <button
-              v-if="isExtensionActive('audio_overview')"
-              class="secondary audio-overview-btn"
-              :class="{ active: showAudioOverview }"
-              :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
-              :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
-              @click="showAudioOverview = !showAudioOverview"
-            >
-              {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
-            </button>
+            <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
+              <button
+                class="secondary split-main-btn audio-overview-btn"
+                :class="{ active: showAudioOverview }"
+                :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
+                @click="startAudio('toggle')"
+              >
+                {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
+              </button>
+              <div class="split-dropdown-wrapper">
+                <button
+                  class="secondary split-chevron-btn audio-chevron-btn"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                  title="Audio Overview page range options"
+                  @click.stop="showAudioMenu = !showAudioMenu"
+                >
+                  ▾
+                </button>
+                <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
+                  <button class="split-dropdown-item" @click="startAudio('session')">
+                    <span class="item-title">Full Session</span>
+                    <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+                  </button>
+                  <button class="split-dropdown-item" @click="startAudio('current')">
+                    <span class="item-title">From Current Page till End</span>
+                    <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
             <button
               v-if="isExtensionActive('text_simplifier')"
               class="secondary simplify-btn"
@@ -152,10 +173,12 @@
           v-else-if="reader.isYouTube.value"
           :embed-url="reader.youtubeEmbedUrl.value"
           :cached-video-url="reader.cachedVideoUrl.value"
+          :video-start-seconds="reader.videoStartSeconds.value"
+          :video-end-seconds="reader.videoEndSeconds.value"
           :transcript-content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
-          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :start-page="reader.effectiveMinPage.value"
+          :end-page="reader.effectiveMaxPage.value"
           :is-task-flow="isTaskFlow"
           :completing="completingSession"
           :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
@@ -165,8 +188,8 @@
           v-else-if="reader.isMarkdown.value"
           :content="reader.textContent.value"
           :topic-title="reader.topicTitle.value"
-          :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 1"
-          :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 1"
+          :start-page="reader.effectiveMinPage.value"
+          :end-page="reader.effectiveMaxPage.value"
           :is-task-flow="isTaskFlow"
           :completing="completingSession"
           :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
@@ -241,8 +264,8 @@
       v-if="showAudioOverview && reader.selectedTopicID.value"
       :topic-id="reader.selectedTopicID.value"
       :notebook-id="reader.selectedNotebookID.value"
-      :start-page="reader.navigationMinPage.value || reader.topicStartPage.value || 0"
-      :end-page="reader.navigationMaxPage.value || reader.topicEndPage.value || 0"
+      :start-page="audioStartPage || defaultAudioStart"
+      :end-page="audioEndPage || defaultAudioEnd"
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />
@@ -282,16 +305,8 @@ async function handleSimplify() {
   if (simplifying.value) return
   simplifying.value = true
   try {
-    const startPage =
-      reader.navigationMinPage.value ||
-      reader.topicStartPage.value ||
-      reader.currentPage.value ||
-      1
-    const endPage =
-      reader.navigationMaxPage.value ||
-      reader.topicEndPage.value ||
-      reader.pageCount.value ||
-      startPage
+    const startPage = reader.effectiveMinPage.value
+    const endPage = reader.effectiveMaxPage.value
     const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
     const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
     const topicTitle = cleanTopicTitle(rawTopic)
@@ -386,10 +401,37 @@ function onDeferQuizClick() {
   completeSession(true)
 }
 
-function handleDocumentClick() {
-  if (showDeferMenu.value) {
-    showDeferMenu.value = false
+// ponytail: audio range selection reusing existing startTopicAudioOverview
+const showAudioMenu = ref(false)
+const audioStartPage = ref(0)
+const audioEndPage = ref(0)
+
+const defaultAudioStart = computed(() => reader.effectiveMinPage.value)
+const defaultAudioEnd = computed(() => reader.effectiveMaxPage.value)
+
+function startAudio(mode = 'session') {
+  if (mode === 'toggle') {
+    showAudioOverview.value = !showAudioOverview.value
+    if (showAudioOverview.value) startAudio('session')
+    return
   }
+  showAudioMenu.value = false
+  const min = defaultAudioStart.value
+  const max = defaultAudioEnd.value
+
+  if (mode === 'current') {
+    audioStartPage.value = reader.currentPage.value || min
+    audioEndPage.value = max
+  } else {
+    audioStartPage.value = min
+    audioEndPage.value = max
+  }
+  showAudioOverview.value = true
+}
+
+function handleDocumentClick() {
+  if (showDeferMenu.value) showDeferMenu.value = false
+  if (showAudioMenu.value) showAudioMenu.value = false
 }
 
 onMounted(() => {
@@ -686,16 +728,8 @@ const copiedSession = ref(false)
 const copyError = ref('')
 
 async function copySessionContent() {
-  const startPage =
-    reader.navigationMinPage.value ||
-    reader.topicStartPage.value ||
-    reader.currentPage.value ||
-    1
-  const endPage =
-    reader.navigationMaxPage.value ||
-    reader.topicEndPage.value ||
-    reader.pageCount.value ||
-    startPage
+  const startPage = reader.effectiveMinPage.value
+  const endPage = reader.effectiveMaxPage.value
   const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
   const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
   const topicTitle = cleanTopicTitle(rawTopic)
@@ -1151,35 +1185,66 @@ button:disabled {
   backdrop-filter: blur(8px);
 }
 
+.stage-head .split-dropdown-item,
 .split-dropdown-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--on-surface, #ebdbb2);
-  text-align: left;
-  border-radius: 8px;
-  cursor: pointer;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--on-surface, #ebdbb2) !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  line-height: 1.3 !important;
   transition: background 0.15s ease;
 }
 
 .split-dropdown-item:hover:not(:disabled) {
-  background: var(--surface-bright, rgba(255, 255, 255, 0.1));
+  background: var(--surface-bright, rgba(255, 255, 255, 0.1)) !important;
 }
 
 .split-dropdown-item .item-title {
   font-weight: 600;
   font-size: 13px;
   color: var(--primary, #d79921);
+  text-align: left !important;
+  width: 100% !important;
+  display: block !important;
 }
 
 .split-dropdown-item .item-desc {
   font-size: 11px;
   color: var(--muted-text, #a89984);
   margin-top: 2px;
+  text-align: left !important;
+  width: 100% !important;
+  display: block !important;
+}
+
+.split-main-btn.secondary {
+  border-right: 1px solid var(--border-color, #e0c8b0) !important;
+}
+
+.split-chevron-btn.secondary {
+  border: 1px solid var(--border-color, #e0c8b0);
+  border-left: none !important;
+}
+
+.audio-chevron-btn {
+  background: #fdf8f4 !important;
+  border: 1px solid #e0c8b0 !important;
+  border-left: none !important;
+  color: #7a3e14 !important;
+}
+
+.audio-chevron-btn:hover:not(:disabled) {
+  background: #faeedd !important;
+  border-color: #c49a6c !important;
 }
 
 </style>

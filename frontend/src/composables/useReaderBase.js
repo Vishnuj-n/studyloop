@@ -77,6 +77,8 @@ export function useReaderBase(taskID) {
   const currentPage = ref(1)
   const topicStartPage = ref(0)
   const topicEndPage = ref(0)
+  const videoStartSeconds = ref(0)
+  const videoEndSeconds = ref(0)
   const sections = ref([])
   const activeSection = ref(null)
   const textContent = ref('')
@@ -120,6 +122,12 @@ export function useReaderBase(taskID) {
   })
 
   const pdfVisible = computed(() => isPdf.value && notebookUrl.value !== '')
+
+  const effectiveMinPage = computed(() => navigationMinPage.value || topicStartPage.value || 1)
+
+  const effectiveMaxPage = computed(
+    () => navigationMaxPage.value || topicEndPage.value || pageCount.value
+  )
 
   const hasNavigationBounds = computed(
     () => navigationMinPage.value > 0 && navigationMaxPage.value >= navigationMinPage.value
@@ -301,6 +309,8 @@ export function useReaderBase(taskID) {
       pageCount.value = Math.max(1, Number(bundle?.page_count) || 1)
       topicStartPage.value = Number(bundle?.topic_start_page ?? 0)
       topicEndPage.value = Number(bundle?.topic_end_page ?? 0)
+      videoStartSeconds.value = Number(bundle?.video_start_seconds ?? 0)
+      videoEndSeconds.value = Number(bundle?.video_end_seconds ?? 0)
       sections.value = bundle?.sections || []
       activeSection.value = sections.value[0] || null
 
@@ -383,6 +393,8 @@ export function useReaderBase(taskID) {
       pageCount.value = Math.max(1, Number(result?.page_count) || 1)
       topicStartPage.value = Number(result?.topic_start_page) || 0
       topicEndPage.value = Number(result?.topic_end_page) || 0
+      videoStartSeconds.value = Number(result?.video_start_seconds ?? 0)
+      videoEndSeconds.value = Number(result?.video_end_seconds ?? 0)
       sections.value = Array.isArray(result?.sections) ? result.sections : []
       activeSection.value = sections.value[0] || null
 
@@ -398,16 +410,16 @@ export function useReaderBase(taskID) {
       currentPage.value = topicStart
 
       readerContext.value = {
-        pdfUrl: notebookUrl.value,
-        startPage: currentPage.value,
-        endPage: 0,
+        pdfUrl: isPdf.value ? notebookUrl.value : '',
+        startPage: topicStart,
+        endPage: Number(result?.topic_end_page) || topicStart,
         mode: 'browse',
-        notebookFileHash: result?.notebook_file_hash || '',
       }
 
       return true
-    } catch (err) {
-      globalError.value = err?.message || 'Failed to load reader data'
+    } catch (e) {
+      console.error('[useReaderBase] Failed to load notebook bundle:', e)
+      globalError.value = 'Failed to load document bundle'
       return false
     } finally {
       loadingBundle.value = false
@@ -468,6 +480,8 @@ export function useReaderBase(taskID) {
     currentPage,
     topicStartPage,
     topicEndPage,
+    videoStartSeconds,
+    videoEndSeconds,
     sections,
     activeSection,
     navigationMinPage,
@@ -485,6 +499,8 @@ export function useReaderBase(taskID) {
     cachedVideoUrl,
     isPdf,
     pdfVisible,
+    effectiveMinPage,
+    effectiveMaxPage,
     hasNavigationBounds,
     canGoPrev,
     canGoNext,
