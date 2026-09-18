@@ -210,7 +210,10 @@
             Explain the concept in your own words (Speak via STT or Type).
           </p>
           <div class="viva-challenge-card__perks">
-            <span>✨ Bonus XP</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+              <BaseIcon name="sparkles" size="13" />
+              <span>Bonus XP</span>
+            </span>
             <span>✦</span>
             <span>🎁 Boosted Rare-Chest Odds</span>
           </div>
@@ -220,7 +223,8 @@
           :disabled="generatingFlashcards"
           @click="handleGoToExaminer"
         >
-          📝 TAKE THE VIVA CHALLENGE
+          <BaseIcon name="file-text" size="14" />
+          <span>TAKE THE VIVA CHALLENGE</span>
         </button>
       </section>
 
@@ -355,6 +359,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import {
   activateTask,
   getTask,

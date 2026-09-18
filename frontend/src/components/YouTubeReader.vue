@@ -77,7 +77,10 @@
 
     <div class="transcript-drawer">
       <div class="transcript-drawer-header" @click="showTranscript = !showTranscript">
-        <span class="transcript-header-title">📖 Chapter Transcript & Notes</span>
+        <span class="transcript-header-title">
+          <BaseIcon name="book" size="14" />
+          <span>Chapter Transcript & Notes</span>
+        </span>
         <span class="transcript-toggle-btn">{{ showTranscript ? '▲ Hide Transcript' : '▼ View Transcript' }}</span>
       </div>
       <div v-if="showTranscript" class="transcript-body">
@@ -98,6 +101,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import MarkdownReader from './MarkdownReader.vue'
 import { openURLInBrowser } from '../services/appApi'
 

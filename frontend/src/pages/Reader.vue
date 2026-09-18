@@ -87,7 +87,14 @@
               title="Copy reading session text as Markdown"
               @click="copySessionContent"
             >
-              {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
+              <template v-if="copiedSession">
+                <BaseIcon name="check" size="14" />
+                <span>Copied to Clipboard!</span>
+              </template>
+              <template v-else>
+                <BaseIcon name="copy" size="14" />
+                <span>Copy Session</span>
+              </template>
             </button>
             <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
               <button
@@ -97,7 +104,8 @@
                 :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
                 @click="startAudio('toggle')"
               >
-                {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
+                <BaseIcon name="headphones" size="14" />
+                <span>{{ showAudioOverview ? 'AI Audio Active' : 'AI Audio Overview' }}</span>
               </button>
               <div class="split-dropdown-wrapper">
                 <button
@@ -106,7 +114,7 @@
                   title="Audio Overview page range options"
                   @click.stop="showAudioMenu = !showAudioMenu"
                 >
-                  ▾
+                  <BaseIcon name="chevron-down" size="12" />
                 </button>
                 <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
                   <button class="split-dropdown-item" @click="startAudio('session')">
@@ -127,7 +135,8 @@
               title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
               @click="handleSimplify"
             >
-              {{ simplifying ? '✨ Opening...' : '✨ Simplify' }}
+              <BaseIcon name="sparkles" size="14" />
+              <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
             </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
@@ -276,6 +285,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import {
   completeReading,
   getUserSettings,
@@ -935,6 +945,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   font-size: 13px;
   line-height: 1;

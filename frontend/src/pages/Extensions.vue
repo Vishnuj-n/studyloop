@@ -286,6 +286,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import { listExtensions, runExtension } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import { useExtensions } from '../composables/useExtensions'

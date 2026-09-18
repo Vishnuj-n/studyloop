@@ -7,7 +7,7 @@ export const NOTEBOOK_IMPORTERS = [
   {
     id: 'deep_pdf',
     name: 'Deep Structured PDF',
-    icon: '⚡',
+    iconName: 'zap',
     badge: 'Pro',
     description: 'Deep high-speed Markdown extraction with tables, headers, and code blocks.',
     fileType: 'pdf',
@@ -15,14 +15,14 @@ export const NOTEBOOK_IMPORTERS = [
   {
     id: 'youtube',
     name: 'YouTube Lecture',
-    icon: '🎥',
+    iconName: 'video',
     description: 'Fetch video transcript & auto-generate structured chapter notes from a YouTube URL.',
     modalName: 'youtube',
   },
   {
     id: 'anki_importer',
     name: 'Anki Deck (.apkg)',
-    icon: '🎴',
+    iconName: 'cards',
     description: 'Import Anki decks (.apkg, .colpkg) directly as flashcards with spaced repetition.',
     modalName: 'anki',
   },

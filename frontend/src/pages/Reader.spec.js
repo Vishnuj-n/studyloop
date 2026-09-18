@@ -240,7 +240,7 @@ describe('Reader.vue Integration', () => {
     await flushPromises()
 
     expect(document.execCommand).toHaveBeenCalledWith('copy')
-    expect(copyBtn.text()).toContain('Copied to Clipboard! ✓')
+    expect(copyBtn.text()).toContain('Copied to Clipboard!')
   })
 
   it('formats raw topic IDs into human readable titles in the header', async () => {

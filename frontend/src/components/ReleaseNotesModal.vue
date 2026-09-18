@@ -4,7 +4,9 @@
       <div class="release-modal" role="dialog" aria-labelledby="release-modal-title">
         <header class="release-modal-header">
           <div class="header-badge">
-            <span class="sparkle-icon">✨</span>
+            <span class="sparkle-icon">
+              <BaseIcon name="sparkles" size="16" />
+            </span>
             <span class="version-tag">v{{ version }}</span>
           </div>
           <h2 id="release-modal-title">What's New in Studyloop</h2>
@@ -38,6 +40,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   visible: {

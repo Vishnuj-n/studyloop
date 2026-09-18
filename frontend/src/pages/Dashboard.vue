@@ -43,7 +43,7 @@
 
           <div class="profile-menu-divider" aria-hidden="true"></div>
           <button type="button" class="profile-menu-action" @click="goToProfileOverview">
-            <span aria-hidden="true">⚙</span>
+            <BaseIcon name="settings" size="14" />
             Manage profiles &amp; notebooks
           </button>
         </div>
@@ -78,7 +78,7 @@
     <StatusBanner
       v-if="streakSavedEvent"
       variant="info"
-      icon="🛡️"
+      icon="shield"
       title="Your streak was saved!"
       :subtitle="`We used 1 Streak Freeze to protect your ${streakSavedEvent.streak_length}-day streak yesterday. You have ${streakSavedEvent.freezes_remaining} freeze(s) remaining.`"
       action-label="Dismiss"
@@ -87,23 +87,23 @@
     <StatusBanner
       v-if="pendingIngestionBook"
       variant="warning"
-      icon="⚡"
+      icon="zap"
       :title="pendingIngestionBannerTitle"
       :subtitle="`${pendingIngestionBook.title} is ready for chapter extraction and ingestion.`"
-      action-label="✨ Ingest Book"
+      action-label="Ingest Book"
       @action="goToIngestBook(pendingIngestionBook.id)"
     />
     <StatusBanner
       v-if="userSettings.skip_to_reading_active"
       variant="info"
-      icon="⚡"
+      icon="zap"
       title='"Skip to Reading" Escape Hatch Active'
       subtitle="Review tasks have been pushed to the background so you can focus on reading new chapters."
     />
     <StatusBanner
       v-if="hasSocraticRescueTask"
       variant="rescue"
-      icon="🛡"
+      icon="shield"
       title="Concept Rescue Active"
       subtitle="Your study queue is locked because you failed the quiz twice on this topic. You must complete the Socratic tutor rescue session to unblock your timeline."
     />

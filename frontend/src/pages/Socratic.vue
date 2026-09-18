@@ -9,7 +9,9 @@
       <!-- Socratic Rescue Active Banner -->
       <div v-if="isRescueMode" class="rescue-alert-banner">
         <div class="rescue-alert-content">
-          <span class="rescue-alert-icon">🛡️</span>
+          <span class="rescue-alert-icon">
+            <BaseIcon name="shield" size="18" />
+          </span>
           <div class="rescue-alert-text">
             <strong>Concept Rescue Active</strong>
             <p>
@@ -256,6 +258,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import {
   askSocratic,

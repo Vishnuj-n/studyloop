@@ -32,7 +32,9 @@
 
           <div class="features-list">
             <div class="feature-item">
-              <span class="feature-icon">💬</span>
+              <span class="feature-icon">
+                <BaseIcon name="chat" size="18" />
+              </span>
               <div>
                 <strong>Interactive Dialogue</strong>
                 <p class="feature-sub">
@@ -41,7 +43,9 @@
               </div>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">📖</span>
+              <span class="feature-icon">
+                <BaseIcon name="book" size="18" />
+              </span>
               <div>
                 <strong>Context Grounded</strong>
                 <p class="feature-sub">
@@ -81,7 +85,9 @@
                 </div>
               </li>
               <li class="package-item">
-                <span class="item-icon">📚</span>
+                <span class="item-icon">
+                  <BaseIcon name="book" size="16" />
+                </span>
                 <div class="item-details">
                   <strong>Source Material Excerpt</strong>
                   <span class="item-sub">{{ notebookTitle ? `From "${notebookTitle}"` : 'Target notebook text & context' }}</span>
@@ -111,8 +117,12 @@
               :class="{ copied: copied }"
               @click="copyPromptToClipboard"
             >
-              <span v-if="copied" class="copy-icon">✓</span>
-              <span v-else class="copy-icon">📋</span>
+              <span v-if="copied" class="copy-icon">
+                <BaseIcon name="check" size="16" />
+              </span>
+              <span v-else class="copy-icon">
+                <BaseIcon name="copy" size="16" />
+              </span>
               {{ copied ? 'Prompt Copied to Clipboard!' : 'Copy Rescue Prompt' }}
             </button>
 
@@ -139,6 +149,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import {
   getTopicSectionsContent,
   completeSocraticRescue,

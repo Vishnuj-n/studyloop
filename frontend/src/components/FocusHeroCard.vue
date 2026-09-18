@@ -2,7 +2,9 @@
   <article class="card focus-hero-card" :class="heroVariantClass">
     <div class="hero-top-row">
       <div class="hero-type-badge">
-        <span class="hero-icon">{{ actionIcon }}</span>
+        <span class="hero-icon">
+          <BaseIcon :name="actionIconName" size="14" />
+        </span>
         <span class="hero-type-label">{{ formatTaskType(task.action_type) }}</span>
         <span v-if="task.estimate_minutes > 0" class="hero-estimate">
           • {{ task.estimate_minutes }} min
@@ -32,12 +34,18 @@
         <span v-if="task.action_type === 'flashcard_generate' && isSyncing"
           >Generating Flashcards...</span
         >
-        <span v-else-if="task.action_type === 'flashcard_generate'">⚡ Generate Flashcards</span>
+        <span v-else-if="task.action_type === 'flashcard_generate'" class="hero-btn-inner">
+          <BaseIcon name="zap" size="14" />
+          <span>Generate Flashcards</span>
+        </span>
         <span v-else-if="isReadingTask">▶ Start Reading</span>
         <span v-else-if="task.action_type === 'quiz' || task.action_type === 'milestone_exam'"
           >▶ Start Quiz</span
         >
-        <span v-else-if="task.action_type === 'socratic_remedial'">🛡️ Start Rescue Session</span>
+        <span v-else-if="task.action_type === 'socratic_remedial'" class="hero-btn-inner">
+          <BaseIcon name="shield" size="14" />
+          <span>Start Rescue Session</span>
+        </span>
         <span v-else>▶ Start Task</span>
       </button>
     </div>
@@ -46,6 +54,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { formatTaskType } from '../utils/dateFormat'
 
 const props = defineProps({
@@ -72,14 +81,14 @@ const showReadingPrefix = computed(() => {
   return isReadingTask.value
 })
 
-const actionIcon = computed(() => {
+const actionIconName = computed(() => {
   const t = (props.task.action_type || '').toLowerCase()
-  if (t === 'reading' || t === 'reread' || t === 'start_reading') return '📖'
-  if (t === 'quiz' || t === 'milestone_exam') return '📝'
-  if (t === 'flashcard_review') return '🗂️'
-  if (t === 'flashcard_generate') return '⚡'
-  if (t === 'socratic_remedial') return '🛡️'
-  return '📌'
+  if (t === 'reading' || t === 'reread' || t === 'start_reading') return 'book'
+  if (t === 'quiz' || t === 'milestone_exam') return 'file-text'
+  if (t === 'flashcard_review') return 'cards'
+  if (t === 'flashcard_generate') return 'zap'
+  if (t === 'socratic_remedial') return 'shield'
+  return 'sparkles'
 })
 
 const heroVariantClass = computed(() => {

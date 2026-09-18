@@ -32,7 +32,9 @@
           @drop.prevent="handleFileDrop"
         >
           <div class="drop-icon-wrapper">
-            <span class="drop-main-icon">📂</span>
+            <span class="drop-main-icon">
+              <BaseIcon name="folder" size="32" />
+            </span>
           </div>
           <p class="drop-title">Drag & drop your study material</p>
           <p class="drop-subtitle">
@@ -56,7 +58,9 @@
               :title="importer.description"
               @click="openImporter(importer)"
             >
-              <span class="importer-icon">{{ importer.icon }}</span>
+              <span class="importer-icon">
+                <BaseIcon :name="importer.iconName || 'sparkles'" size="14" />
+              </span>
               <span class="importer-name">{{ importer.name }}</span>
             </button>
           </div>
@@ -105,6 +109,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
 import { useExtensions } from '../composables/useExtensions'
 import { getAvailableImporters } from '../services/importerRegistry'

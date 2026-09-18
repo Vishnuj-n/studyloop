@@ -28,10 +28,12 @@
         </div>
         <div class="actions-buttons">
           <button type="button" class="action-btn" @click="handleOpenDataDir('')">
-            📁 Open Data Directory
+            <BaseIcon name="folder" size="14" />
+            <span>Open Data Directory</span>
           </button>
           <button type="button" class="action-btn secondary" @click="handleOpenDataDir('logs')">
-            📁 Open Logs Directory
+            <BaseIcon name="folder" size="14" />
+            <span>Open Logs Directory</span>
           </button>
         </div>
       </div>
@@ -135,6 +137,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import SettingsToggle from './SettingsToggle.vue'
 import {
   getReadingTaskHistory,
