@@ -2,11 +2,13 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { useToast } from './composables/useToast'
+import BaseIcon from './components/BaseIcon.vue'
 import './style.css'
 import './assets/shared.css'
 import 'katex/dist/katex.min.css'
 
 const app = createApp(App)
+app.component('BaseIcon', BaseIcon)
 app.use(router)
 
 // ponytail: catch unhandled runtime errors globally into toast

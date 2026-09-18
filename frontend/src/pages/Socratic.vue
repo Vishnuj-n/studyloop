@@ -45,7 +45,8 @@
             class="clear-btn-slim"
             title="Change AI Tutor Style in Settings"
           >
-            ⚙️ Tutor Style
+            <BaseIcon name="settings" size="14" />
+            <span>Tutor Style</span>
           </router-link>
 
           <button
