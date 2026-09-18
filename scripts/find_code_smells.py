@@ -126,6 +126,7 @@ JS_PARANOID_TYPEOF = re.compile(r"typeof\s+([a-zA-Z0-9_\.]+)\s*!==?\s*['\"]undef
 NESTED_TERNARIES = re.compile(r"[^?:\n]+\?[^?:\n]+:[^?:\n]+\?[^?:\n]+:")
 
 
+
 def scan_file_contents(filepath: str, content: str) -> List[Dict[str, Any]]:
     findings = []
     lines = content.splitlines()
@@ -346,6 +347,8 @@ def scan_file_contents(filepath: str, content: str) -> List[Dict[str, Any]]:
                 "message": "Deeply nested ternary expression (3+ conditionals chained on one line).",
                 "hint": "Refactor into standard if/else statements or a dictionary/lookup map."
             })
+
+
 
     return findings
 
