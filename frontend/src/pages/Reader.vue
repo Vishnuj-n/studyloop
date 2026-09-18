@@ -810,13 +810,17 @@ ${sessionText.trim()}`
 
 <style scoped>
 .page {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   gap: 14px;
 }
 
 .head {
   display: grid;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .eyebrow {
@@ -882,12 +886,16 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 360px));
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .layout {
   display: grid;
   grid-template-columns: 1.8fr 1fr;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .layout.collapsed {
@@ -895,10 +903,13 @@ h3 {
 }
 
 .stage {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   position: relative;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .stage-head {
@@ -906,6 +917,7 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .stage-head-left,

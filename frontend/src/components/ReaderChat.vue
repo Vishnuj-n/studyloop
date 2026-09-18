@@ -229,6 +229,7 @@ function handleEnterKey(event) {
   flex-direction: column;
   gap: 10px;
   height: 100%;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -354,7 +355,7 @@ h3 {
 
 .messages {
   flex: 1;
-  min-height: 140px;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
