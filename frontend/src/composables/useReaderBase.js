@@ -88,6 +88,8 @@ export function useReaderBase(taskID) {
   // Shape: { pdfUrl, startPage, endPage, mode: 'task' | 'browse' }
   const readerContext = ref(null)
 
+  const bundleNotebookTitle = ref('')
+
   // Navigation bounds for task-flow sessions.
   const navigationMinPage = ref(0)
   const navigationMaxPage = ref(0)
@@ -98,7 +100,9 @@ export function useReaderBase(taskID) {
     () => notebookTree.value.find((n) => n.notebook_id === selectedNotebookID.value) || null
   )
 
-  const selectedNotebookTitle = computed(() => selectedNotebook.value?.title || '')
+  const selectedNotebookTitle = computed(
+    () => selectedNotebook.value?.title || bundleNotebookTitle.value || ''
+  )
 
   const isMarkdown = computed(
     () =>
@@ -300,6 +304,7 @@ export function useReaderBase(taskID) {
 
       selectedNotebookID.value = task.notebook_id
       selectedTopicID.value = task.topic_id
+      bundleNotebookTitle.value = bundle?.notebook_title || task.notebook_title || ''
 
       // Apply bundle data safely (bundle might be null/empty)
       topicTitle.value = cleanTopicTitle(bundle?.topic_title || task.topic_title) || 'Reader'
@@ -386,6 +391,7 @@ export function useReaderBase(taskID) {
         return true
       }
 
+      bundleNotebookTitle.value = result?.notebook_title || ''
       topicTitle.value = cleanTopicTitle(result?.topic_title || selectedTopicTitle.value) || 'Reader'
       notebookUrl.value = result?.notebook_url || ''
       cachedVideoUrl.value = result?.cached_video_url || ''

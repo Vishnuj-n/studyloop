@@ -731,8 +731,8 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 	// For text, markdown, and youtube files, load raw content directly from disk for instant rendering
 	if !strings.EqualFold(bundle.FileType, "pdf") && filePath.Valid && filePath.String != "" {
 		if contentBytes, err := os.ReadFile(filePath.String); err == nil {
-			bundle.RawContent = string(contentBytes)
 			if strings.EqualFold(bundle.FileType, "youtube") {
+				bundle.RawContent = ""
 				var meta struct {
 					VideoID  string `json:"video_id"`
 					Chapters []struct {
@@ -765,9 +765,7 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 					bundle.VideoStartSeconds = ch.Start
 					bundle.VideoEndSeconds = ch.End
 					bundle.NotebookURL = fmt.Sprintf("https://www.youtube-nocookie.com/embed/%s?enablejsapi=1&start=%d&end=%d", meta.VideoID, ch.Start, ch.End)
-					if ch.Text != "" {
-						bundle.RawContent = ch.Text
-					}
+					bundle.RawContent = ch.Text
 
 					// ponytail: check if offline cached video exists in uploads/videos/<notebook_id>.mp4
 					videoPath := filepath.Join(filepath.Dir(filePath.String), "videos", fmt.Sprintf("%s.mp4", bundle.NotebookID))
@@ -775,6 +773,8 @@ func (r *Repository) GetReaderTopicBundle(topicID string, notebookID string) (*m
 						bundle.CachedVideoURL = fmt.Sprintf("/notebooks/videos/%s.mp4", bundle.NotebookID)
 					}
 				}
+			} else {
+				bundle.RawContent = string(contentBytes)
 			}
 		}
 	}

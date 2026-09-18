@@ -170,6 +170,79 @@ describe('Reader.vue Integration', () => {
     expect(copiedText).toContain('## Intro to AI (Pages 1–5)')
   })
 
+  it('copies YouTube session content with timecode subheader and notebook title', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue()
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    })
+
+    routeQuery.value = {
+      taskId: 'task-yt-1',
+      notebookId: 'nb-yt',
+      topicId: 'topic-yt-1',
+    }
+
+    appApi.initializeReadingSession.mockResolvedValueOnce({
+      ok: true,
+      task: {
+        id: 'task-yt-1',
+        notebook_id: 'nb-yt',
+        notebook_title: 'Learn Networking In 25 MINUTES',
+        topic_id: 'topic-yt-1',
+        topic_title: 'Intro',
+        file_type: 'youtube',
+      },
+      page_bounds: { start_page: 1, end_page: 1, current_page: 1 },
+      navigation: { mode: 'task', current_page: 1, min_page: 1, max_page: 1 },
+      bundle: {
+        notebook_title: 'Learn Networking In 25 MINUTES',
+        topic_id: 'topic-yt-1',
+        topic_title: 'Intro',
+        file_type: 'youtube',
+        video_start_seconds: 0,
+        video_end_seconds: 86,
+        sections: [
+          { id: 's-yt-1', heading: 'Intro', content: 'In Cloud and DevOps Networking is the backbone.', page_num: 1 },
+        ],
+      },
+    })
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const copyBtn = wrapper.find('.copy-session-btn')
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(writeTextMock).toHaveBeenCalledTimes(1)
+    const copied = writeTextMock.mock.calls[0][0]
+    expect(copied).toContain('# Learn Networking In 25 MINUTES')
+    expect(copied).toContain('## Intro (0:00 – 01:26)')
+    expect(copied).toContain('In Cloud and DevOps Networking is the backbone.')
+  })
+
+  it('falls back to execCommand copy when navigator.clipboard.writeText rejects (e.g. iframe de-focus)', async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValue(new Error('Document is not focused')),
+      },
+    })
+
+    document.execCommand = vi.fn().mockReturnValue(true)
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const copyBtn = wrapper.find('.copy-session-btn')
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(document.execCommand).toHaveBeenCalledWith('copy')
+    expect(copyBtn.text()).toContain('Copied to Clipboard! ✓')
+  })
+
   it('formats raw topic IDs into human readable titles in the header', async () => {
     routeQuery.value = { taskId: 'task-raw-slug', notebookId: 'nb-1', topicId: 'nb-92c8f059-78e2-440c-81e8-62d5032d4330-ch-01-cn-final-revision-sh' }
     appApi.initializeReadingSession.mockResolvedValueOnce({

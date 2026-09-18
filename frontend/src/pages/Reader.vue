@@ -295,6 +295,7 @@ import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import PdfViewer from '../components/PdfViewer.vue'
+import { copyTextToClipboard } from '../utils/clipboard'
 
 const { isExtensionActive } = useExtensions()
 const { confirm } = useDialog()
@@ -723,6 +724,18 @@ async function skipSession() {
   }
 }
 
+// ponytail: format seconds to mm:ss or hh:mm:ss for video timecodes
+function formatSecondsToTime(totalSeconds) {
+  if (!totalSeconds || isNaN(totalSeconds) || totalSeconds < 0) return '0:00'
+  const hrs = Math.floor(totalSeconds / 3600)
+  const mins = Math.floor((totalSeconds % 3600) / 60)
+  const secs = Math.floor(totalSeconds % 60)
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
 // ponytail: clean structured markdown clipboard export
 const copiedSession = ref(false)
 const copyError = ref('')
@@ -747,14 +760,41 @@ async function copySessionContent() {
   if (!sessionText) {
     sessionText = reader.textContent.value || ''
   }
+  if (!sessionText.trim() && reader.selectedTopicID.value) {
+    try {
+      const bundle = await getTopicSectionsContent(
+        reader.selectedTopicID.value,
+        reader.selectedNotebookID.value
+      )
+      if (bundle?.content || bundle?.sections_content) {
+        sessionText = bundle.content || bundle.sections_content
+      }
+    } catch (e) {
+      console.warn('[Reader] Failed to fallback fetch topic sections content for copy:', e)
+    }
+  }
+
+  let subHeader = `(Pages ${startPage}–${endPage})`
+  if (reader.isYouTube.value) {
+    const startSec = reader.videoStartSeconds.value
+    const endSec = reader.videoEndSeconds.value
+    if (startSec > 0 || endSec > 0) {
+      subHeader = `(${formatSecondsToTime(startSec)} – ${formatSecondsToTime(endSec)})`
+    } else {
+      subHeader = `(Segment ${startPage}–${endPage})`
+    }
+  }
 
   const markdown = `# ${bookTitle}
-## ${topicTitle} (Pages ${startPage}–${endPage})
+## ${topicTitle} ${subHeader}
 
 ${sessionText.trim()}`
 
   try {
-    await navigator.clipboard.writeText(markdown)
+    const ok = await copyTextToClipboard(markdown)
+    if (!ok) {
+      throw new Error('Clipboard copy was rejected or unhandled')
+    }
     copiedSession.value = true
     copyError.value = ''
     setTimeout(() => {
