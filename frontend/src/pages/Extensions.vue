@@ -122,7 +122,7 @@
               :disabled="isSettingUp(ext.id)"
               @click="triggerSetup(ext)"
             >
-              🛠️
+              <BaseIcon name="wrench" size="14" />
             </button>
 
             <button
@@ -132,7 +132,7 @@
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/settings?category=extensions')"
             >
-              ⚙️
+              <BaseIcon name="settings" size="14" />
             </button>
           </div>
         </div>
@@ -240,7 +240,7 @@
               :disabled="isSettingUp(ext.id)"
               @click="triggerSetup(ext)"
             >
-              🛠️
+              <BaseIcon name="wrench" size="14" />
             </button>
 
             <button
@@ -250,7 +250,7 @@
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/settings?category=extensions')"
             >
-              ⚙️
+              <BaseIcon name="settings" size="14" />
             </button>
           </div>
         </div>
