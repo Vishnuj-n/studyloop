@@ -16,7 +16,7 @@
         <SettingsToggle
           v-model="llmPromptLogEnabled"
           title="Enable LLM Prompt Logging"
-          hint="Appends raw LLM prompt inputs and model parameters to dev_data/logs/llm_prompt.log in real time."
+          hint="Appends raw LLM prompt inputs and model parameters to logs/llm_prompt.log in real time."
         />
       </div>
 

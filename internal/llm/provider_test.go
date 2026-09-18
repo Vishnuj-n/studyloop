@@ -206,3 +206,17 @@ func TestKeyFormatValidation(t *testing.T) {
 		t.Fatalf("expected Groq key validation error, got: %v", errGroq)
 	}
 }
+
+func TestResolveLogsDirDevAndProd(t *testing.T) {
+	t.Setenv("APP_ENV", "dev")
+	if devDir := resolveLogsDir(); !strings.Contains(devDir, "dev_data") {
+		t.Fatalf("expected dev_data in dev logs dir, got: %s", devDir)
+	}
+
+	t.Setenv("APP_ENV", "production")
+	prodDir := resolveLogsDir()
+	if strings.Contains(prodDir, "dev_data") && !strings.Contains(prodDir, "Studyloop") {
+		t.Fatalf("expected production logs directory to target Studyloop, got: %s", prodDir)
+	}
+}
+
