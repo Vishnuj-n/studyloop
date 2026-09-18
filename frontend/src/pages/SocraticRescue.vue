@@ -307,7 +307,7 @@ function goBack() {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  min-height: calc(100vh - 64px);
+  min-height: 100%;
   padding: 16px 8px;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);

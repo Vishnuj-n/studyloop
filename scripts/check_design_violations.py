@@ -78,6 +78,12 @@ PATTERNS = [
         "description": "Template Glitch: Hardcoded 'Read: ' prefix without checking if task.title already has it.",
         "severity": "ERROR",
         "regex": re.compile(r"(?:Read:\s*<\/span>\s*\{\{\s*task\.title\s*\}\})|(?:Read:\s*<\/span>\s*\{\{\s*task\.title\s*\|\|)", re.IGNORECASE),
+    },
+    {
+        "id": "BRITTLE_VIEWPORT_CALC",
+        "description": "Layout Smell: Avoid brittle hardcoded viewport math (e.g., 'calc(100vh - Npx)'). Use flexbox layout with 'flex: 1; min-height: 0;' instead.",
+        "severity": "WARNING",
+        "regex": re.compile(r"(?:height|max-height|min-height)\s*:\s*calc\(\s*100vh\s*[-+]\s*\d+(?:\.\d+)?(?:px|rem|em)?\s*\)", re.IGNORECASE),
     }
 ]
 

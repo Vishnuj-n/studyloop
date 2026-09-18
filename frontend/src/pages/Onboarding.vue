@@ -1021,7 +1021,7 @@ onMounted(() => {
 .onboarding-card {
   width: 100%;
   max-width: 620px;
-  max-height: calc(100vh - 48px);
+  max-height: 100%;
   overflow-y: auto;
   border-radius: 20px;
   padding: 24px 28px;
