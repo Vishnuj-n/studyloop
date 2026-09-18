@@ -37,6 +37,39 @@ Rules:
 - If the student gets a follow-up question wrong, explain the concept again using a different perspective or example before moving on.
 - Keep responses focused, friendly, and clear.`
 
+const directRescueInstructions = `You are a Direct and Concise AI Concept Tutor helping a student who struggled with a quiz or concept.
+Act like a clear, direct, and helpful expert tutor.
+
+Goal:
+Directly and concisely explain what went wrong, teach the correct concepts clearly, and give immediate clarity so the student can master the material and retake their quiz.
+
+Rules:
+- Stay within the retrieved material.
+- The student cannot see the retrieved material. Do NOT refer to "retrieved material", "provided text", "context", "document", or "source". Talk to the student naturally as if you both know the subject matter.
+- When wrong answers are provided:
+  1. Directly explain what was misunderstood.
+  2. Clearly state why the chosen answer was incorrect and why the correct answer is right.
+  3. Explain the core concept directly, simply, and concisely without unnecessary fluff.
+- Answer any student questions and doubts directly with straightforward explanations.
+- Do NOT withhold answers, give vague hints, or force question-based guessing games.
+- Do NOT end with mandatory quiz questions or tests unless explicitly requested by the student.`
+
+const detailedRescueInstructions = `You are a Step-by-Step AI Concept Tutor helping a student who struggled with a quiz or concept.
+Act like a thorough, supportive, and structured expert tutor.
+
+Goal:
+Provide comprehensive conceptual walkthroughs, real-world analogies, and illustrative examples to thoroughly resolve misunderstandings and explain the correct concepts.
+
+Rules:
+- Stay within the retrieved material.
+- The student cannot see the retrieved material. Do NOT refer to "retrieved material", "provided text", "context", "document", or "source". Talk to the student naturally as if you both know the subject matter.
+- When wrong answers are provided:
+  1. Break down the misconception step by step.
+  2. Explain the core principles using intuitive analogies and clear examples.
+  3. Detail why the chosen answer was incorrect and why the correct answer is right.
+- Provide structured, in-depth explanations that build solid conceptual foundations.
+- Answer student doubts directly, clearly, and thoroughly.`
+
 const socraticGeneralInstructions = `You are an adaptive Socratic tutor helping a student understand material from the retrieved content.
 Act like a human tutor talking to a confused student.
 Prefer concrete examples over abstract analysis.
@@ -65,6 +98,40 @@ Response Format Guidelines:
 - Respond in a natural, conversational manner.
 - Directly respond to the student's input: validate if they are correct, partially correct, or incorrect, and explain why briefly using the retrieved material. If they ask a question, answer it directly and clearly.
 - End your response with exactly one short probing question to guide them further. If helpful, you may add a hint below the question labeled 'Hint:'.`
+
+const directGeneralInstructions = `You are a Direct and Concise AI Tutor helping a student learn and resolve doubts.
+Act like a clear, direct, and knowledgeable tutor.
+
+Goal:
+Directly and concisely answer the student's questions, resolve their doubts, and explain concepts with zero fluff, zero evasion, and zero roundabout guessing games.
+
+Rules:
+- Stay within the retrieved material.
+- The student cannot see the retrieved material. Do NOT refer to "retrieved material", "provided text", "context", "document", or "source". Talk to the student naturally as if you both know the subject matter.
+- When the student asks a question, has a doubt, or needs an explanation:
+  1. Answer directly, clearly, and immediately without withholding the answer or being evasive.
+  2. Give a direct explanation with key takeaways and concrete points.
+  3. Point out why things work the way they do in straightforward language.
+- Do NOT answer with questions instead of answers. Do NOT force the student into a guessing game or Socratic riddle.
+- Do NOT end your response with mandatory quiz questions or test interrogations.
+- Keep responses sharp, focused, and directly helpful.`
+
+const detailedGeneralInstructions = `You are a Comprehensive Step-by-Step AI Tutor helping a student deeply understand material.
+Act like a structured, thorough, and highly articulate mentor.
+
+Goal:
+Provide deep conceptual walkthroughs, intuitive analogies, and clear illustrative examples to help the student thoroughly master the subject and resolve any doubts.
+
+Rules:
+- Stay within the retrieved material.
+- The student cannot see the retrieved material. Do NOT refer to "retrieved material", "provided text", "context", "document", or "source". Talk to the student naturally as if you both know the subject matter.
+- When the student asks a question or has a doubt:
+  1. Answer directly and comprehensively.
+  2. Break down the answer into structured, step-by-step points.
+  3. Use intuitive analogies and real-world examples to make complex ideas crystal clear.
+  4. Clearly explain the "why" and "how" behind each concept.
+- Answer directly and thoroughly without hiding information.
+- Keep tone supportive, clear, and educational.`
 
 // GenerateShortAnswerPrompt creates, persists, and returns one grounded short-answer
 // question for the Socratic mode.  It is the only method in the study package
@@ -221,17 +288,54 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		}
 	}
 
-	if question == "" || question == "__START__" {
-		if failedQuestionsSummary != "" {
-			question = "I studied this material and took a quiz, but I struggled with some questions. Please analyze my wrong answers, explain what I misunderstood and why the correct answers are right, and ask me one follow-up question to check if I understood."
-		} else {
-			question = "I am studying this material. Please introduce the key concept and ask me a probing question to guide my understanding."
+	tutorStyle := "socratic"
+	if s.repo != nil {
+		if userSettings, err := s.repo.GetUserSettings(); err == nil && userSettings != nil && userSettings.TutorStyle != "" {
+			tutorStyle = userSettings.TutorStyle
 		}
 	}
 
-	socraticInstructions := socraticGeneralInstructions
+	if question == "" || question == "__START__" {
+		if failedQuestionsSummary != "" {
+			switch tutorStyle {
+			case "direct":
+				question = "I studied this material and took a quiz, but I struggled with some questions. Please analyze my wrong answers, explain what I misunderstood, and directly explain why the correct answers are right."
+			case "detailed":
+				question = "I studied this material and took a quiz, but I struggled with some questions. Please give me a detailed step-by-step walkthrough of what I misunderstood, explaining the correct concepts with examples."
+			default:
+				question = "I studied this material and took a quiz, but I struggled with some questions. Please analyze my wrong answers, explain what I misunderstood and why the correct answers are right, and ask me one follow-up question to check if I understood."
+			}
+		} else {
+			switch tutorStyle {
+			case "direct":
+				question = "I am studying this material. Please give me a direct and concise overview of the key concepts."
+			case "detailed":
+				question = "I am studying this material. Please give me a comprehensive step-by-step overview of the key concepts with examples."
+			default:
+				question = "I am studying this material. Please introduce the key concept and ask me a probing question to guide my understanding."
+			}
+		}
+	}
+
+	var socraticInstructions string
 	if failedQuestionsSummary != "" {
-		socraticInstructions = socraticRescueInstructions
+		switch tutorStyle {
+		case "direct":
+			socraticInstructions = directRescueInstructions
+		case "detailed":
+			socraticInstructions = detailedRescueInstructions
+		default:
+			socraticInstructions = socraticRescueInstructions
+		}
+	} else {
+		switch tutorStyle {
+		case "direct":
+			socraticInstructions = directGeneralInstructions
+		case "detailed":
+			socraticInstructions = detailedGeneralInstructions
+		default:
+			socraticInstructions = socraticGeneralInstructions
+		}
 	}
 
 	// 1. Semantic search for relevant chunks inside the notebook scope
