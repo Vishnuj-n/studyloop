@@ -16,7 +16,7 @@
         <SettingsToggle
           v-model="llmPromptLogEnabled"
           title="Enable LLM Prompt Logging"
-          hint="Appends raw LLM prompt inputs and model parameters to dev_data/logs/llm_prompt.log in real time."
+          hint="Appends raw LLM prompt inputs and model parameters to logs/llm_prompt.log in real time."
         />
       </div>
 
@@ -28,10 +28,12 @@
         </div>
         <div class="actions-buttons">
           <button type="button" class="action-btn" @click="handleOpenDataDir('')">
-            📁 Open Data Directory
+            <BaseIcon name="folder" size="14" />
+            <span>Open Data Directory</span>
           </button>
           <button type="button" class="action-btn secondary" @click="handleOpenDataDir('logs')">
-            📁 Open Logs Directory
+            <BaseIcon name="folder" size="14" />
+            <span>Open Logs Directory</span>
           </button>
         </div>
       </div>
@@ -103,10 +105,12 @@
               </td>
               <td>
                 <span v-if="log.has_anomaly" class="anomaly-tag" :title="log.anomaly_reason">
-                  ⚠ {{ log.anomaly_reason }}
+                  <BaseIcon name="alert-triangle" size="12" />
+                  <span>{{ log.anomaly_reason }}</span>
                 </span>
                 <span v-else class="ok-tag">
-                  ✓ Valid Bounds
+                  <BaseIcon name="check" size="12" />
+                  <span>Valid Bounds</span>
                 </span>
               </td>
             </tr>
@@ -135,6 +139,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import SettingsToggle from './SettingsToggle.vue'
 import {
   getReadingTaskHistory,
@@ -429,12 +434,18 @@ async function fetchMore() {
 }
 
 .anomaly-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #ef4444;
   font-size: 11px;
   font-weight: 600;
 }
 
 .ok-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #10b981;
   font-size: 11px;
 }

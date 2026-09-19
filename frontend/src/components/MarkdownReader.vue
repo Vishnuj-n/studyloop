@@ -7,7 +7,10 @@
     <!-- Start of Assigned Reading Banner -->
     <div class="markdown-boundary-tag top-boundary">
       <div class="boundary-info">
-        <span class="boundary-badge">📖 Start of Assigned Reading</span>
+        <span class="boundary-badge">
+          <BaseIcon name="book" size="16" />
+          <span>Start of Assigned Reading</span>
+        </span>
         <span class="boundary-sub">{{ topicTitle }} (Pages {{ validStartPage }}–{{ validEndPage }})</span>
       </div>
     </div>
@@ -19,13 +22,16 @@
     <!-- End of Assigned Reading Banner -->
     <div class="markdown-boundary-tag bottom-boundary">
       <div class="boundary-info">
-        <span class="boundary-badge success">✓ End of Assigned Reading</span>
+        <span class="boundary-badge success">
+          <BaseIcon name="check" size="16" />
+          <span>End of Assigned Reading</span>
+        </span>
         <span class="boundary-sub">You have reached the end of this study section.</span>
       </div>
       <button
         v-if="isTaskFlow"
-        class="primary proceed-button"
-        :disabled="disabled"
+        class="primary-btn proceed-button"
+        :disabled="disabled || completing"
         @click="$emit('complete')"
       >
         {{ completing ? 'Completing Session...' : 'Complete & Proceed to Quiz →' }}
@@ -40,6 +46,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { renderMarkdown } from '../services/markdown'
 
 const props = defineProps({

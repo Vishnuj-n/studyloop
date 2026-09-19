@@ -49,7 +49,7 @@
                 aria-label="Dismiss"
                 @click="hideToast"
               >
-                ✕
+                <BaseIcon name="x" size="12" />
               </button>
             </div>
             <p class="toast-msg">{{ toast.message }}</p>

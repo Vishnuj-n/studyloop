@@ -103,7 +103,7 @@
 
         <!-- STT Tip -->
         <div class="stt-tip">
-          <span class="stt-tip__icon">💡</span>
+          <span class="stt-tip__icon"><BaseIcon name="sparkles" size="16" /></span>
           <span class="stt-tip__text">
             Prefer speaking? Use OS dictation (<kbd class="kbd-badge">{{ sttShortcut }}</kbd>) or offline tools like
             <a
@@ -179,6 +179,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import {
   getNotebooks,
   generateComprehensiveExam,

@@ -3,7 +3,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="header-left">
-          <span class="modal-icon">🎴</span>
+          <span class="modal-icon">
+            <BaseIcon name="cards" size="22" />
+          </span>
           <div>
             <h3 class="modal-title">Import Anki Deck</h3>
             <p class="modal-subtitle">Import cards (.apkg, .colpkg) directly into your study schedule</p>
@@ -128,6 +130,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { selectAnkiFile } from '../services/appApi'
 
 const props = defineProps({

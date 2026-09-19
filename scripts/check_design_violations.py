@@ -40,7 +40,56 @@ EMOJI_EXEMPT_FILES = {
     "RewardToast.vue",
 }
 
+# Emojis that have standardized SVGs in src/assets/icons/index.js
+EMOJI_SVG_MAP = {
+    "⚙": "settings",
+    "⚙️": "settings",
+    "🛠": "wrench",
+    "🛠️": "wrench",
+    "🔧": "wrench",
+    "📋": "copy",
+    "🎧": "headphones",
+    "✨": "sparkles",
+    "⚡": "zap",
+    "🎥": "video",
+    "🎬": "video",
+    "📹": "video",
+    "🎴": "cards",
+    "📖": "book",
+    "📕": "book",
+    "📚": "book",
+    "📄": "file-text",
+    "📝": "file-text",
+    "✏": "edit",
+    "✏️": "edit",
+    "✎": "edit",
+    "📂": "folder",
+    "📁": "folder",
+    "🛡": "shield",
+    "🛡️": "shield",
+    "💬": "chat",
+    "🗨": "chat",
+    "🗨️": "chat",
+    "🔄": "refresh",
+    "🧩": "puzzle",
+    "🗑": "trash",
+    "🗑️": "trash",
+    "⏱": "clock",
+    "⏱️": "clock",
+    "💾": "hard-drive",
+    "🌐": "globe",
+    "⚠️": "alert-triangle",
+    "⚠": "alert-triangle",
+}
+
 PATTERNS = [
+    {
+        "id": "EMOJI_HAS_SVG",
+        "description": "DESIGN.md: This emoji has a standardized SVG in BaseIcon. Replace it with <BaseIcon name=\"...\" />.",
+        "severity": "ERROR",
+        "regex": re.compile(r"(?:" + "|".join(re.escape(e) for e in sorted(EMOJI_SVG_MAP.keys(), key=len, reverse=True)) + r")"),
+        "exempt_files": EMOJI_EXEMPT_FILES,
+    },
     {
         "id": "EMOJI_DETECTED",
         "description": "DESIGN.md 'The Digital Sanctuary': Use clean SVG icons or text badges instead of raw emojis in UI components.",
@@ -78,6 +127,12 @@ PATTERNS = [
         "description": "Template Glitch: Hardcoded 'Read: ' prefix without checking if task.title already has it.",
         "severity": "ERROR",
         "regex": re.compile(r"(?:Read:\s*<\/span>\s*\{\{\s*task\.title\s*\}\})|(?:Read:\s*<\/span>\s*\{\{\s*task\.title\s*\|\|)", re.IGNORECASE),
+    },
+    {
+        "id": "BRITTLE_VIEWPORT_CALC",
+        "description": "Layout Smell: Avoid brittle hardcoded viewport math (e.g., 'calc(100vh - Npx)'). Use flexbox layout with 'flex: 1; min-height: 0;' instead.",
+        "severity": "WARNING",
+        "regex": re.compile(r"(?:height|max-height|min-height)\s*:\s*calc\(\s*100vh\s*[-+]\s*\d+(?:\.\d+)?(?:px|rem|em)?\s*\)", re.IGNORECASE),
     }
 ]
 

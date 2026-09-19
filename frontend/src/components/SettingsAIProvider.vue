@@ -88,7 +88,8 @@
           {{ testingFastLimits ? 'Testing Limits...' : 'Test Limits' }}
         </button>
         <span v-if="fastResult" :class="['test-result', fastResult.ok ? 'success' : 'error']">
-          {{ fastResult.ok ? (fastResult.status ? '✓ ' + fastResult.status : '✓ Connected successfully') : '✗ ' + fastResult.error }}
+          <BaseIcon :name="fastResult.ok ? 'check' : 'x'" size="13" />
+          <span>{{ fastResult.ok ? (fastResult.status || 'Connected successfully') : fastResult.error }}</span>
         </span>
       </div>
     </div>
@@ -105,7 +106,8 @@
       />
       <p class="hint">Prompt token budget per request. Default is 4000 (safe for Groq/free tiers). Increase for Gemini or paid high-TPM tiers.</p>
       <p v-if="hasFastTokenWarning" class="warning-hint">
-        ⚠️ {{ llmSettings.fast.max_input_tokens || 4000 }} tokens may be lower than your Target Reading Session Words (~{{ Math.round((targetSessionWords || 3000) * 1.3) }} tokens for {{ targetSessionWords || 3000 }} words). Chapter text may be truncated during quizzes.
+        <BaseIcon name="alert-triangle" size="13" />
+        <span>{{ llmSettings.fast.max_input_tokens || 4000 }} tokens may be lower than your Target Reading Session Words (~{{ Math.round((targetSessionWords || 3000) * 1.3) }} tokens for {{ targetSessionWords || 3000 }} words). Chapter text may be truncated during quizzes.</span>
       </p>
     </div>
 
@@ -194,7 +196,8 @@
             {{ testingHeavyLimits ? 'Testing Limits...' : 'Test Heavy Limits' }}
           </button>
           <span v-if="heavyResult" :class="['test-result', heavyResult.ok ? 'success' : 'error']">
-            {{ heavyResult.ok ? (heavyResult.status ? '✓ ' + heavyResult.status : '✓ Connected successfully') : '✗ ' + heavyResult.error }}
+            <BaseIcon :name="heavyResult.ok ? 'check' : 'x'" size="13" />
+            <span>{{ heavyResult.ok ? (heavyResult.status || 'Connected successfully') : heavyResult.error }}</span>
           </span>
         </div>
       </div>
@@ -222,6 +225,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import SettingsToggle from './SettingsToggle.vue'
 import { openURLInBrowser, testLLMConnection, testLLMLimits } from '../services/appApi'
 
@@ -443,6 +447,9 @@ select:focus {
 
 .warning-hint {
   margin: 6px 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   font-size: 12px;
   color: var(--warning, #f59e0b);
   line-height: 1.4;

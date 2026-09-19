@@ -22,14 +22,14 @@
 
       <nav class="menu">
         <RouterLink v-for="item in topItems" :key="item.to" :to="item.to" class="menu-item">
-          <span class="menu-icon" aria-hidden="true">{{ item.icon }}</span>
+          <BaseIcon :name="item.icon" size="18" class="menu-icon" aria-hidden="true" />
           <span class="menu-label">{{ item.label }}</span>
           <span
             v-if="item.to === '/rewards' && pendingChestsCount > 0"
             class="unopened-chests-badge"
             title="Unopened mystery chests waiting in vault"
           >
-            🎁 {{ pendingChestsCount }}
+            <BaseIcon name="gift" size="14" /> {{ pendingChestsCount }}
           </span>
         </RouterLink>
       </nav>
@@ -48,10 +48,13 @@
         title="Sync with Cloud"
         @click="handleSync"
       >
-        <span class="menu-icon">{{ syncIcon }}</span>
+        <BaseIcon :name="syncIconName" size="16" class="menu-icon" />
         <span>{{ syncLabel }}</span>
       </button>
-      <RouterLink to="/settings" class="menu-item bottom-item">Settings</RouterLink>
+      <RouterLink to="/settings" class="menu-item bottom-item">
+        <BaseIcon name="settings" size="18" class="menu-icon" aria-hidden="true" />
+        <span class="menu-label">Settings</span>
+      </RouterLink>
     </div>
   </aside>
 </template>
@@ -59,6 +62,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { triggerCloudSync, getUserSettings, getGamificationState } from '../services/appApi'
+import BaseIcon from './BaseIcon.vue'
 import PomodoroWidget from './PomodoroWidget.vue'
 
 const gamification = ref({
@@ -84,10 +88,11 @@ const syncState = ref('idle')
 const isCloudAccount = ref(false)
 let syncTimer = null
 
-const syncIcon = computed(() => {
-  if (syncState.value === 'success') return '✓'
-  if (syncState.value === 'error') return '⚠️'
-  return '☁️'
+const syncIconName = computed(() => {
+  if (syncState.value === 'syncing') return 'refresh'
+  if (syncState.value === 'success') return 'check'
+  if (syncState.value === 'error') return 'alert-triangle'
+  return 'cloud'
 })
 
 const syncLabel = computed(() => {
@@ -169,15 +174,15 @@ onUnmounted(() => {
 })
 
 const topItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { to: '/reader', label: 'Reader', icon: '◫' },
-  { to: '/notebooks', label: 'Notebooks', icon: '▤' },
-  { to: '/quiz', label: 'Quiz', icon: '◪' },
-  { to: '/flashcards', label: 'Flashcards', icon: '◧' },
-  { to: '/examiner', label: 'Examiner', icon: '✎' },
-  { to: '/tutor', label: 'Tutor', icon: '◎' },
-  { to: '/rewards', label: 'Rewards', icon: '✦' },
-  { to: '/extensions', label: 'Extensions', icon: '❖' },
+  { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
+  { to: '/reader', label: 'Reader', icon: 'book' },
+  { to: '/notebooks', label: 'Notebooks', icon: 'folder' },
+  { to: '/quiz', label: 'Quiz', icon: 'puzzle' },
+  { to: '/flashcards', label: 'Flashcards', icon: 'cards' },
+  { to: '/examiner', label: 'Examiner', icon: 'edit' },
+  { to: '/tutor', label: 'Tutor', icon: 'chat' },
+  { to: '/rewards', label: 'Rewards', icon: 'sparkles' },
+  { to: '/extensions', label: 'Extensions', icon: 'wrench' },
 ]
 </script>
 

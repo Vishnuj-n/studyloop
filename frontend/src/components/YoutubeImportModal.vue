@@ -3,7 +3,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="header-left">
-          <span class="modal-icon">🎥</span>
+          <span class="modal-icon">
+            <BaseIcon name="video" size="22" />
+          </span>
           <div>
             <h3 class="modal-title">Import YouTube Lecture</h3>
             <p class="modal-subtitle">Generate structured study chapters and notes from video</p>
@@ -33,7 +35,7 @@
               :disabled="isLoading"
               @click="url = ''"
             >
-              ✕
+              <BaseIcon name="x" size="12" />
             </button>
           </div>
           <p class="field-hint">
@@ -74,6 +76,7 @@
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

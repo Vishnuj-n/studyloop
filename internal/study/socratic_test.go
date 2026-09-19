@@ -129,3 +129,18 @@ Response Format Guidelines:
 		t.Errorf("socraticPrompt mismatch:\nExpected:\n%q\nActual:\n%q", expectedSocraticPrompt, actualSocraticPrompt)
 	}
 }
+
+func TestTutorStyleDirectAndDetailedInstructions(t *testing.T) {
+	if !strings.Contains(directGeneralInstructions, "zero fluff, zero evasion, and zero roundabout guessing games") {
+		t.Errorf("directGeneralInstructions missing directness directive")
+	}
+	if !strings.Contains(directRescueInstructions, "Directly and concisely explain what went wrong") {
+		t.Errorf("directRescueInstructions missing concise rescue directive")
+	}
+	if !strings.Contains(detailedGeneralInstructions, "Comprehensive Step-by-Step AI Tutor") {
+		t.Errorf("detailedGeneralInstructions missing step-by-step persona")
+	}
+	if !strings.Contains(detailedRescueInstructions, "Step-by-Step AI Concept Tutor") {
+		t.Errorf("detailedRescueInstructions missing detailed rescue persona")
+	}
+}

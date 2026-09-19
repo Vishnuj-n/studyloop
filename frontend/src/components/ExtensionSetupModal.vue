@@ -6,7 +6,7 @@
           <div v-if="status === 'running'" class="setup-icon-spinner">
             <div class="loading-spin-circle"></div>
           </div>
-          <div v-else-if="status === 'success'" class="setup-icon-success">✓</div>
+          <div v-else-if="status === 'success'" class="setup-icon-success"><BaseIcon name="check" size="14" /></div>
           <div v-else class="setup-icon-error">!</div>
           <h3>
             {{
@@ -18,7 +18,7 @@
             }}: {{ extension?.name || 'Python Tool' }}
           </h3>
         </div>
-        <button class="close-modal-btn" title="Close / Cancel Setup" @click="handleCancelOrClose">✕</button>
+        <button class="close-modal-btn" title="Close / Cancel Setup" @click="handleCancelOrClose"><BaseIcon name="x" size="14" /></button>
       </div>
 
       <div class="modal-body">
@@ -34,7 +34,7 @@
 
         <!-- Download Size & Patience Notice Callout -->
         <div v-if="extension?.setup_notice || extension?.download_size" class="setup-notice-banner">
-          <span class="notice-icon">⏳</span>
+          <span class="notice-icon"><BaseIcon name="clock" size="14" /></span>
           <div class="notice-text">
             <strong>Package Size: {{ extension.download_size || '~1 GB' }}</strong>
             <p>{{ extension.setup_notice || 'First-time setup downloads required models. Please keep the app open.' }}</p>

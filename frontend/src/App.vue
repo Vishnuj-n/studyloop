@@ -19,7 +19,7 @@ import {
 } from './services/appApi'
 import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
-import { EventsOn } from '../wailsjs/runtime/runtime'
+import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
 const { showNotice, showError } = useToast()
 
@@ -39,7 +39,7 @@ function handleGlobalIngestionProgress(payload) {
   if (!payload || typeof payload !== 'object') return
   if (payload.status === 'draft_ready') {
     showNotice(
-      '✨ Deep Structured extraction complete! Click the book card or dashboard banner to review your chapter syllabus.',
+      'Deep Structured extraction complete! Click the book card or dashboard banner to review your chapter syllabus.',
       'Extraction Complete'
     )
   } else if (payload.status === 'failed') {
@@ -344,6 +344,7 @@ function handleDismissPrivacyNotice() {
 }
 
 let cancelIngestionListener = null
+let cancelUpdateProgressListener = null
 
 onMounted(() => {
   syncScheduler()
@@ -352,6 +353,20 @@ onMounted(() => {
   checkOneTimeReleaseNotes()
   checkOneTimePrivacyNotice()
   cancelIngestionListener = EventsOn('ingestion-progress', handleGlobalIngestionProgress)
+  if (EventsOn) {
+    cancelUpdateProgressListener = EventsOn('update:progress', (data) => {
+      if (data && typeof data.percentage === 'number') {
+        updateModalProgress.value = Math.min(100, Math.max(0, data.percentage))
+        if (data.total > 0) {
+          const mbDownloaded = (data.downloaded / (1024 * 1024)).toFixed(1)
+          const mbTotal = (data.total / (1024 * 1024)).toFixed(1)
+          updateModalStatus.value = `Downloading update: ${mbDownloaded} MB / ${mbTotal} MB`
+        } else {
+          updateModalStatus.value = `Downloading update: ${(data.downloaded / (1024 * 1024)).toFixed(1)} MB`
+        }
+      }
+    })
+  }
   window.addEventListener('study-reward-earned', handleStudyReward)
 })
 
@@ -363,6 +378,8 @@ onUnmounted(() => {
   window.removeEventListener('settings-updated', syncScheduler)
   window.removeEventListener('study-reward-earned', handleStudyReward)
   if (cancelIngestionListener) cancelIngestionListener()
+  if (cancelUpdateProgressListener) cancelUpdateProgressListener()
+  if (EventsOff) EventsOff('update:progress')
 })
 </script>
 
@@ -376,7 +393,7 @@ onUnmounted(() => {
         <div v-if="showUpdateModal" class="update-modal-overlay">
           <div class="update-modal">
             <div class="update-modal-header">
-              <span class="warning-icon">🚀</span>
+              <span class="warning-icon"><BaseIcon name="rocket" size="20" /></span>
               <h2>Update Available</h2>
             </div>
             <div class="update-modal-body">

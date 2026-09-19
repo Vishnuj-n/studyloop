@@ -86,7 +86,10 @@
           </div>
 
           <button type="button" class="edit-settings-btn" @click="goToSettingsRoutine">
-            <span>⚙ Manage Schedule &amp; Calendar Sync in Settings</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <BaseIcon name="settings" size="14" />
+              <span>Manage Schedule &amp; Calendar Sync in Settings</span>
+            </span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
@@ -100,6 +103,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import BaseIcon from './BaseIcon.vue'
 
 const router = useRouter()
 

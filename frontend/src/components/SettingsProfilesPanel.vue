@@ -24,7 +24,8 @@
               class="cloud-badge"
               :title="`Synced to classroom ${profile.classroom_code}`"
             >
-              ☁️ {{ profile.classroom_code }}
+              <BaseIcon name="cloud" size="12" />
+              <span>{{ profile.classroom_code }}</span>
             </span>
           </div>
           <p class="deadline">
@@ -45,7 +46,8 @@
             title="Click to deselect active profile"
             @click="$emit('select', '')"
           >
-            Active ✓ (Deselect)
+            <BaseIcon name="check" size="12" />
+            <span>Active (Deselect)</span>
           </button>
 
           <button class="edit-btn" @click="$emit('edit', profile)">Edit</button>
@@ -57,6 +59,8 @@
 </template>
 
 <script setup>
+import BaseIcon from './BaseIcon.vue'
+
 defineProps({
   profiles: { type: Array, required: true },
   activeProfileId: { type: String, default: '' },
@@ -169,6 +173,9 @@ defineEmits(['add', 'select', 'edit', 'delete'])
 }
 
 .deselect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: var(--primary);
   color: var(--on-primary);
   border: none;

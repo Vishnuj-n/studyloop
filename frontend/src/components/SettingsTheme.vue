@@ -3,7 +3,8 @@
     <div class="panel-header">
       <h2>Workspace Aesthetics</h2>
       <button type="button" class="shop-trigger-btn" @click="showShopModal = true">
-        🛒 Rewards & Theme Shop
+        <BaseIcon name="gift" size="14" />
+        <span>Rewards & Theme Shop</span>
       </button>
     </div>
 
@@ -24,7 +25,9 @@
           <div class="theme-preview" :style="{ background: t.bg }">
             <span class="preview-dot" :style="{ background: t.primary }"></span>
             <span class="preview-dot" :style="{ background: t.surface }"></span>
-            <span v-if="!isUnlocked(t.id)" class="lock-overlay">🔒</span>
+            <span v-if="!isUnlocked(t.id)" class="lock-overlay">
+              <BaseIcon name="lock" size="14" />
+            </span>
           </div>
           <span class="theme-label">
             {{ t.label }}
@@ -48,6 +51,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import RewardsShopModal from './RewardsShopModal.vue'
 import { getGamificationState } from '../services/appApi'
 
@@ -154,6 +158,9 @@ h2 {
 }
 
 .shop-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   color: var(--on-surface);

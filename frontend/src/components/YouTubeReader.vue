@@ -2,7 +2,10 @@
   <div class="youtube-player-container">
     <div v-if="startSeconds > 0 || endSeconds > 0 || videoId || cachedVideoUrl" class="video-timecode-banner">
       <div class="timecode-info">
-        <span v-if="startSeconds > 0 || endSeconds > 0" class="timecode-badge">⏱️ {{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
+        <span v-if="startSeconds > 0 || endSeconds > 0" class="timecode-badge">
+          <BaseIcon name="clock" size="14" />
+          <span>{{ formatTime(startSeconds) }} – {{ formatTime(endSeconds) }}</span>
+        </span>
         <span v-if="durationText" class="duration-badge">Duration: {{ durationText }}</span>
 
         <!-- Source Mode Switcher (Local Offline vs Online YouTube) -->
@@ -13,7 +16,8 @@
             :class="{ active: sourceMode === 'local' }"
             @click="sourceMode = 'local'"
           >
-            💾 Offline Video
+            <BaseIcon name="hard-drive" size="13" />
+            <span>Offline Video</span>
           </button>
           <button
             type="button"
@@ -21,7 +25,8 @@
             :class="{ active: sourceMode === 'youtube' }"
             @click="sourceMode = 'youtube'"
           >
-            🌐 YouTube Stream
+            <BaseIcon name="globe" size="13" />
+            <span>YouTube Stream</span>
           </button>
         </div>
 
@@ -32,9 +37,13 @@
           title="Play this chapter in your default browser (Chrome/Edge/Firefox)"
           @click="openInExternalBrowser"
         >
-          ↗ Open in Browser
+          <BaseIcon name="external-link" size="13" />
+          <span>Open in Browser</span>
         </button>
-        <span v-if="browserError" class="browser-error-msg">⚠️ {{ browserError }}</span>
+        <span v-if="browserError" class="browser-error-msg">
+          <BaseIcon name="alert-triangle" size="13" />
+          <span>{{ browserError }}</span>
+        </span>
       </div>
       <p v-if="startSeconds > 0 || endSeconds > 0" class="timecode-hint">
         This study session covers the video segment from {{ formatTime(startSeconds) }} to {{ formatTime(endSeconds) }}.
@@ -77,7 +86,10 @@
 
     <div class="transcript-drawer">
       <div class="transcript-drawer-header" @click="showTranscript = !showTranscript">
-        <span class="transcript-header-title">📖 Chapter Transcript & Notes</span>
+        <span class="transcript-header-title">
+          <BaseIcon name="book" size="14" />
+          <span>Chapter Transcript & Notes</span>
+        </span>
         <span class="transcript-toggle-btn">{{ showTranscript ? '▲ Hide Transcript' : '▼ View Transcript' }}</span>
       </div>
       <div v-if="showTranscript" class="transcript-body">
@@ -98,6 +110,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import MarkdownReader from './MarkdownReader.vue'
 import { openURLInBrowser } from '../services/appApi'
 
@@ -342,6 +355,9 @@ async function openInExternalBrowser() {
 }
 
 .browser-error-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   color: var(--error, #ba1a1a);
   font-weight: 500;
@@ -410,6 +426,9 @@ async function openInExternalBrowser() {
 }
 
 .source-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
   color: var(--on-surface-variant);

@@ -206,7 +206,9 @@ defineExpose({ jumpToPage })
 <style scoped>
 .pdf-viewer-viewport {
   width: 100%;
-  height: calc(100vh - 160px);
+  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
   background: var(--background);

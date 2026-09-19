@@ -67,10 +67,10 @@
               </td>
               <td>
                 <span v-if="chapter.in_queue" class="status-pill status-queued" title="Already added to study queue">
-                  🟢 Queued
+                  <BaseIcon name="check-circle" size="12" /> Queued
                 </span>
                 <span v-else class="status-pill status-not-queued" title="Not yet added to study queue">
-                  🔴 Not Queued
+                  <BaseIcon name="circle" size="12" /> Not Queued
                 </span>
               </td>
               <td>
@@ -84,7 +84,8 @@
                   @change="sanitizeChapterPages(chapter)"
                 />
                 <div v-if="fileType === 'youtube' && getStartTimestamp(chapter.start_page)" class="timestamp-pill">
-                  ⏱ {{ getStartTimestamp(chapter.start_page) }}
+                  <BaseIcon name="clock" size="12" />
+                  <span>{{ getStartTimestamp(chapter.start_page) }}</span>
                 </div>
               </td>
               <td>
@@ -98,7 +99,8 @@
                   @change="sanitizeChapterPages(chapter)"
                 />
                 <div v-if="fileType === 'youtube' && getEndTimestamp(chapter.end_page)" class="timestamp-pill">
-                  ⏱ {{ getEndTimestamp(chapter.end_page) }}
+                  <BaseIcon name="clock" size="12" />
+                  <span>{{ getEndTimestamp(chapter.end_page) }}</span>
                   <span v-if="getChapterDuration(chapter.start_page, chapter.end_page)" class="duration-pill">
                     ({{ getChapterDuration(chapter.start_page, chapter.end_page) }})
                   </span>
@@ -149,6 +151,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

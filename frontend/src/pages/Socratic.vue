@@ -9,7 +9,9 @@
       <!-- Socratic Rescue Active Banner -->
       <div v-if="isRescueMode" class="rescue-alert-banner">
         <div class="rescue-alert-content">
-          <span class="rescue-alert-icon">🛡️</span>
+          <span class="rescue-alert-icon">
+            <BaseIcon name="shield" size="18" />
+          </span>
           <div class="rescue-alert-text">
             <strong>Concept Rescue Active</strong>
             <p>
@@ -39,31 +41,42 @@
           @change-topic="handleTopicChange"
         />
 
-        <button
-          type="button"
-          class="clear-btn-slim"
-          :disabled="isRescueMode"
-          title="Clear chat history"
-          @click="clearConversation"
-        >
-          <svg
-            class="clear-btn-icon"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+        <div class="chat-header-actions">
+          <router-link
+            to="/settings"
+            class="clear-btn-slim"
+            title="Change AI Tutor Style in Settings"
           >
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-          </svg>
-          Clear Chat
-        </button>
+            <BaseIcon name="settings" size="14" />
+            <span>Tutor Style</span>
+          </router-link>
+
+          <button
+            type="button"
+            class="clear-btn-slim"
+            :disabled="isRescueMode"
+            title="Clear chat history"
+            @click="clearConversation"
+          >
+            <svg
+              class="clear-btn-icon"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Clear Chat
+          </button>
+        </div>
       </div>
 
       <div ref="threadRef" class="chat-thread">
@@ -245,6 +258,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import {
   askSocratic,
@@ -644,7 +658,7 @@ async function finishRescue() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100vh - 32px);
+  height: 100%;
   overflow: hidden;
 }
 
@@ -689,6 +703,14 @@ h1 {
   align-items: center;
   gap: 12px;
   padding-bottom: 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 

@@ -41,12 +41,12 @@
       title="Edit notebook and chapters"
       @click="$emit('edit-syllabus', notebook.id, notebook.title)"
     >
-      ✎
+      <BaseIcon name="edit" size="14" />
     </button>
 
     <div class="notebook-header-card">
       <div class="file-icon" :class="{ 'active-icon': variant === 'active' }">
-        {{ fileIcon }}
+        <BaseIcon :name="fileIconName" size="20" />
       </div>
       <div class="notebook-info">
         <h3>{{ notebook.title }}</h3>
@@ -54,13 +54,19 @@
         <p v-if="notebook.page_count > 0" class="meta">{{ notebook.page_count }} pages</p>
         <p v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta">{{ notebook.flashcard_count || 0 }} cards</p>
         <p v-else class="meta">{{ notebook.chunk_count }} chunks</p>
-        <p v-if="isDeepExtracted" class="meta deep-badge">⚡ Deep Extracted</p>
+        <p v-if="isDeepExtracted" class="meta deep-badge">
+          <BaseIcon name="zap" size="12" />
+          <span>Deep Extracted</span>
+        </p>
         <p v-if="variant === 'dormant'" class="meta">Status: {{ formattedStatus }}</p>
       </div>
     </div>
 
     <div v-if="needsIngestion" class="notebook-topic">
-      <span class="badge new-assignment-badge">{{ ingestionBadgeLabel }}</span>
+      <span class="badge new-assignment-badge" style="display: inline-flex; align-items: center; gap: 4px;">
+        <BaseIcon name="zap" size="12" />
+        <span>{{ ingestionBadgeLabel }}</span>
+      </span>
     </div>
     <div
       v-else-if="notebook.topic_id"
@@ -74,7 +80,7 @@
         class="tutor-link-btn"
         title="Ask Tutor (RAG)"
       >
-        <span class="tutor-icon">✨</span>
+        <BaseIcon name="sparkles" size="13" />
         <span>Ask Tutor</span>
       </RouterLink>
     </div>
@@ -112,7 +118,8 @@
         title="Review structured chapter syllabus"
         @click="$emit('edit-syllabus', notebook.id, notebook.title)"
       >
-        ✨ Review Chapters
+        <BaseIcon name="sparkles" size="13" />
+        <span>Review Chapters</span>
       </button>
       <button
         v-else-if="needsIngestion"
@@ -120,7 +127,8 @@
         :title="isCloudProfile ? 'Extract bookmarks and run AI cleanup for cloud assignment' : 'Extract bookmarks and run AI cleanup'"
         @click="$emit('edit-syllabus', notebook.id, notebook.title)"
       >
-        ✨ Ingest Book
+        <BaseIcon name="sparkles" size="13" />
+        <span>Ingest Book</span>
       </button>
       <template v-else-if="variant === 'active'">
         <button
@@ -129,7 +137,8 @@
           title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
           @click="$emit('upgrade-deep', notebook.id)"
         >
-          ⚡ Upgrade Deep
+          <BaseIcon name="zap" size="13" />
+          <span>Upgrade Deep</span>
         </button>
         <button
           class="btn-sleep"
@@ -145,7 +154,8 @@
           title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
           @click="$emit('upgrade-deep', notebook.id)"
         >
-          ⚡ Upgrade Deep
+          <BaseIcon name="zap" size="13" />
+          <span>Upgrade Deep</span>
         </button>
         <button
           class="btn-activate"
@@ -173,6 +183,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   notebook: { type: Object, required: true },
@@ -192,9 +203,9 @@ const props = defineProps({
 
 defineEmits(['edit-syllabus', 'update-priority', 'change-status', 'delete', 'upgrade-deep'])
 
-const FILE_ICONS = { pdf: '📕', txt: '📄', md: '📝' }
+const FILE_ICON_NAMES = { pdf: 'book', txt: 'file-text', md: 'file-text', youtube: 'video', anki: 'cards' }
 
-const fileIcon = computed(() => FILE_ICONS[props.notebook.file_type] || '📄')
+const fileIconName = computed(() => FILE_ICON_NAMES[props.notebook.file_type] || 'file-text')
 
 const topicTitle = computed(() => {
   const topic = props.availableTopics.find((t) => t.id === props.notebook.topic_id)
@@ -252,8 +263,8 @@ const canUpgradeDeep = computed(() => {
 
 const ingestionBadgeLabel = computed(() => {
   return props.isCloudProfile
-    ? '⚡ New Assignment — Ingestion Needed'
-    : '⚡ Ingestion Needed'
+    ? 'New Assignment — Ingestion Needed'
+    : 'Ingestion Needed'
 })
 
 const variantClass = computed(() =>
@@ -333,8 +344,11 @@ const circleDashOffset = computed(() => {
   color: var(--on-surface);
   width: 30px;
   height: 30px;
-  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .btn-edit-pen:hover {
@@ -342,8 +356,22 @@ const circleDashOffset = computed(() => {
 }
 
 .file-icon {
-  font-size: 28px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
   flex-shrink: 0;
+}
+
+.file-icon.active-icon {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  color: var(--primary);
 }
 
 .notebook-info {
@@ -367,6 +395,9 @@ const circleDashOffset = computed(() => {
 .deep-badge {
   color: #a78bfa;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .notebook-topic {
@@ -426,12 +457,11 @@ const circleDashOffset = computed(() => {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
-.tutor-icon {
-  font-size: 13px;
-  line-height: 1;
-}
-
 .btn-ingest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: color-mix(in srgb, #3b82f6 20%, var(--surface-container-low));
   color: #60a5fa;
   border: 1px solid var(--outline-variant);
@@ -557,6 +587,10 @@ const circleDashOffset = computed(() => {
 }
 
 .btn-upgrade-deep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.18));
   color: #c4b5fd;
   border: 1px solid var(--outline-variant);

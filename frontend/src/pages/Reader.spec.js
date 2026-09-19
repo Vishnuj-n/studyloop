@@ -240,7 +240,7 @@ describe('Reader.vue Integration', () => {
     await flushPromises()
 
     expect(document.execCommand).toHaveBeenCalledWith('copy')
-    expect(copyBtn.text()).toContain('Copied to Clipboard! ✓')
+    expect(copyBtn.text()).toContain('Copied to Clipboard!')
   })
 
   it('formats raw topic IDs into human readable titles in the header', async () => {
@@ -335,5 +335,31 @@ describe('Reader.vue Integration', () => {
 
     // 3. Verify completion call was dispatched with the correct task ID
     expect(appApi.completeReading).toHaveBeenCalledWith('task-md-flow-1')
+  })
+
+  it('initializes cleanly in browse mode when no task flow is active', async () => {
+    routeQuery.value = {}
+    appApi.getNotebookTopicTree.mockResolvedValueOnce([
+      {
+        notebook_id: 'nb-browse',
+        title: 'Browse Book',
+        topics: [{ topic_id: 't-1', title: 'Chapter 1' }],
+      },
+    ])
+    appApi.getReaderTopicBundle.mockResolvedValueOnce({
+      topic_id: 't-1',
+      topic_title: 'Chapter 1',
+      file_type: 'pdf',
+      page_count: 10,
+      topic_start_page: 1,
+      topic_end_page: 10,
+      notebook_url: 'http://localhost/browse.pdf',
+    })
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    expect(wrapper.find('.browse-badge').exists()).toBe(true)
+    expect(wrapper.find('.controls').exists()).toBe(true)
   })
 })

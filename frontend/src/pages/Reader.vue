@@ -87,7 +87,14 @@
               title="Copy reading session text as Markdown"
               @click="copySessionContent"
             >
-              {{ copiedSession ? 'Copied to Clipboard! ✓' : '📋 Copy Session' }}
+              <template v-if="copiedSession">
+                <BaseIcon name="check" size="14" />
+                <span>Copied to Clipboard!</span>
+              </template>
+              <template v-else>
+                <BaseIcon name="copy" size="14" />
+                <span>Copy Session</span>
+              </template>
             </button>
             <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
               <button
@@ -97,7 +104,8 @@
                 :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
                 @click="startAudio('toggle')"
               >
-                {{ showAudioOverview ? '🎧 AI Audio Active' : '🎧 AI Audio Overview' }}
+                <BaseIcon name="headphones" size="14" />
+                <span>{{ showAudioOverview ? 'AI Audio Active' : 'AI Audio Overview' }}</span>
               </button>
               <div class="split-dropdown-wrapper">
                 <button
@@ -106,7 +114,7 @@
                   title="Audio Overview page range options"
                   @click.stop="showAudioMenu = !showAudioMenu"
                 >
-                  ▾
+                  <BaseIcon name="chevron-down" size="12" />
                 </button>
                 <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
                   <button class="split-dropdown-item" @click="startAudio('session')">
@@ -127,7 +135,8 @@
               title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
               @click="handleSimplify"
             >
-              {{ simplifying ? '✨ Opening...' : '✨ Simplify' }}
+              <BaseIcon name="sparkles" size="14" />
+              <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
             </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
@@ -243,7 +252,7 @@
       <ReaderChat
         v-if="ragEnabled && ragQueueStudy"
         :selected-topic-i-d="reader.selectedTopicID.value"
-        :selected-topic-title="reader.selectedTopicTitle.value"
+        :selected-topic-title="reader.topicTitle?.value || reader.selectedTopicTitle?.value || ''"
         :selected-notebook-i-d="reader.selectedNotebookID.value"
         :selected-notebook-title="reader.selectedNotebookTitle.value"
         :current-page="reader.currentPage.value"
@@ -276,6 +285,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import {
   completeReading,
   getUserSettings,
@@ -810,13 +820,17 @@ ${sessionText.trim()}`
 
 <style scoped>
 .page {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   gap: 14px;
 }
 
 .head {
   display: grid;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .eyebrow {
@@ -882,12 +896,16 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 360px));
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .layout {
   display: grid;
   grid-template-columns: 1.8fr 1fr;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .layout.collapsed {
@@ -895,10 +913,13 @@ h3 {
 }
 
 .stage {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   position: relative;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .stage-head {
@@ -906,6 +927,7 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .stage-head-left,
@@ -923,6 +945,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   font-size: 13px;
   line-height: 1;

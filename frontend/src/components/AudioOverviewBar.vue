@@ -9,9 +9,9 @@
           :title="isPlaying ? 'Pause' : 'Play'"
           @click="togglePlay"
         >
-          <span v-if="isLoading && chunks.length === 0" class="spinner-icon">⏳</span>
-          <span v-else-if="isPlaying">⏸</span>
-          <span v-else>▶</span>
+          <BaseIcon v-if="isLoading && chunks.length === 0" name="loader" size="14" custom-class="spinner-icon" />
+          <BaseIcon v-else-if="isPlaying" name="pause" size="14" />
+          <BaseIcon v-else name="play" size="14" />
         </button>
 
         <button
@@ -20,7 +20,7 @@
           title="Previous sentence"
           @click="prevChunk"
         >
-          ⏮
+          <BaseIcon name="skip-back" size="14" />
         </button>
 
         <button
@@ -29,7 +29,7 @@
           title="Next sentence"
           @click="nextChunk"
         >
-          ⏭
+          <BaseIcon name="skip-forward" size="14" />
         </button>
 
         <div class="progress-indicator">
@@ -42,7 +42,8 @@
       <!-- Center: Subtitle / Transcript -->
       <div class="audio-transcript">
         <p v-if="errorMessage" class="error-text">
-          ⚠️ {{ errorMessage }}
+          <BaseIcon name="alert-triangle" size="14" />
+          <span>{{ errorMessage }}</span>
         </p>
         <p v-else-if="isLoading && chunks.length === 0" class="buffering-text">
           <span class="pulse-dot">●</span> Generating fast audio briefing with Neural TTS...
@@ -72,7 +73,7 @@
         </button>
 
         <button class="close-btn" title="Close Audio Overview" @click="handleClose">
-          ✕
+          <BaseIcon name="x" size="14" />
         </button>
       </div>
     </div>
@@ -81,6 +82,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { startTopicAudioOverview, stopTopicAudioOverview } from '../services/appApi'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useExtensions } from '../composables/useExtensions'
@@ -536,6 +538,9 @@ watch(
 
 .error-text {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   color: #ef4444;
   font-weight: 500;

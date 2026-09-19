@@ -1,7 +1,12 @@
 <template>
   <article :class="['banner', `banner--${variant}`, 'card']">
     <div class="banner-content">
-      <span class="banner-icon"><slot name="icon">{{ icon }}</slot></span>
+      <span class="banner-icon">
+        <slot name="icon">
+          <BaseIcon v-if="isKnownIcon" :name="icon" size="20" />
+          <span v-else>{{ icon }}</span>
+        </slot>
+      </span>
       <div class="banner-text">
         <p class="banner-title">{{ title }}</p>
         <p v-if="subtitle" class="banner-subtitle">{{ subtitle }}</p>
@@ -18,7 +23,7 @@
           aria-label="Dismiss banner"
           @click="$emit('dismiss')"
         >
-          ✕
+          <BaseIcon name="x" size="14" />
         </button>
       </div>
     </div>
@@ -26,7 +31,11 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
+import { icons } from '../assets/icons/index.js'
+
+const props = defineProps({
   /** 'info' | 'rescue' | 'success' | 'error' | 'warning' | 'star' */
   variant: { type: String, required: true },
   icon: { type: String, required: true },
@@ -37,6 +46,8 @@ defineProps({
 })
 
 defineEmits(['action', 'dismiss'])
+
+const isKnownIcon = computed(() => Boolean(icons[props.icon]))
 </script>
 
 <style scoped>

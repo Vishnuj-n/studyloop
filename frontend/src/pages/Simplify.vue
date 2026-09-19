@@ -7,7 +7,10 @@
         </button>
         <div class="title-meta">
           <div class="badge-row">
-            <span class="sparkle-badge">✨ AI Simplified Mode</span>
+            <span class="sparkle-badge">
+              <BaseIcon name="sparkles" size="13" />
+              <span>AI Simplified Mode</span>
+            </span>
             <span v-if="bookTitle" class="book-badge">{{ bookTitle }}</span>
           </div>
           <h1 class="topic-heading">{{ displayTitle }}</h1>
@@ -20,7 +23,14 @@
           class="copy-btn"
           @click="copyMarkdown"
         >
-          {{ copied ? 'Copied! ✓' : '📋 Copy Markdown' }}
+          <template v-if="copied">
+            <BaseIcon name="check" size="14" />
+            <span>Copied!</span>
+          </template>
+          <template v-else>
+            <BaseIcon name="copy" size="14" />
+            <span>Copy Markdown</span>
+          </template>
         </button>
         <button
           v-if="!loading && rawContent"
@@ -28,14 +38,15 @@
           :disabled="loading"
           @click="generateSimplification"
         >
-          🔄 Refresh
+          <BaseIcon name="refresh" size="14" />
+          <span>Refresh</span>
         </button>
       </div>
     </header>
 
     <!-- Error Banner -->
     <div v-if="errorMessage" class="error-banner">
-      <div class="error-text">⚠️ {{ errorMessage }}</div>
+      <div class="error-text"><BaseIcon name="alert-triangle" size="16" /> <span>{{ errorMessage }}</span></div>
       <button class="retry-btn" @click="generateSimplification">Retry</button>
     </div>
 
@@ -66,6 +77,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BaseIcon from '../components/BaseIcon.vue'
 import { simplifyReadingContent, getTopicSectionsContent } from '../services/appApi'
 import { useExtensions } from '../composables/useExtensions'
 import MarkdownReader from '../components/MarkdownReader.vue'
@@ -237,6 +249,9 @@ onMounted(async () => {
 }
 
 .sparkle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 700;
   color: var(--primary);
@@ -268,6 +283,9 @@ onMounted(async () => {
 }
 
 .copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--surface-container-high);
   border: 1px solid var(--outline-variant);
   color: var(--on-surface);
@@ -284,6 +302,9 @@ onMounted(async () => {
 }
 
 .resimplify-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid var(--outline-variant);
   color: var(--muted-text);
@@ -312,6 +333,9 @@ onMounted(async () => {
 }
 
 .error-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 500;
 }

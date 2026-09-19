@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -353,10 +354,11 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	if IsPromptLoggingEnabled() {
-		_ = os.MkdirAll("dev_data/logs", 0755)
+		logDir := resolveLogsDir()
+		_ = os.MkdirAll(logDir, 0755)
 		debugLog := fmt.Sprintf("\n--- PROMPT @ %s [model: %s | max_input: %d | est_tokens: %d | chars: %d] ---\n%s\n--- END PROMPT ---\n",
 			time.Now().Format("2006-01-02 15:04:05"), p.config.Model, limits.MaxInputTokens, estPromptTokens, len(prompt), prompt)
-		if f, err := os.OpenFile("dev_data/logs/llm_prompt.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		if f, err := os.OpenFile(filepath.Join(logDir, "llm_prompt.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
 			_, _ = f.WriteString(debugLog)
 			_ = f.Close()
 		}
@@ -442,3 +444,17 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 
 	return apiResp.Choices[0].Message.Content, nil
 }
+
+func resolveLogsDir() string {
+	if os.Getenv("APP_ENV") == "dev" {
+		return filepath.Join("dev_data", "logs")
+	}
+	if cfgDir, err := os.UserConfigDir(); err == nil && cfgDir != "" {
+		return filepath.Join(cfgDir, "Studyloop", "logs")
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+		return filepath.Join(homeDir, ".Studyloop", "logs")
+	}
+	return filepath.Join("dev_data", "logs")
+}
+

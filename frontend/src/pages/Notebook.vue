@@ -129,8 +129,11 @@
       <transition name="toast-fade">
         <div v-if="showActionToast" class="action-toast">
           <div class="action-toast-inner">
-            <span class="fallback-toast-title">Notice</span>
-            <p>{{ actionToastMessage }}</p>
+            <BaseIcon name="zap" size="18" />
+            <div>
+              <span class="fallback-toast-title">Notice</span>
+              <p>{{ actionToastMessage }}</p>
+            </div>
           </div>
         </div>
       </transition>
@@ -176,6 +179,7 @@ import {
 import NotebookUpload from '../components/NotebookUpload.vue'
 import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
+import BaseIcon from '../components/BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
 
 const { confirm: confirmDialog, alert: alertDialog } = useDialog()
@@ -353,7 +357,7 @@ function handleIngestionProgress(payload) {
   const terminalStates = new Set(['failed', 'chunked', 'indexed', 'draft_ready'])
   if (typeof payload.status === 'string' && terminalStates.has(payload.status)) {
     if (payload.status === 'draft_ready') {
-      showToast('✨ Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
+      showToast('Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
     } else if (payload.status === 'failed') {
       showToast(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
     }
@@ -482,7 +486,7 @@ async function handleDeepStructuredUpload() {
     }
     await loadNotebooks()
     await alertDialog({
-      title: '⚡ Deep Structure Analysis Started',
+      title: 'Deep Structure Analysis Started',
       message: `Deep extraction is running in the background for '${result?.file_name || 'book'}'.\n\nFor large textbooks (100+ pages), this will take several minutes. You can safely continue studying other topics or close this dialog. You will receive an in-app notice as soon as your chapter syllabus is ready.`,
       confirmText: 'Got it, continue',
       type: 'info',
@@ -505,7 +509,7 @@ async function handleUpgradeToDeepPDF(notebookID) {
     }
 
     await loadNotebooks()
-    actionToastMessage.value = `⚡ Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`
+    actionToastMessage.value = `Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`
     showActionToast.value = true
     setTimeout(() => {
       showActionToast.value = false
@@ -513,7 +517,7 @@ async function handleUpgradeToDeepPDF(notebookID) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     uploadError.value = `Upgrade failed: ${msg}`
-    showToast(`⚠️ Upgrade failed: ${msg}`)
+    showToast(`Upgrade failed: ${msg}`)
   }
 }
 
@@ -980,6 +984,9 @@ async function updatePriority(notebookId, priority) {
   border-radius: 14px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
   border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .fallback-toast-inner {
