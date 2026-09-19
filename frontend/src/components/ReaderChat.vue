@@ -19,11 +19,12 @@
           class="chat-tutor-link"
           title="Open full-screen Socratic Tutor for this topic"
         >
-          🧠 Socratic Tutor ↗
+          <span>Socratic Tutor</span>
+          <BaseIcon name="external-link" size="11" customClass="tutor-link-icon" />
         </router-link>
       </div>
       <button
-        class="ghost"
+        class="ghost collapse-btn"
         :aria-expanded="!chat.chatCollapsed.value"
         aria-controls="reader-chat-panel"
         @click="chat.toggleChat"
@@ -37,36 +38,65 @@
         <h3>Loading settings...</h3>
       </div>
       <div v-else-if="ragSettingsError" class="rag-disabled-overlay">
-        <div class="lock-icon">⚠️</div>
+        <div class="lock-icon"><BaseIcon name="alert-triangle" size="24" /></div>
         <h3>Settings Error</h3>
         <p>{{ ragSettingsError }}</p>
         <button class="primary" @click="$emit('retry-settings')">Retry</button>
       </div>
       <div v-else-if="!ragEnabled" class="rag-disabled-overlay">
-        <div class="lock-icon">🔒</div>
+        <div class="lock-icon"><BaseIcon name="lock" size="24" /></div>
         <h3>Local AI Retrieval Offline</h3>
         <p>Local semantic search and Q&A is currently disabled to save memory and CPU.</p>
         <router-link to="/settings" class="enable-rag-btn">Enable in Settings</router-link>
       </div>
       <template v-else>
-        <p class="chat-context">
-          Using topic <strong>{{ selectedTopicTitle || 'None' }}</strong>
-          <span v-if="selectedNotebookTitle">from {{ selectedNotebookTitle }}</span>
-        </p>
+        <!-- Compact Context & Retrieval Scope Bar -->
+        <div class="chat-meta-bar">
+          <div class="chat-context-pill" :title="contextTooltip">
+            <BaseIcon name="book" size="12" customClass="context-pill-icon" />
+            <span class="context-pill-title">{{ selectedTopicTitle || 'No topic selected' }}</span>
+          </div>
 
-        <div class="scope-bar">
-          <div class="scope-main">
-            <label for="scope-select" class="scope-label">Retrieval Scope</label>
-            <select id="scope-select" v-model="chat.chatScope.value" class="scope-select">
+          <div class="scope-compact-wrap" title="Select retrieval scope">
+            <label for="scope-select" class="visually-hidden">Retrieval Scope</label>
+            <select id="scope-select" v-model="chat.chatScope.value" class="scope-compact-select">
               <option value="entire_notebook">Entire Notebook</option>
               <option value="current_chapter">Current Chapter</option>
               <option value="current_page">Current Page</option>
             </select>
+            <BaseIcon name="chevron-down" size="11" customClass="scope-select-chevron" />
           </div>
-          <p class="scope-helper">Broader scopes search more of your notebook.</p>
         </div>
 
+        <!-- Messages Area / Empty Starter State -->
         <div :ref="(el) => { if (chat && chat.messagesPane) chat.messagesPane.value = el }" class="messages">
+          <div
+            v-if="!chat.chatMessages.value || chat.chatMessages.value.length === 0"
+            class="empty-chat-state"
+          >
+            <div class="empty-hero">
+              <div class="empty-icon-badge">
+                <BaseIcon name="sparkles" size="16" />
+              </div>
+              <p class="empty-title">Reading Assistant</p>
+              <p class="empty-desc">Ask anything about your reading or choose a prompt:</p>
+            </div>
+
+            <div class="quick-chips-grid">
+              <button
+                v-for="chip in quickPrompts"
+                :key="chip.id"
+                type="button"
+                class="quick-chip-btn"
+                :disabled="chat.chatLoading.value || !selectedTopicID"
+                @click="triggerQuickPrompt(chip.text)"
+              >
+                <BaseIcon :name="chip.icon" size="13" customClass="chip-icon" />
+                <span class="chip-label">{{ chip.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <article
             v-for="(msg, idx) in chat.chatMessages.value"
             :key="msg.id || idx"
@@ -82,6 +112,7 @@
 
         <article v-if="chat.chatError.value" class="error">{{ chat.chatError.value }}</article>
 
+        <!-- Input Composer -->
         <form class="composer" @submit.prevent="sendChat">
           <div class="composer-box">
             <textarea
@@ -124,7 +155,8 @@
 </template>
 
 <script setup>
-import { inject, watch } from 'vue'
+import { computed, inject, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { logFrontendEvent } from '../services/appApi'
 
 const props = defineProps({
@@ -174,6 +206,39 @@ defineEmits(['retry-settings'])
 
 const chat = inject('chat')
 
+const contextTooltip = computed(() => {
+  if (!props.selectedTopicTitle) return 'No topic selected'
+  if (!props.selectedNotebookTitle) return props.selectedTopicTitle
+  return `${props.selectedTopicTitle} from ${props.selectedNotebookTitle}`
+})
+
+const quickPrompts = [
+  {
+    id: 'summary',
+    label: 'Summarize Key Points',
+    text: 'Summarize the core concepts and key points of this section concisely.',
+    icon: 'file-text',
+  },
+  {
+    id: 'explain',
+    label: 'Explain Simply',
+    text: 'Explain the main ideas in this topic using a simple, intuitive analogy.',
+    icon: 'sparkles',
+  },
+  {
+    id: 'quiz',
+    label: 'Test My Knowledge',
+    text: 'Ask me a conceptual quiz question to test my understanding of this section.',
+    icon: 'zap',
+  },
+  {
+    id: 'terms',
+    label: 'Key Terminology',
+    text: 'List the most important terms and definitions introduced in this reading.',
+    icon: 'cards',
+  },
+]
+
 // Watch settings errors and RAG toggle status
 watch(
   () => props.ragSettingsError,
@@ -205,6 +270,12 @@ async function sendChat() {
       chat.chatError.value = err.message || 'Failed to send message'
     }
   }
+}
+
+async function triggerQuickPrompt(text) {
+  if (chat.chatLoading.value || !props.selectedTopicID) return
+  chat.chatInput.value = text
+  await sendChat()
 }
 
 function handleEnterKey(event) {
@@ -268,12 +339,15 @@ function handleEnterKey(event) {
 
 .chat-head-title-group {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .chat-tutor-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   font-weight: 600;
   text-decoration: none;
@@ -281,9 +355,13 @@ function handleEnterKey(event) {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border: 1px solid var(--outline-variant);
   border-radius: 6px;
-  padding: 2px 8px;
+  padding: 2px 7px;
   transition: all 0.15s ease;
   white-space: nowrap;
+}
+
+.tutor-link-icon {
+  opacity: 0.8;
 }
 
 .chat-tutor-link:hover {
@@ -297,62 +375,104 @@ function handleEnterKey(event) {
 
 h2 {
   margin: 0;
-  font-size: 28px;
+  font-size: 20px;
+  font-weight: 700;
   font-family: 'Manrope', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-family: 'Manrope', sans-serif;
 }
 
-.chat-context {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted-text);
-  flex-shrink: 0;
-}
-
-.scope-bar {
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-container-low) 86%, transparent);
-  flex-shrink: 0;
-}
-
-.scope-main {
+/* Compact Metadata & Retrieval Scope Bar */
+.chat-meta-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
-.scope-helper {
-  margin: 0;
-  font-size: 11px;
+.chat-context-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 4px 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.context-pill-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.context-pill-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scope-compact-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.scope-compact-select {
+  appearance: none;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  padding: 4px 22px 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+}
+
+.scope-compact-select:hover {
+  border-color: var(--outline);
+  color: var(--on-surface);
+}
+
+.scope-compact-select:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.scope-select-chevron {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
   color: var(--muted-text);
-  line-height: 1.3;
 }
 
-.scope-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted-text);
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.scope-select {
-  width: auto;
-  min-width: 160px;
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 10px;
-}
-
+/* Messages Area */
 .messages {
   flex: 1;
   min-height: 0;
@@ -363,6 +483,107 @@ h3 {
   padding-right: 3px;
 }
 
+/* Empty State / Starter Prompts */
+.empty-chat-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 16px 8px;
+  gap: 16px;
+  margin: auto 0;
+}
+
+.empty-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.empty-icon-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--on-surface);
+  font-family: 'Manrope', sans-serif;
+}
+
+.empty-desc {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted-text);
+  max-width: 230px;
+  line-height: 1.4;
+}
+
+.quick-chips-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 270px;
+}
+
+.quick-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-chip-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-low));
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.quick-chip-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.quick-chip-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chip-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.chip-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Chat Messages */
 .msg {
   border-radius: 10px;
   padding: 9px 10px;
@@ -389,12 +610,12 @@ h3 {
 
 .msg p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.5;
 }
 
 .markdown-body {
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.6;
 }
 
@@ -446,7 +667,7 @@ h3 {
   align-items: flex-end;
   background: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 6px 10px;
   transition: all 0.2s ease;
   position: relative;
@@ -465,7 +686,7 @@ h3 {
   padding: 4px 36px 4px 4px;
   color: var(--on-surface);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.45;
   outline: none;
   resize: none;
@@ -555,22 +776,11 @@ h3 {
   }
 }
 
-select {
-  width: 100%;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
-  border-radius: 10px;
-  font: inherit;
-  padding: 10px;
-  outline: 0;
-}
-
 button {
   border: 0;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-weight: 700;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -587,6 +797,11 @@ button:disabled {
 .ghost {
   color: var(--on-surface);
   background: var(--surface-container-low);
+  font-size: 12px;
+}
+
+.ghost:hover {
+  background: var(--surface-container-highest);
 }
 
 .error {

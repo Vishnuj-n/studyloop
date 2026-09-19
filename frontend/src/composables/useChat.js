@@ -14,7 +14,7 @@ export function useChat() {
   const chatInput = ref('')
   const chatLoading = ref(false)
   const chatError = ref('')
-  const chatScope = ref('entire_notebook')
+  const chatScope = ref('current_chapter')
   const messagesPane = ref(null)
 
   /**
