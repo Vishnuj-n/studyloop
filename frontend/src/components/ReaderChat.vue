@@ -20,7 +20,7 @@
           title="Open full-screen Socratic Tutor for this topic"
         >
           <span>Socratic Tutor</span>
-          <BaseIcon name="external-link" size="11" customClass="tutor-link-icon" />
+          <BaseIcon name="external-link" size="11" custom-class="tutor-link-icon" />
         </router-link>
       </div>
       <div class="chat-head-actions">
@@ -65,7 +65,7 @@
         <!-- Compact Context & Retrieval Scope Bar -->
         <div class="chat-meta-bar">
           <div v-if="displayContextTitle" class="chat-context-pill" :title="contextTooltip">
-            <BaseIcon name="book" size="12" customClass="context-pill-icon" />
+            <BaseIcon name="book" size="12" custom-class="context-pill-icon" />
             <span class="context-pill-title">{{ displayContextTitle }}</span>
           </div>
 
@@ -76,7 +76,7 @@
               <option value="current_chapter">Current Chapter</option>
               <option value="current_page">Current Page</option>
             </select>
-            <BaseIcon name="chevron-down" size="11" customClass="scope-select-chevron" />
+            <BaseIcon name="chevron-down" size="11" custom-class="scope-select-chevron" />
           </div>
         </div>
 
@@ -103,7 +103,7 @@
                 :disabled="chat.chatLoading.value || !selectedTopicID"
                 @click="triggerQuickPrompt(chip.text)"
               >
-                <BaseIcon :name="chip.icon" size="13" customClass="chip-icon" />
+                <BaseIcon :name="chip.icon" size="13" custom-class="chip-icon" />
                 <span class="chip-label">{{ chip.label }}</span>
               </button>
             </div>

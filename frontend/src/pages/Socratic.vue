@@ -257,7 +257,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import {
@@ -270,6 +270,7 @@ import {
 import { renderMarkdown } from '../services/markdown'
 
 const route = useRoute()
+const router = useRouter()
 const ragEntireNotebookEnabled = ref(true)
 
 const selectedTopicID = ref('')
@@ -713,43 +714,6 @@ h1 {
   flex-shrink: 0;
 }
 
-.tutor-style-selector {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
-  border-radius: 20px;
-  padding: 3px 8px 3px 10px;
-}
-
-.style-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-text);
-  font-family: 'Inter', sans-serif;
-}
-
-.style-dropdown {
-  background: transparent;
-  border: none;
-  color: var(--on-surface);
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 4px;
-  outline: none;
-}
-
-.style-dropdown option {
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
-}
-
-.settings-btn-slim,
 .clear-btn-slim {
   border: 1px solid var(--outline-variant);
   border-radius: 20px;
@@ -767,7 +731,6 @@ h1 {
   flex-shrink: 0;
 }
 
-.settings-btn-slim:hover,
 .clear-btn-slim:hover:not(:disabled) {
   background: var(--surface-container-highest);
   border-color: var(--outline);

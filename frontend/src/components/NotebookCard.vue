@@ -457,11 +457,6 @@ const circleDashOffset = computed(() => {
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
-.tutor-icon {
-  font-size: 13px;
-  line-height: 1;
-}
-
 .btn-ingest {
   display: inline-flex;
   align-items: center;
