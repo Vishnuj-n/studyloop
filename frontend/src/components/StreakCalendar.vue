@@ -18,7 +18,9 @@
               shielded: streakState.shield_active,
             }"
             :title="flameTooltip"
-          >{{ flameEmoji }}</span>
+          >
+            <BaseIcon :name="streakIconName" size="24" />
+          </span>
           <div class="streak-counts">
             <span class="streak-count-val">{{ streakState.current_streak }}</span>
             <span class="streak-count-label">day streak</span>
@@ -74,6 +76,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   streakState: {
@@ -96,11 +99,10 @@ const isEveningWarning = computed(() => {
   return hour >= 20
 })
 
-const flameEmoji = computed(() => {
-  if (props.streakState?.shield_active) return '🛡️'
-  if (props.streakState?.today_completed) return '🔥'
-  if (isEveningWarning.value) return '⚠️'
-  return '🔥'
+const streakIconName = computed(() => {
+  if (props.streakState?.shield_active) return 'shield'
+  if (isEveningWarning.value && !props.streakState?.today_completed) return 'alert-triangle'
+  return 'flame'
 })
 
 const flameTooltip = computed(() => {

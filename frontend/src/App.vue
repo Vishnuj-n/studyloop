@@ -39,7 +39,7 @@ function handleGlobalIngestionProgress(payload) {
   if (!payload || typeof payload !== 'object') return
   if (payload.status === 'draft_ready') {
     showNotice(
-      '✨ Deep Structured extraction complete! Click the book card or dashboard banner to review your chapter syllabus.',
+      'Deep Structured extraction complete! Click the book card or dashboard banner to review your chapter syllabus.',
       'Extraction Complete'
     )
   } else if (payload.status === 'failed') {

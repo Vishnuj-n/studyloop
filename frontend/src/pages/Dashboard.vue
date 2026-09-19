@@ -667,8 +667,8 @@ async function runFlashcardSyncInline(task) {
       actionError.value = ''
       const count = res && typeof res.cards_scheduled === 'number' ? res.cards_scheduled : 0
       flashcardNotice.value = count > 0
-        ? `🎉 Successfully generated ${count} flashcards for spaced repetition!`
-        : '✨ Flashcards are ready and up to date!'
+        ? `Successfully generated ${count} flashcards for spaced repetition!`
+        : 'Flashcards are ready and up to date!'
       await loadAgenda()
     }
   } catch (err) {

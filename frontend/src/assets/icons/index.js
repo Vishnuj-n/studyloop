@@ -194,5 +194,68 @@ export const icons = {
     "paths": [
       "<path d=\"M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z\"/>"
     ]
+  },
+  "grid": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\"/>",
+      "<rect width=\"7\" height=\"7\" x=\"14\" y=\"3\" rx=\"1\"/>",
+      "<rect width=\"7\" height=\"7\" x=\"14\" y=\"14\" rx=\"1\"/>",
+      "<rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\"/>"
+    ]
+  },
+  "flame": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z\"/>"
+    ]
+  },
+  "alert-triangle": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z\"/>",
+      "<line x1=\"12\" x2=\"12\" y1=\"9\" y2=\"13\"/>",
+      "<line x1=\"12\" x2=\"12.01\" y1=\"17\" y2=\"17\"/>"
+    ]
+  },
+  "x": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<line x1=\"18\" x2=\"6\" y1=\"6\" y2=\"18\"/>",
+      "<line x1=\"6\" x2=\"18\" y1=\"6\" y2=\"18\"/>"
+    ]
+  },
+  "gift": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<rect x=\"3\" y=\"8\" width=\"18\" height=\"4\" rx=\"1\"/>",
+      "<path d=\"M12 8v13\"/>",
+      "<path d=\"M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7\"/>",
+      "<path d=\"M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5\"/>"
+    ]
+  },
+  "cloud": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z\"/>"
+    ]
   }
 };

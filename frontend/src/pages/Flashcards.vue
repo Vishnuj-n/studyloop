@@ -200,7 +200,8 @@
                   :disabled="isSubmittingReview"
                   @click="rate(r.key)"
                 >
-                  {{ r.label }}
+                  <BaseIcon v-if="r.icon" :name="r.icon" size="13" />
+                  <span>{{ r.label }}</span>
                 </button>
               </div>
             </div>
@@ -290,6 +291,7 @@ import {
   getUserSettings,
 } from '../services/appApi.js'
 import BaseButton from '../components/BaseButton.vue'
+import BaseIcon from '../components/BaseIcon.vue'
 import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import { playCardRatingTick } from '../utils/audioJuice'
@@ -316,10 +318,10 @@ const toast = ref({ show: false, message: '', type: 'info' })
 const showInfoTooltip = ref(false)
 
 const ratings = [
-  { key: 'again', label: '✕ Again', value: 1 },
-  { key: 'hard', label: '~ Hard', value: 2 },
-  { key: 'good', label: '✓ Good', value: 3 },
-  { key: 'easy', label: '⚡ Easy', value: 4 },
+  { key: 'again', label: 'Again', icon: 'x', value: 1 },
+  { key: 'hard', label: 'Hard', icon: 'refresh', value: 2 },
+  { key: 'good', label: 'Good', icon: 'check', value: 3 },
+  { key: 'easy', label: 'Easy', icon: 'zap', value: 4 },
 ]
 
 const canGenerate = computed(
@@ -880,6 +882,9 @@ async function loadQueueSession(taskID, notebookID = '') {
   justify-content: center;
 }
 .rating-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
   border: 0;
   border-radius: 10px;
