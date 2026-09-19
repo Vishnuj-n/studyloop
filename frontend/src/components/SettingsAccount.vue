@@ -42,7 +42,8 @@
           class="upgrade-btn"
           @click="onBillingClick"
         >
-          ★ Support Dev &bull; Get Early Access
+          <BaseIcon name="star" size="14" />
+          <span>Support Dev &bull; Get Early Access</span>
         </button>
         <button
           v-else

@@ -105,10 +105,12 @@
               </td>
               <td>
                 <span v-if="log.has_anomaly" class="anomaly-tag" :title="log.anomaly_reason">
-                  ⚠ {{ log.anomaly_reason }}
+                  <BaseIcon name="alert-triangle" size="12" />
+                  <span>{{ log.anomaly_reason }}</span>
                 </span>
                 <span v-else class="ok-tag">
-                  ✓ Valid Bounds
+                  <BaseIcon name="check" size="12" />
+                  <span>Valid Bounds</span>
                 </span>
               </td>
             </tr>
@@ -432,12 +434,18 @@ async function fetchMore() {
 }
 
 .anomaly-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #ef4444;
   font-size: 11px;
   font-weight: 600;
 }
 
 .ok-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #10b981;
   font-size: 11px;
 }

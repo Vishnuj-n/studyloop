@@ -57,7 +57,7 @@
 
           <div class="action-box">
             <button type="button" class="tutor-btn" @click="startInAppTutor">
-              Start Adaptive Tutor Chat ➔
+              Start Adaptive Tutor Chat <BaseIcon name="arrow-right" size="13" />
             </button>
           </div>
         </div>
@@ -78,7 +78,9 @@
           <div class="summary-package-box">
             <ul class="package-items">
               <li class="package-item">
-                <span class="item-icon">❓</span>
+                <span class="item-icon">
+                  <BaseIcon name="help-circle" size="18" />
+                </span>
                 <div class="item-details">
                   <strong>{{ failedQuestions?.length || 0 }} Failed Quiz Questions</strong>
                   <span class="item-sub">Incorrect attempts and target concepts included</span>
@@ -86,7 +88,7 @@
               </li>
               <li class="package-item">
                 <span class="item-icon">
-                  <BaseIcon name="book" size="16" />
+                  <BaseIcon name="book" size="18" />
                 </span>
                 <div class="item-details">
                   <strong>Source Material Excerpt</strong>
@@ -94,7 +96,9 @@
                 </div>
               </li>
               <li class="package-item">
-                <span class="item-icon">🧠</span>
+                <span class="item-icon">
+                  <BaseIcon name="brain" size="18" />
+                </span>
                 <div class="item-details">
                   <strong>Adaptive Concept Tutor</strong>
                   <span class="item-sub">Analyzes mistakes, explains concepts with examples & checks understanding</span>
@@ -104,7 +108,8 @@
 
             <details class="prompt-details">
               <summary class="preview-toggle-btn">
-                <span>👁️</span> Preview Raw Prompt
+                <BaseIcon name="eye" size="14" />
+                <span>Preview Raw Prompt</span>
               </summary>
               <textarea class="raw-prompt-preview" readonly :value="fullPrompt"></textarea>
             </details>
@@ -136,7 +141,8 @@
                 :disabled="completing"
                 @click="finishRescueSession"
               >
-                {{ completing ? 'Completing...' : 'Mark Done & Retry ➔' }}
+                <span v-if="completing">Completing...</span>
+                <span v-else>Mark Done & Retry <BaseIcon name="arrow-right" size="13" /></span>
               </button>
             </div>
           </div>

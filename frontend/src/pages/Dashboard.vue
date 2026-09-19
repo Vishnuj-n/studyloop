@@ -14,7 +14,7 @@
         >
           <span class="profile-trigger-status" aria-hidden="true"></span>
           <span class="profile-trigger-name">{{ activeProfileName }}</span>
-          <span class="profile-trigger-chevron" aria-hidden="true">⌄</span>
+          <span class="profile-trigger-chevron" aria-hidden="true"><BaseIcon name="chevron-down" size="14" /></span>
         </button>
 
         <div v-if="profileMenuOpen" class="profile-switcher-menu" role="listbox" aria-label="Switch profile">
@@ -110,21 +110,21 @@
     <StatusBanner
       v-if="flashcardNotice"
       variant="success"
-      icon="🎉"
+      icon="sparkles"
       title="Flashcards Ready"
       :subtitle="flashcardNotice"
     />
     <StatusBanner
       v-if="flashcardsJustCreated"
       variant="success"
-      icon="✓"
+      icon="check"
       :title="'Flashcards generated successfully!'"
       :subtitle="flashcardsJustCreated + ' cards scheduled for spaced repetition.'"
     />
     <StatusBanner
       v-if="actionError"
       variant="error"
-      icon="⚠"
+      icon="alert-triangle"
       title="Error starting task"
       :subtitle="actionError"
     />

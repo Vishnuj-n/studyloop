@@ -46,7 +46,7 @@
 
     <!-- Error Banner -->
     <div v-if="errorMessage" class="error-banner">
-      <div class="error-text">⚠️ {{ errorMessage }}</div>
+      <div class="error-text"><BaseIcon name="alert-triangle" size="16" /> <span>{{ errorMessage }}</span></div>
       <button class="retry-btn" @click="generateSimplification">Retry</button>
     </div>
 
@@ -333,6 +333,9 @@ onMounted(async () => {
 }
 
 .error-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 500;
 }

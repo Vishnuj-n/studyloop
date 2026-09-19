@@ -74,6 +74,12 @@ EMOJI_SVG_MAP = {
     "🧩": "puzzle",
     "🗑": "trash",
     "🗑️": "trash",
+    "⏱": "clock",
+    "⏱️": "clock",
+    "💾": "hard-drive",
+    "🌐": "globe",
+    "⚠️": "alert-triangle",
+    "⚠": "alert-triangle",
 }
 
 PATTERNS = [

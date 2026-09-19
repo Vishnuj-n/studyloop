@@ -16,7 +16,8 @@
           FREE PLAN
         </div>
         <button v-if="!isPro" class="upgrade-btn-header" @click="handleUpgrade">
-          ★ Support Dev &bull; Get Early Access
+          <BaseIcon name="star" size="14" />
+          <span>Support Dev &bull; Get Early Access</span>
         </button>
       </div>
     </header>
@@ -93,7 +94,7 @@
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/simplify')"
             >
-              Open Simplifier ➔
+              Open Simplifier <BaseIcon name="arrow-right" size="13" />
             </button>
             <button
               v-else-if="ext.id === 'youtube' || ext.id === 'anki_importer'"
@@ -103,7 +104,7 @@
             >
               <span v-if="isSettingUp(ext.id)">Setting up...</span>
               <span v-else-if="isChecking(ext.id)">Checking environment...</span>
-              <span v-else>Import in Notebooks ➔</span>
+              <span v-else>Import in Notebooks <BaseIcon name="arrow-right" size="13" /></span>
             </button>
             <button
               v-else
@@ -214,7 +215,7 @@
             >
               <span v-if="isSettingUp(ext.id)">Setting up...</span>
               <span v-else-if="isChecking(ext.id)">Checking environment...</span>
-              <span v-else>Import in Notebooks ➔</span>
+              <span v-else>Import in Notebooks <BaseIcon name="arrow-right" size="13" /></span>
             </button>
             <button
               v-else-if="isPro"
@@ -229,7 +230,8 @@
               class="action-btn unlock-action"
               @click="handleUpgrade"
             >
-              ★ Support Dev &bull; Get Early Access
+              <BaseIcon name="star" size="14" />
+              <span>Support Dev &bull; Get Early Access</span>
             </button>
 
             <!-- Re-verify / Setup details trigger for Python tools -->
@@ -270,7 +272,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <h3>Extension Output: {{ activeExtName }}</h3>
-          <button class="close-modal-btn" @click="outputModalOpen = false">✕</button>
+          <button class="close-modal-btn" @click="outputModalOpen = false"><BaseIcon name="x" size="14" /></button>
         </div>
         <div class="modal-body">
           <pre class="output-pre">{{ extensionOutput }}</pre>

@@ -17,11 +17,11 @@
           </p>
           <div class="privacy-highlights">
             <div class="highlight-item positive">
-              <span class="status-icon">✓</span>
+              <span class="status-icon"><BaseIcon name="check" size="14" /></span>
               <span><strong>Zero personal data:</strong> No files, notes, prompts, or study content ever leave your computer.</span>
             </div>
             <div class="highlight-item positive">
-              <span class="status-icon">✓</span>
+              <span class="status-icon"><BaseIcon name="check" size="14" /></span>
               <span><strong>Open Source:</strong> Completely verifiable privacy policies and code.</span>
             </div>
           </div>

@@ -2,7 +2,7 @@
   <div class="upload-section">
     <div class="upload-card">
       <div v-if="isCloudProfile" class="cloud-locked-container">
-        <div class="upload-icon">☁️</div>
+        <div class="upload-icon"><BaseIcon name="cloud" size="32" /></div>
         <h3>Cloud Classroom Active</h3>
         <p>
           Direct PDF uploads are disabled for Cloud Profiles. Study materials published by your

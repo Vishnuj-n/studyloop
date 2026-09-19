@@ -35,7 +35,7 @@
               :disabled="isLoading"
               @click="url = ''"
             >
-              ✕
+              <BaseIcon name="x" size="12" />
             </button>
           </div>
           <p class="field-hint">

@@ -23,7 +23,7 @@
           aria-label="Dismiss banner"
           @click="$emit('dismiss')"
         >
-          ✕
+          <BaseIcon name="x" size="14" />
         </button>
       </div>
     </div>

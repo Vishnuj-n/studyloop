@@ -131,7 +131,7 @@
         v-if="result.passed && result.flashcards_generation_error"
         class="result-panel__network-warning"
       >
-        <span class="warning-icon">⚠</span>
+        <span class="warning-icon"><BaseIcon name="alert-triangle" size="18" /></span>
         <div class="warning-text">
           <p class="warning-title">Generation Warning / Network Error</p>
           <p class="warning-detail">
@@ -175,8 +175,9 @@
         >
           <div class="breakdown-header">
             <span class="question-num">{{ index + 1 }}</span>
-            <span class="breakdown-status">
-              {{ isCorrect(q) ? '✓ Correct' : '✗ Incorrect' }}
+            <span class="breakdown-status" style="display: inline-flex; align-items: center; gap: 4px;">
+              <BaseIcon :name="isCorrect(q) ? 'check' : 'x'" size="13" />
+              <span>{{ isCorrect(q) ? 'Correct' : 'Incorrect' }}</span>
             </span>
           </div>
           <p class="question-prompt">{{ q.prompt }}</p>
@@ -202,8 +203,14 @@
       <section v-if="result.passed" class="viva-challenge-card">
         <div class="viva-challenge-card__content">
           <div class="viva-challenge-card__badge">
-            <span>🏆 EXAMINER VIVA CHALLENGE</span>
-            <span class="viva-challenge-card__tag">🎲 Gamble for Loot</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+              <BaseIcon name="trophy" size="14" />
+              <span>EXAMINER VIVA CHALLENGE</span>
+            </span>
+            <span class="viva-challenge-card__tag" style="display: inline-flex; align-items: center; gap: 4px;">
+              <BaseIcon name="dice" size="13" />
+              <span>Gamble for Loot</span>
+            </span>
           </div>
           <h4 class="viva-challenge-card__title">Want to gamble for better loot?</h4>
           <p class="viva-challenge-card__desc">
@@ -214,8 +221,11 @@
               <BaseIcon name="sparkles" size="13" />
               <span>Bonus XP</span>
             </span>
-            <span>✦</span>
-            <span>🎁 Boosted Rare-Chest Odds</span>
+            <span class="perk-bullet">&bull;</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+              <BaseIcon name="gift" size="13" />
+              <span>Boosted Rare-Chest Odds</span>
+            </span>
           </div>
         </div>
         <button

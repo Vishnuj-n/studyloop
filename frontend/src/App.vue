@@ -376,7 +376,7 @@ onUnmounted(() => {
         <div v-if="showUpdateModal" class="update-modal-overlay">
           <div class="update-modal">
             <div class="update-modal-header">
-              <span class="warning-icon">🚀</span>
+              <span class="warning-icon"><BaseIcon name="rocket" size="20" /></span>
               <h2>Update Available</h2>
             </div>
             <div class="update-modal-body">

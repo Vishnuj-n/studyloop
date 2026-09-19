@@ -354,8 +354,8 @@
                 :disabled="presetLoading || isTestingLLM"
                 @click="testLLMConnection"
               >
-                <span v-if="testStatus === 'success'">✓ {{ useSameLLMForHeavy ? 'Connected' : 'Fast Connected' }}</span>
-                <span v-else-if="testStatus === 'error'">✕ {{ useSameLLMForHeavy ? 'Connection Failed' : 'Fast Connection Failed' }}</span>
+                <span v-if="testStatus === 'success'"><BaseIcon name="check" size="14" /> {{ useSameLLMForHeavy ? 'Connected' : 'Fast Connected' }}</span>
+                <span v-else-if="testStatus === 'error'"><BaseIcon name="x" size="14" /> {{ useSameLLMForHeavy ? 'Connection Failed' : 'Fast Connection Failed' }}</span>
                 <span v-else-if="isTestingLLM">Testing {{ useSameLLMForHeavy ? 'Connection...' : 'Fast Connection...' }}</span>
                 <span v-else>{{ useSameLLMForHeavy ? 'Test Connection' : 'Test Fast Connection' }}</span>
               </button>
@@ -372,8 +372,8 @@
                 :disabled="presetLoading || isTestingHeavyLLM"
                 @click="testHeavyLLMConnection"
               >
-                <span v-if="heavyTestStatus === 'success'">✓ Heavy Connected</span>
-                <span v-else-if="heavyTestStatus === 'error'">✕ Heavy Connection Failed</span>
+                <span v-if="heavyTestStatus === 'success'"><BaseIcon name="check" size="14" /> Heavy Connected</span>
+                <span v-else-if="heavyTestStatus === 'error'"><BaseIcon name="x" size="14" /> Heavy Connection Failed</span>
                 <span v-else-if="isTestingHeavyLLM">Testing Heavy Connection...</span>
                 <span v-else>Test Heavy Connection</span>
               </button>
