@@ -23,14 +23,26 @@
           <BaseIcon name="external-link" size="11" customClass="tutor-link-icon" />
         </router-link>
       </div>
-      <button
-        class="ghost collapse-btn"
-        :aria-expanded="!chat.chatCollapsed.value"
-        aria-controls="reader-chat-panel"
-        @click="chat.toggleChat"
-      >
-        {{ chat.chatCollapsed.value ? 'Expand' : 'Collapse' }}
-      </button>
+      <div class="chat-head-actions">
+        <button
+          v-if="chat.chatMessages.value && chat.chatMessages.value.length > 0"
+          type="button"
+          class="ghost clear-chat-btn"
+          title="Clear conversation"
+          @click="chat.clearChat"
+        >
+          <BaseIcon name="refresh" size="12" />
+          <span>Clear</span>
+        </button>
+        <button
+          class="ghost collapse-btn"
+          :aria-expanded="!chat.chatCollapsed.value"
+          aria-controls="reader-chat-panel"
+          @click="chat.toggleChat"
+        >
+          {{ chat.chatCollapsed.value ? 'Expand' : 'Collapse' }}
+        </button>
+      </div>
     </div>
 
     <template v-if="!chat.chatCollapsed.value">
@@ -52,9 +64,9 @@
       <template v-else>
         <!-- Compact Context & Retrieval Scope Bar -->
         <div class="chat-meta-bar">
-          <div class="chat-context-pill" :title="contextTooltip">
+          <div v-if="displayContextTitle" class="chat-context-pill" :title="contextTooltip">
             <BaseIcon name="book" size="12" customClass="context-pill-icon" />
-            <span class="context-pill-title">{{ selectedTopicTitle || 'No topic selected' }}</span>
+            <span class="context-pill-title">{{ displayContextTitle }}</span>
           </div>
 
           <div class="scope-compact-wrap" title="Select retrieval scope">
@@ -206,10 +218,15 @@ defineEmits(['retry-settings'])
 
 const chat = inject('chat')
 
+const displayContextTitle = computed(() => {
+  return props.selectedTopicTitle || props.selectedNotebookTitle || ''
+})
+
 const contextTooltip = computed(() => {
-  if (!props.selectedTopicTitle) return 'No topic selected'
-  if (!props.selectedNotebookTitle) return props.selectedTopicTitle
-  return `${props.selectedTopicTitle} from ${props.selectedNotebookTitle}`
+  if (props.selectedTopicTitle && props.selectedNotebookTitle) {
+    return `${props.selectedTopicTitle} from ${props.selectedNotebookTitle}`
+  }
+  return displayContextTitle.value || ''
 })
 
 const quickPrompts = [
@@ -342,6 +359,29 @@ function handleEnterKey(event) {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.chat-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clear-chat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.clear-chat-btn:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-low));
 }
 
 .chat-tutor-link {

@@ -252,7 +252,7 @@
       <ReaderChat
         v-if="ragEnabled && ragQueueStudy"
         :selected-topic-i-d="reader.selectedTopicID.value"
-        :selected-topic-title="reader.selectedTopicTitle.value"
+        :selected-topic-title="reader.topicTitle?.value || reader.selectedTopicTitle?.value || ''"
         :selected-notebook-i-d="reader.selectedNotebookID.value"
         :selected-notebook-title="reader.selectedNotebookTitle.value"
         :current-page="reader.currentPage.value"
