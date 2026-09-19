@@ -15,11 +15,13 @@ import (
 	"strings"
 	"time"
 
+	"ai-tutor/internal/db"
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/models"
 	appRuntime "ai-tutor/internal/runtime"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
+
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -603,7 +605,31 @@ func (a *App) TriggerCloudSync() map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+func (a *App) RestoreDatabaseFromBackup() map[string]interface{} {
+	dbPath, err := appRuntime.ResolveDBPath()
+	if err != nil {
+		return map[string]interface{}{"error": "resolving database path: " + err.Error()}
+	}
+
+	if a.repo != nil {
+		_ = a.repo.Close()
+	}
+
+	if err := db.RestoreLatestBackup(dbPath); err != nil {
+		return map[string]interface{}{"error": "failed to restore backup: " + err.Error()}
+	}
+
+	newRepo, err := db.Init(dbPath, "")
+	if err != nil {
+		return map[string]interface{}{"error": "database restored but re-init failed: " + err.Error()}
+	}
+	a.repo = newRepo
+
+	return map[string]interface{}{"ok": true}
+}
+
 // app_settings.go end
+
 
 // LoginStudent handles student login via Go cloud-server or direct Supabase REST user_accounts.
 func (a *App) LoginStudent(username, password string) map[string]interface{} {

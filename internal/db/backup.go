@@ -1,6 +1,8 @@
 package db
 
 import (
+	"compress/gzip"
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +15,8 @@ import (
 
 const maxBackups = 3
 
-// BackupDatabase creates a timestamped backup of Studyloop.db and keeps the last 3 copies.
+// BackupDatabase creates a compressed timestamped backup of Studyloop.db (using VACUUM INTO when available)
+// and retains the last 3 copies.
 func BackupDatabase(dbPath string) error {
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		// First run before DB creation: nothing to back up yet
@@ -22,39 +25,62 @@ func BackupDatabase(dbPath string) error {
 
 	destDir := filepath.Dir(dbPath)
 	baseName := filepath.Base(dbPath)
-	// ponytail: simple timestamped name + lexical prune keeps the last 3 without extra metadata
 	timestamp := time.Now().Format("20060102-150405.000")
-	backupPath := filepath.Join(destDir, fmt.Sprintf("%s.%s.bak", baseName, timestamp))
+	backupPath := filepath.Join(destDir, fmt.Sprintf("%s.%s.bak.gz", baseName, timestamp))
 
-	srcFile, err := os.Open(dbPath)
+	tmpGzFile, err := os.CreateTemp(destDir, "studyloop-backup-*.tmp.gz")
 	if err != nil {
-		return fmt.Errorf("backup: open source db: %w", err)
+		return fmt.Errorf("backup: create temp gzip file: %w", err)
 	}
-	defer func() { _ = srcFile.Close() }()
-
-	tmpFile, err := os.CreateTemp(destDir, "studyloop-backup-*.tmp")
-	if err != nil {
-		return fmt.Errorf("backup: create temp backup file: %w", err)
-	}
-	tmpName := tmpFile.Name()
+	tmpGzName := tmpGzFile.Name()
 	success := false
 	defer func() {
 		if !success {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpName)
+			_ = tmpGzFile.Close()
+			_ = os.Remove(tmpGzName)
 		}
 	}()
 
-	if _, err := io.Copy(tmpFile, srcFile); err != nil {
-		return fmt.Errorf("backup: copy content: %w", err)
+	// 1. Attempt atomic online snapshot using SQLite's VACUUM INTO
+	vacuumTmp, err := createVacuumSnapshot(dbPath, destDir)
+	var srcReader io.ReadCloser
+
+	if err == nil {
+		defer func() { _ = os.Remove(vacuumTmp) }()
+		f, openErr := os.Open(vacuumTmp)
+		if openErr == nil {
+			srcReader = f
+		}
 	}
-	if err := tmpFile.Sync(); err != nil {
+
+	// Fallback to raw dbPath reading if VACUUM INTO failed or could not open snapshot
+	if srcReader == nil {
+		rawFile, openErr := os.Open(dbPath)
+		if openErr != nil {
+			return fmt.Errorf("backup: open source db: %w", openErr)
+		}
+		srcReader = rawFile
+	}
+	defer func() { _ = srcReader.Close() }()
+
+	// 2. Compress snapshot into final gzip output
+	gzWriter := gzip.NewWriter(tmpGzFile)
+	if _, err := io.Copy(gzWriter, srcReader); err != nil {
+		_ = gzWriter.Close()
+		return fmt.Errorf("backup: compress content: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return fmt.Errorf("backup: finish gzip stream: %w", err)
+	}
+	if err := tmpGzFile.Sync(); err != nil {
 		return fmt.Errorf("backup: sync temp backup file: %w", err)
 	}
-	if err := tmpFile.Close(); err != nil {
+	if err := tmpGzFile.Close(); err != nil {
 		return fmt.Errorf("backup: close temp backup file: %w", err)
 	}
-	if err := os.Rename(tmpName, backupPath); err != nil {
+
+	// 3. Atomic rename into final backupPath (.bak.gz)
+	if err := os.Rename(tmpGzName, backupPath); err != nil {
 		return fmt.Errorf("backup: atomic place backup file: %w", err)
 	}
 
@@ -65,10 +91,42 @@ func BackupDatabase(dbPath string) error {
 	return nil
 }
 
+func createVacuumSnapshot(dbPath, destDir string) (string, error) {
+	vacFile, err := os.CreateTemp(destDir, "studyloop-vacuum-*.tmp")
+	if err != nil {
+		return "", err
+	}
+	vacPath := vacFile.Name()
+	_ = vacFile.Close()
+	// VACUUM INTO expects the destination file to NOT exist beforehand
+	_ = os.Remove(vacPath)
+
+	dbConn, err := sql.Open("sqlite3", "file:"+dbPath+"?_busy_timeout=5000")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	if _, err := dbConn.Exec("VACUUM INTO ?", vacPath); err != nil {
+		_ = os.Remove(vacPath)
+		return "", err
+	}
+
+	return vacPath, nil
+}
+
 func pruneOldBackups(dir, baseName string, keep int) {
-	pattern := filepath.Join(dir, baseName+".*.bak")
-	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) <= keep {
+	patternBak := filepath.Join(dir, baseName+".*.bak")
+	patternGz := filepath.Join(dir, baseName+".*.bak.gz")
+
+	matchesBak, _ := filepath.Glob(patternBak)
+	matchesGz, _ := filepath.Glob(patternGz)
+
+	var matches []string
+	matches = append(matches, matchesBak...)
+	matches = append(matches, matchesGz...)
+
+	if len(matches) <= keep {
 		return
 	}
 
@@ -77,3 +135,59 @@ func pruneOldBackups(dir, baseName string, keep int) {
 		_ = os.Remove(old)
 	}
 }
+
+// RestoreLatestBackup finds the newest .bak or .bak.gz file for dbPath and restores it.
+func RestoreLatestBackup(dbPath string) error {
+	dir := filepath.Dir(dbPath)
+	baseName := filepath.Base(dbPath)
+	patternBak := filepath.Join(dir, baseName+".*.bak")
+	patternGz := filepath.Join(dir, baseName+".*.bak.gz")
+
+	matchesBak, _ := filepath.Glob(patternBak)
+	matchesGz, _ := filepath.Glob(patternGz)
+	var matches []string
+	matches = append(matches, matchesBak...)
+	matches = append(matches, matchesGz...)
+
+	if len(matches) == 0 {
+		return fmt.Errorf("restore: no backup files found in %s", dir)
+	}
+	sort.Strings(matches)
+	latest := matches[len(matches)-1]
+
+	if _, err := os.Stat(dbPath); err == nil {
+		_ = os.Rename(dbPath, fmt.Sprintf("%s.corrupted.%s", dbPath, time.Now().Format("20060102-150405")))
+	}
+	_ = os.Remove(dbPath + "-wal")
+	_ = os.Remove(dbPath + "-shm")
+
+	src, err := os.Open(latest)
+	if err != nil {
+		return fmt.Errorf("restore: open backup: %w", err)
+	}
+	defer func() { _ = src.Close() }()
+
+	var r io.Reader = src
+	if filepath.Ext(latest) == ".gz" {
+		gz, err := gzip.NewReader(src)
+		if err != nil {
+			return fmt.Errorf("restore: open gzip: %w", err)
+		}
+		defer func() { _ = gz.Close() }()
+		r = gz
+	}
+
+	dst, err := os.Create(dbPath)
+	if err != nil {
+		return fmt.Errorf("restore: create destination: %w", err)
+	}
+	defer func() { _ = dst.Close() }()
+
+	if _, err := io.Copy(dst, r); err != nil {
+		return fmt.Errorf("restore: copy content: %w", err)
+	}
+
+	utils.Warnf("[RESTORE] Successfully restored database from backup: %s", latest)
+	return nil
+}
+

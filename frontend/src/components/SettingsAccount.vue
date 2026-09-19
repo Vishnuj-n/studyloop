@@ -239,14 +239,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Database Backup & Recovery Section -->
+    <div class="backup-section">
+
+      <h3>Database &amp; Recovery</h3>
+      <p class="field-hint">
+        Snapshot backups are taken automatically on application startup. If your data becomes corrupted, you can restore from the latest snapshot.
+      </p>
+      <div v-if="restoreMessage" :class="['restore-message', restoreSuccess ? 'success' : 'error']">
+        {{ restoreMessage }}
+      </div>
+      <button
+        type="button"
+        class="restore-btn"
+        :disabled="restoring"
+        @click="onRestoreClick"
+      >
+        {{ restoring ? 'Restoring Database...' : 'Restore Database from Backup' }}
+      </button>
+    </div>
   </article>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
+import { RestoreDatabaseFromBackup } from '../../wailsjs/go/app/App'
 
 defineProps({
+
   settings: { type: Object, required: true },
   isDev: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
@@ -275,6 +298,35 @@ defineEmits([
 
 const clerkAuth = useClerkAuth()
 const showSchoolLogin = ref(false)
+const restoring = ref(false)
+const restoreMessage = ref('')
+const restoreSuccess = ref(false)
+
+async function onRestoreClick() {
+  const confirmed = window.confirm(
+    'Restoring from backup will revert your database to the latest snapshot. Your current database will be saved as .corrupted. Do you want to proceed?'
+  )
+  if (!confirmed) return
+
+  restoring.value = true
+  restoreMessage.value = ''
+  try {
+    const res = await RestoreDatabaseFromBackup()
+    if (res && res.error) {
+      restoreSuccess.value = false
+      restoreMessage.value = res.error
+    } else {
+      restoreSuccess.value = true
+      restoreMessage.value = 'Database successfully restored from latest snapshot!'
+    }
+  } catch (err) {
+    restoreSuccess.value = false
+    restoreMessage.value = 'Failed to restore database: ' + (err.message || err)
+  } finally {
+    restoring.value = false
+  }
+}
+
 
 function onSignInClick() {
   console.log('[SETTINGS_ACCOUNT] Sign In clicked')
@@ -698,5 +750,54 @@ input:focus {
     transform: translateY(0);
   }
 }
+.backup-section {
+  border-top: 1px solid var(--outline-variant);
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.backup-section h3 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.restore-btn {
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.2s ease;
+}
+
+.restore-btn:hover:not(:disabled) {
+  background: var(--surface-container-high);
+}
+
+.restore-message {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.restore-message.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid #10b981;
+  color: #10b981;
+}
+
+.restore-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
 </style>
+
 
