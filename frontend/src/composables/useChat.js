@@ -123,6 +123,30 @@ export function useChat() {
   }
 
   /**
+   * Bind template ref for messages scroll container
+   * @param {HTMLElement|null} el
+   */
+  function setMessagesPaneRef(el) {
+    messagesPane.value = el
+  }
+
+  /**
+   * Set composer input value
+   * @param {string} val
+   */
+  function setInput(val) {
+    chatInput.value = val
+  }
+
+  /**
+   * Set chat error message
+   * @param {string} msg
+   */
+  function setError(msg) {
+    chatError.value = msg
+  }
+
+  /**
    * Check if chat can be used (has topic context)
    * @param {string} topicID
    * @returns {boolean}
@@ -147,5 +171,8 @@ export function useChat() {
     sendMessage,
     canChat,
     renderMarkdown,
+    setMessagesPaneRef,
+    setInput,
+    setError,
   }
 }
