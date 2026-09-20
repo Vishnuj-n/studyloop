@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/f6a4e039-4ac8-4096-91a1-471ca3e43237
 | **Supported Sources** | PDFs / Docs | Manual card entry | **PDFs (OCR), Markdown (`.md`), YouTube Lectures, Anki Decks (`.apkg`/`.colpkg`)** |
 | **Learning Workflow** | Open-ended conversational chat | Isolated flashcard reviews | **Deterministic Loop (Read ➔ Quiz ➔ Socratic Rescue ➔ Examiner ➔ FSRS)** |
 | **Synthesis & Judgment** | Unguided freeform chat | None | **Examiner Mode (Open-ended written synthesis graded with rubrics)** |
-| **Failure Intervention** | Gives you answers immediately | Manual card reset | **2-Strike Socratic Rescue (Walks you through conceptual flaws)** |
+| **Failure Intervention** | Gives you answers immediately | Manual card reset | **Fast Track Socratic Rescue (Default; direct AI dialogue) or Classic 2-Strike** |
 | **Spaced Repetition** | None | Legacy SM-2 (default) / manual | **Native FSRS-4 (Free Spaced Repetition Scheduler)** |
 | **Data Sovereignty** | Proprietary cloud lock-in | Local files / sync plugins | **Local-First (SQLite + Local ONNX Vector Index + OS Keyring)** |
 
@@ -52,7 +52,10 @@ https://github.com/user-attachments/assets/f6a4e039-4ac8-4096-91a1-471ca3e43237
 ### 2. Dual-Layer Assessment: Recall & Deep Synthesis
 - **Atomic Checkpoint Quizzes:** Immediate AI-generated multiple-choice questions after reading sessions to verify initial comprehension.
 - **Examiner Mode (Written Assessment):** Designed for complex technical subjects (e.g. system design trade-offs in *DDIA*) and analytical exams (e.g. *UPSC Mains*). Generates open-ended scenario and essay questions across chapter page ranges and grades long-form student answers with detailed rubrics.
-- **2-Strike Socratic Rescue:** If you fail a checkpoint quiz twice, the queue blocks progression and launches an interactive Socratic dialogue to isolate and repair the underlying conceptual flaw.
+- **Socratic Rescue Strategies (Fast Track vs. Classic):**
+  - **Fast Track (Default):** If you fail a checkpoint quiz, StudyLoop immediately routes you to an interactive Socratic AI tutor dialogue to diagnose and repair the conceptual gap right away.
+  - **Classic Track:** Offers a 2-strike system where you first re-read the material before unlocking Socratic intervention on a second failure.
+  *(You can switch between Fast Track and Classic anytime in Settings → Quiz Failure Rescue).*
 
 ### 3. Algorithmic Spaced Repetition (FSRS-4 Engine)
 - **Modern Spaced Repetition:** Powered by the state-of-the-art **FSRS-4** algorithm (Free Spaced Repetition Scheduler), outperforming legacy SM-2 with fewer reviews and higher retention.
@@ -92,11 +95,15 @@ StudyLoop is built on a **Local-First, BYOK (Bring Your Own Key)** architecture:
 
 ## Installation & Quick Start
 
-### Option A: Pre-built Windows Installer (Recommended)
+### Option A: Windows Installer (Recommended)
 
-1. Download the latest `StudyLoop-Setup.exe` from [Releases](https://github.com/Vishnuj-n/studyloop/releases).
+> **Important:** Always use the official installer rather than a standalone `.exe`. The installer provisions required runtime assets, vector extensions (`sqlite-vec`), embedding models, and local database directories necessary for full functionality.
+
+1. Download **[Studyloop-amd64-installer.exe](https://github.com/Vishnuj-n/studyloop/releases/download/v1.11.0/Studyloop-amd64-installer.exe)** (or visit [Releases](https://github.com/Vishnuj-n/studyloop/releases)).
 2. Run the installer and launch StudyLoop.
-3. Add your preferred AI endpoint in **Settings** (or connect a local Ollama instance).
+3. Configure your AI provider in **Settings** (or during Onboarding):
+   - **Cloud Providers (BYOK):** Google AI Studio (recommended), Groq, OpenRouter, or OpenAI (requires API key).
+   - **Local AI (Ollama / LM Studio):** Select *Custom* / *Ollama* and set the Base URL (e.g., `http://localhost:11434/v1`). **Note:** Ollama does not require an API key; you can leave the API key field empty (or enter any placeholder like `ollama`), as StudyLoop's local provider will connect directly without requiring a cloud key.
 
 ### Option B: Build from Source
 
