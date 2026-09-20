@@ -1,132 +1,35 @@
 <template>
   <section class="page">
     <header class="topbar">
-      <!-- Compact profile switcher: keep profile context visible without adding dashboard cards. -->
-      <div class="profile-selector-container" @click.stop>
-        <span class="profile-context-label">Profile</span>
-        <button
-          id="active-profile-select"
-          type="button"
-          class="profile-switcher-trigger"
-          :aria-expanded="profileMenuOpen"
-          aria-haspopup="listbox"
-          @click="profileMenuOpen = !profileMenuOpen"
-        >
-          <span class="profile-trigger-status" aria-hidden="true"></span>
-          <span class="profile-trigger-name">{{ activeProfileName }}</span>
-          <span class="profile-trigger-chevron" aria-hidden="true"><BaseIcon name="chevron-down" size="14" /></span>
-        </button>
-
-        <div v-if="profileMenuOpen" class="profile-switcher-menu" role="listbox" aria-label="Switch profile">
-          <button
-            v-for="p in profiles"
-            :key="p.id"
-            type="button"
-            class="profile-menu-item"
-            :class="{ active: p.id === userSettings.active_profile_id }"
-            role="option"
-            :aria-selected="p.id === userSettings.active_profile_id"
-            @click="selectProfile(p.id)"
-          >
-            <span class="profile-menu-dot" aria-hidden="true"></span>
-            <span class="profile-menu-copy">
-              <span class="profile-menu-title-row">
-                <strong class="profile-menu-name">{{ p.name }}</strong>
-                <span v-if="profilePaceBadge(p)" class="profile-pace-badge" :class="profilePaceBadge(p).class">
-                  {{ profilePaceBadge(p).text }}
-                </span>
-              </span>
-              <small class="profile-menu-subtitle">{{ profileTaskSubtitle(p) }}</small>
-            </span>
-            <span v-if="p.id === userSettings.active_profile_id" class="profile-menu-current">Active</span>
-          </button>
-
-          <div class="profile-menu-divider" aria-hidden="true"></div>
-          <button type="button" class="profile-menu-action" @click="goToProfileOverview">
-            <BaseIcon name="settings" size="14" />
-            Manage profiles &amp; notebooks
-          </button>
-        </div>
-      </div>
+      <!-- Compact profile switcher component -->
+      <ProfileSwitcher
+        :profiles="profiles"
+        :active-profile-id="userSettings.active_profile_id"
+        @select-profile="selectProfile"
+        @manage-profiles="goToProfileOverview"
+      />
 
       <!-- Right-edge Minimal GitHub Icon Button -->
       <button type="button" class="topbar-github-icon" title="View GitHub Repository" @click="openGitHubRepo">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-        </svg>
+        <BaseIcon name="github" size="18" />
       </button>
     </header>
 
-    <!-- Status Banners -->
-    <StatusBanner
-      v-if="showGitHubStarToast"
-      variant="star"
-      icon=""
-      title="Support Studyloop on GitHub"
-      subtitle="You've completed 5+ study sessions! If you find Studyloop helpful, consider starring the repo on GitHub to support open-source development."
-      action-label="⭐ Star on GitHub ↗"
-      dismissable
-      @action="handleStarGitHub"
-      @dismiss="dismissGitHubStarToast"
-    >
-      <template #icon>
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-        </svg>
-      </template>
-    </StatusBanner>
-    <StatusBanner
-      v-if="streakSavedEvent"
-      variant="info"
-      icon="shield"
-      title="Your streak was saved!"
-      :subtitle="`We used 1 Streak Freeze to protect your ${streakSavedEvent.streak_length}-day streak yesterday. You have ${streakSavedEvent.freezes_remaining} freeze(s) remaining.`"
-      action-label="Dismiss"
-      @action="streakSavedEvent = null"
-    />
-    <StatusBanner
-      v-if="pendingIngestionBook"
-      variant="warning"
-      icon="zap"
-      :title="pendingIngestionBannerTitle"
-      :subtitle="`${pendingIngestionBook.title} is ready for chapter extraction and ingestion.`"
-      action-label="Ingest Book"
-      @action="goToIngestBook(pendingIngestionBook.id)"
-    />
-    <StatusBanner
-      v-if="userSettings.skip_to_reading_active"
-      variant="info"
-      icon="zap"
-      title='"Skip to Reading" Escape Hatch Active'
-      subtitle="Review tasks have been pushed to the background so you can focus on reading new chapters."
-    />
-    <StatusBanner
-      v-if="hasSocraticRescueTask"
-      variant="rescue"
-      icon="shield"
-      title="Concept Rescue Active"
-      subtitle="Your study queue is locked because you failed the quiz twice on this topic. You must complete the Socratic tutor rescue session to unblock your timeline."
-    />
-    <StatusBanner
-      v-if="flashcardNotice"
-      variant="success"
-      icon="sparkles"
-      title="Flashcards Ready"
-      :subtitle="flashcardNotice"
-    />
-    <StatusBanner
-      v-if="flashcardsJustCreated"
-      variant="success"
-      icon="check"
-      :title="'Flashcards generated successfully!'"
-      :subtitle="flashcardsJustCreated + ' cards scheduled for spaced repetition.'"
-    />
-    <StatusBanner
-      v-if="actionError"
-      variant="error"
-      icon="alert-triangle"
-      title="Error starting task"
-      :subtitle="actionError"
+    <!-- Status Banners Component -->
+    <DashboardBanners
+      :show-git-hub-star-toast="showGitHubStarToast"
+      :streak-saved-event="streakSavedEvent"
+      :pending-ingestion-book="pendingIngestionBook"
+      :is-cloud-account="Boolean(userSettings.classroom_code)"
+      :skip-to-reading-active="userSettings.skip_to_reading_active"
+      :has-socratic-rescue-task="hasSocraticRescueTask"
+      :flashcard-notice="flashcardNotice"
+      :flashcards-just-created="flashcardsJustCreated"
+      :action-error="actionError"
+      @star-github="handleStarGitHub"
+      @dismiss-star-github="dismissGitHubStarToast"
+      @dismiss-streak-saved="streakSavedEvent = null"
+      @ingest-book="goToIngestBook"
     />
 
     <!-- Top Context Bar (Study Queue + Pacing Telemetry + Actions) -->
@@ -259,7 +162,9 @@ import {
 } from '../services/appApi'
 import { buildCalendarDays, MONTH_NAMES } from '../utils/dateFormat'
 
-import StatusBanner from '../components/StatusBanner.vue'
+import BaseIcon from '../components/BaseIcon.vue'
+import ProfileSwitcher from '../components/ProfileSwitcher.vue'
+import DashboardBanners from '../components/DashboardBanners.vue'
 import ReviewHeroCard from '../components/ReviewHeroCard.vue'
 import FocusHeroCard from '../components/FocusHeroCard.vue'
 import TaskCard from '../components/TaskCard.vue'
@@ -360,7 +265,6 @@ const streakState = ref({
 })
 const streakError = ref('')
 const isSyncing = ref(false)
-const profileMenuOpen = ref(false)
 
 // --- Calendar computeds ---
 const now = ref(new Date())
@@ -405,68 +309,12 @@ const activeProfileName = computed(() => {
   return p ? p.name : 'Unknown'
 })
 
-function profileDeadlineLabel(profile) {
-  const deadlineAt = Number(profile?.deadline_at)
-  if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'No deadline'
-
-  const daysLeft = Math.ceil((deadlineAt * 1000 - Date.now()) / 86400000)
-  if (daysLeft < 0) return 'Deadline passed'
-  if (daysLeft === 0) return 'Due today'
-  return `${daysLeft}d left`
-}
-
-function profilePaceBadge(profile) {
-  const pace = profile?.pace
-  if (!pace) return null
-  if (pace.error) {
-    return {
-      text: 'Pace unavailable',
-      class: 'pace-unavailable',
-    }
-  }
-
-  const status = pace.feasibility_status
-  if (status === 'BEHIND' && pace.days_gap !== undefined) {
-    const lateDays = Math.abs(pace.days_gap)
-    return {
-      text: `${lateDays}d behind`,
-      class: 'pace-behind',
-    }
-  }
-  if (status === 'AHEAD' && pace.days_gap !== undefined) {
-    return {
-      text: `${pace.days_gap}d ahead`,
-      class: 'pace-ahead',
-    }
-  }
-  if (status === 'ON_TRACK') {
-    return {
-      text: 'On track',
-      class: 'pace-ontrack',
-    }
-  }
-  return null
-}
-
-function profileTaskSubtitle(profile) {
-  const deadline = profileDeadlineLabel(profile)
-  const count = typeof profile?.pending_tasks === 'number' ? profile.pending_tasks : null
-  if (count === null) return deadline
-  if (count === 0) return `${deadline} · 0 tasks left`
-  return `${deadline} · ${count} task${count === 1 ? '' : 's'} left`
-}
-
 const hasSocraticRescueTask = computed(() => {
   return tasks.value.some((t) => (t.action_type || '').toLowerCase() === 'socratic_remedial')
 })
 
 // ponytail: pending ingestion notification state
 const pendingIngestionBook = ref(null)
-
-const pendingIngestionBannerTitle = computed(() => {
-  const isCloud = Boolean(userSettings.value?.classroom_code)
-  return isCloud ? 'New Assignment — Ingestion Needed' : 'New Book — Ingestion Needed'
-})
 
 function goToIngestBook(notebookId) {
   router.push({ path: '/notebooks', query: { ingest: notebookId } })
@@ -481,8 +329,6 @@ const completedSessionsToday = computed(() => {
 
 // --- Lifecycle ---
 onMounted(async () => {
-  window.addEventListener('click', closeProfileMenu)
-  
   const created = Number.parseInt(route.query.flashcardsCreated, 10)
   if (created > 0) {
     flashcardsJustCreated.value = created
@@ -492,10 +338,6 @@ onMounted(async () => {
   }
 
   await loadAgenda()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('click', closeProfileMenu)
 })
 
 // --- Data Fetching ---
@@ -598,12 +440,7 @@ async function loadFlashcardTimeline(tzOffset) {
 }
 
 // --- User Actions ---
-function closeProfileMenu() {
-  profileMenuOpen.value = false
-}
-
 async function selectProfile(newProfileID) {
-  profileMenuOpen.value = false
   const oldProfileID = lastPersistedProfile.value
   try {
     refreshing.value = true
@@ -629,7 +466,6 @@ async function selectProfile(newProfileID) {
 }
 
 function goToProfileOverview() {
-  profileMenuOpen.value = false
   router.push({ path: '/settings', query: { category: 'profiles' } })
 }
 
@@ -756,212 +592,6 @@ function goToNotebooks() {
   border-color: var(--outline-variant);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.profile-selector-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.profile-context-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted-text, #666);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.profile-switcher-trigger {
-  min-width: 190px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid var(--outline-variant, #e0e0e0);
-  border-radius: 12px;
-  background: var(--surface-container-low, #f8f9fa);
-  color: var(--on-surface, #1e1e1e);
-  padding: 9px 12px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.profile-switcher-trigger:hover,
-.profile-switcher-trigger:focus-visible {
-  border-color: var(--primary);
-  background-color: var(--surface-container-highest);
-}
-
-.profile-switcher-trigger:focus-visible,
-.profile-menu-item:focus-visible,
-.profile-menu-action:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
-}
-
-.profile-trigger-status,
-.profile-menu-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--muted-text, #64707d);
-}
-
-.profile-trigger-status {
-  background: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-}
-
-.profile-trigger-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-trigger-chevron {
-  margin-left: auto;
-  color: var(--muted-text, #64707d);
-  font-size: 18px;
-  line-height: 1;
-}
-
-.profile-switcher-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 66px;
-  z-index: 20;
-  width: 320px;
-  padding: 7px;
-  border: 1px solid var(--outline-variant, #e0e0e0);
-  border-radius: 14px;
-  background: var(--surface-container-lowest, #ffffff);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
-}
-
-.profile-menu-item,
-.profile-menu-action {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--on-surface, #1e1e1e);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.profile-menu-item {
-  padding: 10px;
-}
-
-.profile-menu-item + .profile-menu-item {
-  margin-top: 4px;
-}
-
-.profile-menu-item:hover,
-.profile-menu-item.active {
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
-}
-
-.profile-menu-item.active .profile-menu-dot {
-  background: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-}
-
-.profile-menu-copy {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.profile-menu-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.profile-menu-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.profile-pace-badge {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 6px;
-  white-space: nowrap;
-  line-height: 1.2;
-}
-
-.profile-pace-badge.pace-behind {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-}
-
-.profile-pace-badge.pace-ahead {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-}
-
-.profile-pace-badge.pace-ontrack {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-}
-
-.profile-pace-badge.pace-unavailable {
-  background: rgba(148, 163, 184, 0.12);
-  color: var(--muted-text, #64707d);
-}
-
-.profile-menu-subtitle {
-  color: var(--muted-text, #64707d);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-menu-current {
-  color: var(--primary);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.profile-menu-divider {
-  height: 1px;
-  margin: 5px 3px;
-  background: var(--outline-variant, #e0e0e0);
-}
-
-.profile-menu-action {
-  padding: 9px 10px;
-  color: var(--muted-text, #64707d);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.profile-menu-action:hover {
-  background: var(--surface-container-high, rgba(0, 0, 0, 0.04));
-  color: var(--on-surface, #1e1e1e);
 }
 
 .status-strip {
