@@ -109,6 +109,7 @@
       :page-count="draftPageCount"
       :chapters="draftChapters"
       :segments="draftSegments"
+      :fallback-used="draftFallbackUsed"
       :is-confirming="isConfirmingDraft"
       :is-cleaning="isAICleaning"
       :error="draftError"
@@ -121,8 +122,11 @@
       <transition name="toast-fade">
         <div v-if="showFallbackToast" class="fallback-toast">
           <div class="fallback-toast-inner">
-            <span class="fallback-toast-title">Fallback used</span>
-            <p>{{ fallbackToastMessage }}</p>
+            <BaseIcon name="sparkles" size="18" />
+            <div>
+              <span class="fallback-toast-title">Notice</span>
+              <p>{{ fallbackToastMessage }}</p>
+            </div>
           </div>
         </div>
       </transition>
@@ -208,6 +212,7 @@ const originalDraftPriority = ref(5)
 const draftPageCount = ref(1)
 const draftChapters = ref([])
 const draftSegments = ref([])
+const draftFallbackUsed = ref(false)
 const originalDraftChapters = ref([])
 const draftError = ref('')
 const isConfirmingDraft = ref(false)
@@ -645,8 +650,9 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
 
     showSyllabusModal.value = true
 
+    draftFallbackUsed.value = Boolean(draft?.fallback_used)
     if (draft?.fallback_used) {
-      fallbackToastMessage.value = 'PDF bookmark extraction failed, using fallback chapter draft.'
+      fallbackToastMessage.value = 'No embedded bookmarks found in PDF. Created default chapter draft.'
       showFallbackToast.value = true
       clearFallbackToastTimer()
       fallbackToastTimer.value = setTimeout(() => {
@@ -975,8 +981,7 @@ async function updatePriority(notebookId, priority) {
   position: relative;
 }
 
-.action-toast-inner,
-.fallback-toast-inner {
+.action-toast-inner {
   max-width: 320px;
   padding: 14px 16px;
   background: #1f8b4c;
@@ -990,7 +995,23 @@ async function updatePriority(notebookId, priority) {
 }
 
 .fallback-toast-inner {
-  background: #b33939;
+  max-width: 340px;
+  padding: 14px 16px;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.fallback-toast-inner p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted-text);
+  line-height: 1.4;
 }
 
 .drafting-toast-inner {

@@ -134,7 +134,7 @@
         <button
           v-if="canUpgradeDeep"
           class="btn-upgrade-deep"
-          title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
+          title="Upgrade Deep: Re-extract with AI layout analysis to preserve 2-column text order, scanned pages, and tables"
           @click="$emit('upgrade-deep', notebook.id)"
         >
           <BaseIcon name="zap" size="13" />
@@ -151,7 +151,7 @@
         <button
           v-if="canUpgradeDeep"
           class="btn-upgrade-deep"
-          title="Upgrade: Re-extract with deep structured analysis for rich tables, code blocks, and headings"
+          title="Upgrade Deep: Re-extract with AI layout analysis to preserve 2-column text order, scanned pages, and tables"
           @click="$emit('upgrade-deep', notebook.id)"
         >
           <BaseIcon name="zap" size="13" />

@@ -266,6 +266,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
+import { useDialog } from '../composables/useDialog'
 import { RestoreDatabaseFromBackup } from '../../wailsjs/go/app/App'
 
 defineProps({
@@ -296,6 +297,7 @@ defineEmits([
   'update:signup-classroom-code',
 ])
 
+const { confirm: confirmDialog } = useDialog()
 const clerkAuth = useClerkAuth()
 const showSchoolLogin = ref(false)
 const restoring = ref(false)
@@ -303,9 +305,14 @@ const restoreMessage = ref('')
 const restoreSuccess = ref(false)
 
 async function onRestoreClick() {
-  const confirmed = window.confirm(
-    'Restoring from backup will revert your database to the latest snapshot. Your current database will be saved as .corrupted. Do you want to proceed?'
-  )
+  const confirmed = await confirmDialog({
+    title: 'Restore Database from Backup',
+    message:
+      'Restoring from backup will revert your database to the latest snapshot. Your current database will be saved as .corrupted. Do you want to proceed?',
+    confirmText: 'Restore Database',
+    cancelText: 'Cancel',
+    type: 'warning',
+  })
   if (!confirmed) return
 
   restoring.value = true

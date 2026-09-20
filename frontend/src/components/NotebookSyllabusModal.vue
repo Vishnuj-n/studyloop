@@ -161,6 +161,7 @@ const props = defineProps({
   pageCount: { type: Number, default: 1 },
   chapters: { type: Array, default: () => [] },
   segments: { type: Array, default: () => [] },
+  fallbackUsed: { type: Boolean, default: false },
   isConfirming: { type: Boolean, default: false },
   isCleaning: { type: Boolean, default: false },
   error: { type: String, default: '' },
@@ -328,6 +329,27 @@ function confirm() {
   background: #fff8e6;
   color: #8c6700;
   font-size: 13px;
+}
+
+.modal-fallback-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  color: var(--on-surface);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.modal-fallback-info .deep-tip {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted-text);
+  font-size: 11.5px;
 }
 
 .modal-title-edit {
