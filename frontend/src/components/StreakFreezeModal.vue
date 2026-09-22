@@ -28,6 +28,9 @@
               <strong>Missed Day Safety Net:</strong> If life gets busy and you miss studying for a day, 1 freeze is automatically consumed so your streak doesn't reset to zero.
             </li>
             <li>
+              <strong>Inventory Limit:</strong> You can hold at most <strong>2 freezes</strong> in reserve, with a limit of 1 purchase per week.
+            </li>
+            <li>
               <strong>Shield Indicator:</strong> When protected, your streak icon displays a <strong>🛡️ Shield</strong> until today's study tasks are completed.
             </li>
           </ul>
@@ -37,12 +40,12 @@
         <div v-if="mode !== 'info'" class="transaction-summary">
           <div class="summary-item cost">
             <span class="summary-icon">🪙</span>
-            <span class="summary-text">-50 Coins</span>
+            <span class="summary-text">-150 Coins</span>
           </div>
           <div class="summary-divider"></div>
           <div class="summary-item balance">
             <span class="summary-icon">🛡️</span>
-            <span class="summary-text">{{ totalFreezes }} Owned</span>
+            <span class="summary-text">{{ totalFreezes }} / 2 Owned</span>
           </div>
         </div>
 

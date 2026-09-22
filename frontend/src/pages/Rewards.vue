@@ -81,10 +81,10 @@
           <button
             class="buy-freeze-btn"
             type="button"
-            :disabled="profile.coins < 50 || buying"
+            :disabled="freezeButtonDisabled"
             @click="handleBuyStreakFreeze"
           >
-            {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
+            {{ buying ? 'Purchasing...' : freezeButtonLabel }}
           </button>
           <button
             class="shop-trigger-btn"
@@ -180,9 +180,43 @@ const profile = ref({
   next_title_xp: 1500,
   current_title_min_xp: 0,
   streak_freezes_owned: 1,
+  last_freeze_purchased_at: 0,
 })
 const chests = ref([])
 const activeChest = ref(null)
+
+const isWeeklyCooldown = computed(() => {
+  if (!profile.value.last_freeze_purchased_at) return false
+  const nowSec = Math.floor(Date.now() / 1000)
+  const elapsed = nowSec - profile.value.last_freeze_purchased_at
+  return elapsed < 7 * 24 * 3600
+})
+
+const cooldownDaysLeft = computed(() => {
+  if (!profile.value.last_freeze_purchased_at) return 0
+  const nowSec = Math.floor(Date.now() / 1000)
+  const remainingSec = (7 * 24 * 3600) - (nowSec - profile.value.last_freeze_purchased_at)
+  if (remainingSec <= 0) return 0
+  return Math.ceil(remainingSec / 86400)
+})
+
+const freezeButtonLabel = computed(() => {
+  if ((profile.value.streak_freezes_owned || 0) >= 2) {
+    return 'Max Capacity (2/2 Freezes)'
+  }
+  if (isWeeklyCooldown.value) {
+    return `Weekly Limit (Available in ${cooldownDaysLeft.value}d)`
+  }
+  return 'Buy Streak Freeze (150 Coins)'
+})
+
+const freezeButtonDisabled = computed(() => {
+  if (buying.value) return true
+  if ((profile.value.streak_freezes_owned || 0) >= 2) return true
+  if (isWeeklyCooldown.value) return true
+  if ((profile.value.coins || 0) < 150) return true
+  return false
+})
 
 const progressPercent = computed(() => {
   const min = profile.value.current_title_min_xp || 0

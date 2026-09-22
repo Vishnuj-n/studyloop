@@ -283,6 +283,7 @@ func InitSchema(tx *sql.Tx) error {
 			coins INTEGER NOT NULL DEFAULT 0,
 			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
 			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
+			last_freeze_purchased_at INTEGER NOT NULL DEFAULT 0,
 			frozen_dates_json TEXT NOT NULL DEFAULT '[]',
 			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]',
 			stats_json TEXT NOT NULL DEFAULT '{}',

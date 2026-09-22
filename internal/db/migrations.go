@@ -85,6 +85,7 @@ var alterStatements = []struct {
 
 	// gamification
 	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
+	{"user_gamification", "last_freeze_purchased_at", "ALTER TABLE user_gamification ADD COLUMN last_freeze_purchased_at INTEGER NOT NULL DEFAULT 0"},
 }
 
 // RunMigrations applies idempotent column additions, table deduping, and data backfills.

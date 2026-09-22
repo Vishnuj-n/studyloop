@@ -646,6 +646,7 @@ type GamificationProfile struct {
 	NextTitleXP           int        `json:"next_title_xp"`
 	CurrentTitleMinXP     int        `json:"current_title_min_xp"`
 	StreakFreezesOwned    int        `json:"streak_freezes_owned"`
+	LastFreezePurchasedAt int64      `json:"last_freeze_purchased_at"`
 	FrozenDatesJSON       string     `json:"frozen_dates_json"`
 	UnlockedCosmeticsJSON string     `json:"unlocked_cosmetics_json"`
 	StatsJSON             string     `json:"stats_json"`

@@ -912,11 +912,11 @@ func TestGetStreakState_StreakFreezeAutoConsume(t *testing.T) {
 		t.Fatalf("GetGamificationProfile failed: %v", err)
 	}
 	if prof.StreakFreezesOwned == 0 {
-		_, _, err = testRepo.AddXPAndCoins(100, 100)
+		_, _, err = testRepo.AddXPAndCoins(100, 200)
 		if err != nil {
 			t.Fatalf("AddXPAndCoins failed: %v", err)
 		}
-		_, err = testRepo.BuyStreakFreeze(50)
+		_, err = testRepo.BuyStreakFreeze(150, 0)
 		if err != nil {
 			t.Fatalf("BuyStreakFreeze failed: %v", err)
 		}

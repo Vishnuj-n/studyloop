@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	ErrInsufficientCoins = errors.New("insufficient coins")
-	ErrNoFreezes         = errors.New("no streak freezes available")
-	ErrBoxNotFound       = errors.New("loot box not found")
-	ErrBoxAlreadyOpened  = errors.New("loot box already opened")
+	ErrInsufficientCoins    = errors.New("insufficient coins")
+	ErrNoFreezes            = errors.New("no streak freezes available")
+	ErrFreezeInventoryFull  = errors.New("cannot own more than 2 streak freezes")
+	ErrFreezeWeeklyLimit    = errors.New("streak freeze purchase limit reached for this week (1 purchase per 7 days)")
+	ErrBoxNotFound          = errors.New("loot box not found")
+	ErrBoxAlreadyOpened     = errors.New("loot box already opened")
 )
 
 
@@ -101,7 +103,7 @@ func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextT
 // GetGamificationProfile retrieves the persistent gamification profile for the user.
 func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, error) {
 	row := r.db.QueryRow(`
-		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, COALESCE(stats_json, '{}'), updated_at
+		SELECT user_id, total_xp, coins, current_title, streak_freezes_owned, COALESCE(last_freeze_purchased_at, 0), frozen_dates_json, unlocked_cosmetics_json, COALESCE(stats_json, '{}'), updated_at
 		FROM user_gamification
 		WHERE user_id = 1
 	`)
@@ -113,6 +115,7 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 		&prof.Coins,
 		&prof.CurrentTitle,
 		&prof.StreakFreezesOwned,
+		&prof.LastFreezePurchasedAt,
 		&prof.FrozenDatesJSON,
 		&prof.UnlockedCosmeticsJSON,
 		&prof.StatsJSON,
@@ -121,8 +124,8 @@ func (r *Repository) GetGamificationProfile() (*models.GamificationProfile, erro
 	if err == sql.ErrNoRows {
 		// Auto-initialize if row was missing
 		_, insErr := r.db.Exec(`
-			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, frozen_dates_json, unlocked_cosmetics_json, stats_json)
-			VALUES (1, 0, 0, 'The Apprentice I', 1, '[]', '["dark-gruvbox", "light-classic"]', '{}')
+			INSERT INTO user_gamification (user_id, total_xp, coins, current_title, streak_freezes_owned, last_freeze_purchased_at, frozen_dates_json, unlocked_cosmetics_json, stats_json)
+			VALUES (1, 0, 0, 'The Apprentice I', 1, 0, '[]', '["dark-gruvbox", "light-classic"]', '{}')
 			ON CONFLICT(user_id) DO NOTHING
 		`)
 		if insErr != nil {
@@ -351,8 +354,23 @@ func (r *Repository) ClaimLootBox(boxID string) (*models.PendingLootBox, *models
 		if freezeAmount <= 0 {
 			freezeAmount = 1
 		}
-		if _, err := tx.Exec(`UPDATE user_gamification SET streak_freezes_owned = streak_freezes_owned + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = 1`, freezeAmount); err != nil {
-			return nil, nil, fmt.Errorf("failed to apply streak freeze reward: %w", err)
+		var currentFreezes int
+		if err := tx.QueryRow(`SELECT streak_freezes_owned FROM user_gamification WHERE user_id = 1`).Scan(&currentFreezes); err != nil {
+			return nil, nil, fmt.Errorf("failed to scan streak freezes: %w", err)
+		}
+		if currentFreezes >= 2 {
+			// ponytail: if already capped at max 2 freezes, convert loot drop into 100 bonus coins
+			if _, err := tx.Exec(`UPDATE user_gamification SET coins = coins + 100, updated_at = CURRENT_TIMESTAMP WHERE user_id = 1`); err != nil {
+				return nil, nil, fmt.Errorf("failed to apply converted streak freeze coins: %w", err)
+			}
+		} else {
+			newFreezes := currentFreezes + freezeAmount
+			if newFreezes > 2 {
+				newFreezes = 2
+			}
+			if _, err := tx.Exec(`UPDATE user_gamification SET streak_freezes_owned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = 1`, newFreezes); err != nil {
+				return nil, nil, fmt.Errorf("failed to apply streak freeze reward: %w", err)
+			}
 		}
 	}
 
@@ -375,10 +393,11 @@ func (r *Repository) ClaimLootBox(boxID string) (*models.PendingLootBox, *models
 	return &box, prof, err
 }
 
-// BuyStreakFreeze spends coins (default 50) to acquire a streak freeze shield.
-func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, error) {
+// BuyStreakFreeze spends coins (default 150) to acquire a streak freeze shield.
+// Enforces max inventory cap (2) and a 1-purchase per 7-day rolling window limit.
+func (r *Repository) BuyStreakFreeze(cost int, nowUnix int64) (*models.GamificationProfile, error) {
 	if cost <= 0 {
-		cost = 50
+		cost = 150
 	}
 
 	tx, err := r.db.Begin()
@@ -387,10 +406,21 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var coins int
-	err = tx.QueryRow(`SELECT coins FROM user_gamification WHERE user_id = 1`).Scan(&coins)
+	var coins, freezes int
+	var lastPurchased int64
+	err = tx.QueryRow(`SELECT coins, streak_freezes_owned, COALESCE(last_freeze_purchased_at, 0) FROM user_gamification WHERE user_id = 1`).Scan(&coins, &freezes, &lastPurchased)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch coin balance: %w", err)
+		return nil, fmt.Errorf("failed to fetch gamification balance: %w", err)
+	}
+
+	if freezes >= 2 {
+		return nil, ErrFreezeInventoryFull
+	}
+
+	// 7 days = 7 * 86400 = 604800 seconds
+	const weeklyWindowSeconds = int64(7 * 24 * 3600)
+	if lastPurchased > 0 && (nowUnix-lastPurchased) < weeklyWindowSeconds {
+		return nil, ErrFreezeWeeklyLimit
 	}
 
 	if coins < cost {
@@ -399,9 +429,9 @@ func (r *Repository) BuyStreakFreeze(cost int) (*models.GamificationProfile, err
 
 	_, err = tx.Exec(`
 		UPDATE user_gamification
-		SET coins = coins - ?, streak_freezes_owned = streak_freezes_owned + 1, updated_at = CURRENT_TIMESTAMP
+		SET coins = coins - ?, streak_freezes_owned = streak_freezes_owned + 1, last_freeze_purchased_at = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = 1
-	`, cost)
+	`, cost, nowUnix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to purchase streak freeze: %w", err)
 	}

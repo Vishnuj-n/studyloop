@@ -443,7 +443,8 @@ Singleton table (user_id = 1) tracking XP, coins, narrative titles, streak freez
 | `total_xp` | INTEGER NOT NULL DEFAULT 0 | Cumulative earned experience points |
 | `coins` | INTEGER NOT NULL DEFAULT 0 | Spendable study coins balance |
 | `current_title` | TEXT NOT NULL DEFAULT 'The Apprentice' | Current narrative rank title |
-| `streak_freezes_owned` | INTEGER NOT NULL DEFAULT 1 | Available streak freeze shields |
+| `streak_freezes_owned` | INTEGER NOT NULL DEFAULT 1 | Available streak freeze shields (capped at 2 max) |
+| `last_freeze_purchased_at` | INTEGER NOT NULL DEFAULT 0 | Unix timestamp of last streak freeze purchase (rate limit 1/week) |
 | `frozen_dates_json` | TEXT NOT NULL DEFAULT '[]' | JSON array of dates protected by streak freeze (YYYY-MM-DD) |
 | `unlocked_cosmetics_json` | TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]' | JSON list of unlocked cosmetics |
 | `stats_json` | TEXT NOT NULL DEFAULT '{}' | JSON map of incremental study achievement stats |
