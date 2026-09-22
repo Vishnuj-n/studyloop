@@ -16,6 +16,10 @@ vi.mock('../services/appApi', () => ({
   recordCardReview: vi.fn(),
   getUserSettings: vi.fn(),
   getAvailableTopics: vi.fn(),
+  getFlashcardsDeckOverview: vi.fn().mockResolvedValue({ metrics: {}, notebooks: [] }),
+  toggleCardSuspension: vi.fn().mockResolvedValue({ ok: true }),
+  toggleNotebookCardsSuspension: vi.fn().mockResolvedValue({ ok: true }),
+  deleteFlashcard: vi.fn().mockResolvedValue({ ok: true }),
 }))
 
 // Mock vue-router hooks

@@ -156,6 +156,22 @@ export function suspendFlashcard(taskID, cardID) {
   return appBridge().SuspendFlashcard(taskID, cardID)
 }
 
+export function getFlashcardsDeckOverview() {
+  return appBridge().GetFlashcardsDeckOverview()
+}
+
+export function toggleCardSuspension(cardID, suspended) {
+  return appBridge().ToggleCardSuspension(cardID, suspended)
+}
+
+export function toggleNotebookCardsSuspension(notebookID, suspended) {
+  return appBridge().ToggleNotebookCardsSuspension(notebookID, suspended)
+}
+
+export function deleteFlashcard(cardID) {
+  return appBridge().DeleteFlashcard(cardID)
+}
+
 export function getNotebooks(topicID = '', profileID = '') {
   return appBridge().GetNotebooks(topicID, profileID)
 }

@@ -1,9 +1,5 @@
 <template>
-  <StudyPageLayout
-    eyebrow="Retention"
-    title="Flashcards"
-    :subtitle="queueMode ? `Queue session · ${sessionRemaining} remaining` : ''"
-  >
+  <div class="flashcards-page-root">
     <!-- Toast notification -->
     <Teleport to="body">
       <Transition name="toast">
@@ -12,24 +8,50 @@
         </div>
       </Transition>
     </Teleport>
-    <!-- Toolbar: notebook selector -->
-    <template #toolbar>
-      <div class="toolbar-field">
-        <label class="field-label" for="fc-notebook-select">Notebook</label>
-        <select
-          id="fc-notebook-select"
-          v-model="selectedNotebookID"
-          class="ghost-select"
-          :disabled="loading || reviewing"
-        >
-          <option value="">— Select Notebook —</option>
-          <option v-for="nb in notebooks" :key="nb.id" :value="nb.id">{{ nb.title }}</option>
-        </select>
-      </div>
-    </template>
 
-    <!-- ── COMPREHENSIVE TAB ───────────────────── -->
-    <section class="tab-content">
+    <!-- Deck Manager Modal -->
+    <FlashcardDeckManagerModal
+      :show="showDeckManager"
+      @close="showDeckManager = false"
+      @updated="onDeckUpdated"
+    />
+
+    <StudyPageLayout
+      eyebrow="Retention"
+      title="Flashcards"
+      :subtitle="queueMode ? `Queue session · ${sessionRemaining} remaining` : ''"
+    >
+      <!-- Toolbar: notebook selector & deck manager -->
+      <template #toolbar>
+        <div class="toolbar-actions-row">
+          <div class="toolbar-field">
+            <label class="field-label" for="fc-notebook-select">Notebook</label>
+            <select
+              id="fc-notebook-select"
+              v-model="selectedNotebookID"
+              class="ghost-select"
+              :disabled="loading || reviewing"
+            >
+              <option value="">— Select Notebook —</option>
+              <option v-for="nb in notebooks" :key="nb.id" :value="nb.id">{{ nb.title }}</option>
+            </select>
+          </div>
+
+          <button
+            id="fc-deck-manager-btn"
+            type="button"
+            class="deck-manager-btn"
+            title="Manage all flashcards, pause notebooks, and view FSRS metrics"
+            @click="showDeckManager = true"
+          >
+            <BaseIcon name="layers" size="15" />
+            <span>Manage Decks</span>
+          </button>
+        </div>
+      </template>
+
+      <!-- ── COMPREHENSIVE TAB ───────────────────── -->
+      <section class="tab-content">
       <!-- Config panel: page range -->
       <div v-if="!reviewing" class="config-panel">
         <p class="config-panel__hint">Enter the page range to extract flashcards from.</p>
@@ -273,7 +295,7 @@
       </div>
     </section>
   </StudyPageLayout>
-
+</div>
 </template>
 
 <script setup>
@@ -294,10 +316,12 @@ import BaseButton from '../components/BaseButton.vue'
 import BaseIcon from '../components/BaseIcon.vue'
 import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import FlashcardDeckManagerModal from '../components/FlashcardDeckManagerModal.vue'
 import { playCardRatingTick } from '../utils/audioJuice'
 
 const route = useRoute()
 const router = useRouter()
+const showDeckManager = ref(false)
 const notebooks = ref([])
 const selectedNotebookID = ref('')
 const startPage = ref(1)
@@ -350,6 +374,13 @@ const currentBookTitle = computed(() => {
   if (!nb?.title) return ''
   return nb.title.replace(/\.(pdf|apkg|anki|zip|epub|txt|md|docx)$/i, '').trim()
 })
+
+async function onDeckUpdated() {
+  // Refresh active session if currently in queue mode
+  if (route.query.taskId && reviewing.value) {
+    await loadQueueSession(String(route.query.taskId), String(route.query.notebookId || ''))
+  }
+}
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
@@ -612,6 +643,41 @@ async function loadQueueSession(taskID, notebookID = '') {
 
 <style scoped>
 /* Toolbar & Inputs */
+.toolbar-actions-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.deck-manager-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  height: 38px;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.deck-manager-btn:hover {
+  background: var(--surface-container);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.deck-manager-btn:active {
+  transform: scale(0.96);
+}
+
 .toolbar-field,
 .number-field {
   display: grid;

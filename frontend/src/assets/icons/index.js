@@ -495,5 +495,33 @@ export const icons = {
       "<path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/>",
       "<polyline points=\"22 4 12 14.01 9 11.01\"/>"
     ]
+  },
+  "chevron-down": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<polyline points=\"6 9 12 15 18 9\"/>"
+    ]
+  },
+  "chevron-up": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<polyline points=\"18 15 12 9 6 15\"/>"
+    ]
+  },
+  "chevron-right": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<polyline points=\"9 18 15 12 9 6\"/>"
+    ]
   }
 };
+

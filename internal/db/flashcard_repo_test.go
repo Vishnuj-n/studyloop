@@ -414,3 +414,67 @@ func TestQueryDueReviewCardsTimeline(t *testing.T) {
 	}
 }
 
+func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	topicID := "topic-deck-overview"
+	nbID := "nb-deck-overview"
+	if err := testRepo.EnsureTopic(topicID, "Deck Overview Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(nbID, "Deck Notebook", "/tmp/d.pdf", "pdf", topicID, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	cards := []models.Flashcard{
+		{ID: "card-d1", TopicID: topicID, Prompt: "Prompt 1", Answer: "Answer 1", DueAt: 100, Suspended: false},
+		{ID: "card-d2", TopicID: topicID, Prompt: "Prompt 2", Answer: "Answer 2", DueAt: 9999999999, Suspended: false},
+	}
+	states := map[string]models.FlashcardState{
+		"card-d1": {Stability: 15.0, Reps: 1, StateCode: 1},
+		"card-d2": {Stability: 85.0, Reps: 5, StateCode: 2},
+	}
+	if err := testRepo.CreateFlashcards(topicID, cards, states); err != nil {
+		t.Fatalf("CreateFlashcards failed: %v", err)
+	}
+
+	// 1. Check Deck Overview query
+	overview, err := testRepo.GetAllFlashcardsDeckOverview("")
+	if err != nil {
+		t.Fatalf("GetAllFlashcardsDeckOverview failed: %v", err)
+	}
+	if overview.Metrics.TotalCards < 2 {
+		t.Errorf("expected at least 2 total cards, got %d", overview.Metrics.TotalCards)
+	}
+	if len(overview.Notebooks) == 0 {
+		t.Fatalf("expected at least 1 notebook group, got 0")
+	}
+
+	// 2. Test SetCardSuspension
+	if err := testRepo.SetCardSuspension("card-d1", true); err != nil {
+		t.Fatalf("SetCardSuspension failed: %v", err)
+	}
+	c1, _, _ := testRepo.GetFlashcardByID("card-d1")
+	if !c1.Suspended {
+		t.Errorf("expected card-d1 to be suspended")
+	}
+
+	// 3. Test SetNotebookCardsSuspension
+	if err := testRepo.SetNotebookCardsSuspension(nbID, false); err != nil {
+		t.Fatalf("SetNotebookCardsSuspension failed: %v", err)
+	}
+	c1Resumed, _, _ := testRepo.GetFlashcardByID("card-d1")
+	if c1Resumed.Suspended {
+		t.Errorf("expected card-d1 to be unsuspended after bulk resume")
+	}
+
+	// 4. Test DeleteFlashcardByID
+	if err := testRepo.DeleteFlashcardByID("card-d2"); err != nil {
+		t.Fatalf("DeleteFlashcardByID failed: %v", err)
+	}
+	c2Deleted, _, _ := testRepo.GetFlashcardByID("card-d2")
+	if c2Deleted != nil {
+		t.Errorf("expected card-d2 to be deleted from database")
+	}
+}
+

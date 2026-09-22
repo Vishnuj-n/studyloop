@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"ai-tutor/internal/models"
 )
@@ -678,3 +679,224 @@ func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64) ([]models.SyncL
 	}
 	return logs, nil
 }
+
+// GetAllFlashcardsDeckOverview queries all cards grouped by notebook and topic, calculating retention metrics.
+func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.DeckOverviewResponse, error) {
+	query := `
+		SELECT 
+			c.id, 
+			c.topic_id, 
+			COALESCE(t.title, 'General') AS topic_title, 
+			COALESCE(n.id, '') AS notebook_id, 
+			COALESCE(n.title, 'Standalone Decks') AS notebook_title,
+			c.prompt, 
+			c.answer, 
+			COALESCE(c.due_at, 0) AS due_at, 
+			c.suspended, 
+			COALESCE(c.created_at, '') AS created_at,
+			COALESCE(c.state_json, '') AS state_json
+		FROM fsrs_cards c
+		JOIN topics t ON c.topic_id = t.id
+		LEFT JOIN notebook_topics nt ON t.id = nt.topic_id
+		LEFT JOIN notebooks n ON nt.notebook_id = n.id
+	`
+	var args []interface{}
+	profileID = strings.TrimSpace(profileID)
+	if profileID != "" {
+		query += ` WHERE (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
+		args = append(args, profileID)
+	}
+	query += ` ORDER BY notebook_title ASC, topic_title ASC, c.due_at ASC, c.created_at ASC `
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query flashcards deck overview: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	nowUnix := time.Now().Unix()
+	var metrics models.DeckMetrics
+	notebookMap := make(map[string]*models.NotebookDeckGroup)
+	notebookOrder := make([]string, 0)
+	topicMap := make(map[string]map[string]*models.DeckTopicGroup)
+
+	for rows.Next() {
+		var card models.DeckCardDetail
+		var stateJSON string
+		if err := rows.Scan(
+			&card.ID, &card.TopicID, &card.TopicTitle,
+			&card.NotebookID, &card.NotebookTitle,
+			&card.Prompt, &card.Answer,
+			&card.DueAt, &card.Suspended, &card.CreatedAt, &stateJSON,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan flashcard detail: %w", err)
+		}
+
+		if stateJSON != "" {
+			var state models.FlashcardState
+			if jsonErr := json.Unmarshal([]byte(stateJSON), &state); jsonErr == nil {
+				card.Stability = state.Stability
+				card.Difficulty = state.Difficulty
+				card.Reps = state.Reps
+				card.Lapses = state.Lapses
+				card.StateCode = state.StateCode
+			}
+		}
+
+		metrics.TotalCards++
+		if card.Suspended {
+			metrics.SuspendedCards++
+		} else {
+			metrics.ActiveCards++
+			if card.DueAt <= nowUnix {
+				metrics.DueToday++
+			}
+		}
+
+		// Retention breakdown
+		if card.Reps == 0 || card.StateCode == 0 {
+			metrics.NewCards++
+		} else if card.Stability < 21.0 {
+			metrics.LearningCards++
+		} else if card.Stability < 60.0 {
+			metrics.YoungCards++
+		} else {
+			metrics.MatureCards++
+		}
+
+		// Grouping
+		nbID := card.NotebookID
+		if nbID == "" {
+			nbID = "standalone"
+		}
+		if _, exists := notebookMap[nbID]; !exists {
+			notebookMap[nbID] = &models.NotebookDeckGroup{
+				NotebookID:    card.NotebookID,
+				NotebookTitle: card.NotebookTitle,
+				Topics:        make([]models.DeckTopicGroup, 0),
+			}
+			notebookOrder = append(notebookOrder, nbID)
+			topicMap[nbID] = make(map[string]*models.DeckTopicGroup)
+		}
+
+		nbGroup := notebookMap[nbID]
+		nbGroup.TotalCards++
+		if card.Suspended {
+			nbGroup.SuspendedCards++
+		}
+		if !card.Suspended && card.DueAt <= nowUnix {
+			nbGroup.DueCards++
+		}
+
+		topMap := topicMap[nbID]
+		if _, exists := topMap[card.TopicID]; !exists {
+			topMap[card.TopicID] = &models.DeckTopicGroup{
+				TopicID:    card.TopicID,
+				TopicTitle: card.TopicTitle,
+				Cards:      make([]models.DeckCardDetail, 0),
+			}
+		}
+		topicGroup := topMap[card.TopicID]
+		topicGroup.TotalCards++
+		if !card.Suspended && card.DueAt <= nowUnix {
+			topicGroup.DueCards++
+		}
+		topicGroup.Cards = append(topicGroup.Cards, card)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	notebooks := make([]models.NotebookDeckGroup, 0, len(notebookOrder))
+	for _, nbID := range notebookOrder {
+		nbGroup := notebookMap[nbID]
+		nbGroup.IsAllSuspended = nbGroup.TotalCards > 0 && nbGroup.SuspendedCards == nbGroup.TotalCards
+		topMap := topicMap[nbID]
+		for _, topicGroup := range topMap {
+			nbGroup.Topics = append(nbGroup.Topics, *topicGroup)
+		}
+		notebooks = append(notebooks, *nbGroup)
+	}
+
+	return &models.DeckOverviewResponse{
+		Metrics:   metrics,
+		Notebooks: notebooks,
+	}, nil
+}
+
+// SetCardSuspension sets a single flashcard's suspended flag (0 or 1).
+func (r *Repository) SetCardSuspension(cardID string, suspended bool) error {
+	cardID = strings.TrimSpace(cardID)
+	if cardID == "" {
+		return fmt.Errorf("flashcard id is required")
+	}
+	suspVal := boolToInt(suspended)
+	res, err := r.db.Exec(`
+		UPDATE fsrs_cards
+		SET suspended = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, suspVal, cardID)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("card not found: %s", cardID)
+	}
+	return nil
+}
+
+// SetNotebookCardsSuspension sets the suspended status for all cards associated with a notebook.
+func (r *Repository) SetNotebookCardsSuspension(notebookID string, suspended bool) error {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return fmt.Errorf("notebook id is required")
+	}
+	suspVal := boolToInt(suspended)
+	_, err := r.db.Exec(`
+		UPDATE fsrs_cards
+		SET suspended = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE topic_id IN (
+			SELECT topic_id FROM notebook_topics WHERE notebook_id = ?
+			UNION
+			SELECT topic_id FROM notebooks WHERE id = ? AND topic_id IS NOT NULL
+		)
+	`, suspVal, notebookID, notebookID)
+	return err
+}
+
+// DeleteFlashcardByID permanently deletes a flashcard and removes any linked review tasks.
+func (r *Repository) DeleteFlashcardByID(cardID string) error {
+	cardID = strings.TrimSpace(cardID)
+	if cardID == "" {
+		return fmt.Errorf("flashcard id is required")
+	}
+	return r.withTx(func(tx *sql.Tx) error {
+		// Clean session link first
+		if _, err := tx.Exec(`DELETE FROM review_task_cards WHERE card_id = ?`, cardID); err != nil {
+			return fmt.Errorf("failed to delete review task card link: %w", err)
+		}
+		// Clean review log if any
+		if _, err := tx.Exec(`DELETE FROM fsrs_review_log WHERE activity_type = 'flashcard' AND reference_id = ?`, cardID); err != nil {
+			return fmt.Errorf("failed to delete review logs: %w", err)
+		}
+		// Delete the card itself
+		res, err := tx.Exec(`DELETE FROM fsrs_cards WHERE id = ?`, cardID)
+		if err != nil {
+			return fmt.Errorf("failed to delete card: %w", err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return fmt.Errorf("card not found: %s", cardID)
+		}
+		return nil
+	})
+}
+
