@@ -200,11 +200,11 @@
                   </div>
 
                   <!-- Bulk Notebook Actions -->
-                  <div class="deck-header-actions" @click.stop>
+                  <div v-if="nb.notebook_id" class="deck-header-actions" @click.stop>
                     <button
                       type="button"
                       :class="['action-toggle-btn', nb.is_all_suspended ? 'resume-mode' : 'pause-mode']"
-                      :disabled="pendingNotebookIds.has(nb.notebook_id || 'standalone')"
+                      :disabled="pendingNotebookIds.has(nb.notebook_id)"
                       @click="handleToggleNotebook(nb)"
                     >
                       <BaseIcon :name="nb.is_all_suspended ? 'play' : 'pause'" size="13" />
@@ -325,8 +325,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 
-const { showConfirm } = useDialog()
-const { showSuccess, showError } = useToast()
+const { confirm: showConfirm } = useDialog()
+const { showNotice, showError } = useToast()
 
 const loading = ref(false)
 const pendingCardIds = ref(new Set())
@@ -477,6 +477,10 @@ async function loadOverview() {
   loading.value = true
   try {
     const res = await getFlashcardsDeckOverview()
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
     if (res && res.metrics) {
       metrics.value = res.metrics
       notebooks.value = res.notebooks || []
@@ -503,9 +507,13 @@ async function handleToggleCard(card) {
   const newSuspended = !card.suspended
   try {
     const res = await toggleCardSuspension(card.id, newSuspended)
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
     if (res && res.ok) {
       card.suspended = newSuspended
-      showSuccess(newSuspended ? 'Card paused' : 'Card resumed')
+      showNotice(newSuspended ? 'Card paused' : 'Card resumed')
       // Refetch for reliable metrics consistency
       await loadOverview()
       emit('updated')
@@ -537,8 +545,12 @@ async function handleToggleNotebook(nb) {
   pendingNotebookIds.value = new Set(pendingNotebookIds.value).add(nbKey)
   try {
     const res = await toggleNotebookCardsSuspension(nb.notebook_id, newSuspended)
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
     if (res && res.ok) {
-      showSuccess(newSuspended ? 'Notebook cards paused' : 'Notebook cards resumed')
+      showNotice(newSuspended ? 'Notebook cards paused' : 'Notebook cards resumed')
       await loadOverview()
       emit('updated')
     }
@@ -565,8 +577,12 @@ async function confirmDeleteCard(card) {
   pendingCardIds.value = new Set(pendingCardIds.value).add(card.id)
   try {
     const res = await deleteFlashcard(card.id)
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
     if (res && res.ok) {
-      showSuccess('Flashcard deleted')
+      showNotice('Flashcard deleted')
       await loadOverview()
       emit('updated')
     }

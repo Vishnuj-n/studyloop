@@ -541,7 +541,7 @@ async function suspendCard() {
 }
 
 function handleKeydown(e) {
-  if (!reviewing.value || !currentCard.value) return
+  if (showDeckManager.value || !reviewing.value || !currentCard.value) return
 
   // Prevent hotkeys when typing in inputs/textareas
   if (
