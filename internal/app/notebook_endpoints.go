@@ -1235,10 +1235,15 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to load user settings: %v", err)}
 	}
-	if settings == nil || settings.TargetSessionWords <= 0 {
+
+	targetWords := 0
+	if p.TargetSessionWords != nil && *p.TargetSessionWords > 0 {
+		targetWords = *p.TargetSessionWords
+	} else if settings != nil && settings.TargetSessionWords > 0 {
+		targetWords = settings.TargetSessionWords
+	} else {
 		return map[string]interface{}{"error": "invalid target_session_words in user settings"}
 	}
-	targetWords := settings.TargetSessionWords
 
 	// Workload in sessions
 	remainingSessions := 0.0
