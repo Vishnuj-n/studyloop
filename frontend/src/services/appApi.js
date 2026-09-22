@@ -58,12 +58,11 @@ export function getReadingTaskHistory(notebookID = '', limit = 50, offset = 0) {
 }
 
 
-export async function completeReading(taskID, splitPage = null) {
-  console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID, splitPage })
+export async function completeReading(taskID, splitPage = 0) {
+  const pageNum = Number.parseInt(splitPage) || 0
+  console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID, splitPage: pageNum })
   try {
-    const response = splitPage != null
-      ? await appBridge().CompleteReading(taskID, Number.parseInt(splitPage))
-      : await appBridge().CompleteReading(taskID)
+    const response = await appBridge().CompleteReading(taskID, pageNum)
     console.warn('[COMPLETE_SESSION] appApi.completeReading raw backend response', response)
     return response
   } catch (err) {

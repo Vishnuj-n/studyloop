@@ -16,8 +16,8 @@ Following the **Ponytail** principle of absolute minimal implementation:
 - **[internal/db/study_queue_repo.go](../../internal/db/study_queue_repo.go)**:
   - Added `UpdateTaskEndPage(taskID string, endPage int)` to truncate the `end_page` boundary on active queue tasks.
 - **[internal/app/app_study_reading.go](../../internal/app/app_study_reading.go)**:
-  - Extended `CompleteReading(taskID string, splitPage ...int)`:
-    - If `splitPage` is provided ($start\_page \le splitPage < end\_page$), truncates `task.EndPage` and saves to SQLite before quiz generation.
+  - Extended `CompleteReading(taskID string, splitPage int)`:
+    - If `splitPage > 0` ($start\_page \le splitPage < end\_page$), truncates `task.EndPage` and saves to SQLite before quiz generation.
     - Binds quiz generation chunk retrieval to the truncated page range.
     - Synchronizes topic cursor and seeds the remainder via standard queue replenishment.
 - **[doc/DATA_API.md](../../doc/DATA_API.md)**:
