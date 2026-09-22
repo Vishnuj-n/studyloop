@@ -2,7 +2,10 @@
   <div class="settings-extensions-container">
     <!-- AI Audio Overview -->
     <article class="panel form-grid">
-      <h2>AI Audio Overview (Edge-TTS)</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h2 style="margin: 0;">AI Audio Overview (Edge-TTS)</h2>
+        <span class="global-badge"><BaseIcon name="globe" size="12" /> Global</span>
+      </div>
       <div class="form-group">
         <label for="audio-voice">Voice Persona</label>
         <select
@@ -101,6 +104,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { useExtensions } from '../composables/useExtensions'
 
 defineProps({

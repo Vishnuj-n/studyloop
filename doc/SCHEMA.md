@@ -413,7 +413,7 @@ LLM provider config per performance tier.
 
 ### `study_profiles`
 
-Named study profiles with deadline tracking. Referenced by `user_settings.active_profile_id` + `notebooks.profile_id`.
+Named study profiles with deadline tracking and profile-scoped study parameters. Referenced by `user_settings.active_profile_id` + `notebooks.profile_id`.
 
 | Field | Type | Description |
 |---|---|---|
@@ -427,6 +427,16 @@ Named study profiles with deadline tracking. Referenced by `user_settings.active
 | `pomo_break_sec` | INTEGER NOT NULL DEFAULT 300 | Break session length in seconds (e.g. 5 min) |
 | `pomo_music_path` | TEXT DEFAULT '' | Focus audio track path or lo-fi folder path |
 | `pomo_shuffle` | BOOLEAN DEFAULT 0 | Whether to shuffle folder playback |
+| `target_session_words` | INTEGER DEFAULT NULL | Reading session target word budget (null = inherit global) |
+| `min_session_words` | INTEGER DEFAULT NULL | Reading session min word budget (null = inherit global) |
+| `theme` | TEXT DEFAULT '' | Profile visual theme (empty = inherit global) |
+| `max_flashcards_per_session` | INTEGER DEFAULT NULL | Review volume per session (null = inherit global) |
+| `max_active_notebooks` | INTEGER DEFAULT NULL | Concurrent active decks/books (null = inherit global) |
+| `skip_to_reading_active` | BOOLEAN DEFAULT NULL | Priority bypass behavior (null = inherit global) |
+| `default_remedial_strategy` | TEXT DEFAULT '' | Remedial strategy `FAST` or `CLASSIC` (empty = inherit global) |
+| `quiz_question_count` | INTEGER DEFAULT NULL | Target questions per quiz (null = inherit global) |
+| `quiz_passing_score` | INTEGER DEFAULT NULL | Passing score percentage (null = inherit global) |
+| `tutor_style` | TEXT DEFAULT '' | Pedagogical persona style (empty = inherit global) |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time |
 
 **Referenced by:** `user_settings.active_profile_id` (FK → `id` ON DELETE SET NULL), `notebooks.profile_id` (FK → `id` ON DELETE SET NULL).

@@ -551,17 +551,27 @@ type ReadingSessionResponse struct {
 
 // StudyProfile represents a user's study profile (e.g. UPSC prep).
 type StudyProfile struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	DeadlineAt      int64  `json:"deadline_at"` // Unix timestamp
-	CreatedAt       string `json:"created_at,omitempty"`
-	ClassroomCode   string `json:"classroom_code,omitempty"`
-	StudentUsername string `json:"student_username,omitempty"`
-	CloudAPIToken   string `json:"cloud_api_token,omitempty"`
-	PomoDurationSec int    `json:"pomo_duration_sec"`
-	PomoBreakSec    int    `json:"pomo_break_sec"`
-	PomoMusicPath   string `json:"pomo_music_path"`
-	PomoShuffle     bool   `json:"pomo_shuffle"`
+	ID                     string `json:"id"`
+	Name                   string `json:"name"`
+	DeadlineAt             int64  `json:"deadline_at"` // Unix timestamp
+	CreatedAt              string `json:"created_at,omitempty"`
+	ClassroomCode          string `json:"classroom_code,omitempty"`
+	StudentUsername        string `json:"student_username,omitempty"`
+	CloudAPIToken          string `json:"cloud_api_token,omitempty"`
+	PomoDurationSec        int    `json:"pomo_duration_sec"`
+	PomoBreakSec           int    `json:"pomo_break_sec"`
+	PomoMusicPath          string `json:"pomo_music_path"`
+	PomoShuffle            bool   `json:"pomo_shuffle"`
+	TargetSessionWords     *int   `json:"target_session_words,omitempty"`
+	MinSessionWords        *int   `json:"min_session_words,omitempty"`
+	Theme                  string `json:"theme,omitempty"`
+	MaxFlashcardsPerSession *int   `json:"max_flashcards_per_session,omitempty"`
+	MaxActiveNotebooks     *int   `json:"max_active_notebooks,omitempty"`
+	SkipToReadingActive    *bool  `json:"skip_to_reading_active,omitempty"`
+	DefaultRemedialStrategy string `json:"default_remedial_strategy,omitempty"`
+	QuizQuestionCount      *int   `json:"quiz_question_count,omitempty"`
+	QuizPassingScore       *int   `json:"quiz_passing_score,omitempty"`
+	TutorStyle             string `json:"tutor_style,omitempty"`
 }
 
 // UserSettings represents the application settings.

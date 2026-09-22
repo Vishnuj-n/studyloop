@@ -432,18 +432,28 @@ func sameLLMSettingsForUI(a, b models.LLMTierSettings) bool {
 
 // ProfileWithSummary enriches StudyProfile summary with live pacing telemetry and pending task counts.
 type ProfileWithSummary struct {
-	ID              string                 `json:"id"`
-	Name            string                 `json:"name"`
-	DeadlineAt      int64                  `json:"deadline_at"`
-	CreatedAt       string                 `json:"created_at,omitempty"`
-	ClassroomCode   string                 `json:"classroom_code,omitempty"`
-	StudentUsername string                 `json:"student_username,omitempty"`
-	PomoDurationSec int                    `json:"pomo_duration_sec"`
-	PomoBreakSec    int                    `json:"pomo_break_sec"`
-	PomoMusicPath   string                 `json:"pomo_music_path"`
-	PomoShuffle     bool                   `json:"pomo_shuffle"`
-	Pace            map[string]interface{} `json:"pace,omitempty"`
-	PendingTasks    *int                   `json:"pending_tasks"`
+	ID                      string                 `json:"id"`
+	Name                    string                 `json:"name"`
+	DeadlineAt              int64                  `json:"deadline_at"`
+	CreatedAt               string                 `json:"created_at,omitempty"`
+	ClassroomCode           string                 `json:"classroom_code,omitempty"`
+	StudentUsername         string                 `json:"student_username,omitempty"`
+	PomoDurationSec         int                    `json:"pomo_duration_sec"`
+	PomoBreakSec            int                    `json:"pomo_break_sec"`
+	PomoMusicPath           string                 `json:"pomo_music_path"`
+	PomoShuffle             bool                   `json:"pomo_shuffle"`
+	TargetSessionWords      *int                   `json:"target_session_words,omitempty"`
+	MinSessionWords         *int                   `json:"min_session_words,omitempty"`
+	Theme                   string                 `json:"theme,omitempty"`
+	MaxFlashcardsPerSession *int                   `json:"max_flashcards_per_session,omitempty"`
+	MaxActiveNotebooks      *int                   `json:"max_active_notebooks,omitempty"`
+	SkipToReadingActive     *bool                  `json:"skip_to_reading_active,omitempty"`
+	DefaultRemedialStrategy string                 `json:"default_remedial_strategy,omitempty"`
+	QuizQuestionCount       *int                   `json:"quiz_question_count,omitempty"`
+	QuizPassingScore        *int                   `json:"quiz_passing_score,omitempty"`
+	TutorStyle              string                 `json:"tutor_style,omitempty"`
+	Pace                    map[string]interface{} `json:"pace,omitempty"`
+	PendingTasks            *int                   `json:"pending_tasks"`
 }
 
 func (a *App) GetProfiles() map[string]interface{} {
@@ -464,18 +474,28 @@ func (a *App) GetProfiles() map[string]interface{} {
 			pendingTasks = &count
 		}
 		enriched = append(enriched, ProfileWithSummary{
-			ID:              p.ID,
-			Name:            p.Name,
-			DeadlineAt:      p.DeadlineAt,
-			CreatedAt:       p.CreatedAt,
-			ClassroomCode:   p.ClassroomCode,
-			StudentUsername: p.StudentUsername,
-			PomoDurationSec: p.PomoDurationSec,
-			PomoBreakSec:    p.PomoBreakSec,
-			PomoMusicPath:   p.PomoMusicPath,
-			PomoShuffle:     p.PomoShuffle,
-			Pace:            pace,
-			PendingTasks:    pendingTasks,
+			ID:                      p.ID,
+			Name:                    p.Name,
+			DeadlineAt:              p.DeadlineAt,
+			CreatedAt:               p.CreatedAt,
+			ClassroomCode:           p.ClassroomCode,
+			StudentUsername:         p.StudentUsername,
+			PomoDurationSec:         p.PomoDurationSec,
+			PomoBreakSec:            p.PomoBreakSec,
+			PomoMusicPath:           p.PomoMusicPath,
+			PomoShuffle:             p.PomoShuffle,
+			TargetSessionWords:      p.TargetSessionWords,
+			MinSessionWords:         p.MinSessionWords,
+			Theme:                   p.Theme,
+			MaxFlashcardsPerSession: p.MaxFlashcardsPerSession,
+			MaxActiveNotebooks:      p.MaxActiveNotebooks,
+			SkipToReadingActive:     p.SkipToReadingActive,
+			DefaultRemedialStrategy: p.DefaultRemedialStrategy,
+			QuizQuestionCount:       p.QuizQuestionCount,
+			QuizPassingScore:        p.QuizPassingScore,
+			TutorStyle:              p.TutorStyle,
+			Pace:                    pace,
+			PendingTasks:            pendingTasks,
 		})
 	}
 	return map[string]interface{}{"profiles": enriched}
@@ -494,10 +514,92 @@ func (a *App) CreateProfile(name string, deadlineStr string) map[string]interfac
 	if err != nil {
 		return map[string]interface{}{"error": "failed to parse deadline: " + err.Error()}
 	}
+
+	// Auto-clone preferences from current active profile or user settings
+	var initialTargetWords, initialMinWords, initialCards, initialActive, initialQuizCount, initialQuizScore *int
+	var initialSkipRead *bool
+	var initialTheme, initialStrategy, initialTutorStyle string
+	initialPomoDur := 1500
+	initialPomoBreak := 300
+	initialMusicPath := ""
+	initialShuffle := false
+
+	if activeID, _ := repo.GetActiveProfileID(); activeID != "" {
+		if activeProf, _ := repo.GetProfileByID(activeID); activeProf != nil {
+			initialTargetWords = activeProf.TargetSessionWords
+			initialMinWords = activeProf.MinSessionWords
+			initialCards = activeProf.MaxFlashcardsPerSession
+			initialActive = activeProf.MaxActiveNotebooks
+			initialSkipRead = activeProf.SkipToReadingActive
+			initialTheme = activeProf.Theme
+			initialStrategy = activeProf.DefaultRemedialStrategy
+			initialQuizCount = activeProf.QuizQuestionCount
+			initialQuizScore = activeProf.QuizPassingScore
+			initialTutorStyle = activeProf.TutorStyle
+			initialPomoDur = activeProf.PomoDurationSec
+			initialPomoBreak = activeProf.PomoBreakSec
+			initialMusicPath = activeProf.PomoMusicPath
+			initialShuffle = activeProf.PomoShuffle
+		}
+	}
+	if currentSettings, err := repo.GetUserSettings(); err == nil && currentSettings != nil {
+		if initialTargetWords == nil && currentSettings.TargetSessionWords > 0 {
+			w := currentSettings.TargetSessionWords
+			initialTargetWords = &w
+		}
+		if initialMinWords == nil {
+			w := currentSettings.MinSessionWords
+			initialMinWords = &w
+		}
+		if initialCards == nil && currentSettings.MaxFlashcardsPerSession > 0 {
+			c := currentSettings.MaxFlashcardsPerSession
+			initialCards = &c
+		}
+		if initialActive == nil && currentSettings.MaxActiveNotebooks > 0 {
+			act := currentSettings.MaxActiveNotebooks
+			initialActive = &act
+		}
+		if initialSkipRead == nil {
+			sr := currentSettings.SkipToReadingActive
+			initialSkipRead = &sr
+		}
+		if initialTheme == "" {
+			initialTheme = currentSettings.Theme
+		}
+		if initialStrategy == "" {
+			initialStrategy = currentSettings.DefaultRemedialStrategy
+		}
+		if initialQuizCount == nil && currentSettings.QuizQuestionCount > 0 {
+			q := currentSettings.QuizQuestionCount
+			initialQuizCount = &q
+		}
+		if initialQuizScore == nil && currentSettings.QuizPassingScore > 0 {
+			qs := currentSettings.QuizPassingScore
+			initialQuizScore = &qs
+		}
+		if initialTutorStyle == "" {
+			initialTutorStyle = currentSettings.TutorStyle
+		}
+	}
+
 	p := models.StudyProfile{
-		ID:         uuid.NewString(),
-		Name:       name,
-		DeadlineAt: deadlineTime.Unix(),
+		ID:                      uuid.NewString(),
+		Name:                    name,
+		DeadlineAt:              deadlineTime.Unix(),
+		TargetSessionWords:      initialTargetWords,
+		MinSessionWords:         initialMinWords,
+		Theme:                   initialTheme,
+		MaxFlashcardsPerSession: initialCards,
+		MaxActiveNotebooks:      initialActive,
+		SkipToReadingActive:     initialSkipRead,
+		DefaultRemedialStrategy: initialStrategy,
+		QuizQuestionCount:       initialQuizCount,
+		QuizPassingScore:        initialQuizScore,
+		TutorStyle:              initialTutorStyle,
+		PomoDurationSec:         initialPomoDur,
+		PomoBreakSec:            initialPomoBreak,
+		PomoMusicPath:           initialMusicPath,
+		PomoShuffle:             initialShuffle,
 	}
 	if err := repo.CreateProfile(p); err != nil {
 		return map[string]interface{}{"error": err.Error()}
@@ -530,12 +632,30 @@ func (a *App) UpdateProfile(id string, name string, deadlineStr string) map[stri
 	if err != nil {
 		return map[string]interface{}{"error": "failed to parse deadline: " + err.Error()}
 	}
-	p := models.StudyProfile{
-		ID:         id,
-		Name:       name,
-		DeadlineAt: deadlineTime.Unix(),
+	current, err := repo.GetProfileByID(id)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
 	}
-	if err := repo.UpdateProfile(p); err != nil {
+	if current == nil {
+		return map[string]interface{}{"error": "profile not found"}
+	}
+	current.Name = name
+	current.DeadlineAt = deadlineTime.Unix()
+	if err := repo.UpdateProfile(*current); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
+func (a *App) UpdateProfileFull(profile models.StudyProfile) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if strings.TrimSpace(profile.ID) == "" || strings.TrimSpace(profile.Name) == "" {
+		return map[string]interface{}{"error": "profile ID and Name are required"}
+	}
+	if err := repo.UpdateProfile(profile); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}

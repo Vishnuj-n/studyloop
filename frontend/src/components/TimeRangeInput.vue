@@ -3,6 +3,7 @@
     <div class="time-range-header">
       <div class="header-left">
         <label>Study Schedule</label>
+        <span class="global-badge"><BaseIcon name="globe" size="12" /> Global</span>
         <span v-if="displayDuration" class="duration-badge">{{ displayDuration }}</span>
       </div>
       <button
@@ -154,6 +155,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   startValue: { type: String, default: '17:00' },

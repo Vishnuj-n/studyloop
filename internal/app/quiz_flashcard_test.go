@@ -883,14 +883,14 @@ func TestFSRSCalibrationEasyAndDoubleGood(t *testing.T) {
 	if err := json.Unmarshal([]byte(stateJSON.String), &cardState); err != nil {
 		t.Fatalf("failed to unmarshal state: %v", err)
 	}
-	// Check clean Review state (StateCode: 2, Reps: 0) and ~3 days due_at
+	// Check clean Review state (StateCode: 2, Reps: 0) and ~1 day due_at
 	now := time.Now().Unix()
 	if cardState.StateCode != 2 || cardState.Reps != 0 {
 		t.Fatalf("expected Ace card state to be clean Review state, got reps=%d StateCode=%d", cardState.Reps, cardState.StateCode)
 	}
 	diffDays := float64(dueAt-now) / (24 * 60 * 60)
-	if diffDays < 2.9 || diffDays > 3.1 {
-		t.Fatalf("expected Ace dueAt offset to be ~3 days, got %f days", diffDays)
+	if diffDays < 0.9 || diffDays > 1.1 {
+		t.Fatalf("expected Ace dueAt offset to be ~1 day, got %f days", diffDays)
 	}
 
 	mustInsertActiveQuizTask(t, "nb-calibration-2", "topic-calibration-2", "task-quiz-pass", 50)

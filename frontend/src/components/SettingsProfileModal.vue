@@ -7,6 +7,11 @@
       </div>
 
       <div class="modal-body">
+        <div v-if="!isEdit" class="clone-info-card">
+          <BaseIcon name="check" size="14" />
+          <span>Auto-inherits reading pacing, quiz rules, focus intervals, and theme from your active profile.</span>
+        </div>
+
         <div class="form-group">
           <label for="profile-name">Profile Name</label>
           <input
@@ -40,6 +45,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 
 const props = defineProps({
   isEdit: { type: Boolean, default: false },
@@ -135,6 +141,19 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.clone-info-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--primary, #4f46e5) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 24%, transparent);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--on-surface, #0f172a);
 }
 
 .form-group {

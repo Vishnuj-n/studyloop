@@ -1,7 +1,10 @@
 <template>
   <article class="panel form-grid">
-    <h2>AI Provider</h2>
-    <p class="hint" style="margin-top: -10px; margin-bottom: 8px">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <h2 style="margin: 0;">AI Provider</h2>
+      <span class="global-badge"><BaseIcon name="globe" size="12" /> Global</span>
+    </div>
+    <p class="hint" style="margin-top: -4px; margin-bottom: 8px">
       Provider settings are saved in SQLite. API keys are saved in the OS credential manager through
       the backend.
     </p>

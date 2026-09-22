@@ -1,12 +1,13 @@
 <template>
   <article class="panel form-grid">
     <!-- Master Developer Mode Toggle -->
-    <div class="dev-toggle-card">
+    <div class="dev-toggle-card" style="display: flex; align-items: center; justify-content: space-between;">
       <SettingsToggle
         v-model="devModeEnabled"
         title="Enable Developer Mode"
         hint="Unlocks raw queue inspection, page range diagnostics, and system log details."
       />
+      <span class="global-badge" style="margin-right: 12px;"><BaseIcon name="globe" size="12" /> Global</span>
     </div>
 
     <!-- Developer Tools & History Panel -->

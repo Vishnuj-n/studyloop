@@ -52,6 +52,16 @@ var alterStatements = []struct {
 	{"study_profiles", "pomo_break_sec", "ALTER TABLE study_profiles ADD COLUMN pomo_break_sec INTEGER NOT NULL DEFAULT 300"},
 	{"study_profiles", "pomo_music_path", "ALTER TABLE study_profiles ADD COLUMN pomo_music_path TEXT DEFAULT ''"},
 	{"study_profiles", "pomo_shuffle", "ALTER TABLE study_profiles ADD COLUMN pomo_shuffle BOOLEAN DEFAULT 0"},
+	{"study_profiles", "target_session_words", "ALTER TABLE study_profiles ADD COLUMN target_session_words INTEGER DEFAULT NULL"},
+	{"study_profiles", "min_session_words", "ALTER TABLE study_profiles ADD COLUMN min_session_words INTEGER DEFAULT NULL"},
+	{"study_profiles", "theme", "ALTER TABLE study_profiles ADD COLUMN theme TEXT DEFAULT ''"},
+	{"study_profiles", "max_flashcards_per_session", "ALTER TABLE study_profiles ADD COLUMN max_flashcards_per_session INTEGER DEFAULT NULL"},
+	{"study_profiles", "max_active_notebooks", "ALTER TABLE study_profiles ADD COLUMN max_active_notebooks INTEGER DEFAULT NULL"},
+	{"study_profiles", "skip_to_reading_active", "ALTER TABLE study_profiles ADD COLUMN skip_to_reading_active BOOLEAN DEFAULT NULL"},
+	{"study_profiles", "default_remedial_strategy", "ALTER TABLE study_profiles ADD COLUMN default_remedial_strategy TEXT DEFAULT ''"},
+	{"study_profiles", "quiz_question_count", "ALTER TABLE study_profiles ADD COLUMN quiz_question_count INTEGER DEFAULT NULL"},
+	{"study_profiles", "quiz_passing_score", "ALTER TABLE study_profiles ADD COLUMN quiz_passing_score INTEGER DEFAULT NULL"},
+	{"study_profiles", "tutor_style", "ALTER TABLE study_profiles ADD COLUMN tutor_style TEXT DEFAULT ''"},
 
 	// topics
 	{"topics", "external_help_required", "ALTER TABLE topics ADD COLUMN external_help_required BOOLEAN DEFAULT 0"},
