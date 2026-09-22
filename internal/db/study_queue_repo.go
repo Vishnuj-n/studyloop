@@ -221,8 +221,18 @@ func (r *Repository) UpdateTaskEndPage(taskID string, endPage int) error {
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	_, err := r.db.Exec(`UPDATE study_queue SET end_page = ? WHERE id = ? AND status IN ('ACTIVE', 'RESERVED')`, endPage, taskID)
-	return err
+	res, err := r.db.Exec(`UPDATE study_queue SET end_page = ? WHERE id = ? AND status = 'ACTIVE'`, endPage, taskID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrTaskNotActive
+	}
+	return nil
 }
 
 // CompleteTask marks ACTIVE task as terminal and inserts explicit follow-up tasks transactionally.

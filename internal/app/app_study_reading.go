@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -131,6 +132,10 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		task.EndPage = splitPage
 		if updateErr := repo.UpdateTaskEndPage(taskID, task.EndPage); updateErr != nil {
 			utils.Warnf("[COMPLETE_SESSION] UpdateTaskEndPage failed: %v", updateErr)
+			if errors.Is(updateErr, db.ErrTaskNotActive) {
+				return map[string]interface{}{"error": "task is not active", "code": 409}
+			}
+			return map[string]interface{}{"error": updateErr.Error()}
 		}
 	}
 
