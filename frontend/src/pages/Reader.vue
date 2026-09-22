@@ -77,7 +77,7 @@
                     @click="onCompleteHereClick"
                   >
                     <span class="item-title">Complete Here (Page {{ reader.currentPage.value }})</span>
-                    <span class="item-desc">Wrap up session at this page & create quiz for pages {{ reader.effectiveMinPage.value }}–{{ reader.currentPage.value }}</span>
+                    <span class="item-desc">Wrap up session at this page & create quiz for pages {{ splitStartPage }}–{{ reader.currentPage.value }}</span>
                   </button>
                   <button
                     class="split-dropdown-item"
@@ -415,9 +415,14 @@ const showDeferMenu = ref(false)
 const canSplitHere = computed(() => {
   if (!resolvedTaskID.value) return false
   const cur = reader.currentPage.value || 0
-  const min = reader.effectiveMinPage.value || 0
-  const max = reader.effectiveMaxPage.value || 0
-  return cur >= min && cur < max
+  const min = sessionTask.value?.start_page || reader.effectiveMinPage.value || 1
+  const max = sessionTask.value?.end_page || reader.effectiveMaxPage.value || 1
+  // Can split if the assigned task has multiple pages and user has not reached the end page yet
+  return max > min && cur < max
+})
+
+const splitStartPage = computed(() => {
+  return sessionTask.value?.start_page || reader.effectiveMinPage.value || 1
 })
 
 function toggleDeferMenu() {
@@ -431,7 +436,8 @@ function onDeferQuizClick() {
 
 function onCompleteHereClick() {
   showDeferMenu.value = false
-  completeSession(false, reader.currentPage.value)
+  const cur = reader.currentPage.value || splitStartPage.value
+  completeSession(false, cur)
 }
 
 // ponytail: audio range selection reusing existing startTopicAudioOverview

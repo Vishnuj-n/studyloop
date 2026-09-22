@@ -9,6 +9,7 @@ import (
 	"ai-tutor/internal/app"
 	"ai-tutor/internal/utils"
 
+	"github.com/joho/godotenv"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -19,8 +20,15 @@ import (
 var assets embed.FS
 
 func main() {
+	_ = godotenv.Load()
+
 	// Create an instance of the app structure
 	a := app.NewApp()
+
+	lockID := "8f4e2a1b-9c3d-4e5f-b6a7-1c2d3e4f5a6b"
+	if os.Getenv("APP_ENV") == "dev" {
+		lockID = "studyloop-dev-instance-lock"
+	}
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -29,7 +37,7 @@ func main() {
 		Height:           768,
 		WindowStartState: options.Maximised,
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "8f4e2a1b-9c3d-4e5f-b6a7-1c2d3e4f5a6b",
+			UniqueId: lockID,
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				// ponytail: focus existing window if user opens executable again
 				if ctx := a.GetCtx(); ctx != nil {
