@@ -683,6 +683,11 @@ func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64) ([]models.SyncL
 // GetAllFlashcardsDeckOverview queries all cards grouped by notebook and topic, calculating retention metrics.
 func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.DeckOverviewResponse, error) {
 	query := `
+		WITH notebook_topic_links AS (
+			SELECT notebook_id, topic_id FROM notebook_topics
+			UNION
+			SELECT id AS notebook_id, topic_id FROM notebooks WHERE topic_id IS NOT NULL AND topic_id != ''
+		)
 		SELECT 
 			c.id, 
 			c.topic_id, 
@@ -697,14 +702,14 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			COALESCE(c.state_json, '') AS state_json
 		FROM fsrs_cards c
 		JOIN topics t ON c.topic_id = t.id
-		LEFT JOIN notebook_topics nt ON t.id = nt.topic_id
-		LEFT JOIN notebooks n ON nt.notebook_id = n.id
+		LEFT JOIN notebook_topic_links ntl ON t.id = ntl.topic_id
+		LEFT JOIN notebooks n ON ntl.notebook_id = n.id
 	`
 	var args []interface{}
 	profileID = strings.TrimSpace(profileID)
 	if profileID != "" {
-		query += ` WHERE (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
-		args = append(args, profileID)
+		query += ` WHERE (n.profile_id = ? OR (ntl.notebook_id IS NULL AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = ''))) `
+		args = append(args, profileID, profileID)
 	}
 	query += ` ORDER BY notebook_title ASC, topic_title ASC, c.due_at ASC, c.created_at ASC `
 
