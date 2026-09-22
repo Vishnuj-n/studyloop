@@ -1,32 +1,22 @@
-# What's New – v1.11.0
+# What's New
 
 ## ✨ Features
-- **Database Backup & Recovery**  
-  Introduced a robust backup system that creates atomic SQLite snapshots using `VACUUM INTO`, compresses them with gzip, and stores them safely. Users can now manually restore the latest backup directly from the **Settings → Database & Recovery** page, with clear status feedback and confirmation dialogs.
-
-- **Enhanced Upgrade Button Tooltip**  
-  The “Upgrade” deep‑button now displays a richer tooltip that explains the upgrade process in detail. A fallback message is also shown in the syllabus modal when upgrade information cannot be loaded.
+- **Installer & Fast‑Track Guidance**  
+  The README now includes a direct installer link, step‑by‑step fast‑track remediation instructions, and detailed guidance for using Ollama.
 
 ## 🚀 Improvements
-- **Flashcard Prompt Quality**  
-  Refined the wording and structure of flashcard prompts for a clearer learning experience. Added documentation on backup retention policies to help users understand how long backups are kept.
-
-- **Dashboard Refactor**  
-  Extracted `DashboardBanners` and `ProfileSwitcher` into their own components, simplifying the main Dashboard code and improving maintainability.
-
-- **General UI Polish**  
-  Minor visual tweaks and accessibility enhancements across the application.
+- **Consistent Flashcard Scheduling**  
+  The initial flashcard due‑date logic has been simplified: every newly generated card now starts with a uniform 24‑hour (`1 day`) offset, making the calibration process more predictable and easier to understand. Documentation in `doc/SCHEMA.md` has been updated accordingly.
 
 ## 🐛 Bug Fixes
 *No bug fixes in this release.*
 
 ## 🧹 Maintenance
-- Bumped project version to **v1.11.0**.
-- Updated release‑note templates and documentation for the previous release.
+- Version bump to **v1.11.1**.
 
 ## 📦 Full Changelog
-For a complete list of changes, see the commit history between the previous tag and **v1.11.0**.
-
----
+- Simplified the due‑date calculation for flashcards to a fixed 24‑hour offset.  
+- Updated schema documentation to reflect the new calibration approach.  
+- Added installer link, fast‑track remediation steps, and Ollama usage guidance to the README.
 
 Thanks for using Studyloop!
