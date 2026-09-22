@@ -135,6 +135,7 @@
         :active-theme="activeTheme"
         @theme-changed="onThemeChanged"
       />
+      <p v-if="themeError" class="buy-error-msg theme-error-msg">{{ themeError }}</p>
     </div>
 
     <!-- Mystery Chest Modal -->
@@ -172,6 +173,7 @@ const activeTheme = ref('dark-gruvbox')
 const userSettings = ref(null)
 const loadError = ref('')
 const buyError = ref('')
+const themeError = ref('')
 const profile = ref({
   level: 1,
   total_xp: 0,
@@ -306,26 +308,40 @@ async function handleBuyStreakFreeze() {
 }
 
 async function onThemeChanged(newTheme) {
+  const prevTheme = activeTheme.value
   activeTheme.value = newTheme
   localStorage.setItem('app-theme', newTheme)
   document.documentElement.setAttribute('data-theme', newTheme)
+
+  function rollback(errMsg) {
+    activeTheme.value = prevTheme
+    localStorage.setItem('app-theme', prevTheme)
+    document.documentElement.setAttribute('data-theme', prevTheme)
+    themeError.value = errMsg || 'Failed to save theme setting.'
+  }
+
   try {
     let current = userSettings.value
     if (!current) {
       current = await getUserSettings().catch(() => null)
     }
-    if (current && !current.error) {
-      const updated = { ...current, theme: newTheme }
-      const res = await updateUserSettings(updated)
-      if (res && res.error) {
-        console.error('Failed to update theme setting:', res.error)
-        return
-      }
-      userSettings.value = updated
-      window.dispatchEvent(new CustomEvent('settings-updated'))
+    if (!current || current.error) {
+      rollback(current?.error || 'Failed to load user settings for theme update.')
+      return
     }
+
+    const updated = { ...current, theme: newTheme }
+    const res = await updateUserSettings(updated)
+    if (res && res.error) {
+      rollback(res.error)
+      return
+    }
+    userSettings.value = updated
+    themeError.value = ''
+    window.dispatchEvent(new CustomEvent('settings-updated'))
   } catch (err) {
     console.error('Failed to update theme setting:', err)
+    rollback(err?.message || 'Failed to save theme setting.')
   }
 }
 
