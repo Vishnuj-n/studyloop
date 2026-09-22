@@ -24,6 +24,18 @@ func newClassicTestApp(t *testing.T) *App {
 	return app
 }
 
+func mustExtractQuizResult(t *testing.T, resp map[string]interface{}) models.QuizResult {
+	t.Helper()
+	if errVal, hasErr := resp["error"]; hasErr {
+		t.Fatalf("expected submit success, got error: %v", errVal)
+	}
+	result, ok := resp["result"].(models.QuizResult)
+	if !ok {
+		t.Fatalf("expected QuizResult payload, got %#v", resp["result"])
+	}
+	return result
+}
+
 func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *testing.T) {
 	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-fail", "topic-quiz-fail", "task-quiz-fail", 100)
@@ -32,14 +44,7 @@ func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *test
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
 	})
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected submit success, got error: %v", resp["error"])
-	}
-
-	result, ok := resp["result"].(models.QuizResult)
-	if !ok {
-		t.Fatalf("expected QuizResult payload, got %#v", resp["result"])
-	}
+	result := mustExtractQuizResult(t, resp)
 	if result.Passed {
 		t.Fatalf("expected failed quiz result")
 	}
@@ -88,14 +93,7 @@ func TestSubmitQuizAttemptAfterMaxReturnsManualReviewWithoutReread(t *testing.T)
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
 	})
-	if _, hasErr := resp["error"]; hasErr {
-		t.Fatalf("expected submit success, got error: %v", resp["error"])
-	}
-
-	result, ok := resp["result"].(models.QuizResult)
-	if !ok {
-		t.Fatalf("expected QuizResult payload, got %#v", resp["result"])
-	}
+	result := mustExtractQuizResult(t, resp)
 	if result.RereadTaskID != "" {
 		t.Fatalf("expected no reread task id after max automatic rereads, got %q", result.RereadTaskID)
 	}
