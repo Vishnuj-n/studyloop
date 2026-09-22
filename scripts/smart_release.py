@@ -388,25 +388,37 @@ def main():
     commit_msg = f"chore: version bump to {formatted_new_ver}"
     run_cmd(["git", "commit", "-m", commit_msg], check=True)
 
-    print(f"Pushing version bump commit to origin/{branch}...")
-    try:
-        run_cmd(["git", "push", "origin", branch], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"\n[ERROR] Failed to push version bump commit to origin/{branch}.", file=sys.stderr)
-        print("Aborting build and release process to prevent inconsistent release state.", file=sys.stderr)
-        sys.exit(1)
+    # NOTE: git push is intentionally deferred until after build and release
+    # succeed. Pushing early would leave the remote with a version bump commit
+    # that has no corresponding release if build.py or release.py fails.
 
     # 6. Run build.py
     print("\n=== Step 1/2: Running scripts/build.py ===")
     run_cmd([sys.executable, str(PROJECT_ROOT / "scripts" / "build.py")], check=True)
 
     if args.skip_release:
+        # Push now that the build succeeded (no full release to wait for).
+        print(f"\nPushing version bump commit to origin/{branch}...")
+        try:
+            run_cmd(["git", "push", "origin", branch], check=True)
+        except subprocess.CalledProcessError:
+            print(f"\n[ERROR] Failed to push version bump commit to origin/{branch}.", file=sys.stderr)
+            sys.exit(1)
         print(f"\n[INFO] Skipped release.py (--skip-release). Run 'python scripts/release.py {formatted_new_ver}' manually when ready.")
         return
 
     # 7. Run release.py (generates AI release notes and creates GitHub release)
     print("\n=== Step 2/2: Running scripts/release.py ===")
     run_cmd([sys.executable, str(PROJECT_ROOT / "scripts" / "release.py"), formatted_new_ver], check=True)
+
+    # 8. Push version bump commit only after the full release pipeline succeeds.
+    print(f"\nPushing version bump commit to origin/{branch}...")
+    try:
+        run_cmd(["git", "push", "origin", branch], check=True)
+    except subprocess.CalledProcessError:
+        print(f"\n[ERROR] Release completed but failed to push version bump commit to origin/{branch}.", file=sys.stderr)
+        print(f"Run 'git push origin {branch}' manually to sync the remote.", file=sys.stderr)
+        sys.exit(1)
 
     print(f"\nSmart release process completed successfully for {formatted_new_ver}!")
 
