@@ -71,6 +71,15 @@
                 </button>
                 <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
                   <button
+                    v-if="canSplitHere"
+                    class="split-dropdown-item"
+                    :disabled="completingSession"
+                    @click="onCompleteHereClick"
+                  >
+                    <span class="item-title">Complete Here (Page {{ reader.currentPage.value }})</span>
+                    <span class="item-desc">Wrap up session at this page & create quiz for pages {{ reader.effectiveMinPage.value }}–{{ reader.currentPage.value }}</span>
+                  </button>
+                  <button
                     class="split-dropdown-item"
                     :disabled="completingSession"
                     @click="onDeferQuizClick"
@@ -403,6 +412,14 @@ const completionMessage = ref('')
 const completionError = ref('')
 const showDeferMenu = ref(false)
 
+const canSplitHere = computed(() => {
+  if (!resolvedTaskID.value) return false
+  const cur = reader.currentPage.value || 0
+  const min = reader.effectiveMinPage.value || 0
+  const max = reader.effectiveMaxPage.value || 0
+  return cur >= min && cur < max
+})
+
 function toggleDeferMenu() {
   showDeferMenu.value = !showDeferMenu.value
 }
@@ -410,6 +427,11 @@ function toggleDeferMenu() {
 function onDeferQuizClick() {
   showDeferMenu.value = false
   completeSession(true)
+}
+
+function onCompleteHereClick() {
+  showDeferMenu.value = false
+  completeSession(false, reader.currentPage.value)
 }
 
 // ponytail: audio range selection reusing existing startTopicAudioOverview
@@ -619,7 +641,7 @@ function onNotebookChange() {
   // Don't call loadBundle() here - let user select a topic first
 }
 
-async function completeSession(deferQuiz = false) {
+async function completeSession(deferQuiz = false, splitPage = null) {
   if (completingSession.value || reader.loadingBundle.value || !resolvedTaskID.value) return
 
   completionError.value = ''
@@ -635,8 +657,9 @@ async function completeSession(deferQuiz = false) {
       resolvedTaskID: resolvedTaskID.value,
       actualArg: taskIDForCompletion,
       deferQuiz,
+      splitPage,
     })
-    const done = await completeReading(taskIDForCompletion)
+    const done = await completeReading(taskIDForCompletion, splitPage)
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
     if (done?.error) {
       completionError.value = done.error

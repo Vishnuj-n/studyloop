@@ -107,7 +107,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 	}
 }
 
-func (a *App) CompleteReading(taskID string) map[string]interface{} {
+func (a *App) CompleteReading(taskID string, splitPage ...int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -124,6 +124,14 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 			return map[string]interface{}{"error": "ErrNotFound", "code": 404}
 		}
 		return map[string]interface{}{"error": err.Error()}
+	}
+
+	// ponytail: handle split session ("Complete Here") by truncating task.EndPage
+	if len(splitPage) > 0 && splitPage[0] >= task.StartPage && splitPage[0] < task.EndPage {
+		task.EndPage = splitPage[0]
+		if updateErr := repo.UpdateTaskEndPage(taskID, task.EndPage); updateErr != nil {
+			utils.Warnf("[COMPLETE_SESSION] UpdateTaskEndPage failed: %v", updateErr)
+		}
 	}
 
 	queueTask, qErr := repo.GetTaskByID(taskID)

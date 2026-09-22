@@ -215,6 +215,16 @@ func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.Com
 	return nil
 }
 
+// UpdateTaskEndPage updates the end_page of an active reading task (e.g. for split sessions).
+func (r *Repository) UpdateTaskEndPage(taskID string, endPage int) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
+	}
+	_, err := r.db.Exec(`UPDATE study_queue SET end_page = ? WHERE id = ? AND status IN ('ACTIVE', 'RESERVED')`, endPage, taskID)
+	return err
+}
+
 // CompleteTask marks ACTIVE task as terminal and inserts explicit follow-up tasks transactionally.
 func (r *Repository) CompleteTask(taskID string, result models.CompletionResult) error {
 	utils.Warnf("[QUEUE] CompleteTask transaction start taskID=%s", strings.TrimSpace(taskID))

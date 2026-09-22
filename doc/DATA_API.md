@@ -54,6 +54,11 @@ Returns full context: task, block content, topic info.
 
 ## Reader Module API
 
+### CompleteReading
+Completes an active reading task, generates a scoped quiz from read chunks, awards rewards, and seeds the next pending reading session.
+- **Parameters:** `taskID` (string), optional `splitPage` (int).
+- **Split Session ("Complete Here"):** When `splitPage` is provided ($start\_page \le splitPage < end\_page$), truncates session boundary to $splitPage$, updates SQLite queue record, restricts quiz chunk scope to $[start\_page \dots splitPage]$, and seeds remainder ($splitPage+1 \dots$) for the subsequent session.
+
 ### GetBlockContent
 Returns content for a reading block: id, content, word_count, start_page, end_page, order_index, topic_id.
 
