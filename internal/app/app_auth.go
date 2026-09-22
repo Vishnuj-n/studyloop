@@ -2,18 +2,35 @@ package app
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"ai-tutor/internal/runtime"
 	"ai-tutor/internal/utils"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// ClerkPublishableKey can be set at compile time via:
+// -ldflags "-X ai-tutor/internal/app.ClerkPublishableKey=pk_live_..."
+var ClerkPublishableKey string
+
+const (
+	tenDaysSec        = 10 * 24 * 60 * 60
+	sessionSecretSalt = "studyloop-desktop-auth-salt-v1-wails"
 )
 
 type AuthCallbackResult struct {
@@ -24,47 +41,152 @@ type AuthCallbackResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+type persistentSession struct {
+	UserID     string `json:"userId"`
+	Email      string `json:"email"`
+	IsPro      bool   `json:"isPro"`
+	VerifiedAt int64  `json:"verifiedAt"`
+	Signature  string `json:"signature"`
+}
+
 type authServerState struct {
-	mu     sync.Mutex
-	server *http.Server
+	mu         sync.Mutex
+	server     *http.Server
+	stateNonce string
 }
 
 var activeAuthServer = &authServerState{}
 
-// setSession sets the active session in memory.
+func getMachineID() string {
+	h, _ := os.Hostname()
+	u := os.Getenv("USERNAME")
+	if u == "" {
+		u = os.Getenv("USER")
+	}
+	return strings.TrimSpace(h + "::" + u)
+}
+
+func computeSessionSignature(machineID, userID, email string, isPro bool, verifiedAt int64) string {
+	payload := fmt.Sprintf("%s|%s|%s|%t|%d", machineID, userID, email, isPro, verifiedAt)
+	mac := hmac.New(sha256.New, []byte(sessionSecretSalt))
+	mac.Write([]byte(payload))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func getSessionFilePath() (string, error) {
+	dir, err := runtime.ResolveAppDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "session.json"), nil
+}
+
+func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64) {
+	filePath, err := getSessionFilePath()
+	if err != nil {
+		utils.Warnf("[AUTH] Failed to resolve session file path: %v", err)
+		return
+	}
+
+	sig := computeSessionSignature(getMachineID(), userID, email, isPro, verifiedAt)
+	sess := persistentSession{
+		UserID:     userID,
+		Email:      email,
+		IsPro:      isPro,
+		VerifiedAt: verifiedAt,
+		Signature:  sig,
+	}
+
+	data, err := json.MarshalIndent(sess, "", "  ")
+	if err != nil {
+		utils.Warnf("[AUTH] Failed to marshal session: %v", err)
+		return
+	}
+
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+		utils.Warnf("[AUTH] Failed to write session file: %v", err)
+	}
+}
+
+// setSession sets the active session in memory and persists signed session to disk.
 func (a *App) setSession(userID, email string, isPro bool) {
+	now := time.Now().Unix()
 	a.sessionMu.Lock()
-	defer a.sessionMu.Unlock()
 	a.sessionUserID = userID
 	a.sessionEmail = email
 	a.sessionIsPro = isPro
-	a.sessionVerifiedAt = time.Now().Unix()
+	a.sessionVerifiedAt = now
+	a.sessionMu.Unlock()
+
+	a.persistSession(userID, email, isPro, now)
 }
 
 // RestoreSession allows frontend to re-hydrate offline session on launch within grace period.
+// Untrusted frontend arguments are discarded to prevent DevTools/localStorage tampering;
+// session is verified from machine-bound signed storage on disk.
 func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
-	const tenDaysSec = 10 * 24 * 60 * 60
-	now := time.Now().Unix()
-	if isPro && verifiedAt > 0 && (now-verifiedAt) > tenDaysSec {
-		isPro = false
+	filePath, err := getSessionFilePath()
+	if err != nil {
+		utils.Warnf("[AUTH] Could not resolve session file path: %v", err)
+		a.applyRestoredSession("", "", false, 0)
+		return false
 	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		// File does not exist or unreadable -> no offline session
+		a.applyRestoredSession("", "", false, 0)
+		return false
+	}
+
+	var sess persistentSession
+	if err := json.Unmarshal(data, &sess); err != nil {
+		utils.Warnf("[AUTH] Invalid session JSON format: %v", err)
+		a.applyRestoredSession("", "", false, 0)
+		return false
+	}
+
+	// Verify HMAC signature
+	expectedSig := computeSessionSignature(getMachineID(), sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
+	if !hmac.Equal([]byte(sess.Signature), []byte(expectedSig)) {
+		utils.Warnf("[AUTH] Session signature mismatch or tampering detected. Downgrading to free.")
+		a.applyRestoredSession(sess.UserID, sess.Email, false, 0)
+		return false
+	}
+
+	// Check 10-day offline grace period
+	now := time.Now().Unix()
+	actualIsPro := sess.IsPro
+	if actualIsPro && sess.VerifiedAt > 0 && (now-sess.VerifiedAt) > tenDaysSec {
+		utils.Warnf("[AUTH] Session 10-day grace period expired. Re-verification required.")
+		actualIsPro = false
+	}
+
+	a.applyRestoredSession(sess.UserID, sess.Email, actualIsPro, sess.VerifiedAt)
+	return actualIsPro
+}
+
+func (a *App) applyRestoredSession(userID, email string, isPro bool, verifiedAt int64) {
 	a.sessionMu.Lock()
 	defer a.sessionMu.Unlock()
 	a.sessionUserID = userID
 	a.sessionEmail = email
 	a.sessionIsPro = isPro
 	a.sessionVerifiedAt = verifiedAt
-	return isPro
 }
 
-// ClearSession clears the current in-memory session.
+// ClearSession clears the current in-memory session and removes disk cache.
 func (a *App) ClearSession() {
 	a.sessionMu.Lock()
-	defer a.sessionMu.Unlock()
 	a.sessionUserID = ""
 	a.sessionEmail = ""
 	a.sessionIsPro = false
 	a.sessionVerifiedAt = 0
+	a.sessionMu.Unlock()
+
+	if filePath, err := getSessionFilePath(); err == nil {
+		_ = os.Remove(filePath)
+	}
 }
 
 // IsProUser returns true only if the active session is an authenticated Pro user.
@@ -86,6 +208,19 @@ func (a *App) getUserSession() map[string]interface{} {
 	}
 }
 
+func resolveClerkPublishableKey() string {
+	if ClerkPublishableKey != "" {
+		return ClerkPublishableKey
+	}
+	if k := os.Getenv("VITE_CLERK_PUBLISHABLE_KEY"); k != "" {
+		return k
+	}
+	if k := os.Getenv("CLERK_PUBLISHABLE_KEY"); k != "" {
+		return k
+	}
+	return ""
+}
+
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.
 func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 	utils.Infof("[AUTH] StartBrowserAuth requested with mode: %s", mode)
@@ -93,8 +228,16 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 	if activeAuthServer.server != nil {
 		_ = activeAuthServer.server.Close()
 		activeAuthServer.server = nil
+		activeAuthServer.stateNonce = ""
 	}
 	activeAuthServer.mu.Unlock()
+
+	// Generate a 16-byte random hex nonce (32 hex characters) for CSRF/loopback protection
+	nonceBytes := make([]byte, 16)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		utils.Warnf("[AUTH] Failed to generate crypto nonce: %v", err)
+	}
+	stateNonce := hex.EncodeToString(nonceBytes)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -103,7 +246,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 	}
 
 	port := listener.Addr().(*net.TCPAddr).Port
-	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/callback?state=%s", port, stateNonce)
 	utils.Infof("[AUTH] Created loopback server on port %d with callback: %s", port, callbackURL)
 
 	mux := http.NewServeMux()
@@ -113,14 +256,13 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
 	activeAuthServer.mu.Lock()
 	activeAuthServer.server = server
+	activeAuthServer.stateNonce = stateNonce
 	activeAuthServer.mu.Unlock()
 
-	clerkKey := os.Getenv("VITE_CLERK_PUBLISHABLE_KEY")
+	clerkKey := resolveClerkPublishableKey()
 	if clerkKey == "" {
-		clerkKey = os.Getenv("CLERK_PUBLISHABLE_KEY")
-	}
-	if clerkKey == "" {
-		clerkKey = "pk_test_aW5ub2NlbnQtb3JjYS01NjA1LmNsZXJrLmFjY291bnRzLmRldiQ="
+		// In development, log notice
+		utils.Warnf("[AUTH] No Clerk publishable key configured via ldflags or environment variables")
 	}
 
 	mux.HandleFunc("/api/auth-confirm", func(rw http.ResponseWriter, req *http.Request) {
@@ -135,6 +277,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			IsPro  bool   `json:"isPro"`
 			Plan   string `json:"plan"`
 			Role   string `json:"role"`
+			State  string `json:"state"`
 		}
 
 		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
@@ -143,7 +286,26 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			return
 		}
 
-		isPro := payload.IsPro || payload.Plan == "pro" || payload.Role == "pro"
+		// Verify state nonce
+		activeAuthServer.mu.Lock()
+		expectedState := activeAuthServer.stateNonce
+		activeAuthServer.mu.Unlock()
+
+		headerState := req.Header.Get("X-Auth-State")
+		incomingState := payload.State
+		if incomingState == "" {
+			incomingState = headerState
+		}
+
+		if expectedState == "" || incomingState != expectedState {
+			utils.Warnf("[AUTH] /api/auth-confirm rejected: invalid state nonce")
+			http.Error(rw, "Forbidden: invalid state nonce", http.StatusForbidden)
+			return
+		}
+
+		plan := strings.ToLower(strings.TrimSpace(payload.Plan))
+		role := strings.ToLower(strings.TrimSpace(payload.Role))
+		isPro := payload.IsPro || plan == "pro" || role == "pro"
 		utils.Infof("[AUTH] Authoritative Clerk JS sync: user=%s email=%s plan=%s role=%s -> isPro=%v",
 			payload.UserID, payload.Email, payload.Plan, payload.Role, isPro)
 
@@ -172,6 +334,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			if activeAuthServer.server == server {
 				_ = activeAuthServer.server.Close()
 				activeAuthServer.server = nil
+				activeAuthServer.stateNonce = ""
 			}
 			activeAuthServer.mu.Unlock()
 		}()
@@ -179,14 +342,40 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
 	mux.HandleFunc("/callback", func(rw http.ResponseWriter, req *http.Request) {
 		q := req.URL.Query()
-		userID := q.Get("user_id")
-		email := q.Get("email")
-		isProStr := q.Get("is_pro")
-		isPro := isProStr == "true" || isProStr == "1"
+		givenState := q.Get("state")
 
+		activeAuthServer.mu.Lock()
+		expectedState := activeAuthServer.stateNonce
+		activeAuthServer.mu.Unlock()
+
+		if expectedState == "" || givenState != expectedState {
+			utils.Warnf("[AUTH] /callback rejected: state nonce mismatch")
+			http.Error(rw, "Forbidden: invalid state nonce", http.StatusForbidden)
+			return
+		}
+
+		userID := q.Get("user_id")
+		if userID == "" {
+			userID = q.Get("userId")
+		}
+		if userID == "" {
+			userID = q.Get("id")
+		}
+
+		email := q.Get("email")
 		if email == "" {
 			email = q.Get("primary_email_address")
 		}
+
+		planStr := strings.ToLower(strings.TrimSpace(q.Get("plan")))
+		roleStr := strings.ToLower(strings.TrimSpace(q.Get("role")))
+		isProStr := strings.ToLower(strings.TrimSpace(q.Get("is_pro")))
+		if isProStr == "" {
+			isProStr = strings.ToLower(strings.TrimSpace(q.Get("isPro")))
+		}
+
+		isPro := isProStr == "true" || isProStr == "1" || isProStr == "pro" || isProStr == "yes" || planStr == "pro" || roleStr == "pro"
+
 		if email == "" {
 			email = "Authenticated User"
 		}
@@ -217,6 +406,11 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		if userDisplay == "" {
 			userDisplay = "Pro User"
 		}
+
+		escapedClerkKey := html.EscapeString(clerkKey)
+		escapedUserDisplay := html.EscapeString(userDisplay)
+		escapedState := html.EscapeString(expectedState)
+
 		responseHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -281,85 +475,77 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
       box-shadow:
         0 25px 50px -12px rgba(0, 0, 0, 0.6),
         0 0 0 1px rgba(255, 255, 255, 0.05),
-        0 0 40px rgba(99, 102, 241, 0.12);
-      animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    @keyframes cardAppear {
-      from { opacity: 0; transform: translateY(16px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
     .brand-row {
-      display: inline-flex;
+      display: flex;
       align-items: center;
+      justify-content: center;
       gap: 10px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .brand-logo {
       width: 32px;
       height: 32px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #6366f1, #3b82f6);
-      color: #ffffff;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Manrope', sans-serif;
       font-weight: 800;
-      font-size: 17px;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+      font-size: 16px;
+      color: #fff;
     }
     .brand-name {
       font-family: 'Manrope', sans-serif;
-      font-size: 15px;
       font-weight: 700;
-      letter-spacing: -0.01em;
+      font-size: 18px;
       color: #f8fafc;
+      letter-spacing: -0.3px;
     }
     .success-icon-wrap {
       width: 72px;
       height: 72px;
-      margin: 0 auto 20px auto;
       border-radius: 50%%;
       background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      border: 1.5px solid rgba(16, 185, 129, 0.35);
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      animation: pulseGlow 2.5s infinite;
+      margin: 0 auto 20px;
+      animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
-    @keyframes pulseGlow {
-      0%% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-      70%% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0); }
-      100%% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    @keyframes popIn {
+      0%% { transform: scale(0.5); opacity: 0; }
+      100%% { transform: scale(1); opacity: 1; }
     }
     .check-svg {
       width: 36px;
       height: 36px;
       stroke: #10b981;
       stroke-width: 2.5;
+      fill: none;
       stroke-linecap: round;
       stroke-linejoin: round;
-      fill: none;
     }
     h1 {
       font-family: 'Manrope', sans-serif;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      color: #f8fafc;
       margin-bottom: 8px;
+      letter-spacing: -0.4px;
     }
     .user-badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 5px 14px;
-      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 4px 12px;
       font-size: 13px;
-      color: #cbd5e1;
+      color: #94a3b8;
       margin-bottom: 18px;
     }
     .user-dot {
@@ -427,41 +613,69 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
   <script>
     window.addEventListener('load', async () => {
+      let isPro = false;
+      let email = '';
+      let userId = '';
+      let plan = '';
+      let role = '';
+      const stateNonce = "%s";
+
       try {
         if (window.Clerk) {
           await window.Clerk.load();
-          const user = window.Clerk.user;
-          if (user) {
-            const meta = user.publicMetadata || {};
-            const isPro = meta.role === 'pro' || meta.plan === 'pro' || meta.is_pro === true;
-            const email = user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : '';
-            const userId = user.id;
+          if (window.Clerk.user) {
+            userId = window.Clerk.user.id || '';
+            email = window.Clerk.user.primaryEmailAddress?.emailAddress || '';
+            const pubMetadata = window.Clerk.user.publicMetadata || {};
+            plan = String(pubMetadata.plan || pubMetadata.tier || '').toLowerCase();
+            role = String(pubMetadata.role || '').toLowerCase();
+            isPro = pubMetadata.isPro === true || pubMetadata.is_pro === true || plan === 'pro' || role === 'pro';
 
-            const emailEl = document.getElementById('user-display-email');
-            if (emailEl && email) {
-              emailEl.textContent = email + (isPro ? ' (★ Pro Plan)' : ' (Free Plan)');
+            if (!isPro && Array.isArray(window.Clerk.user.organizationMemberships)) {
+              for (const org of window.Clerk.user.organizationMemberships) {
+                const orgRole = String(org.role || '').toLowerCase();
+                if (orgRole.includes('pro') || orgRole.includes('admin') || orgRole.includes('member')) {
+                  isPro = true;
+                  break;
+                }
+              }
             }
-
-            await fetch('/api/auth-confirm', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: userId,
-                email: email,
-                isPro: isPro,
-                plan: meta.plan || '',
-                role: meta.role || ''
-              })
-            });
           }
         }
-      } catch (err) {
-        console.warn('[AUTH] Clerk metadata sync error:', err);
+      } catch (clerkErr) {
+        console.warn('[AUTH] Clerk.load error on callback page:', clerkErr);
+      }
+
+      // Update UI badge
+      const emailEl = document.getElementById('user-display-email');
+      if (emailEl && (email || userId)) {
+        emailEl.textContent = (email || userId) + (isPro ? ' (★ Pro Plan)' : ' (Free Plan)');
+      }
+
+      // Send authoritative confirmation to Go backend with state nonce
+      try {
+        await fetch('/api/auth-confirm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Auth-State': stateNonce
+          },
+          body: JSON.stringify({
+            userId: userId || 'user_' + Date.now(),
+            email: email || 'User',
+            isPro: isPro,
+            plan: plan || '',
+            role: role || '',
+            state: stateNonce
+          })
+        });
+      } catch (fetchErr) {
+        console.warn('[AUTH] Auth confirm post error:', fetchErr);
       }
     });
   </script>
 </body>
-</html>`, clerkKey, userDisplay)
+</html>`, escapedClerkKey, escapedUserDisplay, escapedState)
 
 		_, _ = rw.Write([]byte(responseHTML))
 
@@ -472,6 +686,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			if activeAuthServer.server == server {
 				_ = activeAuthServer.server.Close()
 				activeAuthServer.server = nil
+				activeAuthServer.stateNonce = ""
 			}
 			activeAuthServer.mu.Unlock()
 		}()
@@ -488,6 +703,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		if activeAuthServer.server == server {
 			_ = server.Shutdown(context.Background())
 			activeAuthServer.server = nil
+			activeAuthServer.stateNonce = ""
 		}
 		activeAuthServer.mu.Unlock()
 	}()

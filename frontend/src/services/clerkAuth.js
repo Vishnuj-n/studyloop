@@ -8,15 +8,16 @@ const authError = ref('')
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
 
-function syncWithBackend() {
+async function syncWithBackend() {
   if (user.value) {
     try {
-      restoreSession(
+      const verifiedPro = await restoreSession(
         user.value.id || '',
         user.value.email || '',
         isPro.value,
         Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
       )
+      isPro.value = Boolean(verifiedPro)
     } catch (err) {
       console.warn('[AUTH] Could not sync session with backend:', err)
     }

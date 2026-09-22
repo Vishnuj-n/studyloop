@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -107,7 +108,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 	}
 }
 
-func (a *App) CompleteReading(taskID string) map[string]interface{} {
+func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -116,7 +117,7 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 	if taskID == "" {
 		return map[string]interface{}{"error": "task ID is required", "code": 400}
 	}
-	utils.Infof("[COMPLETE_SESSION] CompleteReading entry taskID=%s", taskID)
+	utils.Infof("[COMPLETE_SESSION] CompleteReading entry taskID=%s splitPage=%d", taskID, splitPage)
 
 	task, err := repo.GetReadingTask(taskID)
 	if err != nil {
@@ -124,6 +125,18 @@ func (a *App) CompleteReading(taskID string) map[string]interface{} {
 			return map[string]interface{}{"error": "ErrNotFound", "code": 404}
 		}
 		return map[string]interface{}{"error": err.Error()}
+	}
+
+	// ponytail: handle split session ("Complete Here") by truncating task.EndPage
+	if splitPage > 0 && splitPage >= task.StartPage && splitPage < task.EndPage {
+		task.EndPage = splitPage
+		if updateErr := repo.UpdateTaskEndPage(taskID, task.EndPage); updateErr != nil {
+			utils.Warnf("[COMPLETE_SESSION] UpdateTaskEndPage failed: %v", updateErr)
+			if errors.Is(updateErr, db.ErrTaskNotActive) {
+				return map[string]interface{}{"error": "task is not active", "code": 409}
+			}
+			return map[string]interface{}{"error": updateErr.Error()}
+		}
 	}
 
 	queueTask, qErr := repo.GetTaskByID(taskID)

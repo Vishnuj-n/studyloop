@@ -370,6 +370,7 @@ async function setActiveProfile(profileID) {
   settings.value.active_profile_id = profileID
   try {
     await saveUserSettings(true)
+    await loadSettings()
   } catch (err) {
     settings.value.active_profile_id = prev
     error.value = 'Failed to switch profile'

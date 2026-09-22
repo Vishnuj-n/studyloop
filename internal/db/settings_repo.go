@@ -132,20 +132,62 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		}
 	}
 
-	// Read active profile's cloud credentials if available
+	// Read active profile's settings & cloud credentials if available
 	if s.ActiveProfileID != "" {
-		var profClassroom, profUser, profToken sql.NullString
+		var profClassroom, profUser, profToken, profTheme, profStrategy, profTutorStyle sql.NullString
+		var profTargetWords, profMinWords, profMaxFlashcards, profMaxActive sql.NullInt64
+		var profQuizCount, profQuizScore sql.NullInt64
+		var profSkipToReading sql.NullBool
+
 		err := r.db.QueryRow(`
-			SELECT COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, '')
+			SELECT COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
+			       theme, default_remedial_strategy, tutor_style,
+			       target_session_words, min_session_words, max_flashcards_per_session, max_active_notebooks,
+			       quiz_question_count, quiz_passing_score, skip_to_reading_active
 			FROM study_profiles
 			WHERE id = ?
-		`, s.ActiveProfileID).Scan(&profClassroom, &profUser, &profToken)
+		`, s.ActiveProfileID).Scan(
+			&profClassroom, &profUser, &profToken,
+			&profTheme, &profStrategy, &profTutorStyle,
+			&profTargetWords, &profMinWords, &profMaxFlashcards, &profMaxActive,
+			&profQuizCount, &profQuizScore, &profSkipToReading,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query active profile credentials: %w", err)
+			return nil, fmt.Errorf("failed to query active profile credentials and settings: %w", err)
 		}
 		s.ClassroomCode = profClassroom.String
 		s.StudentUsername = profUser.String
 		s.CloudAPIToken = profToken.String
+		if profTheme.Valid && strings.TrimSpace(profTheme.String) != "" {
+			s.Theme = profTheme.String
+		}
+		if profStrategy.Valid && strings.TrimSpace(profStrategy.String) != "" {
+			s.DefaultRemedialStrategy = profStrategy.String
+		}
+		if profTutorStyle.Valid && strings.TrimSpace(profTutorStyle.String) != "" {
+			s.TutorStyle = profTutorStyle.String
+		}
+		if profTargetWords.Valid && profTargetWords.Int64 > 0 {
+			s.TargetSessionWords = int(profTargetWords.Int64)
+		}
+		if profMinWords.Valid && profMinWords.Int64 >= 0 {
+			s.MinSessionWords = int(profMinWords.Int64)
+		}
+		if profMaxFlashcards.Valid && profMaxFlashcards.Int64 > 0 {
+			s.MaxFlashcardsPerSession = int(profMaxFlashcards.Int64)
+		}
+		if profMaxActive.Valid && profMaxActive.Int64 >= 0 {
+			s.MaxActiveNotebooks = int(profMaxActive.Int64)
+		}
+		if profQuizCount.Valid && profQuizCount.Int64 > 0 {
+			s.QuizQuestionCount = int(profQuizCount.Int64)
+		}
+		if profQuizScore.Valid && profQuizScore.Int64 > 0 {
+			s.QuizPassingScore = int(profQuizScore.Int64)
+		}
+		if profSkipToReading.Valid {
+			s.SkipToReadingActive = profSkipToReading.Bool
+		}
 	}
 
 	return &s, nil
@@ -225,7 +267,11 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			tutor_style = excluded.tutor_style,
 			updated_at = CURRENT_TIMESTAMP
 	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetLastSyncedAt updates the last_synced_at timestamp after a successful cloud sync.
@@ -453,7 +499,9 @@ func sameLLMConfig(a, b models.LLMTierSettings) bool {
 func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	rows, err := r.db.Query(`
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
-		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0)
+		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
+		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
+		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, '')
 		FROM study_profiles
 		ORDER BY created_at DESC
 	`)
@@ -469,9 +517,43 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	profiles := make([]models.StudyProfile, 0)
 	for rows.Next() {
 		var p models.StudyProfile
-		if err := rows.Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
-			&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle); err != nil {
+		var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
+		var skipRead sql.NullBool
+		if err := rows.Scan(
+			&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
+			&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
+			&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
+			&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+		); err != nil {
 			return nil, err
+		}
+		if targetWords.Valid {
+			v := int(targetWords.Int64)
+			p.TargetSessionWords = &v
+		}
+		if minWords.Valid {
+			v := int(minWords.Int64)
+			p.MinSessionWords = &v
+		}
+		if maxCards.Valid {
+			v := int(maxCards.Int64)
+			p.MaxFlashcardsPerSession = &v
+		}
+		if maxActive.Valid {
+			v := int(maxActive.Int64)
+			p.MaxActiveNotebooks = &v
+		}
+		if skipRead.Valid {
+			v := skipRead.Bool
+			p.SkipToReadingActive = &v
+		}
+		if quizCount.Valid {
+			v := int(quizCount.Int64)
+			p.QuizQuestionCount = &v
+		}
+		if quizScore.Valid {
+			v := int(quizScore.Int64)
+			p.QuizPassingScore = &v
 		}
 		profiles = append(profiles, p)
 	}
@@ -484,18 +566,54 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 // GetProfileByID retrieves a specific profile by ID.
 func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	var p models.StudyProfile
+	var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
+	var skipRead sql.NullBool
 	err := r.db.QueryRow(`
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
-		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0)
+		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
+		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
+		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, '')
 		FROM study_profiles
 		WHERE id = ?
-	`, id).Scan(&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
-		&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle)
+	`, id).Scan(
+		&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
+		&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
+		&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
+		&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if targetWords.Valid {
+		v := int(targetWords.Int64)
+		p.TargetSessionWords = &v
+	}
+	if minWords.Valid {
+		v := int(minWords.Int64)
+		p.MinSessionWords = &v
+	}
+	if maxCards.Valid {
+		v := int(maxCards.Int64)
+		p.MaxFlashcardsPerSession = &v
+	}
+	if maxActive.Valid {
+		v := int(maxActive.Int64)
+		p.MaxActiveNotebooks = &v
+	}
+	if skipRead.Valid {
+		v := skipRead.Bool
+		p.SkipToReadingActive = &v
+	}
+	if quizCount.Valid {
+		v := int(quizCount.Int64)
+		p.QuizQuestionCount = &v
+	}
+	if quizScore.Valid {
+		v := int(quizScore.Int64)
+		p.QuizPassingScore = &v
 	}
 	return &p, nil
 }
@@ -511,19 +629,42 @@ func (r *Repository) CreateProfile(p models.StudyProfile) error {
 		brk = 300
 	}
 	_, err := r.db.Exec(`
-		INSERT INTO study_profiles (id, name, deadline_at, classroom_code, student_username, cloud_api_token, pomo_duration_sec, pomo_break_sec, pomo_music_path, pomo_shuffle)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken, dur, brk, p.PomoMusicPath, p.PomoShuffle)
+		INSERT INTO study_profiles (
+			id, name, deadline_at, classroom_code, student_username, cloud_api_token,
+			pomo_duration_sec, pomo_break_sec, pomo_music_path, pomo_shuffle,
+			target_session_words, min_session_words, theme, max_flashcards_per_session,
+			max_active_notebooks, skip_to_reading_active, default_remedial_strategy,
+			quiz_question_count, quiz_passing_score, tutor_style
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken,
+		dur, brk, p.PomoMusicPath, p.PomoShuffle,
+		p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
+		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
+		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle)
 	return err
 }
 
-// UpdateProfile updates an existing profile.
+// UpdateProfile updates an existing profile metadata and settings.
 func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 	_, err := r.db.Exec(`
 		UPDATE study_profiles
-		SET name = ?, deadline_at = ?
+		SET name = ?,
+		    deadline_at = ?,
+		    target_session_words = ?,
+		    min_session_words = ?,
+		    theme = ?,
+		    max_flashcards_per_session = ?,
+		    max_active_notebooks = ?,
+		    skip_to_reading_active = ?,
+		    default_remedial_strategy = ?,
+		    quiz_question_count = ?,
+		    quiz_passing_score = ?,
+		    tutor_style = ?
 		WHERE id = ?
-	`, p.Name, p.DeadlineAt, p.ID)
+	`, p.Name, p.DeadlineAt, p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
+		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
+		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, p.ID)
 	return err
 }
 

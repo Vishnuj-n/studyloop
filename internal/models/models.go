@@ -381,6 +381,63 @@ type Flashcard struct {
 	Suspended     bool   `json:"suspended"`
 }
 
+// DeckCardDetail represents a rich flashcard item with notebook and topic context for deck management.
+type DeckCardDetail struct {
+	ID            string  `json:"id"`
+	NotebookID    string  `json:"notebook_id"`
+	NotebookTitle string  `json:"notebook_title"`
+	TopicID       string  `json:"topic_id"`
+	TopicTitle    string  `json:"topic_title"`
+	Prompt        string  `json:"prompt"`
+	Answer        string  `json:"answer"`
+	DueAt         int64   `json:"due_at"`
+	Suspended     bool    `json:"suspended"`
+	CreatedAt     string  `json:"created_at"`
+	Stability     float64 `json:"stability"`
+	Difficulty    float64 `json:"difficulty"`
+	Reps          int     `json:"reps"`
+	Lapses        int     `json:"lapses"`
+	StateCode     int     `json:"state_code"` // 0=New, 1=Learning, 2=Review, 3=Relearning
+}
+
+// DeckTopicGroup aggregates flashcards under a specific topic.
+type DeckTopicGroup struct {
+	TopicID    string           `json:"topic_id"`
+	TopicTitle string           `json:"topic_title"`
+	TotalCards int              `json:"total_cards"`
+	DueCards   int              `json:"due_cards"`
+	Cards      []DeckCardDetail `json:"cards"`
+}
+
+// NotebookDeckGroup aggregates topics and flashcards under a specific notebook.
+type NotebookDeckGroup struct {
+	NotebookID     string           `json:"notebook_id"`
+	NotebookTitle  string           `json:"notebook_title"`
+	TotalCards     int              `json:"total_cards"`
+	DueCards       int              `json:"due_cards"`
+	SuspendedCards int              `json:"suspended_cards"`
+	IsAllSuspended bool             `json:"is_all_suspended"`
+	Topics         []DeckTopicGroup `json:"topics"`
+}
+
+// DeckMetrics aggregates top-level retention metrics across all flashcard decks.
+type DeckMetrics struct {
+	TotalCards     int `json:"total_cards"`
+	DueToday       int `json:"due_today"`
+	ActiveCards    int `json:"active_cards"`
+	SuspendedCards int `json:"suspended_cards"`
+	NewCards       int `json:"new_cards"`
+	LearningCards  int `json:"learning_cards"`
+	YoungCards     int `json:"young_cards"`
+	MatureCards    int `json:"mature_cards"`
+}
+
+// DeckOverviewResponse encapsulates all decks and overall metrics.
+type DeckOverviewResponse struct {
+	Metrics   DeckMetrics         `json:"metrics"`
+	Notebooks []NotebookDeckGroup `json:"notebooks"`
+}
+
 // FlashcardState stores the local review scheduler state in fsrs_cards.state_json.
 type FlashcardState struct {
 	Stability     float64 `json:"stability"`
@@ -551,17 +608,27 @@ type ReadingSessionResponse struct {
 
 // StudyProfile represents a user's study profile (e.g. UPSC prep).
 type StudyProfile struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	DeadlineAt      int64  `json:"deadline_at"` // Unix timestamp
-	CreatedAt       string `json:"created_at,omitempty"`
-	ClassroomCode   string `json:"classroom_code,omitempty"`
-	StudentUsername string `json:"student_username,omitempty"`
-	CloudAPIToken   string `json:"cloud_api_token,omitempty"`
-	PomoDurationSec int    `json:"pomo_duration_sec"`
-	PomoBreakSec    int    `json:"pomo_break_sec"`
-	PomoMusicPath   string `json:"pomo_music_path"`
-	PomoShuffle     bool   `json:"pomo_shuffle"`
+	ID                     string `json:"id"`
+	Name                   string `json:"name"`
+	DeadlineAt             int64  `json:"deadline_at"` // Unix timestamp
+	CreatedAt              string `json:"created_at,omitempty"`
+	ClassroomCode          string `json:"classroom_code,omitempty"`
+	StudentUsername        string `json:"student_username,omitempty"`
+	CloudAPIToken          string `json:"cloud_api_token,omitempty"`
+	PomoDurationSec        int    `json:"pomo_duration_sec"`
+	PomoBreakSec           int    `json:"pomo_break_sec"`
+	PomoMusicPath          string `json:"pomo_music_path"`
+	PomoShuffle            bool   `json:"pomo_shuffle"`
+	TargetSessionWords     *int   `json:"target_session_words,omitempty"`
+	MinSessionWords        *int   `json:"min_session_words,omitempty"`
+	Theme                  string `json:"theme,omitempty"`
+	MaxFlashcardsPerSession *int   `json:"max_flashcards_per_session,omitempty"`
+	MaxActiveNotebooks     *int   `json:"max_active_notebooks,omitempty"`
+	SkipToReadingActive    *bool  `json:"skip_to_reading_active,omitempty"`
+	DefaultRemedialStrategy string `json:"default_remedial_strategy,omitempty"`
+	QuizQuestionCount      *int   `json:"quiz_question_count,omitempty"`
+	QuizPassingScore       *int   `json:"quiz_passing_score,omitempty"`
+	TutorStyle             string `json:"tutor_style,omitempty"`
 }
 
 // UserSettings represents the application settings.
@@ -646,6 +713,7 @@ type GamificationProfile struct {
 	NextTitleXP           int        `json:"next_title_xp"`
 	CurrentTitleMinXP     int        `json:"current_title_min_xp"`
 	StreakFreezesOwned    int        `json:"streak_freezes_owned"`
+	LastFreezePurchasedAt int64      `json:"last_freeze_purchased_at"`
 	FrozenDatesJSON       string     `json:"frozen_dates_json"`
 	UnlockedCosmeticsJSON string     `json:"unlocked_cosmetics_json"`
 	StatsJSON             string     `json:"stats_json"`

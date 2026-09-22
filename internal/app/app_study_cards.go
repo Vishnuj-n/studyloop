@@ -404,6 +404,59 @@ func (a *App) CompleteReviewSession(taskID string) map[string]interface{} {
 	return map[string]interface{}{"ok": true, "rewards": res.Rewards}
 }
 
+// GetFlashcardsDeckOverview returns all flashcards grouped by notebook and topic, along with retention metrics.
+func (a *App) GetFlashcardsDeckOverview() map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	profileID := a.resolveExplicitActiveProfileID()
+	overview, err := repo.GetAllFlashcardsDeckOverview(profileID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"metrics":   overview.Metrics,
+		"notebooks": overview.Notebooks,
+	}
+}
+
+// ToggleCardSuspension updates suspension state for an individual flashcard.
+func (a *App) ToggleCardSuspension(cardID string, suspended bool) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.SetCardSuspension(cardID, suspended); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "card_id": cardID, "suspended": suspended}
+}
+
+// ToggleNotebookCardsSuspension updates suspension state for all flashcards in a notebook.
+func (a *App) ToggleNotebookCardsSuspension(notebookID string, suspended bool) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.SetNotebookCardsSuspension(notebookID, suspended); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "notebook_id": notebookID, "suspended": suspended}
+}
+
+// DeleteFlashcard permanently deletes a flashcard and cleans queue session links.
+func (a *App) DeleteFlashcard(cardID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.DeleteFlashcardByID(cardID); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "card_id": cardID}
+}
+
 func (a *App) SuspendFlashcard(taskID, cardID string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -427,6 +480,7 @@ func (a *App) ScoreShortAnswer(questionID, userAnswer string) map[string]interfa
 	}
 	return a.studyService.ScoreShortAnswer(questionID, userAnswer)
 }
+
 
 // CompleteSocraticRescue completes the socratic rescue session and inserts a re-quiz via Unified Transition Router.
 func (a *App) CompleteSocraticRescue(taskID string) map[string]interface{} {

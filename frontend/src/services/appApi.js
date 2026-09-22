@@ -58,10 +58,11 @@ export function getReadingTaskHistory(notebookID = '', limit = 50, offset = 0) {
 }
 
 
-export async function completeReading(taskID) {
-  console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID })
+export async function completeReading(taskID, splitPage = 0) {
+  const pageNum = Number.parseInt(splitPage) || 0
+  console.warn('[COMPLETE_SESSION] appApi.completeReading request', { taskID, splitPage: pageNum })
   try {
-    const response = await appBridge().CompleteReading(taskID)
+    const response = await appBridge().CompleteReading(taskID, pageNum)
     console.warn('[COMPLETE_SESSION] appApi.completeReading raw backend response', response)
     return response
   } catch (err) {
@@ -153,6 +154,22 @@ export function completeReviewSession(taskID) {
 
 export function suspendFlashcard(taskID, cardID) {
   return appBridge().SuspendFlashcard(taskID, cardID)
+}
+
+export function getFlashcardsDeckOverview() {
+  return appBridge().GetFlashcardsDeckOverview()
+}
+
+export function toggleCardSuspension(cardID, suspended) {
+  return appBridge().ToggleCardSuspension(cardID, suspended)
+}
+
+export function toggleNotebookCardsSuspension(notebookID, suspended) {
+  return appBridge().ToggleNotebookCardsSuspension(notebookID, suspended)
+}
+
+export function deleteFlashcard(cardID) {
+  return appBridge().DeleteFlashcard(cardID)
 }
 
 export function getNotebooks(topicID = '', profileID = '') {

@@ -169,9 +169,9 @@ function profileTaskSubtitle(profile) {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-  background: var(--surface-card, rgba(255, 255, 255, 0.03));
-  color: var(--text-color, #f8fafc);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
+  color: var(--on-surface, #f8fafc);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -179,15 +179,15 @@ function profileTaskSubtitle(profile) {
 }
 
 .profile-switcher-trigger:hover {
-  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
-  border-color: var(--border-hover, rgba(255, 255, 255, 0.15));
+  background: var(--surface-container, rgba(255, 255, 255, 0.06));
+  border-color: color-mix(in srgb, var(--primary, #d79921) 30%, var(--outline-variant));
 }
 
 .profile-trigger-status {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-primary, #6366f1);
+  background: var(--primary, #d79921);
 }
 
 .profile-trigger-name {
@@ -210,8 +210,8 @@ function profileTaskSubtitle(profile) {
   z-index: 50;
   min-width: 240px;
   max-width: 320px;
-  background: var(--surface-dropdown, #1e1e24);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--surface-container-lowest, #1d2021);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   padding: 6px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
@@ -228,7 +228,7 @@ function profileTaskSubtitle(profile) {
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: var(--text-color, #f8fafc);
+  color: var(--on-surface, #f8fafc);
   text-align: left;
   cursor: pointer;
   width: 100%;
@@ -236,11 +236,11 @@ function profileTaskSubtitle(profile) {
 }
 
 .profile-menu-item:hover {
-  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+  background: var(--surface-container, rgba(255, 255, 255, 0.06));
 }
 
 .profile-menu-item.active {
-  background: rgba(99, 102, 241, 0.12);
+  background: color-mix(in srgb, var(--primary, #d79921) 14%, transparent);
 }
 
 .profile-menu-dot {
@@ -252,7 +252,7 @@ function profileTaskSubtitle(profile) {
 }
 
 .profile-menu-item.active .profile-menu-dot {
-  background: var(--brand-primary, #6366f1);
+  background: var(--primary, #d79921);
 }
 
 .profile-menu-copy {
@@ -287,10 +287,10 @@ function profileTaskSubtitle(profile) {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--brand-primary, #6366f1);
+  color: var(--primary, #d79921);
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(99, 102, 241, 0.15);
+  background: color-mix(in srgb, var(--primary, #d79921) 18%, transparent);
 }
 
 .profile-pace-badge {
@@ -322,7 +322,7 @@ function profileTaskSubtitle(profile) {
 
 .profile-menu-divider {
   height: 1px;
-  background: var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--outline-variant, rgba(255, 255, 255, 0.08));
   margin: 4px 0;
 }
 
@@ -343,7 +343,7 @@ function profileTaskSubtitle(profile) {
 }
 
 .profile-menu-action:hover {
-  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
-  color: var(--text-color, #f8fafc);
+  background: var(--surface-container, rgba(255, 255, 255, 0.06));
+  color: var(--on-surface, #f8fafc);
 }
 </style>

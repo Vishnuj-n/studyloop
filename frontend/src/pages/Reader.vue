@@ -71,6 +71,15 @@
                 </button>
                 <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
                   <button
+                    v-if="canSplitHere"
+                    class="split-dropdown-item"
+                    :disabled="completingSession"
+                    @click="onCompleteHereClick"
+                  >
+                    <span class="item-title">Complete Here (Page {{ reader.currentPage.value }})</span>
+                    <span class="item-desc">Wrap up session at page {{ reader.currentPage.value }} & quiz on pages {{ splitStartPage }}–{{ reader.currentPage.value }}</span>
+                  </button>
+                  <button
                     class="split-dropdown-item"
                     :disabled="completingSession"
                     @click="onDeferQuizClick"
@@ -403,6 +412,19 @@ const completionMessage = ref('')
 const completionError = ref('')
 const showDeferMenu = ref(false)
 
+const canSplitHere = computed(() => {
+  if (!resolvedTaskID.value) return false
+  const cur = reader.currentPage.value || 0
+  const min = sessionTask.value?.start_page || reader.effectiveMinPage.value || 1
+  const max = sessionTask.value?.end_page || reader.effectiveMaxPage.value || 1
+  // Can split if the assigned task has multiple pages and user has not reached the end page yet
+  return max > min && cur < max
+})
+
+const splitStartPage = computed(() => {
+  return sessionTask.value?.start_page || reader.effectiveMinPage.value || 1
+})
+
 function toggleDeferMenu() {
   showDeferMenu.value = !showDeferMenu.value
 }
@@ -410,6 +432,12 @@ function toggleDeferMenu() {
 function onDeferQuizClick() {
   showDeferMenu.value = false
   completeSession(true)
+}
+
+function onCompleteHereClick() {
+  showDeferMenu.value = false
+  const cur = reader.currentPage.value || splitStartPage.value
+  completeSession(false, cur)
 }
 
 // ponytail: audio range selection reusing existing startTopicAudioOverview
@@ -619,7 +647,7 @@ function onNotebookChange() {
   // Don't call loadBundle() here - let user select a topic first
 }
 
-async function completeSession(deferQuiz = false) {
+async function completeSession(deferQuiz = false, splitPage = null) {
   if (completingSession.value || reader.loadingBundle.value || !resolvedTaskID.value) return
 
   completionError.value = ''
@@ -635,8 +663,11 @@ async function completeSession(deferQuiz = false) {
       resolvedTaskID: resolvedTaskID.value,
       actualArg: taskIDForCompletion,
       deferQuiz,
+      splitPage,
     })
-    const done = await completeReading(taskIDForCompletion)
+    const done = splitPage
+      ? await completeReading(taskIDForCompletion, splitPage)
+      : await completeReading(taskIDForCompletion)
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
     if (done?.error) {
       completionError.value = done.error

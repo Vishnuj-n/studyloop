@@ -74,37 +74,62 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("expected total XP %d, got %d", 1500+75, afterClaimProf.TotalXP)
 	}
 
-	// 5. Buy Streak Freeze
-	afterFreezeProf, err := repo.BuyStreakFreeze(50)
+	// 5. Buy Streak Freeze (Cost: 150)
+	// Add enough coins for testing
+	_, _, err = repo.AddXPAndCoins(0, 500)
+	if err != nil {
+		t.Fatalf("AddXPAndCoins failed: %v", err)
+	}
+
+	nowUnix := int64(1700000000)
+	afterFreezeProf, err := repo.BuyStreakFreeze(150, nowUnix)
 	if err != nil {
 		t.Fatalf("BuyStreakFreeze failed: %v", err)
 	}
-	if afterFreezeProf.Coins != 10 { // 60 - 50 = 10
-		t.Fatalf("expected coins 10, got %d", afterFreezeProf.Coins)
+	if afterFreezeProf.Coins != 560-150 { // (60 + 500) - 150 = 410
+		t.Fatalf("expected coins 410, got %d", afterFreezeProf.Coins)
 	}
 	if afterFreezeProf.StreakFreezesOwned != 2 { // 1 + 1 = 2
 		t.Fatalf("expected 2 streak freezes, got %d", afterFreezeProf.StreakFreezesOwned)
 	}
 
-	// Insufficient coins test
-	_, err = repo.BuyStreakFreeze(50)
-	if err == nil {
-		t.Fatalf("expected error buying streak freeze with insufficient coins")
+	// Max capacity test (already has 2)
+	_, err = repo.BuyStreakFreeze(150, nowUnix+8*86400)
+	if err != ErrFreezeInventoryFull {
+		t.Fatalf("expected ErrFreezeInventoryFull, got %v", err)
+	}
+
+	// Consume one freeze
+	consumedProf, err := repo.ConsumeStreakFreeze("2026-09-20")
+	if err != nil {
+		t.Fatalf("ConsumeStreakFreeze failed: %v", err)
+	}
+	if consumedProf.StreakFreezesOwned != 1 {
+		t.Fatalf("expected 1 streak freeze owned after consumption, got %d", consumedProf.StreakFreezesOwned)
+	}
+
+	// Weekly rate limit test (buying within 7 days of last purchase)
+	_, err = repo.BuyStreakFreeze(150, nowUnix+2*86400)
+	if err != ErrFreezeWeeklyLimit {
+		t.Fatalf("expected ErrFreezeWeeklyLimit, got %v", err)
+	}
+
+	// Successful purchase after 7 days
+	afterWeeklyProf, err := repo.BuyStreakFreeze(150, nowUnix+8*86400)
+	if err != nil {
+		t.Fatalf("expected successful purchase after 7 days, got: %v", err)
+	}
+	if afterWeeklyProf.StreakFreezesOwned != 2 {
+		t.Fatalf("expected 2 streak freezes after second buy, got %d", afterWeeklyProf.StreakFreezesOwned)
 	}
 
 	// 6. Test UnlockCosmetic with coins
-	// First top up coins
-	_, _, err = repo.AddXPAndCoins(0, 100)
-	if err != nil {
-		t.Fatalf("AddXPAndCoins failed: %v", err)
-	}
-
 	afterUnlockProf, err := repo.UnlockCosmetic("dark-emerald", 75)
 	if err != nil {
 		t.Fatalf("UnlockCosmetic failed: %v", err)
 	}
-	if afterUnlockProf.Coins != 35 { // 10 + 100 - 75 = 35
-		t.Fatalf("expected coins 35, got %d", afterUnlockProf.Coins)
+	if afterUnlockProf.Coins != 410-150-75 { // 410 - 150 - 75 = 185
+		t.Fatalf("expected coins 185, got %d", afterUnlockProf.Coins)
 	}
 
 	// 7. Test IncrementStat & Achievement auto-unlock

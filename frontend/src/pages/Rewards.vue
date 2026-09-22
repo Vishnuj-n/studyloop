@@ -81,10 +81,10 @@
           <button
             class="buy-freeze-btn"
             type="button"
-            :disabled="profile.coins < 50 || buying"
+            :disabled="freezeButtonDisabled"
             @click="handleBuyStreakFreeze"
           >
-            {{ buying ? 'Purchasing...' : 'Buy Streak Freeze (50 Coins)' }}
+            {{ buying ? 'Purchasing...' : freezeButtonLabel }}
           </button>
           <button
             class="shop-trigger-btn"
@@ -135,6 +135,7 @@
         :active-theme="activeTheme"
         @theme-changed="onThemeChanged"
       />
+      <p v-if="themeError" class="buy-error-msg theme-error-msg">{{ themeError }}</p>
     </div>
 
     <!-- Mystery Chest Modal -->
@@ -169,8 +170,10 @@ const buying = ref(false)
 const showFreezeModal = ref(false)
 const freezeModalMode = ref('purchase')
 const activeTheme = ref('dark-gruvbox')
+const userSettings = ref(null)
 const loadError = ref('')
 const buyError = ref('')
+const themeError = ref('')
 const profile = ref({
   level: 1,
   total_xp: 0,
@@ -180,9 +183,43 @@ const profile = ref({
   next_title_xp: 1500,
   current_title_min_xp: 0,
   streak_freezes_owned: 1,
+  last_freeze_purchased_at: 0,
 })
 const chests = ref([])
 const activeChest = ref(null)
+
+const isWeeklyCooldown = computed(() => {
+  if (!profile.value.last_freeze_purchased_at) return false
+  const nowSec = Math.floor(Date.now() / 1000)
+  const elapsed = nowSec - profile.value.last_freeze_purchased_at
+  return elapsed < 7 * 24 * 3600
+})
+
+const cooldownDaysLeft = computed(() => {
+  if (!profile.value.last_freeze_purchased_at) return 0
+  const nowSec = Math.floor(Date.now() / 1000)
+  const remainingSec = (7 * 24 * 3600) - (nowSec - profile.value.last_freeze_purchased_at)
+  if (remainingSec <= 0) return 0
+  return Math.ceil(remainingSec / 86400)
+})
+
+const freezeButtonLabel = computed(() => {
+  if ((profile.value.streak_freezes_owned || 0) >= 2) {
+    return 'Max Capacity (2/2 Freezes)'
+  }
+  if (isWeeklyCooldown.value) {
+    return `Weekly Limit (Available in ${cooldownDaysLeft.value}d)`
+  }
+  return 'Buy Streak Freeze (150 Coins)'
+})
+
+const freezeButtonDisabled = computed(() => {
+  if (buying.value) return true
+  if ((profile.value.streak_freezes_owned || 0) >= 2) return true
+  if (isWeeklyCooldown.value) return true
+  if ((profile.value.coins || 0) < 150) return true
+  return false
+})
 
 const progressPercent = computed(() => {
   const min = profile.value.current_title_min_xp || 0
@@ -226,8 +263,11 @@ async function loadData() {
       chests.value = res.pending_chests
     }
     const settings = await getUserSettings().catch(() => null)
-    if (settings && settings.theme) {
-      activeTheme.value = settings.theme
+    if (settings && !settings.error) {
+      userSettings.value = settings
+      if (settings.theme) {
+        activeTheme.value = settings.theme
+      }
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
@@ -268,11 +308,40 @@ async function handleBuyStreakFreeze() {
 }
 
 async function onThemeChanged(newTheme) {
+  const prevTheme = activeTheme.value
   activeTheme.value = newTheme
+  localStorage.setItem('app-theme', newTheme)
+  document.documentElement.setAttribute('data-theme', newTheme)
+
+  function rollback(errMsg) {
+    activeTheme.value = prevTheme
+    localStorage.setItem('app-theme', prevTheme)
+    document.documentElement.setAttribute('data-theme', prevTheme)
+    themeError.value = errMsg || 'Failed to save theme setting.'
+  }
+
   try {
-    await updateUserSettings({ theme: newTheme })
+    let current = userSettings.value
+    if (!current) {
+      current = await getUserSettings().catch(() => null)
+    }
+    if (!current || current.error) {
+      rollback(current?.error || 'Failed to load user settings for theme update.')
+      return
+    }
+
+    const updated = { ...current, theme: newTheme }
+    const res = await updateUserSettings(updated)
+    if (res && res.error) {
+      rollback(res.error)
+      return
+    }
+    userSettings.value = updated
+    themeError.value = ''
+    window.dispatchEvent(new CustomEvent('settings-updated'))
   } catch (err) {
     console.error('Failed to update theme setting:', err)
+    rollback(err?.message || 'Failed to save theme setting.')
   }
 }
 

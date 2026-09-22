@@ -63,13 +63,11 @@ func (r *Repository) GetChunksForTopicPageRange(topicID string, startPage, endPa
 			WHERE nc.notebook_id IN (
 				SELECT notebook_id FROM notebook_topics WHERE topic_id = ?
 				UNION
-				SELECT notebook_id FROM topics WHERE id = ?
-				UNION
 				SELECT nc2.notebook_id FROM notebook_chunks nc2 JOIN chunks c2 ON c2.id = nc2.chunk_id WHERE c2.topic_id = ?
 			)
 			AND nc.page_num BETWEEN ? AND ?
 			ORDER BY nc.page_num ASC, c.id ASC
-		`, topicID, topicID, topicID, startPage, endPage)
+		`, topicID, topicID, startPage, endPage)
 		if err != nil {
 			return nil, err
 		}

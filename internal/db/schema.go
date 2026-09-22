@@ -23,7 +23,17 @@ func InitSchema(tx *sql.Tx) error {
 			pomo_duration_sec INTEGER NOT NULL DEFAULT 1500,
 			pomo_break_sec INTEGER NOT NULL DEFAULT 300,
 			pomo_music_path TEXT DEFAULT '',
-			pomo_shuffle BOOLEAN DEFAULT 0
+			pomo_shuffle BOOLEAN DEFAULT 0,
+			target_session_words INTEGER DEFAULT NULL,
+			min_session_words INTEGER DEFAULT NULL,
+			theme TEXT DEFAULT '',
+			max_flashcards_per_session INTEGER DEFAULT NULL,
+			max_active_notebooks INTEGER DEFAULT NULL,
+			skip_to_reading_active BOOLEAN DEFAULT NULL,
+			default_remedial_strategy TEXT DEFAULT '',
+			quiz_question_count INTEGER DEFAULT NULL,
+			quiz_passing_score INTEGER DEFAULT NULL,
+			tutor_style TEXT DEFAULT ''
 		)`,
 
 		// Core tables
@@ -283,6 +293,7 @@ func InitSchema(tx *sql.Tx) error {
 			coins INTEGER NOT NULL DEFAULT 0,
 			current_title TEXT NOT NULL DEFAULT 'The Apprentice',
 			streak_freezes_owned INTEGER NOT NULL DEFAULT 1,
+			last_freeze_purchased_at INTEGER NOT NULL DEFAULT 0,
 			frozen_dates_json TEXT NOT NULL DEFAULT '[]',
 			unlocked_cosmetics_json TEXT NOT NULL DEFAULT '["dark-gruvbox", "light-classic"]',
 			stats_json TEXT NOT NULL DEFAULT '{}',

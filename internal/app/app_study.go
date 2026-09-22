@@ -732,14 +732,14 @@ func (a *App) ClaimLootBox(boxID string) map[string]interface{} {
 	}
 }
 
-// BuyStreakFreeze purchases a streak freeze with 50 coins.
+// BuyStreakFreeze purchases a streak freeze with 150 coins subject to capacity (max 2) and weekly limit.
 func (a *App) BuyStreakFreeze() map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
 	}
 
-	prof, err := repo.BuyStreakFreeze(50)
+	prof, err := repo.BuyStreakFreeze(150, time.Now().Unix())
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}

@@ -229,6 +229,7 @@ async function buyItem(item) {
 
 function equipTheme(themeId) {
   document.documentElement.setAttribute('data-theme', themeId)
+  localStorage.setItem('app-theme', themeId)
   emit('theme-changed', themeId)
 }
 </script>

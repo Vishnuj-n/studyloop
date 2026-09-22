@@ -72,21 +72,10 @@ func TestDeleteNotebookRemovesLinkedDataAndPreservesUnrelatedRows(t *testing.T) 
 	autoTopicID := "nb-" + notebookID + "-topic-a"
 	keepTopicID := "topic-keep"
 
-	if err := testRepo.EnsureTopic(autoTopicID, "Auto Topic"); err != nil {
-		t.Fatalf("EnsureTopic auto failed: %v", err)
-	}
-	if err := testRepo.EnsureTopic(keepTopicID, "Keep Topic"); err != nil {
-		t.Fatalf("EnsureTopic keep failed: %v", err)
-	}
+	seedTestNotebookWithTopic(t, notebookID, autoTopicID, "", 1, 1)
+	seedTestNotebookWithTopic(t, keepNotebookID, keepTopicID, "", 1, 1)
 	if _, err := testRepo.db.Exec(`INSERT INTO topic_progress (topic_id, mastery_score) VALUES (?, 0.1)`, autoTopicID); err != nil {
 		t.Fatalf("failed to insert topic_progress: %v", err)
-	}
-
-	if err := testRepo.CreateNotebook(notebookID, "Delete Notebook", "/tmp/del.txt", "txt", autoTopicID, "", 1, ""); err != nil {
-		t.Fatalf("CreateNotebook delete target failed: %v", err)
-	}
-	if err := testRepo.CreateNotebook(keepNotebookID, "Keep Notebook", "/tmp/keep.txt", "txt", keepTopicID, "", 1, ""); err != nil {
-		t.Fatalf("CreateNotebook keep target failed: %v", err)
 	}
 
 	chunkDelID := "chunk-del"
@@ -1288,12 +1277,7 @@ func TestNotebookRepoFixes(t *testing.T) {
 
 	notebookID := "nb-fixes-1"
 	topicID := "topic-fixes-1"
-	if err := testRepo.EnsureTopic(topicID, "Fixes Topic"); err != nil {
-		t.Fatalf("EnsureTopic failed: %v", err)
-	}
-	if err := testRepo.CreateNotebook(notebookID, "Fixes Notebook", "/tmp/fixes.txt", "txt", topicID, "", 1, ""); err != nil {
-		t.Fatalf("CreateNotebook failed: %v", err)
-	}
+	seedTestNotebookWithTopic(t, notebookID, topicID, "", 1, 1)
 
 	groups := []NotebookTopicIngestionGroup{{
 		TopicID: topicID,

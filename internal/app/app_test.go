@@ -912,11 +912,11 @@ func TestGetStreakState_StreakFreezeAutoConsume(t *testing.T) {
 		t.Fatalf("GetGamificationProfile failed: %v", err)
 	}
 	if prof.StreakFreezesOwned == 0 {
-		_, _, err = testRepo.AddXPAndCoins(100, 100)
+		_, _, err = testRepo.AddXPAndCoins(100, 200)
 		if err != nil {
 			t.Fatalf("AddXPAndCoins failed: %v", err)
 		}
-		_, err = testRepo.BuyStreakFreeze(50)
+		_, err = testRepo.BuyStreakFreeze(150, 0)
 		if err != nil {
 			t.Fatalf("BuyStreakFreeze failed: %v", err)
 		}
@@ -1014,6 +1014,63 @@ func TestApp_GetUserSettings_IncludesAllConfiguredFields(t *testing.T) {
 		t.Errorf("expected min_session_words 2500, got %v", fetched["min_session_words"])
 	}
 }
+
+func TestCompleteReading_SplitPage(t *testing.T) {
+	app := newTestApp(t)
+
+	notebookID := "split-test-nb"
+	topicID := "split-test-topic"
+	taskID := "task-split-reading-1"
+
+	if err := testRepo.EnsureTopic(topicID, "Split Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(notebookID, "Split Notebook", "/tmp/split.pdf", "pdf", topicID, "", 20, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+
+	mustInsertMockChunk(t, notebookID, topicID, "chunk-p1", 1)
+	mustInsertMockChunk(t, notebookID, topicID, "chunk-p2", 2)
+	mustInsertMockChunk(t, notebookID, topicID, "chunk-p3", 3)
+	mustInsertMockChunk(t, notebookID, topicID, "chunk-p4", 4)
+	mustInsertMockChunk(t, notebookID, topicID, "chunk-p5", 5)
+
+	task := models.StudyQueueTask{
+		ID:         taskID,
+		NotebookID: notebookID,
+		TopicID:    topicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusActive,
+		Priority:   1,
+		StartPage:  1,
+		EndPage:    5,
+	}
+	if err := testRepo.InsertStudyTask(task); err != nil {
+		t.Fatalf("InsertStudyTask failed: %v", err)
+	}
+
+	// Complete at page 3 (split session)
+	res := app.CompleteReading(taskID, 3)
+	if res["error"] != nil {
+		t.Fatalf("CompleteReading split failed: %v", res["error"])
+	}
+	if res["ok"] != true {
+		t.Fatalf("expected ok: true, got %v", res)
+	}
+
+	// Verify task completed with end_page = 3
+	completedTask, err := testRepo.GetTaskByID(taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByID failed: %v", err)
+	}
+	if completedTask.Status != models.StudyTaskStatusCompleted {
+		t.Fatalf("expected status COMPLETED, got %s", completedTask.Status)
+	}
+	if completedTask.EndPage != 3 {
+		t.Fatalf("expected endPage 3, got %d", completedTask.EndPage)
+	}
+}
+
 
 
 
