@@ -71,13 +71,12 @@
                 </button>
                 <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
                   <button
-                    v-if="canSplitHere"
                     class="split-dropdown-item"
                     :disabled="completingSession"
                     @click="onCompleteHereClick"
                   >
                     <span class="item-title">Complete Here (Page {{ reader.currentPage.value }})</span>
-                    <span class="item-desc">Wrap up session at this page & create quiz for pages {{ splitStartPage }}–{{ reader.currentPage.value }}</span>
+                    <span class="item-desc">Wrap up session at page {{ reader.currentPage.value }} & quiz on pages {{ splitStartPage }}–{{ reader.currentPage.value }}</span>
                   </button>
                   <button
                     class="split-dropdown-item"
