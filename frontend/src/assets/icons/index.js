@@ -299,17 +299,6 @@ export const icons = {
       "<line x1=\"10\" x2=\"10.01\" y1=\"16\" y2=\"16\"/>"
     ]
   },
-  "globe": {
-    "viewBox": "0 0 24 24",
-    "fill": "none",
-    "stroke": "currentColor",
-    "strokeWidth": 2,
-    "paths": [
-      "<circle cx=\"12\" cy=\"12\" r=\"10\"/>",
-      "<line x1=\"2\" x2=\"22\" y1=\"12\" y2=\"12\"/>",
-      "<path d=\"M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z\"/>"
-    ]
-  },
   "external-link": {
     "viewBox": "0 0 24 24",
     "fill": "none",
@@ -494,24 +483,6 @@ export const icons = {
     "paths": [
       "<path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/>",
       "<polyline points=\"22 4 12 14.01 9 11.01\"/>"
-    ]
-  },
-  "chevron-down": {
-    "viewBox": "0 0 24 24",
-    "fill": "none",
-    "stroke": "currentColor",
-    "strokeWidth": 2,
-    "paths": [
-      "<polyline points=\"6 9 12 15 18 9\"/>"
-    ]
-  },
-  "chevron-up": {
-    "viewBox": "0 0 24 24",
-    "fill": "none",
-    "stroke": "currentColor",
-    "strokeWidth": 2,
-    "paths": [
-      "<polyline points=\"18 15 12 9 6 15\"/>"
     ]
   },
   "chevron-right": {

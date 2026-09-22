@@ -146,6 +146,29 @@ describe('Reader.vue Integration', () => {
     expect(appApi.completeReading).toHaveBeenCalledWith('task-read-456')
   })
 
+  it('completes reading task with splitPage when Complete Here is clicked', async () => {
+    appApi.completeReading.mockResolvedValue({
+      error: null,
+      quiz_task_id: 'quiz-next-789',
+    })
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const chevronBtn = wrapper.find('.split-chevron-btn')
+    await chevronBtn.trigger('click')
+    await flushPromises()
+
+    const items = wrapper.findAll('.split-dropdown-item')
+    const completeHereBtn = items.find((b) => b.text().includes('Complete Here'))
+    expect(completeHereBtn.exists()).toBe(true)
+
+    await completeHereBtn.trigger('click')
+    await flushPromises()
+
+    expect(appApi.completeReading).toHaveBeenCalledWith('task-read-456', 1)
+  })
+
   it('copies session content as formatted markdown when Copy Session is clicked', async () => {
     const writeTextMock = vi.fn().mockResolvedValue()
     Object.assign(navigator, {

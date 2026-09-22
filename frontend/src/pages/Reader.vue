@@ -71,6 +71,7 @@
                 </button>
                 <div v-if="showDeferMenu" class="split-dropdown-menu" @click.stop>
                   <button
+                    v-if="canSplitHere"
                     class="split-dropdown-item"
                     :disabled="completingSession"
                     @click="onCompleteHereClick"
@@ -664,7 +665,9 @@ async function completeSession(deferQuiz = false, splitPage = null) {
       deferQuiz,
       splitPage,
     })
-    const done = await completeReading(taskIDForCompletion, splitPage)
+    const done = splitPage
+      ? await completeReading(taskIDForCompletion, splitPage)
+      : await completeReading(taskIDForCompletion)
     console.warn('[COMPLETE_SESSION] completeSession() completeReading response', done)
     if (done?.error) {
       completionError.value = done.error
