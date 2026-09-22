@@ -100,28 +100,15 @@ func (s *StudyService) GenerateFSRSCardsForTopic(topicID, notebookID string, sta
 		return nil, nil, false, "", fmt.Errorf("failed to link topic to notebook: %w", err)
 	}
 
-	// Start cards in Review state (bypass learning phase) with day-based offsets
+	// Start cards in Review state (bypass learning phase) with initial 1-day (24h) offset
 	initialState := models.FlashcardState{
 		StateCode:  2,   // 2 = Review state in models.go
 		Stability:  1.0, // Default initial stability for Review state
 		Difficulty: 5.0, // Default initial difficulty for Review state
 	}
 	now := time.Now().Unix()
-	dueAt := now + 24*60*60 // Default fallback: tomorrow
-
-	score, passedAttempt, err := s.repo.GetLatestQuizAttemptScoreByTopic(topicID)
-	if err == nil && passedAttempt {
-		switch score {
-		case 100:
-			dueAt = now + 3*24*60*60 // Ace: 3 days
-			utils.Warnf("[FSRS_CALIBRATION] Ace detected (score=100) for topicID=%s. Scheduled in 3 days.", topicID)
-		default:
-			dueAt = now + 24*60*60 // Pass: tomorrow (1 day)
-			utils.Warnf("[FSRS_CALIBRATION] Pass detected (score=%d) for topicID=%s. Scheduled in 1 day.", score, topicID)
-		}
-	} else {
-		utils.Warnf("[FSRS_CALIBRATION] Using default tomorrow offset for topicID=%s (no passed quiz attempt found, err=%v)", topicID, err)
-	}
+	dueAt := now + 24*60*60 // 1 day initial offset across all generated cards
+	utils.Warnf("[FSRS_CALIBRATION] Initializing flashcard due_at to 1-day offset (24h) for topicID=%s", topicID)
 
 	states := make(map[string]models.FlashcardState, len(cards))
 	for i := range cards {

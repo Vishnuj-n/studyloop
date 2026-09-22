@@ -294,10 +294,8 @@ CREATE INDEX idx_fsrs_cards_suspended_due_at ON fsrs_cards(suspended, due_at);
 
 **Initial State (Simplified Calibration):**
 - New flashcards start in clean Review state (`StateCode: 2`, `Reps: 0`)
-- Initial `due_at` set based on quiz performance:
-  - Ace (100%): 3-day offset
-  - Pass (<100%): 1-day offset
-  - Default: Tomorrow offset (1 day)
+- Initial `due_at` set to a 1-day (24 hours) offset across all generated cards
+- FSRS algorithm calculates and expands subsequent review intervals based on user ratings in active flashcard review sessions
 - Bypasses FSRS intraday learning phase for predictable initial intervals
 
 ### `fsrs_review_log`
