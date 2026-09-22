@@ -271,23 +271,6 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		return err
 	}
 
-	if s.ActiveProfileID != "" {
-		_, _ = r.db.Exec(`
-			UPDATE study_profiles
-			SET target_session_words = ?,
-			    min_session_words = ?,
-			    theme = ?,
-			    max_flashcards_per_session = ?,
-			    max_active_notebooks = ?,
-			    skip_to_reading_active = ?,
-			    default_remedial_strategy = ?,
-			    quiz_question_count = ?,
-			    quiz_passing_score = ?,
-			    tutor_style = ?
-			WHERE id = ?
-		`, targetWords, minWords, theme, s.MaxFlashcardsPerSession, maxActive, s.SkipToReadingActive, strategy, quizCount, passingScore, tutorStyle, s.ActiveProfileID)
-	}
-
 	return nil
 }
 
