@@ -169,6 +169,7 @@ const buying = ref(false)
 const showFreezeModal = ref(false)
 const freezeModalMode = ref('purchase')
 const activeTheme = ref('dark-gruvbox')
+const userSettings = ref(null)
 const loadError = ref('')
 const buyError = ref('')
 const profile = ref({
@@ -260,8 +261,11 @@ async function loadData() {
       chests.value = res.pending_chests
     }
     const settings = await getUserSettings().catch(() => null)
-    if (settings && settings.theme) {
-      activeTheme.value = settings.theme
+    if (settings && !settings.error) {
+      userSettings.value = settings
+      if (settings.theme) {
+        activeTheme.value = settings.theme
+      }
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
@@ -303,8 +307,23 @@ async function handleBuyStreakFreeze() {
 
 async function onThemeChanged(newTheme) {
   activeTheme.value = newTheme
+  localStorage.setItem('app-theme', newTheme)
+  document.documentElement.setAttribute('data-theme', newTheme)
   try {
-    await updateUserSettings({ theme: newTheme })
+    let current = userSettings.value
+    if (!current) {
+      current = await getUserSettings().catch(() => null)
+    }
+    if (current && !current.error) {
+      const updated = { ...current, theme: newTheme }
+      const res = await updateUserSettings(updated)
+      if (res && res.error) {
+        console.error('Failed to update theme setting:', res.error)
+        return
+      }
+      userSettings.value = updated
+      window.dispatchEvent(new CustomEvent('settings-updated'))
+    }
   } catch (err) {
     console.error('Failed to update theme setting:', err)
   }
