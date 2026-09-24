@@ -149,6 +149,7 @@ func InitSchema(tx *sql.Tx) error {
 			tutor_style TEXT NOT NULL DEFAULT 'socratic',
 			analytics_enabled BOOLEAN DEFAULT 0,
 			anonymous_user_id TEXT DEFAULT '',
+			llm_prompt_logging BOOLEAN DEFAULT 0,
 			extension_settings TEXT DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (active_profile_id) REFERENCES study_profiles(id) ON DELETE SET NULL

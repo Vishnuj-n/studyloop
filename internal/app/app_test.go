@@ -1015,6 +1015,42 @@ func TestApp_GetUserSettings_IncludesAllConfiguredFields(t *testing.T) {
 	}
 }
 
+func TestApp_LLMPromptLogging_RPCs(t *testing.T) {
+	app := newTestApp(t)
+
+	// Enable via RPC
+	enabled := app.SetLLMPromptLogging(true)
+	if !enabled {
+		t.Fatalf("expected SetLLMPromptLogging(true) to return true")
+	}
+
+	// Verify GetLLMPromptLogging
+	if !app.GetLLMPromptLogging() {
+		t.Fatalf("expected GetLLMPromptLogging to return true")
+	}
+
+	// Verify persistence in SQLite
+	persisted, err := testRepo.GetLLMPromptLogging()
+	if err != nil || !persisted {
+		t.Fatalf("expected SQLite to have llm_prompt_logging=true, got %v (err: %v)", persisted, err)
+	}
+
+	// Disable via RPC
+	enabled = app.SetLLMPromptLogging(false)
+	if enabled {
+		t.Fatalf("expected SetLLMPromptLogging(false) to return false")
+	}
+
+	if app.GetLLMPromptLogging() {
+		t.Fatalf("expected GetLLMPromptLogging to return false")
+	}
+
+	persisted, err = testRepo.GetLLMPromptLogging()
+	if err != nil || persisted {
+		t.Fatalf("expected SQLite to have llm_prompt_logging=false, got %v (err: %v)", persisted, err)
+	}
+}
+
 func TestCompleteReading_SplitPage(t *testing.T) {
 	app := newTestApp(t)
 

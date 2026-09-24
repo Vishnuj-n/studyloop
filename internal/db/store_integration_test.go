@@ -1303,3 +1303,44 @@ func TestNotebookRepoFixes(t *testing.T) {
 	}
 	assertCountEquals(t, `SELECT COUNT(*) FROM chunks WHERE id = ?`, "c-fix-1", 0)
 }
+
+func TestLLMPromptLoggingPersistence(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	// Default should be false
+	enabled, err := testRepo.GetLLMPromptLogging()
+	if err != nil {
+		t.Fatalf("GetLLMPromptLogging failed: %v", err)
+	}
+	if enabled {
+		t.Fatalf("expected default llm_prompt_logging to be false, got true")
+	}
+
+	// Update to true
+	if err := testRepo.SetLLMPromptLogging(true); err != nil {
+		t.Fatalf("SetLLMPromptLogging(true) failed: %v", err)
+	}
+	enabled, err = testRepo.GetLLMPromptLogging()
+	if err != nil || !enabled {
+		t.Fatalf("expected llm_prompt_logging true, got %v (err: %v)", enabled, err)
+	}
+
+	// Verify GetUserSettings also reflects this
+	settings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if !settings.LLMPromptLogging {
+		t.Fatalf("expected UserSettings.LLMPromptLogging true, got false")
+	}
+
+	// Update back to false
+	if err := testRepo.SetLLMPromptLogging(false); err != nil {
+		t.Fatalf("SetLLMPromptLogging(false) failed: %v", err)
+	}
+	enabled, err = testRepo.GetLLMPromptLogging()
+	if err != nil || enabled {
+		t.Fatalf("expected llm_prompt_logging false, got %v (err: %v)", enabled, err)
+	}
+}
+

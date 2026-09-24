@@ -42,6 +42,7 @@ var alterStatements = []struct {
 	{"user_settings", "tutor_style", "ALTER TABLE user_settings ADD COLUMN tutor_style TEXT NOT NULL DEFAULT 'socratic'"},
 	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
 	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
+	{"user_settings", "llm_prompt_logging", "ALTER TABLE user_settings ADD COLUMN llm_prompt_logging BOOLEAN DEFAULT 0"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 
 	// study_profiles

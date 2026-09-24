@@ -117,6 +117,10 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 		}
 	}
 
+	if loggingEnabled, err := res.Repo.GetLLMPromptLogging(); err == nil {
+		llm.SetPromptLoggingEnabled(loggingEnabled)
+	}
+
 	llmSettings, err := res.Repo.GetLLMSettings()
 	if err != nil {
 		utils.Warnf("failed to load LLM settings: %v. Falling back to environment config.", err)

@@ -63,6 +63,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"quiz_question_count":        s.QuizQuestionCount,
 		"quiz_passing_score":         s.QuizPassingScore,
 		"tutor_style":                s.TutorStyle,
+		"llm_prompt_logging":         s.LLMPromptLogging,
 	}
 }
 
@@ -1092,14 +1093,24 @@ func (a *App) GetCloudConfig() map[string]interface{} {
 	}
 }
 
-// SetLLMPromptLogging enables or disables runtime LLM prompt logging.
+// SetLLMPromptLogging enables or disables runtime and persisted LLM prompt logging.
 func (a *App) SetLLMPromptLogging(enabled bool) bool {
 	llm.SetPromptLoggingEnabled(enabled)
+	if repo := a.getRepo(); repo != nil {
+		if err := repo.SetLLMPromptLogging(enabled); err != nil {
+			utils.Warnf("failed to persist LLM prompt logging setting: %v", err)
+		}
+	}
 	return llm.IsPromptLoggingEnabled()
 }
 
 // GetLLMPromptLogging returns whether LLM prompt logging is enabled.
 func (a *App) GetLLMPromptLogging() bool {
+	if repo := a.getRepo(); repo != nil {
+		if enabled, err := repo.GetLLMPromptLogging(); err == nil {
+			llm.SetPromptLoggingEnabled(enabled)
+		}
+	}
 	return llm.IsPromptLoggingEnabled()
 }
 

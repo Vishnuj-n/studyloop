@@ -373,6 +373,7 @@ Singleton table for global preferences.
 | `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
 | `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |
+| `llm_prompt_logging` | BOOLEAN DEFAULT 0 | Whether raw LLM prompt inputs and model parameters are logged to `logs/llm_prompt.log` |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 

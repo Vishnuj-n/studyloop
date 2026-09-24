@@ -660,6 +660,7 @@ type UserSettings struct {
 	TutorStyle              string `json:"tutor_style"`
 	AnalyticsEnabled        bool   `json:"analytics_enabled"`
 	AnonymousUserID         string `json:"anonymous_user_id"`
+	LLMPromptLogging        bool   `json:"llm_prompt_logging"`
 }
 
 type AnalyticsEventSync struct {

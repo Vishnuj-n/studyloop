@@ -53,10 +53,10 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic')
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0)
 		FROM user_settings
 		WHERE id = 1
-	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle)
+	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging)
 	if err == sql.ErrNoRows {
 		s = models.UserSettings{
 			MaxFlashcardsPerSession: 30,
@@ -236,8 +236,8 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		studySlots = "[]"
 	}
 	_, err := r.db.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			max_flashcards_per_session = excluded.max_flashcards_per_session,
 			study_start_time = excluded.study_start_time,
@@ -265,8 +265,9 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			quiz_question_count = excluded.quiz_question_count,
 			quiz_passing_score = excluded.quiz_passing_score,
 			tutor_style = excluded.tutor_style,
+			llm_prompt_logging = excluded.llm_prompt_logging,
 			updated_at = CURRENT_TIMESTAMP
-	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle)
+	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging)
 	if err != nil {
 		return err
 	}
@@ -756,3 +757,20 @@ func (r *Repository) SaveExtensionConfig(configJSON string) error {
 	_, err := r.db.Exec(`UPDATE user_settings SET extension_settings = ? WHERE id = 1`, trimmed)
 	return err
 }
+
+// GetLLMPromptLogging returns the persisted LLM prompt logging boolean from user_settings.
+func (r *Repository) GetLLMPromptLogging() (bool, error) {
+	var enabled bool
+	err := r.db.QueryRow(`SELECT COALESCE(llm_prompt_logging, 0) FROM user_settings WHERE id = 1`).Scan(&enabled)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return enabled, err
+}
+
+// SetLLMPromptLogging persists the LLM prompt logging toggle state into user_settings.
+func (r *Repository) SetLLMPromptLogging(enabled bool) error {
+	_, err := r.db.Exec(`UPDATE user_settings SET llm_prompt_logging = ? WHERE id = 1`, enabled)
+	return err
+}
+

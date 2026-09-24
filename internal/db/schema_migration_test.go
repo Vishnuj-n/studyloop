@@ -153,6 +153,7 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 		{"user_settings", "target_session_words", "SELECT target_session_words FROM user_settings WHERE id = 1"},
 		{"user_settings", "analytics_enabled", "SELECT analytics_enabled FROM user_settings WHERE id = 1"},
 		{"user_settings", "anonymous_user_id", "SELECT anonymous_user_id FROM user_settings WHERE id = 1"},
+		{"user_settings", "llm_prompt_logging", "SELECT llm_prompt_logging FROM user_settings WHERE id = 1"},
 	}
 
 	for _, check := range checkQueries {
