@@ -313,6 +313,14 @@ func ResolveDBPath() (string, error) {
 	return filepath.Join(appDir, "Studyloop.db"), nil
 }
 
+func ResolveSessionPath() (string, error) {
+	appDir, err := ResolveAppDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(appDir, "session.json"), nil
+}
+
 func ResolveNotebookDir() (string, error) {
 	appDir, err := ResolveAppDir()
 	if err != nil {
