@@ -59,7 +59,13 @@ Completes an active reading task, generates a scoped quiz from read chunks, awar
 - **Parameters:** `taskID` (string), optional `splitPage` (int).
 - **Split Session ("Complete Here"):** When `splitPage` is provided ($start\_page \le splitPage < end\_page$), truncates session boundary to $splitPage$, updates SQLite queue record, restricts quiz chunk scope to $[start\_page \dots splitPage]$, and seeds remainder ($splitPage+1 \dots$) for the subsequent session.
 
+### RevertReadingTaskSession
+Reverts a completed reading session back to active status in developer mode.
+- **Parameters:** `taskID` (string).
+- **Behavior:** Atomically resets `study_queue` status to `ACTIVE` (`completed_at = NULL`), restores `topics.current_page_cursor` to session `start_page`, and cleans up downstream generated quizzes, attempts, and follow-up reading tasks.
+
 ### GetBlockContent
+
 Returns content for a reading block: id, content, word_count, start_page, end_page, order_index, topic_id.
 
 ### MarkBlockRead

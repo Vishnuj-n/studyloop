@@ -57,6 +57,11 @@ export function getReadingTaskHistory(notebookID = '', limit = 50, offset = 0) {
   return appBridge().GetReadingTaskHistory(notebookID || '', limit, offset)
 }
 
+export function revertReadingTaskSession(taskID) {
+  return appBridge().RevertReadingTaskSession(taskID)
+}
+
+
 
 export async function completeReading(taskID, splitPage = 0) {
   const pageNum = Number.parseInt(splitPage) || 0

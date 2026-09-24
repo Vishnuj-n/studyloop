@@ -61,6 +61,12 @@
         {{ error }}
       </div>
 
+      <!-- Success alert -->
+      <div v-if="successMessage" class="success-banner">
+        {{ successMessage }}
+      </div>
+
+
       <!-- Reading Logs Table -->
       <div class="logs-table-container">
         <table class="logs-table">
@@ -72,11 +78,12 @@
               <th>Page Range</th>
               <th>Cursor</th>
               <th>Diagnostics</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="logs.length === 0 && !loading">
-              <td colspan="6" class="empty-state">
+              <td colspan="7" class="empty-state">
                 No reading history tasks found in database.
               </td>
             </tr>
@@ -114,10 +121,27 @@
                   <span>Valid Bounds</span>
                 </span>
               </td>
+              <td>
+                <button
+                  v-if="log.status === 'COMPLETED'"
+                  type="button"
+                  class="action-btn secondary"
+                  style="padding: 4px 8px; font-size: 11px;"
+                  :disabled="revertingId === log.task_id"
+                  title="Revert session back to active and restore topic cursor"
+                  @click="handleRevertSession(log.task_id)"
+                >
+                  <BaseIcon name="rotate-ccw" size="12" />
+                  <span>{{ revertingId === log.task_id ? 'Reverting...' : 'Revert' }}</span>
+                </button>
+                <span v-else class="action-na">—</span>
+              </td>
+
             </tr>
           </tbody>
         </table>
       </div>
+
 
       <!-- Footer Pagination / Load More -->
       <div class="table-footer">
@@ -147,6 +171,7 @@ import {
   getLLMPromptLogging,
   setLLMPromptLogging,
   openDataDirectory,
+  revertReadingTaskSession,
 } from '../services/appApi'
 
 const DEV_MODE_STORAGE_KEY = 'studyloop_dev_mode_enabled'
@@ -159,7 +184,36 @@ const hasMore = ref(false)
 const offset = ref(0)
 const limit = 50
 const loading = ref(false)
+const revertingId = ref('')
 const error = ref('')
+const successMessage = ref('')
+
+async function handleRevertSession(taskID) {
+  if (!taskID || revertingId.value) return
+  const confirmed = window.confirm(
+    'Are you sure you want to revert this completed reading session? This will restore the task back to ACTIVE and reset the topic cursor.'
+  )
+  if (!confirmed) return
+
+  revertingId.value = taskID
+  error.value = ''
+  successMessage.value = ''
+  try {
+    const res = await revertReadingTaskSession(taskID)
+    if (res?.error) {
+      error.value = res.error
+    } else {
+      successMessage.value = res?.message || 'Session successfully reverted.'
+      await resetAndFetch()
+    }
+  } catch (err) {
+    console.error('Failed reverting reading session:', err)
+    error.value = err.message || 'Failed to revert session'
+  } finally {
+    revertingId.value = ''
+  }
+}
+
 
 async function handleOpenDataDir(subDir = '') {
   error.value = ''
@@ -490,4 +544,19 @@ async function fetchMore() {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.success-banner {
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.action-na {
+  color: var(--muted-text);
+  font-size: 12px;
+}
 </style>
+

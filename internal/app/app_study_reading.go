@@ -301,3 +301,29 @@ func (a *App) GetReadingTaskHistory(notebookID string, limit, offset int) map[st
 	}
 }
 
+// RevertReadingTaskSession rolls back a completed reading session back to ACTIVE in dev mode.
+func (a *App) RevertReadingTaskSession(taskID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return map[string]interface{}{"error": "task ID is required", "code": 400}
+	}
+
+	if err := repo.RevertReadingTaskSession(taskID); err != nil {
+		utils.QueueLogger.Error("failed to revert reading task session", "taskID", taskID, "err", err)
+		return map[string]interface{}{"error": err.Error(), "code": 500}
+	}
+
+	utils.Infof("[REVERT_SESSION] Successfully reverted reading task session: %s", taskID)
+	return map[string]interface{}{
+		"ok":      true,
+		"task_id": taskID,
+		"message": "Session successfully reverted to active state.",
+	}
+}
+
+

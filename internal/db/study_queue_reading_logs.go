@@ -1,11 +1,14 @@
 package db
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"ai-tutor/internal/models"
 )
+
 
 
 // GetReadingTaskHistory fetches paginated reading tasks joined with notebook and topic titles for developer diagnostics.
@@ -114,3 +117,106 @@ func (r *Repository) GetReadingTaskHistory(notebookID string, limit, offset int)
 
 	return records, totalCount, nil
 }
+
+// RevertReadingTaskSession rolls back a completed reading task back to ACTIVE, restores topic cursor, and deletes generated follow-ups.
+func (r *Repository) RevertReadingTaskSession(taskID string) error {
+	return r.withTx(func(tx *sql.Tx) error {
+		return r.RevertReadingTaskSessionTx(tx, taskID)
+	})
+}
+
+// RevertReadingTaskSessionTx executes the atomic reversion inside a transaction.
+func (r *Repository) RevertReadingTaskSessionTx(tx *sql.Tx, taskID string) error {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task ID is required")
+	}
+
+	var notebookID, topicID, taskType, status string
+	var startPage, endPage int
+	var completedAt sql.NullString
+
+	err := tx.QueryRow(`
+		SELECT notebook_id, COALESCE(topic_id, ''), task_type, status, COALESCE(start_page, 0), COALESCE(end_page, 0), completed_at
+		FROM study_queue
+		WHERE id = ?
+	`, taskID).Scan(&notebookID, &topicID, &taskType, &status, &startPage, &endPage, &completedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		return fmt.Errorf("failed to fetch task to revert: %w", err)
+	}
+
+	if taskType != string(models.StudyTaskTypeReading) && taskType != string(models.StudyTaskTypeReread) {
+		return fmt.Errorf("only READING or REREAD tasks can be reverted (got %s)", taskType)
+	}
+	if status != string(models.StudyTaskStatusCompleted) {
+		return fmt.Errorf("task is not in COMPLETED status (current: %s)", status)
+	}
+
+	// 1. Reset the reading task back to ACTIVE
+	if _, err := tx.Exec(`
+		UPDATE study_queue
+		SET status = 'ACTIVE', completed_at = NULL, current_page = ?
+		WHERE id = ?
+	`, startPage, taskID); err != nil {
+		return fmt.Errorf("failed resetting task to ACTIVE: %w", err)
+	}
+
+	// 2. Reset topic cursor if topic exists
+	if topicID != "" && startPage > 0 {
+		if _, err := tx.Exec(`
+			UPDATE topics
+			SET current_page_cursor = ?
+			WHERE id = ?
+		`, startPage, topicID); err != nil {
+			return fmt.Errorf("failed resetting topic cursor: %w", err)
+		}
+	}
+
+	// 3. Delete downstream generated tasks for subsequent pages in pending/active status
+	if notebookID != "" && endPage > 0 {
+		if topicID != "" {
+			_, _ = tx.Exec(`
+				DELETE FROM study_queue
+				WHERE notebook_id = ? AND topic_id = ? AND start_page > ? AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID, topicID, endPage)
+		} else {
+			_, _ = tx.Exec(`
+				DELETE FROM study_queue
+				WHERE notebook_id = ? AND start_page > ? AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID, endPage)
+		}
+	}
+
+	// 4. Delete quiz attempts recorded for the session
+	if topicID != "" {
+		_, _ = tx.Exec(`
+			DELETE FROM quiz_attempts
+			WHERE task_id IN (
+				SELECT id FROM study_queue
+				WHERE topic_id = ? AND start_page = ? AND task_type = 'QUIZ'
+			)
+		`, topicID, startPage)
+	}
+
+	// 5. Delete generated QUIZ and FLASHCARD_GENERATE tasks for this session range
+	if topicID != "" {
+		_, _ = tx.Exec(`
+			DELETE FROM study_queue
+			WHERE topic_id = ? AND start_page = ? AND task_type IN ('QUIZ', 'FLASHCARD_GENERATE')
+		`, topicID, startPage)
+	}
+
+	// 6. Delete flashcards created at or after the completion timestamp if recorded
+	if topicID != "" && completedAt.Valid && completedAt.String != "" {
+		_, _ = tx.Exec(`
+			DELETE FROM fsrs_cards
+			WHERE topic_id = ? AND created_at >= ?
+		`, topicID, completedAt.String)
+	}
+
+	return nil
+}
+

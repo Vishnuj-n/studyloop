@@ -208,6 +208,10 @@ func (a *App) getUserSession() map[string]interface{} {
 	}
 }
 
+const (
+	DefaultClerkPublishableKey = "pk_test_aW5ub2NlbnQtb3JjYS01NjA1LmNsZXJrLmFjY291bnRzLmRldiQ"
+)
+
 func resolveClerkPublishableKey() string {
 	if ClerkPublishableKey != "" {
 		return ClerkPublishableKey
@@ -218,7 +222,7 @@ func resolveClerkPublishableKey() string {
 	if k := os.Getenv("CLERK_PUBLISHABLE_KEY"); k != "" {
 		return k
 	}
-	return ""
+	return DefaultClerkPublishableKey
 }
 
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.
@@ -348,8 +352,12 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		expectedState := activeAuthServer.stateNonce
 		activeAuthServer.mu.Unlock()
 
+		utils.Infof("[AUTH] GET /callback hit with full URL: %s | Query: %v | Headers: %v", req.URL.String(), req.URL.RawQuery, req.Header)
+		fmt.Printf("[AUTH] GET /callback hit with query: %s\n", req.URL.RawQuery)
+
 		if expectedState == "" || givenState != expectedState {
-			utils.Warnf("[AUTH] /callback rejected: state nonce mismatch")
+			utils.Warnf("[AUTH] /callback rejected: state nonce mismatch. expected=%s, given=%s", expectedState, givenState)
+			fmt.Printf("[AUTH] /callback rejected: state nonce mismatch. expected=%s, given=%s\n", expectedState, givenState)
 			http.Error(rw, "Forbidden: invalid state nonce", http.StatusForbidden)
 			return
 		}
@@ -376,29 +384,24 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
 		isPro := isProStr == "true" || isProStr == "1" || isProStr == "pro" || isProStr == "yes" || planStr == "pro" || roleStr == "pro"
 
-		if email == "" {
-			email = "Authenticated User"
-		}
-		if userID == "" {
-			userID = fmt.Sprintf("user_%d", time.Now().Unix())
-		}
-		utils.Infof("[AUTH] Received initial callback for user %s (%s), isPro: %v", userID, email, isPro)
-
-		a.setSession(userID, email, isPro)
-
-		result := AuthCallbackResult{
-			Success: true,
-			UserID:  userID,
-			Email:   email,
-			IsPro:   isPro,
-		}
-
-		// Emit initial event back to Wails frontend window
-		if a.ctx != nil {
-			wailsruntime.EventsEmit(a.ctx, "clerk_auth_success", result)
-			utils.Infof("[AUTH] Emitted clerk_auth_success initial event to frontend")
+		// Only emit session immediately if email/user were explicitly provided in query params;
+		// otherwise, let the browser Clerk JS script authoritatively confirm via /api/auth-confirm.
+		if email != "" && userID != "" {
+			utils.Infof("[AUTH] Query param session detected on /callback: user=%s email=%s isPro=%v", userID, email, isPro)
+			fmt.Printf("[AUTH] Query param session detected on /callback: user=%s email=%s isPro=%v\n", userID, email, isPro)
+			a.setSession(userID, email, isPro)
+			result := AuthCallbackResult{
+				Success: true,
+				UserID:  userID,
+				Email:   email,
+				IsPro:   isPro,
+			}
+			if a.ctx != nil {
+				wailsruntime.EventsEmit(a.ctx, "clerk_auth_success", result)
+			}
 		} else {
-			utils.Warnf("[AUTH] Wails app context is nil, unable to emit clerk_auth_success")
+			utils.Infof("[AUTH] Awaiting client-side Clerk JS metadata confirmation from browser...")
+			fmt.Println("[AUTH] Awaiting client-side Clerk JS metadata confirmation from browser...")
 		}
 
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -604,7 +607,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
       <span id="user-display-email">%s</span>
     </div>
 
-    <p>Your StudyLoop desktop workspace is now connected and ready.</p>
+    <p id="status-desc">Connecting your account to the desktop workspace...</p>
 
     <div class="action-badge">
       <span>Switch back to StudyLoop app</span>
@@ -612,70 +615,127 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
   </div>
 
   <script>
-    window.addEventListener('load', async () => {
-      let isPro = false;
-      let email = '';
-      let userId = '';
-      let plan = '';
-      let role = '';
+    function logMsg(msg) {
+      console.log('[AUTH_CALLBACK]', msg);
+    }
+
+    async function runVerification() {
       const stateNonce = "%s";
+      const clerkKey = "%s";
+      logMsg('Init auth verification for state: ' + stateNonce.substring(0, 8) + '...');
 
+      let clerk = window.Clerk;
+      for (let i = 0; i < 50 && !clerk; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        clerk = window.Clerk;
+      }
+
+      if (!clerk) {
+        logMsg('ERROR: Clerk JS failed to mount on window. Check internet / adblocker.');
+        return;
+      }
+
+      logMsg('Clerk JS mounted. Loading instance...');
       try {
-        if (window.Clerk) {
-          await window.Clerk.load();
-          if (window.Clerk.user) {
-            userId = window.Clerk.user.id || '';
-            email = window.Clerk.user.primaryEmailAddress?.emailAddress || '';
-            const pubMetadata = window.Clerk.user.publicMetadata || {};
-            plan = String(pubMetadata.plan || pubMetadata.tier || '').toLowerCase();
-            role = String(pubMetadata.role || '').toLowerCase();
-            isPro = pubMetadata.isPro === true || pubMetadata.is_pro === true || plan === 'pro' || role === 'pro';
+        if (!clerk.loaded) {
+          await clerk.load({ publishableKey: clerkKey });
+        }
+        logMsg('Clerk load() complete.');
+      } catch (loadErr) {
+        logMsg('Clerk load() error: ' + (loadErr.message || loadErr));
+      }
 
-            if (!isPro && Array.isArray(window.Clerk.user.organizationMemberships)) {
-              for (const org of window.Clerk.user.organizationMemberships) {
-                const orgRole = String(org.role || '').toLowerCase();
-                if (orgRole.includes('pro') || orgRole.includes('admin') || orgRole.includes('member')) {
-                  isPro = true;
-                  break;
-                }
-              }
-            }
+      const currentUser = clerk.user;
+      if (!currentUser) {
+        logMsg('No active Clerk session found in browser. Please sign in below:');
+        const emailEl = document.getElementById('user-display-email');
+        if (emailEl) emailEl.textContent = 'Not Signed In';
+        
+        // Provide in-place sign in modal trigger
+        if (clerk.openSignIn) {
+          clerk.openSignIn();
+        }
+        return;
+      }
+
+      const userId = currentUser.id || '';
+      const email = currentUser.primaryEmailAddress?.emailAddress || 
+                    (currentUser.emailAddresses && currentUser.emailAddresses[0]?.emailAddress) || 
+                    'User';
+      
+      const pubMetadata = currentUser.publicMetadata || {};
+      const unsafeMetadata = currentUser.unsafeMetadata || {};
+      
+      logMsg('User identified: ' + email + ' (ID: ' + userId + ')');
+      logMsg('Public Metadata: ' + JSON.stringify(pubMetadata));
+      logMsg('Unsafe Metadata: ' + JSON.stringify(unsafeMetadata));
+
+      const plan = String(pubMetadata.plan || pubMetadata.tier || pubMetadata.subscription || unsafeMetadata.plan || unsafeMetadata.tier || unsafeMetadata.subscription || '').toLowerCase();
+      const role = String(pubMetadata.role || unsafeMetadata.role || '').toLowerCase();
+      
+      const isProFlag = pubMetadata.isPro === true || pubMetadata.is_pro === true || pubMetadata.pro === true ||
+                        unsafeMetadata.isPro === true || unsafeMetadata.is_pro === true || unsafeMetadata.pro === true ||
+                        pubMetadata.isPro === 'true' || pubMetadata.is_pro === 'true' || pubMetadata.pro === 'true' ||
+                        unsafeMetadata.isPro === 'true' || unsafeMetadata.is_pro === 'true';
+                        
+      const isProPlan = plan.includes('pro') || plan.includes('premium') || plan.includes('lifetime') || plan.includes('active') || plan.includes('supporter') || plan.includes('early_access');
+      const isProRole = role.includes('pro') || role.includes('admin') || role.includes('owner');
+      
+      let isPro = Boolean(isProFlag || isProPlan || isProRole);
+
+      if (!isPro && Array.isArray(currentUser.organizationMemberships)) {
+        for (const org of currentUser.organizationMemberships) {
+          const orgRole = String(org.role || '').toLowerCase();
+          logMsg('Org membership: ' + org.organization?.name + ' (role: ' + orgRole + ')');
+          if (orgRole.includes('pro') || orgRole.includes('admin') || orgRole.includes('member') || orgRole.includes('owner')) {
+            isPro = true;
+            break;
           }
         }
-      } catch (clerkErr) {
-        console.warn('[AUTH] Clerk.load error on callback page:', clerkErr);
       }
+
+      logMsg('Resolved Entitlement: isPro=' + isPro + ' (plan=' + plan + ', role=' + role + ')');
 
       // Update UI badge
       const emailEl = document.getElementById('user-display-email');
-      if (emailEl && (email || userId)) {
-        emailEl.textContent = (email || userId) + (isPro ? ' (★ Pro Plan)' : ' (Free Plan)');
+      if (emailEl) {
+        emailEl.textContent = email + (isPro ? ' (★ Pro Plan)' : ' (Free Plan)');
       }
 
-      // Send authoritative confirmation to Go backend with state nonce
+      // Send authoritative confirmation to Go backend
       try {
-        await fetch('/api/auth-confirm', {
+        logMsg('Sending confirmation to desktop backend (/api/auth-confirm)...');
+        const res = await fetch('/api/auth-confirm', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-Auth-State': stateNonce
           },
           body: JSON.stringify({
-            userId: userId || 'user_' + Date.now(),
-            email: email || 'User',
+            userId: userId,
+            email: email,
             isPro: isPro,
-            plan: plan || '',
-            role: role || '',
+            plan: plan,
+            role: role,
             state: stateNonce
           })
         });
+        const json = await res.json();
+        logMsg('Backend confirmed sync: ' + JSON.stringify(json));
+        const statusDesc = document.getElementById('status-desc');
+        if (statusDesc) {
+          statusDesc.textContent = 'Your StudyLoop desktop workspace is now connected and ready.';
+        }
       } catch (fetchErr) {
-        console.warn('[AUTH] Auth confirm post error:', fetchErr);
+        logMsg('Backend confirm fetch error: ' + (fetchErr.message || fetchErr));
       }
-    });
+    }
+
+    window.addEventListener('DOMContentLoaded', runVerification);
+    window.addEventListener('load', runVerification);
   </script>
 </body>
-</html>`, escapedClerkKey, escapedUserDisplay, escapedState)
+</html>`, escapedClerkKey, escapedUserDisplay, escapedState, escapedClerkKey)
 
 		_, _ = rw.Write([]byte(responseHTML))
 
