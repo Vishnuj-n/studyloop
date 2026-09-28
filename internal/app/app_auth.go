@@ -74,15 +74,11 @@ func computeSessionSignature(machineID, userID, email string, isPro bool, verifi
 }
 
 func getSessionFilePath() (string, error) {
-	dir, err := runtime.ResolveAppDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "session.json"), nil
+	return runtime.ResolveSessionPath()
 }
 
 func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64) {
-	filePath, err := getSessionFilePath()
+	filePath, err := runtime.ResolveSessionPath()
 	if err != nil {
 		utils.Warnf("[AUTH] Failed to resolve session file path: %v", err)
 		return
@@ -103,8 +99,14 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 		return
 	}
 
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		utils.Warnf("[AUTH] Failed to create session directory %s: %v", dir, err)
+		return
+	}
+
 	if err := os.WriteFile(filePath, data, 0o600); err != nil {
-		utils.Warnf("[AUTH] Failed to write session file: %v", err)
+		utils.Warnf("[AUTH] Failed to write session file to %s: %v", filePath, err)
 	}
 }
 
@@ -125,7 +127,7 @@ func (a *App) setSession(userID, email string, isPro bool) {
 // Untrusted frontend arguments are discarded to prevent DevTools/localStorage tampering;
 // session is verified from machine-bound signed storage on disk.
 func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
-	filePath, err := getSessionFilePath()
+	filePath, err := runtime.ResolveSessionPath()
 	if err != nil {
 		utils.Warnf("[AUTH] Could not resolve session file path: %v", err)
 		a.applyRestoredSession("", "", false, 0)
@@ -141,7 +143,7 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 
 	var sess persistentSession
 	if err := json.Unmarshal(data, &sess); err != nil {
-		utils.Warnf("[AUTH] Invalid session JSON format: %v", err)
+		utils.Warnf("[AUTH] Invalid session JSON format in %s: %v", filePath, err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
@@ -184,7 +186,7 @@ func (a *App) ClearSession() {
 	a.sessionVerifiedAt = 0
 	a.sessionMu.Unlock()
 
-	if filePath, err := getSessionFilePath(); err == nil {
+	if filePath, err := runtime.ResolveSessionPath(); err == nil {
 		_ = os.Remove(filePath)
 	}
 }

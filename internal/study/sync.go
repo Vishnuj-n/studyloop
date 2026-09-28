@@ -59,6 +59,15 @@ func ResolveCloudSyncURL(storedURL string) string {
 	return DefaultProductionSyncURL
 }
 
+// ResolveBaseURL strips `/rest/v1/...` and trailing slashes from a Supabase sync URL.
+func ResolveBaseURL(syncURL string) string {
+	baseURL := strings.TrimSpace(syncURL)
+	if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
+		baseURL = baseURL[:idx]
+	}
+	return strings.TrimSuffix(baseURL, "/")
+}
+
 // ResolveAnonKey returns the project Supabase anon/publishable API key from environment variables.
 func ResolveAnonKey() string {
 	for _, envKey := range []string{"CLOUD_API_TOKEN", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"} {

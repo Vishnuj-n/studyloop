@@ -1,7 +1,6 @@
 package study
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -16,7 +15,7 @@ import (
 
 // GenerateManualFlashcards generates flashcards for a synthetic topic based on a page range (manual sandbox)
 func (s *StudyService) GenerateManualFlashcards(notebookID string, startPage, endPage int) map[string]interface{} {
-	cards, tier, err := s.generateFlashcardsCore(notebookID, startPage, endPage, nil)
+	cards, tier, err := s.generateFlashcardsCore(notebookID, startPage, endPage)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
@@ -56,31 +55,7 @@ func (s *StudyService) GenerateFSRSCardsForTopic(topicID, notebookID string, sta
 		return nil, nil, false, "", fmt.Errorf("topic ID and notebook ID are required")
 	}
 
-	// ponytail: lookup latest quiz attempt and extract failed questions
-	var failedQuestions []models.FailedQuestionDetail
-	if payloadJSON, answersJSON, err := s.repo.GetLatestQuizAttemptDetailsByTopic(topicID); err == nil && payloadJSON != "" && answersJSON != "" {
-		var payload models.QuizTaskPayload
-		var answers []models.QuizAnswer
-		if json.Unmarshal([]byte(payloadJSON), &payload) == nil && json.Unmarshal([]byte(answersJSON), &answers) == nil {
-			selectedByQuestionID := make(map[string]string)
-			for _, ans := range answers {
-				selectedByQuestionID[ans.QuestionID] = strings.TrimSpace(ans.Selected)
-			}
-			for _, q := range payload.Questions {
-				userAns := selectedByQuestionID[q.ID]
-				if !strings.EqualFold(strings.TrimSpace(q.CorrectAnswer), userAns) {
-					failedQuestions = append(failedQuestions, models.FailedQuestionDetail{
-						Prompt:        q.Prompt,
-						Options:       q.Options,
-						CorrectAnswer: q.CorrectAnswer,
-						UserAnswer:    userAns,
-					})
-				}
-			}
-		}
-	}
-
-	cards, tier, err := s.generateFlashcardsCore(notebookID, startPage, endPage, failedQuestions)
+	cards, tier, err := s.generateFlashcardsCore(notebookID, startPage, endPage)
 	if err != nil {
 		return nil, nil, false, "", err
 	}
@@ -133,7 +108,7 @@ func (s *StudyService) GenerateFSRSCardsForTopic(topicID, notebookID string, sta
 	return cards, persistedStates, existing, tier, nil
 }
 
-func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endPage int, failedQuestions []models.FailedQuestionDetail) ([]models.Flashcard, string, error) {
+func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endPage int) ([]models.Flashcard, string, error) {
 	generationSource := "flashcard_pipeline_core"
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
@@ -173,11 +148,11 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 		return nil, "", fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
 	}
 
-	// Default to 5 base flashcards. Additional cards will be added for failed questions in buildMarathonFlashcardPromptWithBudget.
+	// Default to 5 flashcards
 	targetCount := 5
 
 	// Build prompt with token budgeting
-	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, targetCount, maxInputTokens, failedQuestions)
+	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, targetCount, maxInputTokens)
 	if len(includedChunkIDs) == 0 {
 		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
 	}
@@ -204,7 +179,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	}
 
 	// Apply "Hard Slice" (The Array Truncation Trick) to prevent flashcard avalanche.
-	maxCardsAllowed := 5 + len(failedQuestions)
+	const maxCardsAllowed = 5
 	if len(parsed.Cards) > maxCardsAllowed {
 		originalCount := len(parsed.Cards)
 		parsed.Cards = parsed.Cards[:maxCardsAllowed]
@@ -252,65 +227,28 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	return cards, tier, nil
 }
 
-func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, targetCount, maxInputTokens int, failedQuestions []models.FailedQuestionDetail) (string, int, []string) {
+func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, targetCount, maxInputTokens int) (string, int, []string) {
 	// Template with empty chunks to calculate static template prompt overhead
-	emptyTemplate := buildFlashcardStaticTemplate(notebookTitle, startPage, endPage, targetCount, failedQuestions)
+	emptyTemplate := buildFlashcardStaticTemplate(notebookTitle, startPage, endPage, targetCount)
 	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, emptyTemplate)
 	if err != nil || availableBudget < 1000 {
 		availableBudget = 1000 // Minimum budget for meaningful content
 	}
 
-	baseTargetCount := targetCount
-	// ponytail: increment target count by failed questions count to generate extra targeted corrective cards
-	if len(failedQuestions) > 0 {
-		targetCount += len(failedQuestions)
-	}
-
 	var b strings.Builder
 	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
 	b.WriteString("CRITICAL: Return ONLY valid JSON. No markdown. No code blocks. No explanations.\n")
-	b.WriteString("Output must start with { and end with }. No prefix or suffix text.\n")
+	b.WriteString("Output must start with { and end with }.\n")
 	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
 
-	if len(failedQuestions) > 0 {
-		b.WriteString("\n=== TARGETED REVIEW: TOPICS NEEDING REINFORCEMENT ===\n")
-		b.WriteString("The user recently took a quiz and missed questions on the following concepts. Generate targeted corrective flashcards (1 per concept) addressing the core principles tested below:\n")
-		for _, q := range failedQuestions {
-			fmt.Fprintf(&b, "- Tested Concept: %s | Correct Ground Truth: %s\n", q.Prompt, q.CorrectAnswer)
-		}
-		b.WriteString("CRITICAL: Do NOT allow these targeted topics to crowd out or replace baseline coverage for the remaining pages.\n\n")
-	}
-
-	b.WriteString("\n=== JSON FORMAT (FOLLOW EXACTLY) ===\n")
-	b.WriteString(`{"cards":[{"prompt":"Why can an early-layer weight be updated during backpropagation even though loss is only calculated at the output layer?","answer":"Because the output depends on early weights through successive intermediate layers, allowing the chain rule to propagate error gradients backward layer-by-layer."}]}` + "\n")
-	b.WriteString("\n=== GOAL & KNOWLEDGE DENSITY ===\n")
-	b.WriteString("Create a small set of high-value cards that help the learner reconstruct important concepts months or years later. Prioritize understanding over coverage and quantity.\n")
-	b.WriteString("Generate 0 to targetCount cards based strictly on information density. There is NO minimum quota. Never create filler cards.\n")
-	b.WriteString("- Use ONLY the information contained in the provided source material.\n")
-	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
-	b.WriteString("- Concepts may be synthesized across multiple source chunks.\n")
-	b.WriteString("\n=== PRIORITIZE ===\n")
-	b.WriteString("- Cause-and-effect and 'why/how' mechanisms\n")
-	b.WriteString("- Relationships between important concepts\n")
-	b.WriteString("- Predictions: 'If X changes, what happens to Y and why?'\n")
-	b.WriteString("- Failure modes, misconceptions, and important invariants\n")
-	b.WriteString("- State transitions, mathematical/dimensional reasoning, and practical consequences\n")
-	b.WriteString("\n=== AVOID ===\n")
-	b.WriteString("- Shallow 'What is X?' definitions when deeper questions are possible\n")
-	b.WriteString("- Author/book structure trivia or rhetorical questions\n")
-	b.WriteString("- Incidental facts and boilerplate\n")
-	b.WriteString("- Near-duplicate cards testing the same knowledge\n")
-	b.WriteString("- Multiple cards about the same concept from slightly different angles\n")
-	b.WriteString("\n=== CARD QUALITY & SELF-EVALUATION ===\n")
-	b.WriteString("- Each card must test ONE important cognitive target.\n")
+	b.WriteString("\n=== JSON FORMAT ===\n")
+	b.WriteString(`{"cards":[{"prompt":"...","answer":"..."}]}` + "\n")
+	b.WriteString("\n=== GUIDELINES ===\n")
+	b.WriteString("- Focus on cause-and-effect, mechanisms, invariants, failure modes, and 'why/how' principles.\n")
+	b.WriteString("- Avoid shallow definitions, trivia, rhetorical questions, and duplicate/filler cards.\n")
 	b.WriteString("- Answers must be concise (1–3 sentences), technically accurate, self-contained, and explain the underlying mechanism.\n")
-	b.WriteString("- Before returning a card, ask: 'Would remembering this card meaningfully improve ability to understand or apply this material months later?' If not, discard it.\n")
-	b.WriteString("\n")
-	if len(failedQuestions) > 0 {
-		fmt.Fprintf(&b, "Generate up to %d flashcards total: %d balanced coverage cards across pages %d-%d, plus %d targeted reinforcement card(s) for the missed concepts above.\n", targetCount, baseTargetCount, startPage, endPage, len(failedQuestions))
-	} else {
-		fmt.Fprintf(&b, "Generate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
-	}
+	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
+	fmt.Fprintf(&b, "\nGenerate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 
@@ -327,7 +265,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 		}
 
 		// Estimate tokens for this chunk with formatting
-		chunkLine := fmt.Sprintf("- page_num: %d | text: %s\n", chunk.PageNum, text)
+		chunkLine := fmt.Sprintf("[Page %d]\n%s\n\n", chunk.PageNum, text)
 		chunkTokens, err := embeddings.CountTokens(chunkLine)
 		if err != nil {
 			// Fallback to word count if tokenization fails
@@ -348,7 +286,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	// Add chunks to prompt
 	for _, chunk := range includedChunks {
 		text := strings.TrimSpace(chunk.Text)
-		fmt.Fprintf(&b, "- page_num: %d | text: %s\n", chunk.PageNum, text)
+		fmt.Fprintf(&b, "[Page %d]\n%s\n\n", chunk.PageNum, text)
 	}
 
 	if truncatedCount > 0 {
@@ -361,49 +299,22 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	return b.String(), currentTokens, includedChunkIDs
 }
 
-func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targetCount int, failedQuestions []models.FailedQuestionDetail) string {
+func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targetCount int) string {
 	var b strings.Builder
 	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
 	b.WriteString("CRITICAL: Return ONLY valid JSON. No markdown. No code blocks. No explanations.\n")
-	b.WriteString("Output must start with { and end with }. No prefix or suffix text.\n")
+	b.WriteString("Output must start with { and end with }.\n")
 	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
 
-	if len(failedQuestions) > 0 {
-		b.WriteString("\n=== TARGETED REVIEW: TOPICS NEEDING REINFORCEMENT ===\n")
-		for _, q := range failedQuestions {
-			fmt.Fprintf(&b, "- Tested Concept: %s | Correct Ground Truth: %s\n", q.Prompt, q.CorrectAnswer)
-		}
-		b.WriteString("CRITICAL: Do NOT allow these targeted topics to crowd out or replace baseline coverage for the remaining pages.\n\n")
-	}
-
-	b.WriteString("\n=== JSON FORMAT (FOLLOW EXACTLY) ===\n")
-	b.WriteString(`{"cards":[{"prompt":"Why can an early-layer weight be updated during backpropagation even though loss is only calculated at the output layer?","answer":"Because the output depends on early weights through successive intermediate layers, allowing the chain rule to propagate error gradients backward layer-by-layer."}]}` + "\n")
-	b.WriteString("\n=== GOAL & KNOWLEDGE DENSITY ===\n")
-	b.WriteString("Create a small set of high-value cards that help the learner reconstruct important concepts months or years later. Prioritize understanding over coverage and quantity.\n")
-	b.WriteString("Generate 0 to targetCount cards based strictly on information density. There is NO minimum quota. Never create filler cards.\n")
-	b.WriteString("- Use ONLY the information contained in the provided source material.\n")
-	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
-	b.WriteString("- Concepts may be synthesized across multiple source chunks.\n")
-	b.WriteString("\n=== PRIORITIZE ===\n")
-	b.WriteString("- Cause-and-effect and 'why/how' mechanisms\n")
-	b.WriteString("- Relationships between important concepts\n")
-	b.WriteString("- Predictions: 'If X changes, what happens to Y and why?'\n")
-	b.WriteString("- Failure modes, misconceptions, and important invariants\n")
-	b.WriteString("- State transitions, mathematical/dimensional reasoning, and practical consequences\n")
-	b.WriteString("\n=== AVOID ===\n")
-	b.WriteString("- Shallow 'What is X?' definitions when deeper questions are possible\n")
-	b.WriteString("- Author/book structure trivia or rhetorical questions\n")
-	b.WriteString("- Incidental facts and boilerplate\n")
-	b.WriteString("- Near-duplicate cards testing the same knowledge\n")
-	b.WriteString("- Multiple cards about the same concept from slightly different angles\n")
-	b.WriteString("\n=== CARD QUALITY & SELF-EVALUATION ===\n")
-	b.WriteString("- Each card must test ONE important cognitive target.\n")
+	b.WriteString("\n=== JSON FORMAT ===\n")
+	b.WriteString(`{"cards":[{"prompt":"...","answer":"..."}]}` + "\n")
+	b.WriteString("\n=== GUIDELINES ===\n")
+	b.WriteString("- Focus on cause-and-effect, mechanisms, invariants, failure modes, and 'why/how' principles.\n")
+	b.WriteString("- Avoid shallow definitions, trivia, rhetorical questions, and duplicate/filler cards.\n")
 	b.WriteString("- Answers must be concise (1–3 sentences), technically accurate, self-contained, and explain the underlying mechanism.\n")
-	b.WriteString("- Before returning a card, ask: 'Would remembering this card meaningfully improve ability to understand or apply this material months later?' If not, discard it.\n")
-	b.WriteString("\n")
-	fmt.Fprintf(&b, "Generate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
+	fmt.Fprintf(&b, "\nGenerate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 	return b.String()
 }
-

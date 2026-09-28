@@ -297,4 +297,137 @@ func TestGetProfileRemainingWords_ExcludesDormant(t *testing.T) {
 	}
 }
 
+func TestProfileScopedSettingsPersistence(t *testing.T) {
+	tempDB := "test_profile_scoped_settings.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() {
+		_ = repo.Close()
+	}()
+
+	// 1. Create two profiles
+	p1 := models.StudyProfile{
+		ID:         "prof-a",
+		Name:       "Profile A",
+		DeadlineAt: time.Now().Add(24 * time.Hour).Unix(),
+	}
+	if err := repo.CreateProfile(p1); err != nil {
+		t.Fatalf("CreateProfile A failed: %v", err)
+	}
+
+	p2 := models.StudyProfile{
+		ID:         "prof-b",
+		Name:       "Profile B",
+		DeadlineAt: time.Now().Add(48 * time.Hour).Unix(),
+	}
+	if err := repo.CreateProfile(p2); err != nil {
+		t.Fatalf("CreateProfile B failed: %v", err)
+	}
+
+	// 2. Set Profile A as active and update profile-scoped settings (theme, word budget, quiz, tutor_style)
+	s, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	s.ActiveProfileID = "prof-a"
+	s.Theme = "dark-obsidian"
+	s.TargetSessionWords = 4500
+	s.MinSessionWords = 1500
+	s.QuizQuestionCount = 10
+	s.QuizPassingScore = 80
+	s.TutorStyle = "direct"
+	s.DefaultRemedialStrategy = "CLASSIC"
+	s.MaxFlashcardsPerSession = 40
+	s.MaxActiveNotebooks = 6
+
+	if err := repo.UpdateUserSettings(*s); err != nil {
+		t.Fatalf("UpdateUserSettings for prof-a failed: %v", err)
+	}
+
+	// 3. Fetch effective settings for Profile A
+	effA, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if effA.Theme != "dark-obsidian" {
+		t.Errorf("expected Profile A theme 'dark-obsidian', got %q", effA.Theme)
+	}
+	if effA.TargetSessionWords != 4500 {
+		t.Errorf("expected Profile A TargetSessionWords 4500, got %d", effA.TargetSessionWords)
+	}
+	if effA.TutorStyle != "direct" {
+		t.Errorf("expected Profile A TutorStyle 'direct', got %q", effA.TutorStyle)
+	}
+	if effA.QuizQuestionCount != 10 {
+		t.Errorf("expected Profile A QuizQuestionCount 10, got %d", effA.QuizQuestionCount)
+	}
+
+	// Direct DB check on study_profiles for prof-a
+	var profATheme, profATutorStyle string
+	var profATargetWords int
+	err = repo.db.QueryRow("SELECT theme, tutor_style, target_session_words FROM study_profiles WHERE id = 'prof-a'").
+		Scan(&profATheme, &profATutorStyle, &profATargetWords)
+	if err != nil {
+		t.Fatalf("query study_profiles for prof-a failed: %v", err)
+	}
+	if profATheme != "dark-obsidian" {
+		t.Errorf("expected study_profiles row theme 'dark-obsidian', got %q", profATheme)
+	}
+	if profATutorStyle != "direct" {
+		t.Errorf("expected study_profiles row tutor_style 'direct', got %q", profATutorStyle)
+	}
+	if profATargetWords != 4500 {
+		t.Errorf("expected study_profiles row target_session_words 4500, got %d", profATargetWords)
+	}
+
+	// 4. Switch to Profile B and set different settings
+	sB, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	sB.ActiveProfileID = "prof-b"
+	sB.Theme = "light-warm"
+	sB.TargetSessionWords = 2000
+	sB.TutorStyle = "socratic"
+	if err := repo.UpdateUserSettings(*sB); err != nil {
+		t.Fatalf("UpdateUserSettings for prof-b failed: %v", err)
+	}
+
+	effB, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if effB.Theme != "light-warm" {
+		t.Errorf("expected Profile B theme 'light-warm', got %q", effB.Theme)
+	}
+	if effB.TargetSessionWords != 2000 {
+		t.Errorf("expected Profile B TargetSessionWords 2000, got %d", effB.TargetSessionWords)
+	}
+
+	// 5. Switch active profile back to Profile A via direct user_settings update
+	_, err = repo.db.Exec("UPDATE user_settings SET active_profile_id = 'prof-a' WHERE id = 1")
+	if err != nil {
+		t.Fatalf("Switch active profile to prof-a failed: %v", err)
+	}
+
+	effAReturn, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if effAReturn.Theme != "dark-obsidian" {
+		t.Errorf("expected restored Profile A theme 'dark-obsidian', got %q", effAReturn.Theme)
+	}
+	if effAReturn.TargetSessionWords != 4500 {
+		t.Errorf("expected restored Profile A TargetSessionWords 4500, got %d", effAReturn.TargetSessionWords)
+	}
+	if effAReturn.TutorStyle != "direct" {
+		t.Errorf("expected restored Profile A TutorStyle 'direct', got %q", effAReturn.TutorStyle)
+	}
+}
+
 

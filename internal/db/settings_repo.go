@@ -22,6 +22,17 @@ func (r *Repository) GetActiveProfileID() (string, error) {
 	return activeProfileID.String, nil
 }
 
+// SetActiveProfileID updates the active profile ID in user_settings.
+// ponytail: dedicated single-column mutation prevents clobbering active profile settings with stale state.
+func (r *Repository) SetActiveProfileID(profileID string) error {
+	var val interface{} = nil
+	if profileID != "" {
+		val = profileID
+	}
+	_, err := r.db.Exec(`UPDATE user_settings SET active_profile_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1`, val)
+	return err
+}
+
 // GetDefaultProfileID retrieves the oldest profile ID.
 func (r *Repository) GetDefaultProfileID() (string, error) {
 	var id string
@@ -235,7 +246,13 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	if studySlots == "" {
 		studySlots = "[]"
 	}
-	_, err := r.db.Exec(`
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.Exec(`
 		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging)
 		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -272,7 +289,27 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		return err
 	}
 
-	return nil
+	if s.ActiveProfileID != "" {
+		_, err = tx.Exec(`
+			UPDATE study_profiles
+			SET target_session_words = ?,
+			    min_session_words = ?,
+			    theme = ?,
+			    max_flashcards_per_session = ?,
+			    max_active_notebooks = ?,
+			    skip_to_reading_active = ?,
+			    default_remedial_strategy = ?,
+			    quiz_question_count = ?,
+			    quiz_passing_score = ?,
+			    tutor_style = ?
+			WHERE id = ?
+		`, targetWords, minWords, theme, s.MaxFlashcardsPerSession, maxActive, s.SkipToReadingActive, strategy, quizCount, passingScore, tutorStyle, s.ActiveProfileID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // SetLastSyncedAt updates the last_synced_at timestamp after a successful cloud sync.
