@@ -163,46 +163,35 @@ def generate_release_notes(tag_name, commit_history):
     )
 
     prompt = f"""
-You are an experienced open-source maintainer.
+You are writing release notes for Studyloop.
 
-Generate professional GitHub Release Notes.
-
-Version:
-{tag_name}
+Generate clean, user-focused GitHub Release Notes for version {tag_name}.
 
 Commit history:
-
 {commit_history}
 
-Requirements:
+Guidelines:
+- Focus on end-user features, visible improvements, and fixed issues/bugs.
+- Do NOT include deep internal implementation details, refactoring noise, CI/CD tweaks, code-level minutiae, or developer-only plumbing unless directly relevant to user experience.
+- Keep the language clear, concise, and professional.
+- Do not mention commit hashes or author names.
+- Group and synthesize related commits into meaningful summary points rather than a raw 1:1 list.
 
-- Output ONLY markdown.
-- Don't mention commit hashes.
-- Don't mention authors.
-- Group related commits.
-- Rewrite technical commit messages into user-friendly release notes.
-- Combine multiple commits belonging to one feature.
-- Ignore trivial commits unless important.
-
-Structure:
-
-# What's New
+Format & Structure (Markdown ONLY):
 
 ## ✨ Features
+(Key new capabilities and user-facing features)
 
 ## 🚀 Improvements
+(Enhancements to speed, UI/UX, usability, or existing features)
 
-## 🐛 Bug Fixes
+## 🐛 Bug Fixes & Issue Resolutions
+(Problems solved and fixes that improve reliability)
 
-## 🧹 Maintenance
+(Omit any section if there are no relevant changes for it)
 
-## 📦 Full Changelog
-
-At the end include:
-
-"Thanks for using Studyloop!"
-
-Keep it concise.
+---
+*Thanks for using Studyloop!*
 """
 
     response = client.chat.completions.create(
@@ -212,7 +201,7 @@ Keep it concise.
             {
                 "role": "system",
                 "content": (
-                    "You write high quality GitHub release notes in Markdown."
+                    "You write concise, user-focused GitHub release notes in Markdown, highlighting user-visible features and fixes without dev-side clutter."
                 ),
             },
             {
