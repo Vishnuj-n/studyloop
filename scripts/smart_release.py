@@ -175,8 +175,25 @@ def parse_json_response(raw_text):
     return json.loads(raw_text)
 
 
+def calculate_next_version(current_version, bump_type):
+    """Deterministically compute the next SemVer string from current version and bump type."""
+    clean = current_version.lstrip("v").strip()
+    parts = clean.split(".")
+    major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
+    minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+    patch = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+
+    bump = (bump_type or "patch").lower().strip()
+    if bump == "major":
+        return f"{major + 1}.0.0"
+    elif bump == "minor":
+        return f"{major}.{minor + 1}.0"
+    else:  # patch
+        return f"{major}.{minor}.{patch + 1}"
+
+
 def ask_ai_version_bump(current_version, commit_history):
-    """Use AI to analyze git history and recommend the next version in JSON format."""
+    """Use AI to analyze git history and recommend the bump type (patch, minor, major)."""
     api_key = os.getenv("FAST_LLM_API_KEY") or os.getenv("HEAVY_LLM_API_KEY")
     base_url = (
         os.getenv("FAST_LLM_BASE_URL")
@@ -213,11 +230,12 @@ Commit Log since last tag/release:
 
 Instructions:
 1. Analyze the changes in the commit log.
-2. Determine whether the next release should be a patch bump (e.g., 1.3.11 -> 1.3.12), a minor bump (e.g., 1.3.11 -> 1.4.0), or a major bump (e.g., 1.3.11 -> 2.0.0).
+2. Decide whether the changes warrant a:
+   - "patch" (bug fixes, small polish, minor refactors)
+   - "minor" (new user-facing features, significant additions)
+   - "major" (breaking architectural changes / breaking API changes)
 3. Return ONLY a valid JSON object matching this structure:
 {{
-  "current_version": "{current_version}",
-  "recommended_version": "<NEW_VERSION_STRING_WITHOUT_V>",
   "bump_type": "patch|minor|major",
   "reason": "<Short sentence explaining why this bump was chosen>"
 }}
@@ -238,7 +256,12 @@ Do NOT include extra commentary or Markdown wrappers outside the JSON.
     )
 
     content = response.choices[0].message.content
-    return parse_json_response(content)
+    data = parse_json_response(content)
+    bump_type = data.get("bump_type", "patch").lower().strip()
+    data["current_version"] = current_version
+    data["bump_type"] = bump_type
+    data["recommended_version"] = calculate_next_version(current_version, bump_type)
+    return data
 
 
 def revert_release(target_tag=None, dry_run=False):
