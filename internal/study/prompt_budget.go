@@ -64,7 +64,7 @@ func calculatePromptTokenCount(chunks []models.ChunkWithContext) int {
 		if text == "" {
 			continue
 		}
-		fmt.Fprintf(&contentBuilder, "- page_num: %d | text: %s\n", chunk.PageNum, text)
+		fmt.Fprintf(&contentBuilder, "[Page %d]\n%s\n\n", chunk.PageNum, text)
 	}
 
 	if len(chunks) > maxContextChunks {
