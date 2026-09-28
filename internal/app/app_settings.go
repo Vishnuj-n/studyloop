@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,15 +15,35 @@ import (
 	"time"
 
 	"ai-tutor/internal/db"
+	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/llm"
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/notebook"
 	appRuntime "ai-tutor/internal/runtime"
+	"ai-tutor/internal/scheduler"
 	"ai-tutor/internal/study"
 	"ai-tutor/internal/utils"
 
-
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+)
+
+const (
+	maxActiveNotebooksLimit   = 50
+	minFlashcardsPerSession   = 5
+	maxFlashcardsPerSession   = 200
+	defaultTargetSessionWords = 3000
+	minTargetSessionWords     = 1000
+	maxTargetSessionWords     = 20000
+	sessionWordsStep          = 500
+	minSessionWordsFloor      = 500
+	minQuizQuestionCount      = 3
+	maxQuizQuestionCount      = 15
+	minQuizPassingScore       = 50
+	maxQuizPassingScore       = 100
+	timeFormatHHMM            = "15:04"
+	strategyFast              = "FAST"
+	strategyClassic           = "CLASSIC"
 )
 
 func (a *App) GetUserSettings() map[string]interface{} {
@@ -72,50 +91,50 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
 	}
-	if s.MaxActiveNotebooks < 0 || s.MaxActiveNotebooks > 50 {
-		return map[string]interface{}{"error": "max active notebooks must be between 0 (unlimited) and 50"}
+	if s.MaxActiveNotebooks < 0 || s.MaxActiveNotebooks > maxActiveNotebooksLimit {
+		return map[string]interface{}{"error": fmt.Sprintf("max active notebooks must be between 0 (unlimited) and %d", maxActiveNotebooksLimit)}
 	}
-	if s.MaxFlashcardsPerSession < 5 || s.MaxFlashcardsPerSession > 200 {
-		return map[string]interface{}{"error": "max flashcards per session must be between 5 and 200"}
+	if s.MaxFlashcardsPerSession < minFlashcardsPerSession || s.MaxFlashcardsPerSession > maxFlashcardsPerSession {
+		return map[string]interface{}{"error": fmt.Sprintf("max flashcards per session must be between %d and %d", minFlashcardsPerSession, maxFlashcardsPerSession)}
 	}
 	if s.TargetSessionWords > 0 {
-		if s.TargetSessionWords < 1000 || s.TargetSessionWords > 20000 || s.TargetSessionWords%500 != 0 {
-			return map[string]interface{}{"error": "target session words must be between 1000 and 20000 and a multiple of 500"}
+		if s.TargetSessionWords < minTargetSessionWords || s.TargetSessionWords > maxTargetSessionWords || s.TargetSessionWords%sessionWordsStep != 0 {
+			return map[string]interface{}{"error": fmt.Sprintf("target session words must be between %d and %d and a multiple of %d", minTargetSessionWords, maxTargetSessionWords, sessionWordsStep)}
 		}
 	} else {
-		s.TargetSessionWords = 3000
+		s.TargetSessionWords = defaultTargetSessionWords
 	}
 	if s.MinSessionWords > 0 {
 		if s.MinSessionWords > s.TargetSessionWords {
 			return map[string]interface{}{"error": "min session words cannot exceed target session words"}
 		}
-		if s.MinSessionWords < 500 || s.MinSessionWords%500 != 0 {
-			return map[string]interface{}{"error": "min session words must be at least 500 and a multiple of 500"}
+		if s.MinSessionWords < minSessionWordsFloor || s.MinSessionWords%sessionWordsStep != 0 {
+			return map[string]interface{}{"error": fmt.Sprintf("min session words must be at least %d and a multiple of %d", minSessionWordsFloor, sessionWordsStep)}
 		}
 	} else {
 		s.MinSessionWords = 0
 	}
 	if s.StudyStartTime != "" {
-		if _, err := time.Parse("15:04", s.StudyStartTime); err != nil {
+		if _, err := time.Parse(timeFormatHHMM, s.StudyStartTime); err != nil {
 			return map[string]interface{}{"error": "invalid study start time: must match format HH:MM"}
 		}
 	}
 	if s.StudyEndTime != "" {
-		if _, err := time.Parse("15:04", s.StudyEndTime); err != nil {
+		if _, err := time.Parse(timeFormatHHMM, s.StudyEndTime); err != nil {
 			return map[string]interface{}{"error": "invalid study end time: must match format HH:MM"}
 		}
 	}
 	if s.DefaultRemedialStrategy == "" {
-		s.DefaultRemedialStrategy = "FAST"
+		s.DefaultRemedialStrategy = strategyFast
 	}
-	if s.DefaultRemedialStrategy != "FAST" && s.DefaultRemedialStrategy != "CLASSIC" {
-		return map[string]interface{}{"error": "default remedial strategy must be CLASSIC or FAST"}
+	if s.DefaultRemedialStrategy != strategyFast && s.DefaultRemedialStrategy != strategyClassic {
+		return map[string]interface{}{"error": fmt.Sprintf("default remedial strategy must be %s or %s", strategyClassic, strategyFast)}
 	}
-	if s.QuizQuestionCount > 0 && (s.QuizQuestionCount < 3 || s.QuizQuestionCount > 15) {
-		return map[string]interface{}{"error": "quiz question count must be between 3 and 15"}
+	if s.QuizQuestionCount > 0 && (s.QuizQuestionCount < minQuizQuestionCount || s.QuizQuestionCount > maxQuizQuestionCount) {
+		return map[string]interface{}{"error": fmt.Sprintf("quiz question count must be between %d and %d", minQuizQuestionCount, maxQuizQuestionCount)}
 	}
-	if s.QuizPassingScore > 0 && (s.QuizPassingScore < 50 || s.QuizPassingScore > 100) {
-		return map[string]interface{}{"error": "quiz passing score must be between 50 and 100"}
+	if s.QuizPassingScore > 0 && (s.QuizPassingScore < minQuizPassingScore || s.QuizPassingScore > maxQuizPassingScore) {
+		return map[string]interface{}{"error": fmt.Sprintf("quiz passing score must be between %d and %d", minQuizPassingScore, maxQuizPassingScore)}
 	}
 	// Persist settings first so SQLite is never stale if runtime mutation fails.
 	if err := repo.UpdateUserSettings(s); err != nil {
@@ -123,17 +142,21 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	}
 
 	// Only mutate runtime after successful persistence.
+	var embToClose *embeddings.OnnxEmbedder
 	a.aiMutex.Lock()
 	if !s.RAGEnabled && a.embedder != nil {
 		utils.Infof("RAG disabled dynamically in settings. Closing ONNX embedder.")
-		if err := a.embedder.Close(); err != nil {
-			a.aiMutex.Unlock()
-			return map[string]interface{}{"error": fmt.Sprintf("failed to close embedder: %v", err)}
-		}
+		embToClose = a.embedder
 		a.embedder = nil
 		a.aiReady = false
 	}
 	a.aiMutex.Unlock()
+
+	if embToClose != nil {
+		if err := embToClose.Close(); err != nil {
+			return map[string]interface{}{"error": fmt.Sprintf("failed to close embedder: %v", err)}
+		}
+	}
 
 	if !s.RAGEnabled {
 		if err := a.reloadRetrievalEngine(); err != nil {
@@ -305,31 +328,7 @@ func (a *App) DeleteLLMAPIKey(tier string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
-func (a *App) TestLLMConnection(tier, provider, baseURL, model, apiKey string) map[string]interface{} {
-	tier = normalizeLLMTierForApp(tier)
-	if apiKey == "" && tier != "" {
-		key, _ := llm.GetAPIKey(tier)
-		if key == "" && tier == "heavy" {
-			key, _ = llm.GetAPIKey("fast")
-		}
-		apiKey = key
-	}
-	cfg := llm.LoadConfigFromSettingsForPrefix(
-		strings.ToUpper(tier),
-		models.LLMTierSettings{Provider: provider, BaseURL: baseURL, Model: model},
-		apiKey,
-	)
-	if cfg.TimeoutMs <= 0 || cfg.TimeoutMs > 10000 {
-		cfg.TimeoutMs = 10000
-	}
-	providerObj := llm.NewProvider(cfg)
-	if _, err := providerObj.GenerateAnswer("Hi"); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"ok": true}
-}
-
-func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxInput int) map[string]interface{} {
+func (a *App) runLLMTest(tier, provider, baseURL, model, apiKey string, maxInput int) (string, error) {
 	tier = normalizeLLMTierForApp(tier)
 	if apiKey == "" && tier != "" {
 		key, _ := llm.GetAPIKey(tier)
@@ -356,8 +355,22 @@ func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxIn
 		cfg.TimeoutMs = 10000
 	}
 	providerObj := llm.NewProvider(cfg)
-	if _, err := providerObj.GenerateAnswer("Hi"); err != nil {
+	return providerObj.GenerateAnswer("Hi")
+}
+
+func (a *App) TestLLMConnection(tier, provider, baseURL, model, apiKey string) map[string]interface{} {
+	if _, err := a.runLLMTest(tier, provider, baseURL, model, apiKey, 0); err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
+func (a *App) TestLLMLimits(tier, provider, baseURL, model, apiKey string, maxInput int) map[string]interface{} {
+	if _, err := a.runLLMTest(tier, provider, baseURL, model, apiKey, maxInput); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if maxInput <= 0 {
+		maxInput = 4000
 	}
 	return map[string]interface{}{
 		"ok":     true,
@@ -756,7 +769,22 @@ func (a *App) RestoreDatabaseFromBackup() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": "database restored but re-init failed: " + err.Error()}
 	}
+
+	a.repoMutex.Lock()
 	a.repo = newRepo
+	a.scheduler = scheduler.New(newRepo, scheduler.Dependencies{})
+	a.notebookService = notebook.NewService(a.notebookUploadDir)
+	a.repoMutex.Unlock()
+
+	if err := a.reloadLLMProviders(); err != nil {
+		utils.Warnf("failed to reload LLM providers after DB restore: %v", err)
+	}
+	if err := a.reloadRetrievalEngine(); err != nil {
+		utils.Warnf("failed to reload retrieval engine after DB restore: %v", err)
+	}
+	if a.ctx != nil {
+		a.initIndexQueue(a.ctx, newRepo)
+	}
 
 	return map[string]interface{}{"ok": true}
 }
@@ -815,17 +843,11 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 		}
 	}
 
-	baseURL := syncURL
-	if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
-		baseURL = baseURL[:idx]
-	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
+	baseURL := study.ResolveBaseURL(syncURL)
 
 	if !authenticated && syncURL == "" {
 		return map[string]interface{}{"error": "Cloud connection URL is not configured"}
 	}
-
-
 
 	// 2. Fallback: query Supabase REST user_accounts table directly if cloud server unreachable
 	if !authenticated {
@@ -893,7 +915,8 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 									}
 								}
 								if sessToken == "" {
-									sessToken = uname
+									utils.Warnf("failed to create secure session token on Supabase for %s", uname)
+									return map[string]interface{}{"error": "failed to establish secure session with cloud server"}
 								}
 								loginResp.SessionToken = sessToken
 								loginResp.Role = role
@@ -935,7 +958,7 @@ func (a *App) LoginStudent(username, password string) map[string]interface{} {
 
 	if targetProfileID != "" {
 		if err := repo.UpdateProfileCloudCredentials(targetProfileID, loginResp.ClassroomCode, loginResp.Username, loginResp.SessionToken); err != nil {
-			log.Printf("warning: failed to save profile cloud credentials: %v", err)
+			utils.Warnf("failed to save profile cloud credentials: %v", err)
 		}
 	} else {
 		// Automatically create a new study profile for this new classroom
@@ -1022,15 +1045,17 @@ func (a *App) SignUpStudent(username, password, classroomCode string) map[string
 			return map[string]interface{}{"error": "Supabase Anon Key is not configured in environment"}
 		}
 
-		baseURL := syncURL
-		if idx := strings.Index(baseURL, "/rest/v1/"); idx != -1 {
-			baseURL = baseURL[:idx]
+		baseURL := study.ResolveBaseURL(syncURL)
+		insertURL := fmt.Sprintf("%s/rest/v1/user_accounts", baseURL)
+
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if hashErr != nil {
+			return map[string]interface{}{"error": "failed to hash password: " + hashErr.Error()}
 		}
-		insertURL := fmt.Sprintf("%s/rest/v1/user_accounts", strings.TrimSuffix(baseURL, "/"))
 
 		newUser := map[string]string{
 			"username":       username,
-			"password_hash":  password,
+			"password_hash":  string(hashedPassword),
 			"role":           "student",
 			"classroom_code": classroomCode,
 		}
@@ -1080,7 +1105,7 @@ func (a *App) LogoutStudent() map[string]interface{} {
 	}
 	if settings.ActiveProfileID != "" {
 		if err := repo.UpdateProfileCloudCredentials(settings.ActiveProfileID, "", "", ""); err != nil {
-			log.Printf("warning: failed to clear active profile cloud credentials: %v", err)
+			utils.Warnf("failed to clear active profile cloud credentials: %v", err)
 		}
 	}
 	return map[string]interface{}{"ok": true}

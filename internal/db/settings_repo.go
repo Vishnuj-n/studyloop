@@ -246,7 +246,13 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	if studySlots == "" {
 		studySlots = "[]"
 	}
-	_, err := r.db.Exec(`
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.Exec(`
 		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging)
 		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -284,7 +290,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	}
 
 	if s.ActiveProfileID != "" {
-		_, err = r.db.Exec(`
+		_, err = tx.Exec(`
 			UPDATE study_profiles
 			SET target_session_words = ?,
 			    min_session_words = ?,
@@ -303,7 +309,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 // SetLastSyncedAt updates the last_synced_at timestamp after a successful cloud sync.

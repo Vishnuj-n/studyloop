@@ -62,3 +62,22 @@ func TestResolveAnonKeyAndToken(t *testing.T) {
 		t.Errorf("expected default fallback, got %q", got)
 	}
 }
+
+func TestResolveBaseURL(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"https://xyz.supabase.co/rest/v1/rpc/handle_cloud_sync", "https://xyz.supabase.co"},
+		{"https://xyz.supabase.co/rest/v1/user_accounts", "https://xyz.supabase.co"},
+		{"https://xyz.supabase.co/", "https://xyz.supabase.co"},
+		{"https://xyz.supabase.co", "https://xyz.supabase.co"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := ResolveBaseURL(c.input); got != c.expected {
+			t.Errorf("ResolveBaseURL(%q) = %q; want %q", c.input, got, c.expected)
+		}
+	}
+}
+
