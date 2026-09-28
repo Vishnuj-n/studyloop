@@ -301,6 +301,10 @@ export function deleteProfile(id) {
   return appBridge().DeleteProfile(id)
 }
 
+export function setActiveProfileID(profileID) {
+  return appBridge().SetActiveProfileID(profileID || '')
+}
+
 export function assignNotebookToProfile(notebookID, profileID) {
   return appBridge().AssignNotebookToProfile(notebookID, profileID)
 }

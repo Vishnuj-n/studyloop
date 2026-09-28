@@ -1107,6 +1107,69 @@ func TestCompleteReading_SplitPage(t *testing.T) {
 	}
 }
 
+func TestSetActiveProfileID_PreservesProfileSettings(t *testing.T) {
+	app := newTestApp(t)
+
+	// Create profile 1 with distinct theme and tutor style
+	res1 := app.CreateProfile("Profile 1", "2026-12-31")
+	if res1["error"] != nil {
+		t.Fatalf("CreateProfile 1 failed: %v", res1["error"])
+	}
+	p1 := res1["profile"].(models.StudyProfile)
+
+	// Create profile 2 with different theme and tutor style
+	res2 := app.CreateProfile("Profile 2", "2026-12-31")
+	if res2["error"] != nil {
+		t.Fatalf("CreateProfile 2 failed: %v", res2["error"])
+	}
+	p2 := res2["profile"].(models.StudyProfile)
+
+	// Set distinct settings on Profile 1
+	app.SetActiveProfileID(p1.ID)
+	s1 := models.UserSettings{
+		ActiveProfileID:    p1.ID,
+		Theme:              "dark-obsidian",
+		TutorStyle:         "direct",
+		TargetSessionWords: 4000,
+	}
+	if err := testRepo.UpdateUserSettings(s1); err != nil {
+		t.Fatalf("UpdateUserSettings for p1 failed: %v", err)
+	}
+
+	// Set distinct settings on Profile 2
+	app.SetActiveProfileID(p2.ID)
+	s2 := models.UserSettings{
+		ActiveProfileID:    p2.ID,
+		Theme:              "light-warm",
+		TutorStyle:         "socratic",
+		TargetSessionWords: 2000,
+	}
+	if err := testRepo.UpdateUserSettings(s2); err != nil {
+		t.Fatalf("UpdateUserSettings for p2 failed: %v", err)
+	}
+
+	// Switch back to Profile 1 via SetActiveProfileID
+	setRes := app.SetActiveProfileID(p1.ID)
+	if setRes["ok"] != true {
+		t.Fatalf("SetActiveProfileID failed: %v", setRes["error"])
+	}
+
+	// Verify effective user settings loaded for Profile 1 without being clobbered by Profile 2
+	loaded := app.GetUserSettings()
+	if loaded["error"] != nil {
+		t.Fatalf("GetUserSettings failed: %v", loaded["error"])
+	}
+	if loaded["theme"] != "dark-obsidian" {
+		t.Errorf("expected Profile 1 theme 'dark-obsidian', got %v", loaded["theme"])
+	}
+	if loaded["tutor_style"] != "direct" {
+		t.Errorf("expected Profile 1 tutor_style 'direct', got %v", loaded["tutor_style"])
+	}
+	if loaded["target_session_words"] != 4000 {
+		t.Errorf("expected Profile 1 target_session_words 4000, got %v", loaded["target_session_words"])
+	}
+}
+
 
 
 

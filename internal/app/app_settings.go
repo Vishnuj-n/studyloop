@@ -677,6 +677,18 @@ func (a *App) DeleteProfile(id string) map[string]interface{} {
 	return map[string]interface{}{"ok": true}
 }
 
+func (a *App) SetActiveProfileID(profileID string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	profileID = strings.TrimSpace(profileID)
+	if err := repo.SetActiveProfileID(profileID); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
 func (a *App) AssignNotebookToProfile(notebookID, profileID string) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {

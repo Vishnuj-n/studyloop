@@ -181,18 +181,24 @@ export function useSettings(errorRef, successRef) {
   }
 
   async function loadSettings() {
-    const res = await getUserSettings()
-    if (res.error) {
-      errorRef.value = res.error
-      return false
+    clearTimeout(saveTimer)
+    loading.value = true
+    try {
+      const res = await getUserSettings()
+      if (res.error) {
+        errorRef.value = res.error
+        return false
+      }
+      if (!res.default_remedial_strategy) res.default_remedial_strategy = 'FAST'
+      if (!res.quiz_question_count) res.quiz_question_count = 8
+      if (!res.quiz_passing_score) res.quiz_passing_score = 70
+      if (!res.tutor_style) res.tutor_style = 'socratic'
+      settings.value = res
+      computeDuration()
+      return true
+    } finally {
+      loading.value = false
     }
-    if (!res.default_remedial_strategy) res.default_remedial_strategy = 'FAST'
-    if (!res.quiz_question_count) res.quiz_question_count = 8
-    if (!res.quiz_passing_score) res.quiz_passing_score = 70
-    if (!res.tutor_style) res.tutor_style = 'socratic'
-    settings.value = res
-    computeDuration()
-    return true
   }
 
   function cleanup() {

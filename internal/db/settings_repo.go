@@ -22,6 +22,17 @@ func (r *Repository) GetActiveProfileID() (string, error) {
 	return activeProfileID.String, nil
 }
 
+// SetActiveProfileID updates the active profile ID in user_settings.
+// ponytail: dedicated single-column mutation prevents clobbering active profile settings with stale state.
+func (r *Repository) SetActiveProfileID(profileID string) error {
+	var val interface{} = nil
+	if profileID != "" {
+		val = profileID
+	}
+	_, err := r.db.Exec(`UPDATE user_settings SET active_profile_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1`, val)
+	return err
+}
+
 // GetDefaultProfileID retrieves the oldest profile ID.
 func (r *Repository) GetDefaultProfileID() (string, error) {
 	var id string

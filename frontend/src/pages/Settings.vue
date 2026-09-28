@@ -225,7 +225,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getAppEnv, getCloudConfig, triggerCloudSync } from '../services/appApi'
+import { getAppEnv, getCloudConfig, triggerCloudSync, setActiveProfileID } from '../services/appApi'
 
 import { useSettings } from '../composables/useSettings'
 import { useLLM } from '../composables/useLLM'
@@ -369,8 +369,14 @@ async function setActiveProfile(profileID) {
   const prev = settings.value.active_profile_id
   settings.value.active_profile_id = profileID
   try {
-    await saveUserSettings(true)
+    const res = await setActiveProfileID(profileID)
+    if (res?.error) {
+      settings.value.active_profile_id = prev
+      error.value = res.error
+      return
+    }
     await loadSettings()
+    window.dispatchEvent(new CustomEvent('settings-updated'))
   } catch (err) {
     settings.value.active_profile_id = prev
     error.value = 'Failed to switch profile'
