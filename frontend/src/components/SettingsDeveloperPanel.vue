@@ -328,7 +328,7 @@ async function fetchMore() {
   gap: 6px;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid var(--primary);
+  border: 1px solid var(--outline-variant);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
   font-size: 12px;
@@ -394,7 +394,7 @@ async function fetchMore() {
 .error-banner {
   padding: 10px 14px;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid #ef4444;
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
   border-radius: 8px;
   font-size: 13px;
@@ -526,7 +526,7 @@ async function fetchMore() {
 .load-more-btn {
   padding: 8px 16px;
   border-radius: 8px;
-  border: 1px solid var(--primary);
+  border: 1px solid var(--outline-variant);
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   color: var(--primary);
   font-size: 12px;
@@ -548,7 +548,7 @@ async function fetchMore() {
 .success-banner {
   padding: 10px 14px;
   background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid var(--outline-variant);
   color: #10b981;
   border-radius: 8px;
   font-size: 13px;

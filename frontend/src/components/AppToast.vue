@@ -90,7 +90,7 @@ const { toast, hideToast } = useToast()
   background: var(--surface-container-low, #1e1e24);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2), 0 0 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 0, 0, 0.06);
   color: var(--on-surface, #e2e8f0);
   display: flex;
   align-items: flex-start;

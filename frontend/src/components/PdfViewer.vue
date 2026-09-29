@@ -23,6 +23,7 @@
           :width="containerWidth"
           @rendered="onPageRendered(pg)"
           @load-error="onLoadError"
+          @navigate="handleInternalNavigate"
         />
       </div>
     </div>
@@ -50,6 +51,10 @@ const emit = defineEmits(['update:currentPage', 'load-error', 'rendered'])
 const BASE_WIDTH = 800
 const PAGE_GAP = 20
 const BUFFER = 3 // render activePage ± BUFFER pages (3 above, current, 3 below = 7 active pages)
+
+// ─── History Stack for Back Navigation ──────────────────────────────────────────
+const historyStack = ref([])
+const canGoBack = computed(() => historyStack.value.length > 0)
 
 // ─── Refs ───────────────────────────────────────────────────────────────────────
 const viewportRef = ref(null)
@@ -107,17 +112,35 @@ function handleScroll() {
 }
 
 // ─── Instant Jump (no scrollIntoView) ───────────────────────────────────────────
-function jumpToPage(page) {
+function jumpToPage(page, trackHistory = false) {
   const vp = viewportRef.value
   if (!vp) return
   const validPage = Math.max(1, Math.min(page, props.pageCount))
+  if (trackHistory && activePage.value !== validPage) {
+    historyStack.value.push(activePage.value)
+  }
   const target = scrollTopForPage(validPage)
   scrollListenerActive = false
   vp.scrollTop = target
   activePage.value = validPage
+  emit('update:currentPage', validPage)
   requestAnimationFrame(() => {
     scrollListenerActive = true
   })
+}
+
+function handleInternalNavigate({ fromPage, targetPage }) {
+  if (targetPage > 0 && targetPage <= props.pageCount) {
+    jumpToPage(targetPage, true)
+  }
+}
+
+function goBack() {
+  if (historyStack.value.length === 0) return
+  const prevPage = historyStack.value.pop()
+  if (prevPage) {
+    jumpToPage(prevPage, false)
+  }
 }
 
 // ─── Page Rendered Callback ─────────────────────────────────────────────────────
@@ -200,7 +223,7 @@ onUnmounted(() => {
 })
 
 // ─── Expose for parent to call programmatic navigation ──────────────────────────
-defineExpose({ jumpToPage })
+defineExpose({ jumpToPage, goBack, canGoBack })
 </script>
 
 <style scoped>

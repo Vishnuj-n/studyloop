@@ -12,6 +12,7 @@ export function useLLM(loading, errorRef, successRef) {
   const { confirm } = useDialog()
   const savingLLM = ref(false)
   const presetLoading = ref(false)
+  const isInitialized = ref(false)
 
   const llmSettings = ref({
     use_same_for_heavy: true,
@@ -44,7 +45,7 @@ export function useLLM(loading, errorRef, successRef) {
   watch(
     [llmSettings, llmFastKey, llmHeavyKey],
     () => {
-      if (loading.value || savingLLM.value) return
+      if (loading.value || savingLLM.value || !isInitialized.value) return
       clearTimeout(saveTimer)
       saveTimer = setTimeout(() => saveLLMProviderSettings(), 800)
     },
@@ -67,7 +68,7 @@ export function useLLM(loading, errorRef, successRef) {
   }
 
   async function saveLLMProviderSettings() {
-    if (presetLoading.value || errorRef.value) return
+    if (!isInitialized.value || presetLoading.value || errorRef.value) return
     errorRef.value = ''
     successRef.value = ''
     try {
@@ -155,6 +156,9 @@ export function useLLM(loading, errorRef, successRef) {
       return false
     }
     if (res.settings) llmSettings.value = res.settings
+    setTimeout(() => {
+      isInitialized.value = true
+    }, 50)
     return true
   }
 

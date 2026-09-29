@@ -422,47 +422,15 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 
 	// Include as many blocks as will fit into available tokens, truncating
 	// the final block if necessary. Keep citations aligned to included blocks.
-	newBlocks := make([]string, 0, len(blocks))
-	newCitations := make([]string, 0, len(citations))
-	newChunkTexts := make([]string, 0, len(chunkTexts))
-	usedTokens := 0
-	for i, blk := range blocks {
-		blkTokens, err := embeddings.CountTokens(blk)
-		if err != nil {
-			return nil, fmt.Errorf("error counting block tokens: %w", err)
-		}
-		if usedTokens+blkTokens <= available {
-			newBlocks = append(newBlocks, blk)
-			newCitations = append(newCitations, citations[i])
-			newChunkTexts = append(newChunkTexts, chunkTexts[i])
-			usedTokens += blkTokens
-			continue
-		}
-		remaining := available - usedTokens
-		if remaining > 8 {
-			// Try tokenizer-based truncation for the final chunk
-			if truncated, err := embeddings.TruncateToTokens(blk, remaining); err == nil && strings.TrimSpace(truncated) != "" {
-				newBlocks = append(newBlocks, truncated)
-				newCitations = append(newCitations, citations[i])
-				newChunkTexts = append(newChunkTexts, chunkTexts[i])
-			}
-		}
-		break
+	newBlocks, newCitations, err := BudgetContextBlocks(blocks, citations, available)
+	if err != nil {
+		return nil, fmt.Errorf("error budgeting context blocks: %w", err)
 	}
 
-	// If everything was truncated away, only fall back within remaining budget.
-	if len(newBlocks) == 0 && len(blocks) > 0 {
-		safeLimit := available
-		if safeLimit > 128 {
-			safeLimit = 128
-		}
-		if safeLimit > 0 {
-			if truncated, err := embeddings.TruncateToTokens(blocks[0], safeLimit); err == nil && strings.TrimSpace(truncated) != "" {
-				newBlocks = append(newBlocks, truncated)
-				newCitations = append(newCitations, citations[0])
-				newChunkTexts = append(newChunkTexts, chunkTexts[0])
-			}
-		}
+	// Slice chunkTexts to match the number of retained blocks
+	newChunkTexts := chunkTexts
+	if len(newBlocks) < len(chunkTexts) {
+		newChunkTexts = chunkTexts[:len(newBlocks)]
 	}
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))

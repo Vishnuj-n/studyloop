@@ -234,6 +234,14 @@
           class="pdf-edge-controls"
         >
           <button
+            v-if="pdfViewerRef?.canGoBack"
+            class="edge-btn back-btn"
+            title="Back to previous page"
+            @click="pdfViewerRef?.goBack()"
+          >
+            ←
+          </button>
+          <button
             class="edge-btn zoom-btn"
             :disabled="zoomScale <= 0.5"
             title="Zoom out"
@@ -992,7 +1000,7 @@ h3 {
   box-sizing: border-box;
   color: #ef4444;
   background: color-mix(in srgb, #ef4444 12%, var(--surface-container-low));
-  border: 1px solid color-mix(in srgb, #ef4444 28%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1273,7 +1281,7 @@ button:disabled {
   background: var(--surface-container-highest, #282828);
   border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.15));
   border-radius: 12px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
   padding: 6px;
   z-index: 100;
   backdrop-filter: blur(8px);
@@ -1321,17 +1329,17 @@ button:disabled {
 }
 
 .split-main-btn.secondary {
-  border-right: 1px solid var(--border-color, #e0c8b0) !important;
+  border-right: 1px solid var(--outline-variant) !important;
 }
 
 .split-chevron-btn.secondary {
-  border: 1px solid var(--border-color, #e0c8b0);
+  border: 1px solid var(--outline-variant);
   border-left: none !important;
 }
 
 .audio-chevron-btn {
   background: #fdf8f4 !important;
-  border: 1px solid #e0c8b0 !important;
+  border: 1px solid var(--outline-variant) !important;
   border-left: none !important;
   color: #7a3e14 !important;
 }

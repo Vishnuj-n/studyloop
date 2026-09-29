@@ -1375,7 +1375,7 @@ function handleGoToDetailedAnalysis() {
   margin: 20px 0 8px;
   padding: 20px 24px;
   background: linear-gradient(135deg, rgba(243, 156, 18, 0.08) 0%, rgba(211, 84, 0, 0.12) 100%);
-  border: 1px solid rgba(243, 156, 18, 0.35);
+  border: 1px solid var(--outline-variant);
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(243, 156, 18, 0.08);
   display: flex;

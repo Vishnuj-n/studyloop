@@ -1168,12 +1168,12 @@ async function handleExit(shouldGenerateFlashcards) {
 
 .diagnostic-block--misconception {
   background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .diagnostic-block--rule {
   background: rgba(99, 102, 241, 0.06);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .block-label {
@@ -1452,12 +1452,12 @@ async function handleExit(shouldGenerateFlashcards) {
 
 .answer-box--user {
   background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .answer-box--correct {
   background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .answer-box-label {
@@ -1550,7 +1550,7 @@ async function handleExit(shouldGenerateFlashcards) {
   padding: 48px 24px;
   text-align: center;
   background: var(--surface-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   gap: 16px;
   margin: 24px 0;

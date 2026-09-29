@@ -80,4 +80,48 @@ describe('Flashcards.vue Integration', () => {
     expect(wrapper.find('.done-panel').exists()).toBe(true)
     expect(wrapper.text()).toContain('1 card reviewed')
   })
+
+  it('handles keyboard shortcuts: Space toggles question/answer, Enter is ignored, 1-4 rates', async () => {
+    appApi.getNotebooks.mockResolvedValue([{ id: 'nb-1', title: 'Calculus 101' }])
+    appApi.generateManualFlashcards.mockResolvedValue({
+      cards: [{ id: 'fc-1', prompt: 'Prompt 1', answer: 'Answer 1' }],
+    })
+    appApi.recordCardReview.mockResolvedValue({ ok: true })
+
+    const wrapper = mount(Flashcards)
+    await flushPromises()
+
+    await wrapper.find('#fc-notebook-select').setValue('nb-1')
+    await wrapper.find('#fc-generate-btn').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.flashcard').classes()).not.toContain('flipped')
+
+    // Pressing Enter should do nothing
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    await flushPromises()
+    expect(wrapper.find('.flashcard').classes()).not.toContain('flipped')
+
+    // Pressing Space should flip to Answer
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }))
+    await flushPromises()
+    expect(wrapper.find('.flashcard').classes()).toContain('flipped')
+
+    // Pressing Space again should flip back to Question
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }))
+    await flushPromises()
+    expect(wrapper.find('.flashcard').classes()).not.toContain('flipped')
+
+    // Flip again with Space to answer side
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }))
+    await flushPromises()
+    expect(wrapper.find('.flashcard').classes()).toContain('flipped')
+
+    // Pressing 3 (Good) should rate and advance
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' }))
+    await flushPromises()
+
+    expect(wrapper.find('.done-panel').exists()).toBe(true)
+  })
 })
+

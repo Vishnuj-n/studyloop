@@ -355,7 +355,7 @@ label {
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .add-slot-btn {
@@ -368,7 +368,7 @@ label {
   font-weight: 600;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -433,7 +433,7 @@ label {
   font-weight: 600;
   padding: 4px 8px;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid transparent; /* design-lint-ignore */
   border-radius: 6px;
   color: var(--on-surface);
   max-width: 220px;

@@ -3,6 +3,8 @@ package study
 import (
 	"fmt"
 	"strings"
+
+	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/retrieval"
 )
 
@@ -51,8 +53,57 @@ func (s *StudyService) AnswerReaderQuestion(req ReaderAIRequest) map[string]inte
 		return map[string]interface{}{"error": "no relevant content found in the selected reading scope"}
 	}
 
-	contextText, citations := buildReaderContext(results)
+	blocks, citations, _ := buildReaderContextBlocksWithText(results)
 	scopeLabel := readerScopeLabel(scope)
+
+	// Determine LLM provider to compute token limits
+	// First estimate context length with all blocks to pick tier
+	initialContext := strings.TrimSpace(strings.Join(blocks, "\n\n"))
+	llm, tier := s.selectLLM(initialContext)
+	if llm == nil {
+		return map[string]interface{}{"error": "LLM provider not available"}
+	}
+
+	limits := llm.GetLimits()
+
+	// Compute overhead (template + student question + scope label)
+	templateOverhead := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
+Use the retrieved reading material below to answer the student's question.
+If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
+
+Rules:
+- Keep the response concise and grounded.
+- Explain in simple, clear, and easy-to-understand language, avoiding overly academic or complex jargon.
+- If the student asks to explain a specific paragraph, passage, or concept from the material, focus on explaining the underlying logic, meaning, and rationale of the passage (e.g., why something is done or how it works) rather than just describing a specific tool or example mentioned within it.
+- Prefer 2 short paragraphs or up to 3 bullets.
+- Explain clearly, but do not turn this into a full tutoring session.
+- Stay anchored to the student's current reading flow and selected scope.
+
+Selected retrieval scope: %s
+
+Student question: %s
+
+Answer:`, scopeLabel, req.Question)
+
+	overheadTokens, err := embeddings.CountTokens(templateOverhead)
+	if err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("failed to count prompt overhead tokens: %v", err)}
+	}
+
+	reserved := 100 // safety margin
+	available := limits.MaxInputTokens - overheadTokens - reserved
+	if available < 0 {
+		available = 0
+	}
+
+	// Budget context blocks strictly to fit into available tokens
+	newBlocks, newCitations, err := BudgetContextBlocks(blocks, citations, available)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
+
 	prompt := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
 Use the retrieved reading material below to answer the student's question.
 If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
@@ -74,11 +125,6 @@ Student question: %s
 
 Answer:`, scopeLabel, contextText, req.Question)
 
-	llm, tier := s.selectLLM(contextText)
-	if llm == nil {
-		return map[string]interface{}{"error": "LLM provider not available"}
-	}
-
 	answer, err := llm.GenerateAnswer(prompt)
 	if err != nil {
 		formattedErr := s.FormatLLMError(err, tier)
@@ -87,7 +133,7 @@ Answer:`, scopeLabel, contextText, req.Question)
 
 	return map[string]interface{}{
 		"answer":         answer,
-		"cited_sections": citations,
+		"cited_sections": newCitations,
 		"scope":          string(scope),
 	}
 }
@@ -145,18 +191,6 @@ func readerScopeLabel(scope ReaderRetrievalScope) string {
 	}
 }
 
-func buildReaderContext(results []retrieval.SearchResult) (string, []string) {
-	blocks, citations := buildReaderContextBlocks(results)
-	return strings.TrimSpace(strings.Join(blocks, "\n\n")), citations
-}
-
-// buildReaderContextBlocks returns the sequence of section blocks (as strings)
-// and a parallel list of citation labels. This allows callers to truncate the
-// context while keeping citations synchronized to included blocks.
-func buildReaderContextBlocks(results []retrieval.SearchResult) ([]string, []string) {
-	blocks, citations, _ := buildReaderContextBlocksWithText(results)
-	return blocks, citations
-}
 
 func buildReaderContextBlocksWithText(results []retrieval.SearchResult) ([]string, []string, []string) {
 	blocks := make([]string, 0, len(results))

@@ -43,9 +43,11 @@ func CountTokens(text string) (int, error) {
 	tok := getPromptTokenizer()
 	if tok == nil {
 		words := len(strings.Fields(text))
-		approx := int(float64(words) * 1.3)
-		if approx < 1 {
-			approx = (len(text) + 3) / 4
+		approxWords := int(float64(words) * 1.3)
+		approxChars := (len(text) + 3) / 4
+		approx := approxWords
+		if approxChars > approx {
+			approx = approxChars
 		}
 		if approx < 1 {
 			approx = 1
@@ -78,10 +80,17 @@ func TruncateToTokens(text string, limit int) (string, error) {
 		if maxWords <= 0 {
 			maxWords = 1
 		}
-		if maxWords >= len(words) {
-			return text, nil
+		truncated := text
+		if maxWords < len(words) {
+			truncated = strings.Join(words[:maxWords], " ")
 		}
-		truncated := strings.Join(words[:maxWords], " ")
+
+		// Also cap by character limit (approx 4 chars/token) to prevent giant unspaced tokens from blowing budget
+		maxChars := limit * 4
+		if len(truncated) > maxChars {
+			truncated = truncated[:maxChars]
+		}
+
 		trimmed := trimToSentenceBoundary(truncated)
 		if trimmed == "" {
 			return truncated, nil

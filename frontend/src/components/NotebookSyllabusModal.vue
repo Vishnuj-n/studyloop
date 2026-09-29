@@ -466,13 +466,13 @@ function confirm() {
 .status-queued {
   background-color: rgba(34, 197, 94, 0.12);
   color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid var(--outline-variant);
 }
 
 .status-not-queued {
   background-color: rgba(239, 68, 68, 0.1);
   color: #dc2626;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .duration-pill {

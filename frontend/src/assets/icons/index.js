@@ -4,6 +4,73 @@
  */
 
 export const icons = {
+  "coin": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"12\" cy=\"12\" r=\"9\"/>",
+      "<path d=\"M12 6v12M15 9.5a2.5 2.5 0 0 0-5 0c0 1.5 1 2 2 2.5s2 1 2 2.5a2.5 2.5 0 0 1-5 0\"/>"
+    ]
+  },
+  "map": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<polygon points=\"3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21\"/>",
+      "<line x1=\"9\" x2=\"9\" y1=\"3\" y2=\"18\"/>",
+      "<line x1=\"15\" x2=\"15\" y1=\"6\" y2=\"21\"/>"
+    ]
+  },
+  "palette": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"13.5\" cy=\"6.5\" r=\".5\" fill=\"currentColor\"/>",
+      "<circle cx=\"17.5\" cy=\"10.5\" r=\".5\" fill=\"currentColor\"/>",
+      "<circle cx=\"8.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>",
+      "<circle cx=\"6.5\" cy=\"12.5\" r=\".5\" fill=\"currentColor\"/>",
+      "<path d=\"M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z\"/>"
+    ]
+  },
+  "target": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"12\" cy=\"12\" r=\"10\"/>",
+      "<circle cx=\"12\" cy=\"12\" r=\"6\"/>",
+      "<circle cx=\"12\" cy=\"12\" r=\"2\"/>"
+    ]
+  },
+  "award": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"12\" cy=\"8\" r=\"7\"/>",
+      "<polyline points=\"8.21 13.89 7 23 12 20 17 23 15.79 13.88\"/>"
+    ]
+  },
+  "package": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"m7.5 4.27 9 5.15\"/>",
+      "<path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/>",
+      "<path d=\"m3.3 7 8.7 5 8.7-5\"/>",
+      "<path d=\"M12 22V12\"/>"
+    ]
+  },
   "github": {
     "viewBox": "0 0 24 24",
     "fill": "currentColor",

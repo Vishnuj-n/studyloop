@@ -796,13 +796,13 @@ input:focus {
 
 .restore-message.success {
   background: rgba(16, 185, 129, 0.1);
-  border: 1px solid #10b981;
+  border: 1px solid var(--outline-variant);
   color: #10b981;
 }
 
 .restore-message.error {
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid #ef4444;
+  border: 1px solid var(--outline-variant);
   color: #ef4444;
 }
 </style>

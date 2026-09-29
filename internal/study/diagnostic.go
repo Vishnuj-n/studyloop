@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/models"
 )
 
@@ -52,24 +53,52 @@ func (s *StudyService) AnalyzeQuizFailure(bookContent string, failedQuestions []
 		return nil, fmt.Errorf("fast LLM provider not initialized")
 	}
 
+	// Build questions portion first to calculate available token budget for reference material
+	var questionsBuilder strings.Builder
+	questionsBuilder.WriteString("Missed Questions:\n")
+	for i, fq := range failedQuestions {
+		fmt.Fprintf(&questionsBuilder, "Question %d:\nPrompt: %s\n", i+1, fq.Prompt)
+		if len(fq.Options) > 0 {
+			fmt.Fprintf(&questionsBuilder, "Options: %s\n", strings.Join(fq.Options, " | "))
+		}
+		fmt.Fprintf(&questionsBuilder, "Student's Answer: %s\nCorrect Answer: %s\n\n", fq.UserAnswer, fq.CorrectAnswer)
+	}
+	questionsText := questionsBuilder.String()
+
+	// Measure baseline prompt overhead (instructions + questions)
+	basePromptOverhead := diagnosticPromptSystem + "\n\n" + questionsText
+	limits := s.fastLLMProvider.GetLimits()
+	overheadTokens, err := embeddings.CountTokens(basePromptOverhead)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate diagnostic prompt tokens: %w", err)
+	}
+
+	reserved := 100
+	availableBudget := limits.MaxInputTokens - overheadTokens - reserved
+	if availableBudget < 0 {
+		availableBudget = 0
+	}
+
+	trimmedBookContent := strings.TrimSpace(bookContent)
+	if trimmedBookContent != "" && availableBudget > 0 {
+		if truncated, err := embeddings.TruncateToTokens(trimmedBookContent, availableBudget); err == nil && strings.TrimSpace(truncated) != "" {
+			trimmedBookContent = strings.TrimSpace(truncated)
+		}
+	} else if availableBudget <= 0 {
+		trimmedBookContent = ""
+	}
+
 	var promptBuilder strings.Builder
 	promptBuilder.WriteString(diagnosticPromptSystem)
 	promptBuilder.WriteString("\n\n")
 
-	if strings.TrimSpace(bookContent) != "" {
+	if trimmedBookContent != "" {
 		promptBuilder.WriteString("Textbook Reference Material:\n")
-		promptBuilder.WriteString(strings.TrimSpace(bookContent))
+		promptBuilder.WriteString(trimmedBookContent)
 		promptBuilder.WriteString("\n\n")
 	}
 
-	promptBuilder.WriteString("Missed Questions:\n")
-	for i, fq := range failedQuestions {
-		fmt.Fprintf(&promptBuilder, "Question %d:\nPrompt: %s\n", i+1, fq.Prompt)
-		if len(fq.Options) > 0 {
-			fmt.Fprintf(&promptBuilder, "Options: %s\n", strings.Join(fq.Options, " | "))
-		}
-		fmt.Fprintf(&promptBuilder, "Student's Answer: %s\nCorrect Answer: %s\n\n", fq.UserAnswer, fq.CorrectAnswer)
-	}
+	promptBuilder.WriteString(questionsText)
 
 	rawResponse, err := s.fastLLMProvider.GenerateAnswer(promptBuilder.String())
 	if err != nil {

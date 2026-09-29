@@ -94,5 +94,24 @@ func TestCountTokensFallback(t *testing.T) {
 	if truncated == "" {
 		t.Fatalf("expected non-empty truncated text from fallback")
 	}
+
+	// Test dense unspaced LaTeX/symbol string fallback
+	denseText := strings.Repeat("\\frac{a}{b}+\\alpha_{i,j}^2=", 100) // ~2800 chars, only 1 "word" without spaces
+	denseTokens, err := CountTokens(denseText)
+	if err != nil {
+		t.Fatalf("CountTokens dense fallback failed: %v", err)
+	}
+	expectedMin := (len(denseText) + 3) / 4
+	if denseTokens < expectedMin {
+		t.Fatalf("expected denseTokens >= %d, got %d", expectedMin, denseTokens)
+	}
+
+	truncatedDense, err := TruncateToTokens(denseText, 50)
+	if err != nil {
+		t.Fatalf("TruncateToTokens dense fallback failed: %v", err)
+	}
+	if len(truncatedDense) > 200 { // 50 tokens * 4 chars = 200 chars
+		t.Fatalf("TruncateToTokens dense fallback exceeded character limit: len=%d", len(truncatedDense))
+	}
 }
 

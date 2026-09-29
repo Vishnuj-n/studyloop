@@ -33,6 +33,7 @@ export function useSettings(errorRef, successRef) {
   })
 
   const studyDuration = ref('')
+  const isInitialized = ref(false)
 
   function computeDuration() {
     if (settings.value.study_slots_json) {
@@ -101,7 +102,7 @@ export function useSettings(errorRef, successRef) {
     settings,
     () => {
       computeDuration()
-      if (loading.value) return
+      if (loading.value || !isInitialized.value) return
 
       clearTimeout(saveTimer)
       saveTimer = setTimeout(() => saveUserSettings(), 800)
@@ -110,6 +111,7 @@ export function useSettings(errorRef, successRef) {
   )
 
   async function saveUserSettings(skipValidation = false) {
+    if (!isInitialized.value) return
     errorRef.value = ''
     successRef.value = ''
     try {
@@ -195,6 +197,9 @@ export function useSettings(errorRef, successRef) {
       if (!res.tutor_style) res.tutor_style = 'socratic'
       settings.value = res
       computeDuration()
+      setTimeout(() => {
+        isInitialized.value = true
+      }, 50)
       return true
     } finally {
       loading.value = false

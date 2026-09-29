@@ -263,7 +263,7 @@ const topItems = [
   padding: 1.5px 7px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 20%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--primary, #38bdf8);
   line-height: 1.2;
 }

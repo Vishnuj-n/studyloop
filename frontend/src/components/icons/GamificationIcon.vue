@@ -102,12 +102,12 @@ defineProps({
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
   transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .gamification-icon:hover {
   transform: scale(1.06);
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
 }
 </style>

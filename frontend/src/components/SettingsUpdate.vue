@@ -383,7 +383,7 @@ button {
 .btn-redirect {
   background: var(--surface-container-high);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .btn-redirect:hover {
@@ -505,7 +505,7 @@ button {
   gap: 8px;
   background: var(--surface-container-highest);
   color: var(--on-surface);
-  border: 1px solid color-mix(in srgb, var(--primary, #6366f1) 30%, var(--outline-variant));
+  border: 1px solid var(--outline-variant);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--primary, #6366f1) 12%, transparent);
 }

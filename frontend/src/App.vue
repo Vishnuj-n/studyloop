@@ -19,6 +19,7 @@ import {
 } from './services/appApi'
 import { useToast } from './composables/useToast'
 import { playStudyChime } from './services/calendarService'
+import { initClerk } from './services/clerkAuth'
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
 const { showNotice, showError } = useToast()
@@ -347,6 +348,7 @@ let cancelIngestionListener = null
 let cancelUpdateProgressListener = null
 
 onMounted(() => {
+  initClerk()
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
   checkAppUpdates()

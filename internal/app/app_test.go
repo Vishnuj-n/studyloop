@@ -1061,9 +1061,13 @@ func TestCompleteReading_SplitPage(t *testing.T) {
 	if err := testRepo.EnsureTopic(topicID, "Split Topic"); err != nil {
 		t.Fatalf("EnsureTopic failed: %v", err)
 	}
+	if err := testRepo.UpdateTopicPageBounds(topicID, 1, 10); err != nil {
+		t.Fatalf("UpdateTopicPageBounds failed: %v", err)
+	}
 	if err := testRepo.CreateNotebook(notebookID, "Split Notebook", "/tmp/split.pdf", "pdf", topicID, "", 20, ""); err != nil {
 		t.Fatalf("CreateNotebook failed: %v", err)
 	}
+	_ = testRepo.LinkNotebookTopics(notebookID, []string{topicID})
 
 	mustInsertMockChunk(t, notebookID, topicID, "chunk-p1", 1)
 	mustInsertMockChunk(t, notebookID, topicID, "chunk-p2", 2)
@@ -1104,6 +1108,10 @@ func TestCompleteReading_SplitPage(t *testing.T) {
 	}
 	if completedTask.EndPage != 3 {
 		t.Fatalf("expected endPage 3, got %d", completedTask.EndPage)
+	}
+	nextTask, ok := res["next_reading_task"].(map[string]interface{})
+	if !ok || nextTask["id"] == "" {
+		t.Fatalf("expected next_reading_task to be populated, got %v", res["next_reading_task"])
 	}
 }
 

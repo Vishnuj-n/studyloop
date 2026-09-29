@@ -171,7 +171,7 @@
               </button>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text" v-html="currentCard.prompt"></p>
-              <button id="fc-reveal-btn" class="reveal-btn" @click="flipped = true">
+              <button id="fc-reveal-btn" class="reveal-btn" title="Show Answer (Space)" @click="flipped = true">
                 Show Answer
               </button>
             </div>
@@ -212,13 +212,14 @@
               </button>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text answer-text" v-html="currentCard.answer"></p>
-              <button class="flip-back-btn" @click="flipped = false">Show Question</button>
+              <button class="flip-back-btn" title="Show Question (Space)" @click="flipped = false">Show Question</button>
               <div class="rating-row">
                 <button
                   v-for="r in ratings"
                   :id="`fc-rate-${r.key}`"
                   :key="r.key"
                   :class="['rating-btn', `rating-btn--${r.key}`]"
+                  :title="`${r.label} (${r.value})`"
                   :disabled="isSubmittingReview"
                   @click="rate(r.key)"
                 >
@@ -236,7 +237,7 @@
           @mouseenter="showInfoTooltip = true"
           @mouseleave="showInfoTooltip = false"
         >
-          <button class="info-btn" type="button">
+          <button class="info-btn" type="button" aria-label="Rating and shortcut guide">
             <svg
               width="16"
               height="16"
@@ -252,24 +253,24 @@
           </button>
           <Transition name="tooltip">
             <div v-if="showInfoTooltip" class="info-tooltip">
-              <p class="tooltip-title">Rating Guide</p>
+              <p class="tooltip-title">Rating & Shortcut Guide</p>
               <div class="tooltip-items">
                 <div class="tooltip-item">
-                  <span class="tooltip-key again">Again</span>
+                  <span class="tooltip-key again"><kbd>1</kbd> Again</span>
                   <span class="tooltip-desc"
                     >You forgot it completely. You'll see this card again soon.</span
                   >
                 </div>
                 <div class="tooltip-item">
-                  <span class="tooltip-key hard">Hard</span>
+                  <span class="tooltip-key hard"><kbd>2</kbd> Hard</span>
                   <span class="tooltip-desc">You got it, but it was a struggle.</span>
                 </div>
                 <div class="tooltip-item">
-                  <span class="tooltip-key good">Good</span>
+                  <span class="tooltip-key good"><kbd>3</kbd> Good</span>
                   <span class="tooltip-desc">You knew it after thinking for a moment.</span>
                 </div>
                 <div class="tooltip-item">
-                  <span class="tooltip-key easy">Easy</span>
+                  <span class="tooltip-key easy"><kbd>4</kbd> Easy</span>
                   <span class="tooltip-desc">You knew it right away, no thinking needed.</span>
                 </div>
                 <div class="tooltip-divider"></div>
@@ -277,7 +278,11 @@
                   <span class="tooltip-key suspend">Suspend</span>
                   <span class="tooltip-desc">Bad card? Hide it forever. Your data stays safe.</span>
                 </div>
-                <div class="tooltip-shortcut">Press <kbd>Shift</kbd> + <kbd>S</kbd> to suspend</div>
+                <div class="tooltip-shortcuts-list">
+                  <div class="tooltip-shortcut">Press <kbd>Space</kbd> to flip card</div>
+                  <div class="tooltip-shortcut">Press <kbd>1</kbd>-<kbd>4</kbd> to rate answer</div>
+                  <div class="tooltip-shortcut">Press <kbd>Shift</kbd> + <kbd>S</kbd> to suspend</div>
+                </div>
               </div>
             </div>
           </Transition>
@@ -558,14 +563,15 @@ function handleKeydown(e) {
     return
   }
 
-  // Space or Enter to reveal answer if not flipped
-  if (!flipped.value) {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault()
-      flipped.value = true
-    }
-  } else {
-    // 1-4 keys to rate
+  // Space to flip card (toggle question and answer)
+  if (e.key === ' ') {
+    e.preventDefault()
+    flipped.value = !flipped.value
+    return
+  }
+
+  // 1-4 keys to rate (only when answer is revealed)
+  if (flipped.value) {
     if (e.key === '1') {
       e.preventDefault()
       rate('again')
@@ -874,6 +880,7 @@ async function loadQueueSession(taskID, notebookID = '') {
   inset: 0;
   backface-visibility: hidden;
   border-radius: 16px;
+  border: 1px solid var(--outline-variant);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1153,6 +1160,20 @@ async function loadQueueSession(taskID, notebookID = '') {
   padding: 2px 8px;
   border-radius: 6px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tooltip-key kbd {
+  display: inline-block;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: inherit;
+  background: color-mix(in srgb, var(--on-surface) 10%, transparent);
+  border: 1px solid var(--outline-variant);
+  border-radius: 3px;
+  line-height: 1.4;
 }
 .tooltip-key.again,
 .tooltip-key.suspend {
@@ -1181,11 +1202,16 @@ async function loadQueueSession(taskID, notebookID = '') {
   background: var(--outline-variant);
   margin: 4px 0;
 }
+.tooltip-shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
 .tooltip-shortcut {
   font-size: 11px;
   color: var(--muted-text);
-  text-align: center;
-  margin-top: 4px;
+  text-align: left;
 }
 .tooltip-shortcut kbd {
   display: inline-block;

@@ -455,7 +455,7 @@
               <input v-model="wantRag" type="radio" :value="false" :disabled="isSettingUpRag" />
               <div class="option-info">
                 <strong>No, Skip Offline Search</strong>
-                <p>AI Q&A will be limited in the reader, falling back to simple keyword matching.</p>
+                <p>Local RAG gives you smarter, faster semantic search and keeps token usage to a minimum. Without it, Reader Q&A falls back to broader page context.</p>
               </div>
             </label>
           </div>
@@ -1025,7 +1025,7 @@ onMounted(() => {
   overflow-y: auto;
   border-radius: 20px;
   padding: 24px 28px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   box-sizing: border-box;
   background: var(--surface-container-lowest);
   transition: background 0.3s ease;

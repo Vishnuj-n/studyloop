@@ -138,7 +138,7 @@ function close() {
   padding: 28px 32px;
   max-width: 520px;
   width: 100%;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -174,7 +174,7 @@ function close() {
   color: var(--primary, #6366f1);
   padding: 3px 10px;
   border-radius: 99px;
-  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .release-modal-header h2 {

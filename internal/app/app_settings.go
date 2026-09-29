@@ -219,7 +219,7 @@ func (a *App) GetLLMProviderPreset(provider string) map[string]interface{} {
 		return map[string]interface{}{
 			"provider": "openrouter",
 			"base_url": "https://openrouter.ai/api/v1",
-			"model":    "openai/gpt-4.1-mini",
+			"model":    "openrouter/free",
 		}
 	default:
 		return map[string]interface{}{

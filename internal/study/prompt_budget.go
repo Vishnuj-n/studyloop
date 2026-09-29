@@ -196,3 +196,60 @@ func BudgetTextSample(sample string, tokenBudget int) (string, error) {
 	return embeddings.TruncateToTokens(sample, tokenBudget)
 }
 
+// BudgetContextBlocks fits string blocks and synchronized citations/metadata into available tokens,
+// cleanly truncating the boundary chunk when partial budget remains.
+func BudgetContextBlocks(blocks []string, citations []string, tokenBudget int) ([]string, []string, error) {
+	if len(blocks) == 0 || tokenBudget <= 0 {
+		return nil, nil, nil
+	}
+
+	newBlocks := make([]string, 0, len(blocks))
+	newCitations := make([]string, 0, len(citations))
+	usedTokens := 0
+
+	for i, blk := range blocks {
+		blkTokens, err := embeddings.CountTokens(blk)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to count block tokens: %w", err)
+		}
+
+		if usedTokens+blkTokens <= tokenBudget {
+			newBlocks = append(newBlocks, blk)
+			if i < len(citations) {
+				newCitations = append(newCitations, citations[i])
+			}
+			usedTokens += blkTokens
+			continue
+		}
+
+		remaining := tokenBudget - usedTokens
+		if remaining > 8 {
+			if truncated, err := embeddings.TruncateToTokens(blk, remaining); err == nil && strings.TrimSpace(truncated) != "" {
+				newBlocks = append(newBlocks, truncated)
+				if i < len(citations) {
+					newCitations = append(newCitations, citations[i])
+				}
+			}
+		}
+		break
+	}
+
+	if len(newBlocks) == 0 && len(blocks) > 0 {
+		safeLimit := tokenBudget
+		if safeLimit > 128 {
+			safeLimit = 128
+		}
+		if safeLimit > 0 {
+			if truncated, err := embeddings.TruncateToTokens(blocks[0], safeLimit); err == nil && strings.TrimSpace(truncated) != "" {
+				newBlocks = append(newBlocks, truncated)
+				if len(citations) > 0 {
+					newCitations = append(newCitations, citations[0])
+				}
+			}
+		}
+	}
+
+	return newBlocks, newCitations, nil
+}
+
+

@@ -367,7 +367,7 @@ function closeModal() {
   padding: 0.6rem 0.8rem;
   background: color-mix(in srgb, var(--danger, #ef4444) 15%, transparent);
   color: var(--danger, #ef4444);
-  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 600;

@@ -516,7 +516,7 @@ func defaultModelForProvider(provider string) string {
 	case "openai":
 		return "gpt-4.1-mini"
 	case "openrouter":
-		return "openai/gpt-4.1-mini"
+		return "openrouter/free"
 	default:
 		return ""
 	}
