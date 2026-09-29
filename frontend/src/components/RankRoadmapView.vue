@@ -133,7 +133,7 @@ function isNextTier(tier, idx) {
   align-items: center;
   gap: 6px;
   background: color-mix(in srgb, var(--primary) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 6px 14px;
   border-radius: 999px;
   font-weight: 800;

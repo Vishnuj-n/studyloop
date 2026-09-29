@@ -756,7 +756,7 @@ onUnmounted(() => {
   background: var(--surface-container-lowest, #141617);
   border: 1px solid var(--outline-variant);
   border-radius: 18px;
-  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1179,7 +1179,7 @@ onUnmounted(() => {
   border-radius: 10px;
   background: rgba(245, 158, 11, 0.15);
   color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid var(--outline-variant);
 }
 
 .action-toggle-btn {
@@ -1487,7 +1487,7 @@ onUnmounted(() => {
   font-size: 10.5px;
   font-weight: 600;
   background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--outline-variant);
   color: #f87171;
   cursor: pointer;
   transition: all 0.15s ease;

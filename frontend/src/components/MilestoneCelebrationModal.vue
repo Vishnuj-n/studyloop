@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div v-if="visible" class="milestone-backdrop" @click.self="closeModal">
       <div class="milestone-card" :class="[tierClass]">
-        <button class="close-btn" type="button" aria-label="Close" @click="closeModal">✕</button>
+        <button class="close-btn" type="button" aria-label="Close" @click="closeModal"><BaseIcon name="x" size="18" /></button>
 
         <div class="milestone-header">
           <div class="milestone-badge-pill">
@@ -115,7 +115,7 @@ onMounted(() => {
   max-width: 440px;
   padding: 2.25rem 2rem;
   text-align: center;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
   color: var(--on-surface);
 }
 
@@ -148,7 +148,7 @@ onMounted(() => {
   border-radius: 999px;
   margin-bottom: 0.75rem;
   background: color-mix(in srgb, var(--primary) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--primary);
 }
 

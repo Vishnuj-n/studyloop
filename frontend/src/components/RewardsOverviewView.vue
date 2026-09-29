@@ -111,7 +111,7 @@
           </div>
           <div class="chest-vault-info">
             <span class="chest-vault-tier">{{ chest.box_tier }} CHEST</span>
-            <span class="chest-vault-tap">Click to open ✨</span>
+            <span class="chest-vault-tap">Click to open <BaseIcon name="sparkles" :size="13" class="inline-sparkle" /></span>
           </div>
         </button>
       </div>
@@ -259,7 +259,7 @@ const progressPercent = computed(() => {
 
 .level-chip {
   background: color-mix(in srgb, var(--primary) 20%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--primary);
   font-size: 0.75rem;
   font-weight: 700;
@@ -437,7 +437,7 @@ const progressPercent = computed(() => {
 .vault-counter-pill {
   background: color-mix(in srgb, var(--primary) 20%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 0.75rem;
   font-weight: 800;
   padding: 4px 10px;

@@ -148,7 +148,7 @@ watch(
   align-items: center;
   gap: 8px;
   background: color-mix(in srgb, var(--primary, #4f46e5) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 24%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 12px;

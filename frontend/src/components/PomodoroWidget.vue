@@ -451,7 +451,7 @@ onUnmounted(() => {
 
 .glyph-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid transparent; /* design-lint-ignore */
   color: var(--muted-text);
   border-radius: 6px;
   padding: 4px 6px;

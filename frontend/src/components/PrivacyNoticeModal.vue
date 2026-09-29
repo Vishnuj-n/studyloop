@@ -96,7 +96,7 @@ function handleAcknowledge() {
   padding: 28px 32px;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
   gap: 20px;

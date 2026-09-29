@@ -1025,7 +1025,7 @@ onMounted(() => {
   overflow-y: auto;
   border-radius: 20px;
   padding: 24px 28px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   box-sizing: border-box;
   background: var(--surface-container-lowest);
   transition: background 0.3s ease;

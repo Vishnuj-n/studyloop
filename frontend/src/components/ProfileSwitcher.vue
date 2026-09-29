@@ -214,7 +214,7 @@ function profileTaskSubtitle(profile) {
   border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   gap: 2px;

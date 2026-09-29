@@ -279,7 +279,7 @@ select option {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border: 1px solid var(--outline-variant);
   vertical-align: middle;
   line-height: 1.3;
 }

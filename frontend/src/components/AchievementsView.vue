@@ -205,7 +205,7 @@ function getAchBaseIcon(ach) {
 .filter-pill-btn.active {
   background: var(--surface-container-high, #2a2d36);
   color: var(--primary, #38bdf8);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .achievements-grid {

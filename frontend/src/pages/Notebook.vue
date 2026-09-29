@@ -987,7 +987,7 @@ async function updatePriority(notebookId, priority) {
   background: #1f8b4c;
   color: #fff;
   border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.15);
   border: 1px solid var(--outline-variant);
   display: flex;
   align-items: center;
@@ -1000,7 +1000,7 @@ async function updatePriority(notebookId, priority) {
   background: var(--surface-container-low);
   color: var(--on-surface);
   border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.15);
   border: 1px solid var(--outline-variant);
   display: flex;
   align-items: flex-start;

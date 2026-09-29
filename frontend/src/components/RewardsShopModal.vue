@@ -216,7 +216,7 @@ function equipTheme(themeId) {
   align-items: center;
   gap: 6px;
   background: color-mix(in srgb, #f59e0b 15%, transparent);
-  border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 6px 14px;
   border-radius: 999px;
   font-weight: 800;
@@ -246,7 +246,7 @@ function equipTheme(themeId) {
 .shop-item-card:hover {
   border-color: color-mix(in srgb, var(--primary, #38bdf8) 40%, transparent);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .shop-item-card.active {
@@ -277,14 +277,14 @@ function equipTheme(themeId) {
   justify-content: center;
   gap: 8px;
   margin: 8px 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--outline-variant);
 }
 
 .swatch-dot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.15);
 }
 
 .badge {
@@ -298,7 +298,7 @@ function equipTheme(themeId) {
 .active-badge {
   background: color-mix(in srgb, var(--primary, #38bdf8) 20%, transparent);
   color: var(--primary, #38bdf8);
-  border: 1px solid color-mix(in srgb, var(--primary, #38bdf8) 40%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .unlocked-badge {

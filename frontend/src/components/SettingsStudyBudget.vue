@@ -679,7 +679,7 @@ function downloadICS() {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border: 1px solid var(--outline-variant);
   margin-left: 6px;
   letter-spacing: 0.03em;
   display: inline-block;
@@ -747,7 +747,7 @@ select:focus {
   height: 18px;
   border-radius: 50%;
   background: var(--primary);
-  border: 2px solid var(--surface-container-lowest);
+  border: 2px solid var(--surface-container-lowest); /* design-lint-ignore */
   box-shadow: 0 2px 6px color-mix(in srgb, var(--on-surface) 25%, transparent);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -775,7 +775,7 @@ select:focus {
   height: 18px;
   border-radius: 50%;
   background: var(--primary);
-  border: 2px solid var(--surface-container-lowest);
+  border: 2px solid var(--surface-container-lowest); /* design-lint-ignore */
   box-shadow: 0 2px 6px color-mix(in srgb, var(--on-surface) 25%, transparent);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
