@@ -8,16 +8,35 @@ const authError = ref('')
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
 
+async function waitForBridge(timeoutMs = 3000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (typeof window !== 'undefined' && (window?.go?.app?.App || window?.go?.main?.App)) {
+      return true
+    }
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  return false
+}
+
 async function syncWithBackend() {
   if (user.value) {
     try {
+      const bridgeReady = await waitForBridge(2000)
+      if (!bridgeReady) {
+        console.warn('[AUTH] Wails backend bridge not ready yet during syncWithBackend')
+        return
+      }
       const verifiedPro = await restoreSession(
         user.value.id || '',
         user.value.email || '',
         isPro.value,
         Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
       )
-      isPro.value = Boolean(verifiedPro)
+      // Only update isPro if verification completed without throwing
+      if (typeof verifiedPro === 'boolean') {
+        isPro.value = verifiedPro
+      }
     } catch (err) {
       console.warn('[AUTH] Could not sync session with backend:', err)
     }
@@ -26,7 +45,7 @@ async function syncWithBackend() {
 
 export async function initClerk() {
   isLoaded.value = true
-  syncWithBackend()
+  await syncWithBackend()
   return null
 }
 
@@ -69,7 +88,7 @@ try {
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || Date.now()
-      syncWithBackend()
+      // Do not sync immediately on file load; App.vue onMounted will call initClerk()
     }
   }
 } catch (err) {
