@@ -97,42 +97,9 @@ Answer:`, scopeLabel, req.Question)
 	}
 
 	// Budget context blocks strictly to fit into available tokens
-	var newBlocks []string
-	var newCitations []string
-	usedTokens := 0
-
-	for i, blk := range blocks {
-		blkTokens, err := embeddings.CountTokens(blk)
-		if err != nil {
-			return map[string]interface{}{"error": fmt.Sprintf("failed to count block tokens: %v", err)}
-		}
-		if usedTokens+blkTokens <= available {
-			newBlocks = append(newBlocks, blk)
-			newCitations = append(newCitations, citations[i])
-			usedTokens += blkTokens
-			continue
-		}
-		remaining := available - usedTokens
-		if remaining > 8 {
-			if truncated, err := embeddings.TruncateToTokens(blk, remaining); err == nil && strings.TrimSpace(truncated) != "" {
-				newBlocks = append(newBlocks, truncated)
-				newCitations = append(newCitations, citations[i])
-			}
-		}
-		break
-	}
-
-	if len(newBlocks) == 0 && len(blocks) > 0 {
-		safeLimit := available
-		if safeLimit > 128 {
-			safeLimit = 128
-		}
-		if safeLimit > 0 {
-			if truncated, err := embeddings.TruncateToTokens(blocks[0], safeLimit); err == nil && strings.TrimSpace(truncated) != "" {
-				newBlocks = append(newBlocks, truncated)
-				newCitations = append(newCitations, citations[0])
-			}
-		}
+	newBlocks, newCitations, err := BudgetContextBlocks(blocks, citations, available)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
 	}
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
