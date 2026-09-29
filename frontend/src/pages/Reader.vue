@@ -234,6 +234,14 @@
           class="pdf-edge-controls"
         >
           <button
+            v-if="pdfViewerRef?.canGoBack"
+            class="edge-btn back-btn"
+            title="Back to previous page"
+            @click="pdfViewerRef?.goBack()"
+          >
+            ←
+          </button>
+          <button
             class="edge-btn zoom-btn"
             :disabled="zoomScale <= 0.5"
             title="Zoom out"
