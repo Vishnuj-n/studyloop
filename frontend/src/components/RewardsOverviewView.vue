@@ -361,11 +361,6 @@ const progressPercent = computed(() => {
   border-color: color-mix(in srgb, var(--primary) 35%, var(--outline-variant));
 }
 
-.currency-icon {
-  font-size: 1.6rem;
-  display: inline-block;
-}
-
 .currency-val {
   font-size: 1.35rem;
   font-weight: 700;
