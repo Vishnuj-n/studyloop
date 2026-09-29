@@ -874,6 +874,7 @@ async function loadQueueSession(taskID, notebookID = '') {
   inset: 0;
   backface-visibility: hidden;
   border-radius: 16px;
+  border: 1px solid var(--outline-variant);
   display: flex;
   flex-direction: column;
   align-items: center;

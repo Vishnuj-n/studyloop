@@ -191,18 +191,6 @@ func readerScopeLabel(scope ReaderRetrievalScope) string {
 	}
 }
 
-func buildReaderContext(results []retrieval.SearchResult) (string, []string) {
-	blocks, citations := buildReaderContextBlocks(results)
-	return strings.TrimSpace(strings.Join(blocks, "\n\n")), citations
-}
-
-// buildReaderContextBlocks returns the sequence of section blocks (as strings)
-// and a parallel list of citation labels. This allows callers to truncate the
-// context while keeping citations synchronized to included blocks.
-func buildReaderContextBlocks(results []retrieval.SearchResult) ([]string, []string) {
-	blocks, citations, _ := buildReaderContextBlocksWithText(results)
-	return blocks, citations
-}
 
 func buildReaderContextBlocksWithText(results []retrieval.SearchResult) ([]string, []string, []string) {
 	blocks := make([]string, 0, len(results))
