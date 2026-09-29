@@ -64,6 +64,14 @@ describe('Rewards.vue Theme Handling', () => {
 
     await flushPromises()
 
+    // Switch to Theme Wardrobe tab
+    const tabs = wrapper.findAll('.rewards-tab-btn')
+    const shopTab = tabs.find((t) => t.text().includes('Theme Wardrobe'))
+    if (shopTab) {
+      await shopTab.trigger('click')
+      await flushPromises()
+    }
+
     // Trigger theme change from shop component
     const shopStub = wrapper.findComponent({ name: 'RewardsShopModal' })
     await shopStub.find('.change-theme-btn').trigger('click')

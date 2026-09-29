@@ -27,12 +27,17 @@ ROOT_DIR = Path(__file__).resolve().parent.parent / "frontend" / "src"
 
 EXEMPT_FILES = {
     "Rewards.vue",
+    "RewardsOverviewView.vue",
+    "RankRoadmapView.vue",
+    "AchievementsView.vue",
     "RewardsShopModal.vue",
     "MysteryChestModal.vue",
+    "MilestoneCelebrationModal.vue",
     "StreakFreezeModal.vue",
     "RewardToast.vue",
     "RewardToast.spec.js",
     "GamificationIcon.vue",
+    "gamification.js",
     "calendarService.js",
     "calendarService.spec.js",
 }
