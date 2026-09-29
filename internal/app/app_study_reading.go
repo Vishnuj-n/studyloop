@@ -255,8 +255,8 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
 			targetWords = settings.TargetSessionWords
 		}
-		if seedErr := repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords); seedErr != nil {
-			utils.Warnf("[COMPLETE_SESSION] EnsurePendingReadingTaskForNotebook err: %v", seedErr)
+		if seedErr := repo.ForceSeedPendingReadingTaskForNotebook(task.NotebookID, targetWords); seedErr != nil {
+			utils.Warnf("[COMPLETE_SESSION] ForceSeedPendingReadingTaskForNotebook err: %v", seedErr)
 		} else if nextTask, err := repo.GetPendingReadingTaskForNotebook(task.NotebookID); err == nil && nextTask.ID != "" {
 			resp["next_reading_task"] = map[string]interface{}{
 				"id":          nextTask.ID,

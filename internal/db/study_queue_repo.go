@@ -670,6 +670,15 @@ func (r *Repository) ResolveFlashcardGenerateTasksForTopic(topicID string) error
 
 // EnsurePendingReadingTaskForNotebook ensures at least one PENDING/ACTIVE READING task exists in study_queue for an active notebook.
 func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targetSessionWords int, maxSessionWords ...int) error {
+	return r.ensurePendingReadingTaskForNotebookInternal(notebookID, targetSessionWords, false, maxSessionWords...)
+}
+
+// ForceSeedPendingReadingTaskForNotebook seeds a pending reading task ignoring pending/active QUIZ tasks (e.g. when user chooses to defer the quiz and continue reading).
+func (r *Repository) ForceSeedPendingReadingTaskForNotebook(notebookID string, targetSessionWords int, maxSessionWords ...int) error {
+	return r.ensurePendingReadingTaskForNotebookInternal(notebookID, targetSessionWords, true, maxSessionWords...)
+}
+
+func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID string, targetSessionWords int, allowDeferredQuiz bool, maxSessionWords ...int) error {
 	notebookID = strings.TrimSpace(notebookID)
 	if notebookID == "" {
 		return fmt.Errorf("notebook id is required")
@@ -686,12 +695,22 @@ func (r *Repository) EnsurePendingReadingTaskForNotebook(notebookID string, targ
 
 	return r.withTx(func(tx *sql.Tx) error {
 		var count int
-		err := tx.QueryRow(`
-			SELECT COUNT(*) FROM study_queue
-			WHERE notebook_id = ? 
-			  AND task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL', 'FLASHCARD_GENERATE')
-			  AND status IN ('PENDING', 'ACTIVE')
-		`, notebookID).Scan(&count)
+		var err error
+		if allowDeferredQuiz {
+			err = tx.QueryRow(`
+				SELECT COUNT(*) FROM study_queue
+				WHERE notebook_id = ? 
+				  AND task_type IN ('READING', 'REREAD')
+				  AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID).Scan(&count)
+		} else {
+			err = tx.QueryRow(`
+				SELECT COUNT(*) FROM study_queue
+				WHERE notebook_id = ? 
+				  AND task_type IN ('READING', 'REREAD', 'QUIZ', 'MILESTONE_EXAM', 'SOCRATIC_REMEDIAL', 'FLASHCARD_GENERATE')
+				  AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID).Scan(&count)
+		}
 		if err != nil {
 			return err
 		}
