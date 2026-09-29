@@ -129,7 +129,7 @@ function jumpToPage(page, trackHistory = false) {
   })
 }
 
-function handleInternalNavigate({ fromPage, targetPage }) {
+function handleInternalNavigate({ targetPage }) {
   if (targetPage > 0 && targetPage <= props.pageCount) {
     jumpToPage(targetPage, true)
   }

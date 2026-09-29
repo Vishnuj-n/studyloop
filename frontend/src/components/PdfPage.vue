@@ -15,6 +15,7 @@
       @rendered="$emit('rendered', pageNum)"
       @loading-failed="onFailed"
       @rendering-failed="onFailed"
+      @internal-link-clicked="handleInternalLinkClicked"
     />
   </div>
 </template>
@@ -45,6 +46,13 @@ function onFailed(err) {
   emit('load-error', err)
 }
 
+function handleInternalLinkClicked(targetPage) {
+  const target = Number.parseInt(targetPage, 10)
+  if (target > 0) {
+    emit('navigate', { fromPage: props.pageNum, targetPage: target })
+  }
+}
+
 function handleLayerClick(event) {
   const link = event.target.closest('a')
   if (!link) return
@@ -52,21 +60,8 @@ function handleLayerClick(event) {
   const href = link.getAttribute('href') || ''
   if (!href) return
 
-  // Check if it's an internal PDF page reference (e.g., #page=88, #nameddest=..., #[{num: 88, ...}])
-  if (href.startsWith('#')) {
-    event.preventDefault()
-    event.stopPropagation()
-
-    // Match "#page=88" or "#88" or explicit page parameters
-    const pageMatch = href.match(/page=(\d+)/i) || href.match(/^#(\d+)$/)
-    if (pageMatch) {
-      const targetPage = Number.parseInt(pageMatch[1], 10)
-      if (targetPage > 0) {
-        emit('navigate', { fromPage: props.pageNum, targetPage })
-      }
-    }
-  } else if (/^https?:\/\//i.test(href)) {
-    // Ensure external links open safely in a new browser window
+  // External links open in a new tab/window safely
+  if (/^https?:\/\//i.test(href)) {
     link.setAttribute('target', '_blank')
     link.setAttribute('rel', 'noopener noreferrer')
   }
