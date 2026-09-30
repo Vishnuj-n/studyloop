@@ -7,18 +7,49 @@
         <h1 class="rail-title">Configuration</h1>
       </div>
 
+      <!-- Quick Search / Filter Bar -->
+      <div class="rail-search">
+        <div class="search-input-wrapper">
+          <BaseIcon name="search" size="14" class="search-icon" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search settings..."
+            class="settings-search-input"
+          />
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="search-clear-btn"
+            title="Clear search"
+            @click="searchQuery = ''"
+          >
+            <BaseIcon name="x" size="12" />
+          </button>
+        </div>
+      </div>
+
       <nav class="rail-nav">
         <button
-          v-for="cat in categories"
+          v-for="cat in filteredCategories"
           :key="cat.id"
           type="button"
           class="rail-item"
           :class="{ active: activeCategory === cat.id }"
           @click="activeCategory = cat.id"
         >
-          <span class="rail-item-title">{{ cat.label }}</span>
+          <div class="rail-item-top">
+            <span class="rail-item-title">{{ cat.label }}</span>
+            <span v-if="searchQuery && categoryMatches[cat.id]" class="match-badge">
+              Match
+            </span>
+          </div>
           <span class="rail-item-desc">{{ cat.desc }}</span>
         </button>
+
+        <div v-if="filteredCategories.length === 0" class="no-search-results">
+          No settings match "{{ searchQuery }}"
+        </div>
       </nav>
 
       <div class="rail-footer">
@@ -60,7 +91,6 @@
             <SettingsQuizRescue
               :settings="settings"
               :disabled="loading || saving"
-              @rag-toggle="onRagToggle"
             />
           </div>
         </div>
@@ -70,7 +100,7 @@
           <header class="pane-header">
             <h2>AI &amp; Retrieval</h2>
             <p class="pane-subtitle">
-              Manage fast and heavy LLM endpoints, credentials, and local vector retrieval.
+              Manage fast and heavy LLM endpoints, credentials, local vector retrieval, and AI tutor persona.
             </p>
           </header>
 
@@ -85,6 +115,15 @@
               @remove-keys="removeLLMKeys"
               @update:llm-fast-key="llmFastKey = $event"
               @update:llm-heavy-key="llmHeavyKey = $event"
+            />
+
+            <SettingsRagRetrieval
+              :settings="settings"
+              :rag-status="ragStatus"
+              :is-setting-up-rag="isSettingUpRag"
+              :disabled="loading || saving"
+              @rag-toggle="onRagToggle"
+              @open-setup="openRagModal"
             />
           </div>
         </div>
@@ -233,9 +272,11 @@ import { useProfiles } from '../composables/useProfiles'
 import { useRAG } from '../composables/useRAG'
 import { useAuth } from '../composables/useAuth'
 
+import BaseIcon from '../components/BaseIcon.vue'
 import SettingsStudyBudget from '../components/SettingsStudyBudget.vue'
 import SettingsQuizRescue from '../components/SettingsQuizRescue.vue'
 import SettingsAIProvider from '../components/SettingsAIProvider.vue'
+import SettingsRagRetrieval from '../components/SettingsRagRetrieval.vue'
 import SettingsExtensions from '../components/SettingsExtensions.vue'
 import SettingsTheme from '../components/SettingsTheme.vue'
 import SettingsUpdate from '../components/SettingsUpdate.vue'
@@ -249,21 +290,87 @@ import SettingsDeveloperPanel from '../components/SettingsDeveloperPanel.vue'
 const route = useRoute()
 
 const categories = [
-  { id: 'study', label: 'Study & Routine', desc: 'Budgets, schedules, quiz rules' },
-  { id: 'ai', label: 'AI & Retrieval', desc: 'LLM models, API keys, RAG' },
-  { id: 'profiles', label: 'Profiles & Notebooks', desc: 'Exam goals and book mapping' },
-  { id: 'extensions', label: 'Extensions & Tools', desc: 'Podcast voice, simplifier, AI tools' },
-  { id: 'system', label: 'System & Account', desc: 'Themes, cloud sync, updates' },
-  { id: 'dev', label: 'Developer Mode', desc: 'Diagnostics, reading history & dev logs' },
+  {
+    id: 'study',
+    label: 'Study & Routine',
+    desc: 'Budgets, schedules, quiz rules',
+    keywords: ['study', 'budget', 'tokens', 'duration', 'quiz', 'rescue', 'remediation', 'reading', 'schedule', 'volume', 'review limits', 'pomodoro']
+  },
+  {
+    id: 'ai',
+    label: 'AI & Retrieval',
+    desc: 'LLM models, API keys, RAG',
+    keywords: ['ai', 'llm', 'retrieval', 'rag', 'onnx', 'vector', 'embeddings', 'api key', 'keys', 'fast', 'heavy', 'gemini', 'openai', 'groq', 'openrouter', 'ollama', 'provider', 'tutor', 'persona', 'socratic', 'limits']
+  },
+  {
+    id: 'profiles',
+    label: 'Profiles & Notebooks',
+    desc: 'Exam goals and book mapping',
+    keywords: ['profile', 'profiles', 'notebooks', 'textbooks', 'books', 'exam', 'deadline', 'pace', 'syllabus', 'assign']
+  },
+  {
+    id: 'extensions',
+    label: 'Extensions & Tools',
+    desc: 'Podcast voice, simplifier, AI tools',
+    keywords: ['extension', 'extensions', 'tools', 'podcast', 'voice', 'audio', 'simplifier', 'comprehension', 'tts', 'speech']
+  },
+  {
+    id: 'system',
+    label: 'System & Account',
+    desc: 'Themes, cloud sync, updates',
+    keywords: ['system', 'account', 'theme', 'dark mode', 'light mode', 'appearance', 'cloud', 'sync', 'student', 'login', 'signup', 'classroom', 'update', 'version']
+  },
+  {
+    id: 'dev',
+    label: 'Developer Mode',
+    desc: 'Diagnostics, reading history & dev logs',
+    keywords: ['developer', 'dev', 'diagnostics', 'logs', 'history', 'debug', 'vector db', 'tasks', 'reading history']
+  },
 ]
 
-
+const searchQuery = ref('')
 const activeCategory = ref('study')
 const isDev = ref(false)
 const cloudConfigured = ref(false)
 const syncing = ref(false)
 const error = ref('')
 const success = ref('')
+
+const categoryMatches = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return {}
+
+  const matches = {}
+  categories.forEach((cat) => {
+    let count = 0
+    if (cat.label.toLowerCase().includes(q)) count += 2
+    if (cat.desc.toLowerCase().includes(q)) count += 1
+    cat.keywords?.forEach((kw) => {
+      if (kw.includes(q)) count += 1
+    })
+    if (count > 0) {
+      matches[cat.id] = count
+    }
+  })
+  return matches
+})
+
+const filteredCategories = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return categories
+  return categories.filter((cat) => categoryMatches.value[cat.id] > 0)
+})
+
+watch(searchQuery, (newQuery) => {
+  const q = newQuery.trim().toLowerCase()
+  if (!q) return
+  if (!categoryMatches.value[activeCategory.value]) {
+    const firstMatch = filteredCategories.value[0]
+    if (firstMatch) {
+      activeCategory.value = firstMatch.id
+    }
+  }
+})
 
 // Composables — all share the same error/success refs
 const {
@@ -315,6 +422,7 @@ const {
   ragError,
   ragSetupCompleted,
   onRagToggle,
+  openRagModal,
   startRagSetup,
   handleRagModalDismiss,
   closeRagModal,
@@ -466,6 +574,62 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.05));
 }
 
+.rail-search {
+  padding: 0 4px;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: all 0.15s ease;
+}
+
+.search-input-wrapper:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.search-icon {
+  color: var(--muted-text);
+  flex-shrink: 0;
+}
+
+.settings-search-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.settings-search-input::placeholder {
+  color: var(--muted-text);
+}
+
+.search-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.search-clear-btn:hover {
+  color: var(--on-surface);
+  background: var(--surface-container-highest);
+}
+
 .eyebrow {
   font-size: 11px;
   text-transform: uppercase;
@@ -512,6 +676,34 @@ onUnmounted(() => {
 .rail-item.active {
   background: var(--surface-container-highest);
   border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.rail-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 6px;
+}
+
+.match-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.no-search-results {
+  font-size: 12px;
+  color: var(--muted-text);
+  padding: 16px 8px;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .rail-item-title {

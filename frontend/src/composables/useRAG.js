@@ -85,6 +85,16 @@ export function useRAG(settings) {
     EventsOff('rag-setup-progress')
   }
 
+  function openRagModal() {
+    showRagModal.value = true
+    ragSetupCompleted.value = false
+    ragError.value = ''
+    ragPercent.value = 0
+    ragMessage.value = 'Ready to initialize local AI'
+    ragDetail.value = ''
+    ragStatus.value = ''
+  }
+
   return {
     showRagModal,
     isSettingUpRag,
@@ -95,6 +105,7 @@ export function useRAG(settings) {
     ragError,
     ragSetupCompleted,
     onRagToggle,
+    openRagModal,
     startRagSetup,
     handleRagModalDismiss,
     closeRagModal,

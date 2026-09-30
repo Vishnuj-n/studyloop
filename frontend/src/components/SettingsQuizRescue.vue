@@ -48,108 +48,14 @@
         </label>
       </div>
     </div>
-
-    <div class="form-group">
-      <label>AI Tutor Style</label>
-      <p class="hint" style="margin-bottom: 8px">
-        Choose how the AI tutor interacts with you during concept rescue sessions.
-      </p>
-      <div class="strategy-options">
-        <label
-          class="strategy-option"
-          :class="{ active: (settings.tutor_style || 'socratic') === 'socratic' }"
-        >
-          <input
-            v-model="settings.tutor_style"
-            type="radio"
-            value="socratic"
-            :disabled="disabled"
-            style="cursor: pointer"
-          />
-          <div class="option-content">
-            <span class="option-title">Socratic Guide</span>
-            <span class="option-desc">Asks leading questions to help you discover the answers yourself</span>
-          </div>
-        </label>
-
-        <label
-          class="strategy-option"
-          :class="{ active: settings.tutor_style === 'direct' }"
-        >
-          <input
-            v-model="settings.tutor_style"
-            type="radio"
-            value="direct"
-            :disabled="disabled"
-            style="cursor: pointer"
-          />
-          <div class="option-content">
-            <span class="option-title">Direct &amp; Concise</span>
-            <span class="option-desc">Direct explanations pointing out exactly where you went wrong</span>
-          </div>
-        </label>
-
-        <label
-          class="strategy-option"
-          :class="{ active: settings.tutor_style === 'detailed' }"
-        >
-          <input
-            v-model="settings.tutor_style"
-            type="radio"
-            value="detailed"
-            :disabled="disabled"
-            style="cursor: pointer"
-          />
-          <div class="option-content">
-            <span class="option-title">Step-by-Step</span>
-            <span class="option-desc">Deep walkthroughs with intuitive analogies and clear examples</span>
-          </div>
-        </label>
-      </div>
-    </div>
-
-    <SettingsToggle
-      :model-value="settings.rag_enabled"
-      :disabled="disabled"
-      title="Enable Local AI Retrieval (RAG)"
-      hint="Preloads local ONNX embeddings for context-rich Q&A. Unticking unloads RAG from memory instantly."
-      @update:model-value="$emit('rag-toggle', $event)"
-    />
-
-    <div v-if="settings.rag_enabled" class="rag-sub-settings">
-      <SettingsToggle
-        v-model="settings.rag_notebook_chapter"
-        :disabled="disabled"
-        title="Enable Tutor from Notebook Chapters"
-        hint="Allows accessing Socratic RAG directly from notebook chapter details."
-      />
-
-      <SettingsToggle
-        v-model="settings.rag_entire_notebook"
-        :disabled="disabled"
-        title="Enable RAG for Entire Book"
-        hint="Allows general queries scoped to the selected notebook in the Tutor interface."
-      />
-
-      <SettingsToggle
-        v-model="settings.rag_queue_study"
-        :disabled="disabled"
-        title="Enable Tutor in Queue Study Sessions"
-        hint="Shows an optional Tutor panel inside active reading tasks."
-      />
-    </div>
   </article>
 </template>
 
 <script setup>
-import SettingsToggle from './SettingsToggle.vue'
-
 defineProps({
   settings: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
 })
-
-defineEmits(['rag-toggle'])
 </script>
 
 <style scoped>

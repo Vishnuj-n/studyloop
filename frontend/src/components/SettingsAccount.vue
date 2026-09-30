@@ -240,6 +240,17 @@
       </div>
     </div>
 
+    <!-- Privacy & Telemetry Section -->
+    <div class="privacy-section">
+      <h3>Privacy &amp; Telemetry</h3>
+      <SettingsToggle
+        v-model="settings.analytics_enabled"
+        :disabled="disabled"
+        title="Help improve StudyLoop by sharing anonymous usage telemetry"
+        hint="Telemetry events are strictly anonymized and contain no personal or notebook data. Unticking disables all usage telemetry."
+      />
+    </div>
+
     <!-- Database Backup & Recovery Section -->
     <div class="backup-section">
 
@@ -268,6 +279,7 @@ import { ref, onMounted } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
 import { useDialog } from '../composables/useDialog'
 import { RestoreDatabaseFromBackup } from '../../wailsjs/go/app/App'
+import SettingsToggle from './SettingsToggle.vue'
 
 defineProps({
 
@@ -757,6 +769,7 @@ input:focus {
     transform: translateY(0);
   }
 }
+.privacy-section,
 .backup-section {
   border-top: 1px solid var(--outline-variant);
   padding-top: 18px;
@@ -765,6 +778,7 @@ input:focus {
   gap: 12px;
 }
 
+.privacy-section h3,
 .backup-section h3 {
   font-size: 15px;
   margin: 0;

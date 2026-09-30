@@ -337,13 +337,6 @@
     </div>
 
     <SettingsToggle
-      v-model="settings.analytics_enabled"
-      :disabled="disabled"
-      title="Help improve the app by sharing anonymous usage data"
-      hint="Telemetry events are anonymized. No personal information is ever collected."
-    />
-
-    <SettingsToggle
       v-model="settings.skip_to_reading_active"
       :disabled="disabled"
       title='Enable "Skip to Reading" (Escape Hatch)'
