@@ -14,7 +14,9 @@
       @click.stop="showDevPanel = !showDevPanel"
       @pointerdown.stop
       :title="showDevPanel ? 'Hide dev panel' : 'Show dev panel'"
-    >⚙</button>
+    >
+      <BaseIcon name="settings" size="11" />
+    </button>
 
     <!-- Close / Dismiss button (hides Mochi) -->
     <button
@@ -22,7 +24,9 @@
       @click.stop="togglePet(false)"
       @pointerdown.stop
       title="Close Mochi (can re-enable in Settings)"
-    >✕</button>
+    >
+      <BaseIcon name="x" size="10" />
+    </button>
 
     <!-- DEV MODE PANEL — hidden until toggle is clicked -->
     <transition name="dev-panel-fade">
@@ -34,7 +38,9 @@
         <div class="dev-panel-header">
           <span class="dev-badge">DEV</span>
           <span class="dev-action-label">{{ currentAction }}</span>
-          <button class="dev-close-btn" @click.stop="showDevPanel = false">✕</button>
+          <button class="dev-close-btn" @click.stop="showDevPanel = false">
+            <BaseIcon name="x" size="10" />
+          </button>
         </div>
         <div class="dev-action-buttons">
           <button
@@ -176,6 +182,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import BaseIcon from './BaseIcon.vue'
 import { usePet } from '../composables/usePet'
 import { PET_REGISTRY } from '../config/pets'
 
@@ -218,6 +225,19 @@ const containerStyle = computed(() => {
 
 // Interactive click reactions (excluding sleep for responsive click feel)
 const CLICK_ACTIONS = ['cheer', 'wiggle', 'coffee', 'blink']
+const RANDOM_ACTION_DURATIONS = {
+  sleep: 6000,
+  coffee: 4000,
+}
+const INTERACTIVE_ACTION_DURATIONS = {
+  coffee: 3500,
+  wiggle: 1800,
+  blink: 1200,
+}
+const DEV_ACTION_DURATIONS = {
+  sleep: 8000,
+  coffee: 5000,
+}
 let lastAction = ''
 
 function clearActionResetTimer() {
@@ -233,7 +253,7 @@ function triggerRandomAction() {
   const next = actions[Math.floor(Math.random() * actions.length)]
   currentAction.value = next
 
-  const duration = next === 'sleep' ? 6000 : next === 'coffee' ? 4000 : 2000
+  const duration = RANDOM_ACTION_DURATIONS[next] || 2000
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === next) {
       currentAction.value = 'idle'
@@ -270,7 +290,7 @@ function triggerInteractiveReaction() {
     setTimeout(spawnParticle, 160)
   }
 
-  const duration = next === 'coffee' ? 3500 : next === 'wiggle' ? 1800 : next === 'blink' ? 1200 : 2000
+  const duration = INTERACTIVE_ACTION_DURATIONS[next] || 2000
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === next) {
       currentAction.value = 'idle'
@@ -293,7 +313,7 @@ function forceAction(action) {
   clearActionResetTimer()
   currentAction.value = action
   console.log(`[Mochi Dev] Forced action: ${action}`)
-  const duration = action === 'sleep' ? 8000 : action === 'coffee' ? 5000 : 3000
+  const duration = DEV_ACTION_DURATIONS[action] || 3000
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === action) {
       currentAction.value = 'idle'
@@ -325,7 +345,9 @@ function onPointerMove(e) {
       if (petContainer.value && !petContainer.value.hasPointerCapture(e.pointerId)) {
         petContainer.value.setPointerCapture(e.pointerId)
       }
-    } catch (_) {}
+    } catch (err) {
+      console.debug('[FloatingPet] Pointer capture unavailable:', err)
+    }
   }
 
   if (!hasMoved) return
@@ -345,7 +367,9 @@ function onPointerUp(e) {
     if (petContainer.value && petContainer.value.hasPointerCapture(e.pointerId)) {
       petContainer.value.releasePointerCapture(e.pointerId)
     }
-  } catch (_) {}
+  } catch (err) {
+    console.debug('[FloatingPet] Pointer release unavailable:', err)
+  }
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
 }
@@ -397,7 +421,7 @@ onUnmounted(() => {
   cursor: grab;
   position: relative;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.12));
 }
 
 .pet-avatar-wrapper:hover {
@@ -416,7 +440,7 @@ onUnmounted(() => {
 }
 
 .pet-shadow {
-  fill: rgba(0, 0, 0, 0.18);
+  fill: rgba(0, 0, 0, 0.14);
 }
 
 /* Animations */
@@ -508,7 +532,7 @@ onUnmounted(() => {
 }
 
 /* ── Dismiss / Close Button ────────────────────────────── */
-/* Small ✕ button on top-right corner of Mochi */
+/* Small close button on top-right corner of Mochi */
 .pet-dismiss-btn {
   position: absolute;
   top: -8px;
@@ -516,9 +540,9 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1px solid #334155;
-  background: #1e293b;
-  color: #94a3b8;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container, #1e293b);
+  color: var(--muted-text, #94a3b8);
   font-size: 10px;
   line-height: 1;
   display: flex;
@@ -544,7 +568,7 @@ onUnmounted(() => {
 
 /* ── Dev Panel ─────────────────────────────────────────── */
 
-/* Toggle button: tiny ⚙ pill, top-left corner of the pet */
+/* Toggle button: settings pill, top-left corner of the pet */
 .dev-toggle-btn {
   position: absolute;
   top: -8px;
@@ -552,9 +576,9 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1px solid #334155;
-  background: #1e293b;
-  color: #64748b;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container, #1e293b);
+  color: var(--muted-text, #64748b);
   font-size: 10px;
   line-height: 1;
   display: flex;
@@ -596,11 +620,11 @@ onUnmounted(() => {
   bottom: 108px;
   right: 0;
   width: 160px;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--surface-container-high, #0f172a);
+  border: 1px solid var(--outline-variant);
   border-radius: 10px;
   padding: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
   font-family: ui-monospace, monospace;
   pointer-events: auto;
   z-index: 1;
@@ -656,8 +680,8 @@ onUnmounted(() => {
   font-family: inherit;
   padding: 3px 6px;
   border-radius: 5px;
-  border: 1px solid #334155;
-  background: #1e293b;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container, #1e293b);
   color: #cbd5e1;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;

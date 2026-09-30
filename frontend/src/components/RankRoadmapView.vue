@@ -267,13 +267,13 @@ function isNextTier(tier, idx) {
 .badge-status.unlocked {
   background: color-mix(in srgb, #10b981 15%, transparent);
   color: #10b981;
-  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .badge-status.next {
   background: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .badge-status.locked {

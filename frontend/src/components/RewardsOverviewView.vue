@@ -606,7 +606,7 @@ const progressPercent = computed(() => {
   cursor: pointer;
   background: rgba(255, 255, 255, 0.07);
   color: var(--muted-text, #94a3b8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--outline-variant);
   transition: all 0.2s ease;
 }
 
@@ -644,7 +644,7 @@ const progressPercent = computed(() => {
   padding: 8px 10px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--outline-variant);
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;

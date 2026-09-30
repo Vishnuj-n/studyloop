@@ -149,7 +149,7 @@ onUnmounted(() => {
   max-width: 440px;
   padding: 2.25rem 2rem;
   text-align: center;
-  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.15);
   color: var(--on-surface);
   overflow: hidden;
   animation: cardScaleUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -319,7 +319,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
   z-index: 1;
   animation: pedestalBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -331,7 +331,7 @@ onUnmounted(() => {
 
 .emblem-avatar {
   font-size: 3.4rem;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.14));
   animation: floatAvatar 3s ease-in-out infinite;
 }
 
