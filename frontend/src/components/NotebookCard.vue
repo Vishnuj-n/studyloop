@@ -36,6 +36,17 @@
       </svg>
     </div>
 
+    <!-- Certificate Badge / Button when completed or in dev mode -->
+    <button
+      v-if="completionPercent >= 100"
+      class="btn-certificate-badge"
+      title="View & Download Completion Certificate"
+      @click="$emit('view-certificate', notebook.id)"
+    >
+      <BaseIcon name="award" size="14" />
+      <span>Certificate</span>
+    </button>
+
     <button
       class="btn-edit-pen"
       title="Edit notebook and chapters"
@@ -201,7 +212,7 @@ const props = defineProps({
   activeLimitReached: { type: Boolean, default: false },
 })
 
-defineEmits(['edit-syllabus', 'update-priority', 'change-status', 'delete', 'upgrade-deep'])
+defineEmits(['edit-syllabus', 'update-priority', 'change-status', 'delete', 'upgrade-deep', 'view-certificate', 'dev-unlock-certificate'])
 
 const FILE_ICON_NAMES = { pdf: 'book', txt: 'file-text', md: 'file-text', youtube: 'video', anki: 'cards' }
 
@@ -305,6 +316,34 @@ const circleDashOffset = computed(() => {
   align-items: center;
   justify-content: center;
   user-select: none;
+}
+
+.btn-certificate-badge {
+  position: absolute;
+  top: 13px;
+  right: 96px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.08));
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  color: #d4af37;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+.btn-certificate-badge:hover {
+  background: #d4af37;
+  color: #12141a;
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
 }
 
 .progress-ring-bg {

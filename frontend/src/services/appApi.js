@@ -505,5 +505,24 @@ export function openDataDirectory(subDir = '') {
   }
 }
 
+export function getNotebookCertificateStats(notebookID) {
+  try {
+    return appBridge().GetNotebookCertificateStats(notebookID)
+  } catch (err) {
+    console.error('Failed fetching notebook certificate stats:', err)
+    throw err
+  }
+}
+
+export function devUnlockNotebookCertificate(notebookID) {
+  try {
+    return appBridge().DevUnlockNotebookCertificate(notebookID)
+  } catch (err) {
+    console.error('Failed dev-unlocking notebook certificate:', err)
+    throw err
+  }
+}
+
+
 
 
