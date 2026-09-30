@@ -461,6 +461,13 @@ type ReviewSessionPayload struct {
 	CreatedAtUnix int64 `json:"created_at_unix"`
 }
 
+type NextReviewIntervals struct {
+	Again string `json:"again"`
+	Hard  string `json:"hard"`
+	Good  string `json:"good"`
+	Easy  string `json:"easy"`
+}
+
 type ReviewSessionCard struct {
 	CardID        string               `json:"card_id"`
 	TaskID        string               `json:"task_id"`
@@ -472,6 +479,7 @@ type ReviewSessionCard struct {
 	Answer        string               `json:"answer"`
 	DueAt         int64                `json:"due_at,omitempty"`
 	Suspended     bool                 `json:"suspended"`
+	Intervals     *NextReviewIntervals `json:"intervals,omitempty"`
 }
 
 type ReviewSession struct {

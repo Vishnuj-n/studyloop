@@ -223,8 +223,11 @@
                   :disabled="isSubmittingReview"
                   @click="rate(r.key)"
                 >
-                  <BaseIcon v-if="r.icon" :name="r.icon" size="13" />
-                  <span>{{ r.label }}</span>
+                  <span v-if="getCardInterval(r.key)" class="rating-interval">{{ getCardInterval(r.key) }}</span>
+                  <div class="rating-label-wrap">
+                    <BaseIcon v-if="r.icon" :name="r.icon" size="13" />
+                    <span>{{ r.label }}</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -352,6 +355,17 @@ const ratings = [
   { key: 'good', label: 'Good', icon: 'check', value: 3 },
   { key: 'easy', label: 'Easy', icon: 'zap', value: 4 },
 ]
+
+function getCardInterval(key) {
+  const card = currentCard.value
+  if (!card) return ''
+  if (card.intervals && card.intervals[key]) {
+    return card.intervals[key]
+  }
+  // Default fallback for brand-new/manual sandbox cards
+  const defaults = { again: '<10m', hard: '1d', good: '3d', easy: '7d' }
+  return defaults[key] || ''
+}
 
 const canGenerate = computed(
   () =>
@@ -956,9 +970,12 @@ async function loadQueueSession(taskID, notebookID = '') {
 }
 .rating-btn {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 3px;
   padding: 8px 16px;
+  min-width: 82px;
   border: 0;
   border-radius: 10px;
   font: inherit;
@@ -970,6 +987,17 @@ async function loadQueueSession(taskID, notebookID = '') {
     filter 0.12s ease;
   background: var(--surface-container-lowest);
   color: var(--on-surface);
+}
+.rating-interval {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+}
+.rating-label-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .rating-btn:active:not(:disabled) {
   transform: scale(0.95);
