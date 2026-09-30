@@ -33,13 +33,14 @@ RESET = "\033[0m"
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "src"
 
-# Files exempted from the EMOJI_DETECTED rule (Gamification loot, trophies, reward pedestals, companion particles)
+# Files exempted from the EMOJI_DETECTED rule (Gamification loot, trophies, reward pedestals, companion particles, certificates)
 EMOJI_EXEMPT_FILES = {
     "Rewards.vue",
     "MysteryChestModal.vue",
     "StreakFreezeModal.vue",
     "RewardToast.vue",
     "FloatingPet.vue",
+    "NotebookCertificateModal.vue",
 }
 
 # Emojis that have standardized SVGs in src/assets/icons/index.js

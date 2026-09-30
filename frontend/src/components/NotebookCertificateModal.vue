@@ -490,7 +490,7 @@ onUnmounted(() => {
   max-width: 780px;
   padding: 2rem 2.25rem;
   color: var(--on-surface, #f0f3fa);
-  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   animation: scaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -549,7 +549,7 @@ onUnmounted(() => {
   border-radius: 999px;
   margin-bottom: 0.5rem;
   background: rgba(212, 175, 55, 0.15);
-  border: 1px solid rgba(212, 175, 55, 0.4);
+  border: 1px solid var(--outline-variant, rgba(212, 175, 55, 0.4));
   color: #d4af37;
 }
 
@@ -621,7 +621,7 @@ onUnmounted(() => {
   position: absolute;
   right: 8px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   color: var(--muted-text, #9aa4b2);
   font-size: 0.72rem;
@@ -649,7 +649,8 @@ onUnmounted(() => {
 
 .cert-document {
   background: #151821;
-  border: 2px solid #d4af37;
+  border: 1px solid var(--outline-variant, #d4af37);
+  box-shadow: inset 0 0 0 1px #d4af37;
   border-radius: 12px;
   padding: 1.5rem 1.75rem;
   position: relative;
@@ -749,7 +750,7 @@ onUnmounted(() => {
 
 .metric-box {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
   border-radius: 8px;
   padding: 0.6rem 0.4rem;
   text-align: center;

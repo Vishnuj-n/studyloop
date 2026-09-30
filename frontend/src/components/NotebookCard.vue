@@ -385,7 +385,7 @@ const circleDashOffset = computed(() => {
   font-weight: 700;
   letter-spacing: 0.02em;
   background: color-mix(in srgb, #d97706 14%, var(--surface-container-low));
-  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+  border: 1px solid var(--outline-variant);
   color: #b45309;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -394,8 +394,8 @@ const circleDashOffset = computed(() => {
 
 [data-theme^='dark'] .btn-certificate-badge {
   background: color-mix(in srgb, #f59e0b 16%, var(--surface-container-low));
-  border-color: color-mix(in srgb, #f59e0b 35%, transparent);
-  color: #fbbf24;
+  border-color: var(--outline-variant);
+  color: #f59e0b;
 }
 
 .btn-certificate-badge:hover {
@@ -541,7 +541,7 @@ const circleDashOffset = computed(() => {
   text-decoration: none;
   background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
