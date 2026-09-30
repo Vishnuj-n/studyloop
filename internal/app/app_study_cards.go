@@ -357,6 +357,16 @@ func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage in
 	return a.studyService.GenerateComprehensiveExam(notebookID, startPage, endPage)
 }
 
+func (a *App) GenerateVivaExam(notebookID string, startPage, endPage int, quizTaskID string) map[string]interface{} {
+	if _, errMap := requireRepo(a); errMap != nil {
+		return errMap
+	}
+	if a.studyService == nil {
+		return map[string]interface{}{"error": errStudyServiceNotInitialized}
+	}
+	return a.studyService.GenerateVivaExam(notebookID, startPage, endPage, quizTaskID)
+}
+
 func (a *App) GetReviewSession(taskID string, notebookID string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap

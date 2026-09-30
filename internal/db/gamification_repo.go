@@ -919,15 +919,6 @@ func getAchievementDefinitions() []models.Achievement {
 			TargetValue: 100,
 			RewardCoins: 250,
 		},
-		{
-			ID:          "wager_winner",
-			Title:       "Goal Conqueror",
-			Description: "Win your first daily study wager",
-			Icon:        "flame",
-			StatKey:     "wagers_won",
-			TargetValue: 1,
-			RewardCoins: 150,
-		},
 	}
 }
 

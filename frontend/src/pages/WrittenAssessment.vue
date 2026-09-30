@@ -347,10 +347,12 @@ async function generate(isRetry = false) {
   if (!isRetry) userAnswer.value = ''
   loading.value = true
   try {
+    const quizTaskId = String(route.query.quizTaskId || '')
     const res = await generateComprehensiveExam(
       selectedNotebookID.value,
       startPage.value,
-      endPage.value
+      endPage.value,
+      quizTaskId
     )
     if (res.error) {
       error.value = res.error

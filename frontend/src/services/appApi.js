@@ -137,7 +137,10 @@ export function generateManualFlashcards(notebookID, startPage, endPage) {
   return appBridge().GenerateManualFlashcards(notebookID, startPage, endPage)
 }
 
-export function generateComprehensiveExam(notebookID, startPage, endPage) {
+export function generateComprehensiveExam(notebookID, startPage, endPage, quizTaskID = '') {
+  if (appBridge().GenerateVivaExam) {
+    return appBridge().GenerateVivaExam(notebookID, startPage, endPage, quizTaskID)
+  }
   return appBridge().GenerateComprehensiveExam(notebookID, startPage, endPage)
 }
 

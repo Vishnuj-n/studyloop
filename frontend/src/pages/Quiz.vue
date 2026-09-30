@@ -750,11 +750,8 @@ async function handleGoToExaminer() {
   const startP = taskMeta.value?.start_page || startPage.value || 1
   const endP = taskMeta.value?.end_page || endPage.value || startP
 
-  // Defer flashcard generation to avoid double LLM calls (429 TPM limit) when Examiner auto-generates
   const quizTaskId =
-    result.value?.passed && result.value?.flashcards_pending
-      ? result.value?.task_id || taskID.value || ''
-      : ''
+    result.value?.task_id || taskID.value || (result.value?.passed && result.value?.flashcards_pending ? result.value?.task_id || taskID.value || '' : '')
 
   const query = {
     notebookID: nbID,
