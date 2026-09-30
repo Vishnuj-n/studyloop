@@ -136,8 +136,8 @@
             :disabled="isExporting"
             @click="copyCertificateToClipboard"
           >
-            <BaseIcon name="copy" size="16" />
-            <span>{{ copySuccess ? 'Copied to Clipboard!' : 'Copy to Clipboard' }}</span>
+            <BaseIcon :name="copyFailed ? 'alert-circle' : 'copy'" size="16" />
+            <span>{{ copySuccess ? 'Copied to Clipboard!' : copyFailed ? 'Failed to Copy' : 'Copy to Clipboard' }}</span>
           </button>
         </div>
       </div>
@@ -167,6 +167,8 @@ const emit = defineEmits(['close'])
 const visible = ref(true)
 const isExporting = ref(false)
 const copySuccess = ref(false)
+const copyFailed = ref(false)
+let copyTimer = null
 const certDocumentRef = ref(null)
 const exportCanvasRef = ref(null)
 let confettiCleanup = null
@@ -413,26 +415,44 @@ async function exportCertificatePNG() {
 }
 
 async function copyCertificateToClipboard() {
+  copySuccess.value = false
+  copyFailed.value = false
+  if (copyTimer) clearTimeout(copyTimer)
+
   try {
     const canvas = exportCanvasRef.value || document.createElement('canvas')
     renderCertificateToCanvas(canvas)
 
     canvas.toBlob(async (blob) => {
-      if (!blob) return
+      if (!blob) {
+        copyFailed.value = true
+        copyTimer = setTimeout(() => {
+          copyFailed.value = false
+        }, 3000)
+        return
+      }
       try {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ])
         copySuccess.value = true
-        setTimeout(() => {
+        copyTimer = setTimeout(() => {
           copySuccess.value = false
         }, 3000)
       } catch (clipErr) {
         console.warn('Clipboard write failed:', clipErr)
+        copyFailed.value = true
+        copyTimer = setTimeout(() => {
+          copyFailed.value = false
+        }, 3000)
       }
     })
   } catch (err) {
     console.error('Failed copying certificate image:', err)
+    copyFailed.value = true
+    copyTimer = setTimeout(() => {
+      copyFailed.value = false
+    }, 3000)
   }
 }
 
@@ -456,6 +476,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (copyTimer) {
+    clearTimeout(copyTimer)
+  }
   if (confettiCleanup) {
     confettiCleanup()
   }

@@ -315,11 +315,12 @@ async function goToDashboard() {
   navigatingAway.value = true
 
   const quizTaskId = String(route.query.quizTaskId || '')
+  const isFlashcardsPending = route.query.flashcardsPending === 'true'
   const query = {}
 
-  if (quizTaskId) {
-    // Strip quizTaskId from route query to prevent repeat executions on navigation/refresh
-    await router.replace({ query: { ...route.query, quizTaskId: undefined } })
+  if (quizTaskId && isFlashcardsPending) {
+    // Strip params from route query to prevent repeat executions on navigation/refresh
+    await router.replace({ query: { ...route.query, quizTaskId: undefined, flashcardsPending: undefined } })
     try {
       const genResult = await generateFlashcardsForQuizTask(quizTaskId)
       if (genResult?.rewards) {
