@@ -52,7 +52,26 @@
           >
             {{ action }}
           </button>
+          <button
+            class="dev-action-btn dev-msg-btn"
+            @click.stop="triggerSpeechBubble()"
+          >
+            💬 Say
+          </button>
         </div>
+      </div>
+    </transition>
+
+    <!-- Speech / Thought Bubble -->
+    <transition name="pet-bubble-fade">
+      <div
+        v-if="activeMessage"
+        class="pet-speech-bubble"
+        @click.stop="dismissBubble"
+        @pointerdown.stop
+      >
+        <span class="bubble-text">{{ activeMessage }}</span>
+        <div class="bubble-tail"></div>
       </div>
     </transition>
 
@@ -66,15 +85,6 @@
       title="Click to interact · Drag to move"
       @click="onPetClick"
     >
-      <!-- Floating particles on click -->
-      <TransitionGroup tag="div" name="particle" class="particle-container">
-        <span
-          v-for="p in particles"
-          :key="p.id"
-          class="particle"
-          :style="{ left: p.x + 'px', top: p.y + 'px' }"
-        >{{ p.emoji }}</span>
-      </TransitionGroup>
       <svg
         viewBox="0 0 100 100"
         class="pet-svg"
@@ -184,7 +194,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import { usePet } from '../composables/usePet'
-import { PET_REGISTRY } from '../config/pets'
+import { PET_REGISTRY, PET_MESSAGES } from '../config/pets'
 
 const { petState, currentSkin, setPosition, togglePet } = usePet()
 
@@ -196,9 +206,11 @@ const showDevPanel = ref(false)
 const petContainer = ref(null)
 const currentAction = ref('idle')
 const isDragging = ref(false)
-// Click particles: [{id, emoji, x, y}], auto-cleared after animation
-const particles = ref([])
-let particleId = 0
+
+// Speech bubble state
+const activeMessage = ref(null)
+let bubbleTimer = null
+let lastMessageIdx = -1
 
 let dragStart = { x: 0, y: 0 }
 let initialPos = { x: 0, y: 0 }
@@ -223,16 +235,17 @@ const containerStyle = computed(() => {
   }
 })
 
-// Interactive click reactions (excluding sleep for responsive click feel)
-const CLICK_ACTIONS = ['cheer', 'wiggle', 'coffee', 'blink']
-const RANDOM_ACTION_DURATIONS = {
+// Petting click reactions: only happy petting responses (bounce/wiggle)
+const PETTING_ACTIONS = ['cheer', 'wiggle']
+// Ambient idle actions: behaviors performed spontaneously while studying
+const AMBIENT_ACTIONS = ['idle', 'blink', 'wiggle', 'coffee', 'sleep']
+
+const ACTION_DURATIONS = {
   sleep: 6000,
   coffee: 4000,
-}
-const INTERACTIVE_ACTION_DURATIONS = {
-  coffee: 3500,
   wiggle: 1800,
   blink: 1200,
+  cheer: 1600,
 }
 const DEV_ACTION_DURATIONS = {
   sleep: 8000,
@@ -247,13 +260,44 @@ function clearActionResetTimer() {
   }
 }
 
+function clearBubbleTimer() {
+  if (bubbleTimer) {
+    clearTimeout(bubbleTimer)
+    bubbleTimer = null
+  }
+}
+
+function triggerSpeechBubble(customText = null) {
+  clearBubbleTimer()
+  if (customText) {
+    activeMessage.value = customText
+  } else if (PET_MESSAGES && PET_MESSAGES.length > 0) {
+    let nextIdx = Math.floor(Math.random() * PET_MESSAGES.length)
+    if (PET_MESSAGES.length > 1 && nextIdx === lastMessageIdx) {
+      nextIdx = (nextIdx + 1) % PET_MESSAGES.length
+    }
+    lastMessageIdx = nextIdx
+    activeMessage.value = PET_MESSAGES[nextIdx]
+  }
+
+  // Auto-dismiss after 4 seconds
+  bubbleTimer = setTimeout(() => {
+    activeMessage.value = null
+    bubbleTimer = null
+  }, 4000)
+}
+
+function dismissBubble() {
+  clearBubbleTimer()
+  activeMessage.value = null
+}
+
 function triggerRandomAction() {
   clearActionResetTimer()
-  const actions = ['idle', 'blink', 'wiggle', 'coffee', 'cheer', 'sleep']
-  const next = actions[Math.floor(Math.random() * actions.length)]
+  const next = AMBIENT_ACTIONS[Math.floor(Math.random() * AMBIENT_ACTIONS.length)]
   currentAction.value = next
 
-  const duration = RANDOM_ACTION_DURATIONS[next] || 2000
+  const duration = ACTION_DURATIONS[next] || 2000
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === next) {
       currentAction.value = 'idle'
@@ -261,36 +305,20 @@ function triggerRandomAction() {
   }, duration)
 }
 
-// Spawn a floating heart particle at a random offset above Mochi
-const CLICK_EMOJIS = ['💖', '❤️', '💕', '💗', '💓', '💘']
-function spawnParticle() {
-  const emoji = CLICK_EMOJIS[Math.floor(Math.random() * CLICK_EMOJIS.length)]
-  const x = 20 + Math.random() * 60   // random x within pet width
-  const y = 10 + Math.random() * 20   // start near top of pet
-  const id = particleId++
-  particles.value.push({ id, emoji, x, y })
-  // Remove after animation completes (900ms)
-  setTimeout(() => {
-    const idx = particles.value.findIndex((p) => p.id === id)
-    if (idx !== -1) particles.value.splice(idx, 1)
-  }, 900)
-}
-
-// Interactive random reaction with anti-repeat
-function triggerInteractiveReaction() {
+// Interactive petting reaction (Bounce / Wiggle)
+function triggerPettingReaction() {
   clearActionResetTimer()
-  const available = CLICK_ACTIONS.filter((a) => a !== lastAction)
-  const next = available[Math.floor(Math.random() * available.length)] || CLICK_ACTIONS[0]
+  const available = PETTING_ACTIONS.filter((a) => a !== lastAction)
+  const next = available[Math.floor(Math.random() * available.length)] || PETTING_ACTIONS[0]
   lastAction = next
   currentAction.value = next
-  console.log(`[Mochi] Random click reaction: ${next}`)
 
-  spawnParticle()
-  if (Math.random() > 0.4) {
-    setTimeout(spawnParticle, 160)
+  // ~20% chance on click to show a friendly study message bubble if none active
+  if (!activeMessage.value && Math.random() < 0.22) {
+    triggerSpeechBubble()
   }
 
-  const duration = INTERACTIVE_ACTION_DURATIONS[next] || 2000
+  const duration = ACTION_DURATIONS[next] || 1600
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === next) {
       currentAction.value = 'idle'
@@ -301,18 +329,15 @@ function triggerInteractiveReaction() {
 // Click handler
 function onPetClick() {
   if (hasMoved) {
-    console.log('[Mochi] Click ignored: pet was dragging')
     return
   }
-  console.log('[Mochi] Click registered -> triggering reaction')
-  triggerInteractiveReaction()
+  triggerPettingReaction()
 }
 
 // DEV: force any action directly from the panel
 function forceAction(action) {
   clearActionResetTimer()
   currentAction.value = action
-  console.log(`[Mochi Dev] Forced action: ${action}`)
   const duration = DEV_ACTION_DURATIONS[action] || 3000
   actionResetTimer = setTimeout(() => {
     if (currentAction.value === action) {
@@ -345,8 +370,8 @@ function onPointerMove(e) {
       if (petContainer.value && !petContainer.value.hasPointerCapture(e.pointerId)) {
         petContainer.value.setPointerCapture(e.pointerId)
       }
-    } catch (err) {
-      console.debug('[FloatingPet] Pointer capture unavailable:', err)
+    } catch {
+      // pointer capture unavailable
     }
   }
 
@@ -367,8 +392,8 @@ function onPointerUp(e) {
     if (petContainer.value && petContainer.value.hasPointerCapture(e.pointerId)) {
       petContainer.value.releasePointerCapture(e.pointerId)
     }
-  } catch (err) {
-    console.debug('[FloatingPet] Pointer release unavailable:', err)
+  } catch {
+    // pointer release unavailable
   }
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
@@ -398,6 +423,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)
   clearActionResetTimer()
+  clearBubbleTimer()
   if (actionTimer) clearInterval(actionTimer)
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
@@ -497,37 +523,6 @@ onUnmounted(() => {
   0% { opacity: 0; transform: translateY(0); }
   50% { opacity: 0.8; }
   100% { opacity: 0; transform: translateY(-4px); }
-}
-
-/* ── Click Particles ───────────────────────────────────── */
-.particle-container {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.particle {
-  position: absolute;
-  font-size: 18px;
-  line-height: 1;
-  pointer-events: none;
-  user-select: none;
-  will-change: transform, opacity;
-}
-
-.particle-enter-active {
-  animation: particleFloat 0.9s ease-out forwards;
-}
-
-.particle-leave-active {
-  display: none;
-}
-
-@keyframes particleFloat {
-  0%   { transform: translateY(0)   scale(1);    opacity: 1; }
-  60%  { transform: translateY(-42px) scale(1.2); opacity: 0.9; }
-  100% { transform: translateY(-60px) scale(0.8); opacity: 0; }
 }
 
 /* ── Dismiss / Close Button ────────────────────────────── */
@@ -695,5 +690,87 @@ onUnmounted(() => {
   background: #6366f1;
   border-color: #818cf8;
   color: #fff;
+}
+
+.dev-msg-btn {
+  background: #0f766e;
+  border-color: #14b8a6;
+  color: #ccfbf1;
+}
+
+.dev-msg-btn:hover {
+  background: #115e59;
+  color: #f0fdfa;
+}
+
+/* ── Speech / Thought Bubble ────────────────────────────── */
+.pet-speech-bubble {
+  position: absolute;
+  bottom: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 170px;
+  background: var(--surface-container-highest, #1e293b);
+  border: 1px solid var(--outline-variant, #475569);
+  color: var(--on-surface, #f8fafc);
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 10;
+  white-space: normal;
+  word-break: break-word;
+  user-select: none;
+}
+
+.pet-speech-bubble:hover {
+  filter: brightness(1.08);
+}
+
+.bubble-text {
+  display: block;
+}
+
+.bubble-tail {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--surface-container-highest, #1e293b);
+}
+
+/* Bubble pop-fade transitions */
+.pet-bubble-fade-enter-active {
+  animation: bubblePopIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pet-bubble-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pet-bubble-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px) scale(0.95);
+}
+
+@keyframes bubblePopIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 </style>
