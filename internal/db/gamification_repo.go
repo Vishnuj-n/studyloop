@@ -689,36 +689,114 @@ func (r *Repository) AddDevCoins(amount int) (*models.GamificationProfile, error
 	return r.GetGamificationProfile()
 }
 
-// reconcileAchievementsTx checks achievement thresholds and unlocks rewards.
-func reconcileAchievementsTx(stats map[string]int, unlockedList []string, coins int) ([]string, int, bool) {
+// ClaimAchievement awards the rewards for the next claimable tier of an achievement.
+func (r *Repository) ClaimAchievement(achID string) (*models.GamificationStore, int, string, error) {
+	if achID == "" {
+		return nil, 0, "", fmt.Errorf("achievement ID cannot be empty")
+	}
+
+	defs := getAchievementDefinitions()
+	var def *models.Achievement
+	for i := range defs {
+		if defs[i].ID == achID {
+			def = &defs[i]
+			break
+		}
+	}
+	if def == nil {
+		return nil, 0, "", fmt.Errorf("unknown achievement: %s", achID)
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to begin claim transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var statsJSON, unlockedJSON string
+	var coins int
+	err = tx.QueryRow(`SELECT COALESCE(stats_json, '{}'), unlocked_cosmetics_json, coins FROM user_gamification WHERE user_id = 1`).Scan(&statsJSON, &unlockedJSON, &coins)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to read user gamification: %w", err)
+	}
+
+	stats := make(map[string]int)
+	if statsJSON != "" {
+		_ = json.Unmarshal([]byte(statsJSON), &stats)
+	}
+
+	var unlockedList []string
+	if unlockedJSON != "" {
+		_ = json.Unmarshal([]byte(unlockedJSON), &unlockedList)
+	}
 	unlockedMap := make(map[string]bool, len(unlockedList))
 	for _, u := range unlockedList {
 		unlockedMap[u] = true
 	}
 
-	changed := false
-	achievements := getAchievementDefinitions()
-	for _, ach := range achievements {
-		if stats[ach.StatKey] >= ach.TargetValue {
-			claimKey := "achievement:" + ach.ID
-			if !unlockedMap[claimKey] {
-				unlockedList = append(unlockedList, claimKey)
-				unlockedMap[claimKey] = true
-				changed = true
-				if ach.RewardItem != "" && !unlockedMap[ach.RewardItem] {
-					unlockedList = append(unlockedList, ach.RewardItem)
-					unlockedMap[ach.RewardItem] = true
-				}
-				if ach.RewardCoins > 0 {
-					coins += ach.RewardCoins
-				}
-			}
+	claimedTier := stats["claim_tier:"+def.ID]
+	if claimedTier == 0 && unlockedMap["achievement:"+def.ID] {
+		claimedTier = 1
+	}
+
+	nextTier := claimedTier + 1
+	multiplier := 1 << (nextTier - 1)
+	requiredStat := def.TargetValue * multiplier
+
+	currentStat := stats[def.StatKey]
+	if currentStat < requiredStat {
+		return nil, 0, "", fmt.Errorf("achievement %s tier %d requires %d %s (current: %d)", def.Title, nextTier, requiredStat, def.StatKey, currentStat)
+	}
+
+	coinsEarned := def.RewardCoins * nextTier
+	var unlockedItem string
+
+	if nextTier == 1 && def.RewardItem != "" {
+		if !unlockedMap[def.RewardItem] {
+			unlockedList = append(unlockedList, def.RewardItem)
+			unlockedMap[def.RewardItem] = true
+			unlockedItem = def.RewardItem
 		}
 	}
-	return unlockedList, coins, changed
+
+	claimKey := fmt.Sprintf("achievement:%s:%d", def.ID, nextTier)
+	if !unlockedMap[claimKey] {
+		unlockedList = append(unlockedList, claimKey)
+		unlockedMap[claimKey] = true
+	}
+	if !unlockedMap["achievement:"+def.ID] {
+		unlockedList = append(unlockedList, "achievement:"+def.ID)
+		unlockedMap["achievement:"+def.ID] = true
+	}
+
+	stats["claim_tier:"+def.ID] = nextTier
+	coins += coinsEarned
+
+	newStatsBytes, _ := json.Marshal(stats)
+	newUnlockedBytes, _ := json.Marshal(unlockedList)
+
+	_, err = tx.Exec(`
+		UPDATE user_gamification
+		SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = 1
+	`, string(newStatsBytes), string(newUnlockedBytes), coins)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to update gamification profile: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, 0, "", fmt.Errorf("failed to commit achievement claim: %w", err)
+	}
+
+	store, err := r.GetGamificationStore()
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to reload store after claim: %w", err)
+	}
+
+	return store, coinsEarned, unlockedItem, nil
 }
 
-// IncrementStat increments a counter in stats_json and auto-unlocks any completed achievements.
+// IncrementStat increments a counter in stats_json without auto-claiming rewards.
 func (r *Repository) IncrementStat(statKey string, delta int) error {
 	if statKey == "" || delta <= 0 {
 		return nil
@@ -730,9 +808,8 @@ func (r *Repository) IncrementStat(statKey string, delta int) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var statsJSON, unlockedJSON string
-	var coins int
-	err = tx.QueryRow(`SELECT COALESCE(stats_json, '{}'), unlocked_cosmetics_json, coins FROM user_gamification WHERE user_id = 1`).Scan(&statsJSON, &unlockedJSON, &coins)
+	var statsJSON string
+	err = tx.QueryRow(`SELECT COALESCE(stats_json, '{}') FROM user_gamification WHERE user_id = 1`).Scan(&statsJSON)
 	if err != nil {
 		return fmt.Errorf("failed to query stats: %w", err)
 	}
@@ -743,21 +820,13 @@ func (r *Repository) IncrementStat(statKey string, delta int) error {
 	}
 	stats[statKey] = stats[statKey] + delta
 
-	var unlockedList []string
-	if unlockedJSON != "" {
-		_ = json.Unmarshal([]byte(unlockedJSON), &unlockedList)
-	}
-
-	unlockedList, coins, _ = reconcileAchievementsTx(stats, unlockedList, coins)
-
 	newStatsBytes, _ := json.Marshal(stats)
-	newUnlockedBytes, _ := json.Marshal(unlockedList)
 
 	_, err = tx.Exec(`
 		UPDATE user_gamification
-		SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
+		SET stats_json = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = 1
-	`, string(newStatsBytes), string(newUnlockedBytes), coins)
+	`, string(newStatsBytes))
 	if err != nil {
 		return fmt.Errorf("failed to update stats: %w", err)
 	}
@@ -903,14 +972,6 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		changed = true
 	}
 
-	achDefs := getAchievementDefinitions()
-	coins := prof.Coins
-	var recChanged bool
-	unlockedList, coins, recChanged = reconcileAchievementsTx(stats, unlockedList, coins)
-	if recChanged {
-		changed = true
-	}
-
 	if changed {
 		tx, err := r.db.Begin()
 		if err != nil {
@@ -919,12 +980,11 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		defer func() { _ = tx.Rollback() }()
 
 		newStatsBytes, _ := json.Marshal(stats)
-		newUnlockedBytes, _ := json.Marshal(unlockedList)
 		_, err = tx.Exec(`
 			UPDATE user_gamification
-			SET stats_json = ?, unlocked_cosmetics_json = ?, coins = ?, updated_at = CURRENT_TIMESTAMP
+			SET stats_json = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE user_id = 1
-		`, string(newStatsBytes), string(newUnlockedBytes), coins)
+		`, string(newStatsBytes))
 		if err != nil {
 			return nil, fmt.Errorf("failed to update reconciled stats: %w", err)
 		}
@@ -949,28 +1009,31 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 		allThemes[i] = c
 	}
 
+	achDefs := getAchievementDefinitions()
 	achievements := make([]models.Achievement, 0, len(achDefs))
 	for _, a := range achDefs {
 		curr := stats[a.StatKey]
 		a.CurrentValue = curr
 
-		// ponytail: dynamic exponential target scaling (doubles target per tier: e.g. 5 -> 10 -> 20 -> 40...)
-		if a.TargetValue > 0 && curr >= a.TargetValue {
-			tier := 1
-			tVal := a.TargetValue
-			for curr >= tVal {
-				tier++
-				tVal *= 2
-			}
-			a.Title = fmt.Sprintf("%s %s", a.Title, toRoman(tier))
-			a.TargetValue = tVal
-			a.Completed = false
-			if tier > 1 {
-				a.RewardItem = ""
-			}
-		} else {
-			a.Completed = curr >= a.TargetValue
+		claimedTier := stats["claim_tier:"+a.ID]
+		if claimedTier == 0 && unlockedMap["achievement:"+a.ID] {
+			claimedTier = 1
 		}
+		a.ClaimedTier = claimedTier
+
+		displayTier := claimedTier + 1
+		a.Tier = displayTier
+		targetMultiplier := 1 << (displayTier - 1)
+		a.TargetValue = a.TargetValue * targetMultiplier
+		a.RewardCoins = a.RewardCoins * displayTier
+
+		if displayTier > 1 {
+			a.Title = fmt.Sprintf("%s %s", a.Title, toRoman(displayTier))
+			a.RewardItem = ""
+		}
+
+		a.Claimable = (curr >= a.TargetValue)
+		a.Completed = (claimedTier > 0 && !a.Claimable)
 
 		achievements = append(achievements, a)
 	}

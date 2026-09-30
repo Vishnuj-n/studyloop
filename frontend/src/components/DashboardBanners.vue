@@ -49,7 +49,7 @@
       variant="rescue"
       icon="shield"
       title="Concept Rescue Active"
-      subtitle="Your study queue is locked because you failed the quiz twice on this topic. You must complete the Socratic tutor rescue session to unblock your timeline."
+      subtitle="A Concept Rescue session is available to help you review tricky topics before retrying your quiz."
     />
 
     <StatusBanner

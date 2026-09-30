@@ -8,6 +8,7 @@ import RewardToast from './components/RewardToast.vue'
 import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
 import PrivacyNoticeModal from './components/PrivacyNoticeModal.vue'
+import FloatingPet from './components/FloatingPet.vue'
 import {
   getUserSettings,
   updateUserSettings,
@@ -530,6 +531,9 @@ onUnmounted(() => {
 
       <!-- Global Toaster -->
       <AppToast />
+
+      <!-- Floating Study Companion -->
+      <FloatingPet />
     </main>
   </div>
 </template>

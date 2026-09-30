@@ -742,6 +742,9 @@ type Achievement struct {
 	TargetValue  int    `json:"target_value"`
 	CurrentValue int    `json:"current_value"`
 	Completed    bool   `json:"completed"`
+	Claimable    bool   `json:"claimable"`
+	Tier         int    `json:"tier"`
+	ClaimedTier  int    `json:"claimed_tier"`
 	RewardCoins  int    `json:"reward_coins"`
 	RewardItem   string `json:"reward_item,omitempty"`
 }

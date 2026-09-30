@@ -132,7 +132,7 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("expected coins 185, got %d", afterUnlockProf.Coins)
 	}
 
-	// 7. Test IncrementStat & Achievement auto-unlock
+	// 7. Test IncrementStat, Claimable state & manual ClaimAchievement
 	if err := repo.IncrementStat("quizzes_passed", 5); err != nil {
 		t.Fatalf("IncrementStat failed: %v", err)
 	}
@@ -142,7 +142,18 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("GetGamificationStore failed: %v", err)
 	}
 
-	// Check if light-monochrome was auto unlocked by quiz_master achievement
+	var quizMasterAch *models.Achievement
+	for i := range store.Achievements {
+		if store.Achievements[i].ID == "quiz_master" {
+			quizMasterAch = &store.Achievements[i]
+			break
+		}
+	}
+	if quizMasterAch == nil || !quizMasterAch.Claimable {
+		t.Fatalf("expected quiz_master to be Claimable, got %+v", quizMasterAch)
+	}
+
+	// Verify theme is locked until claimed
 	foundMonochrome := false
 	for _, th := range store.Themes {
 		if th.ID == "light-monochrome" && th.Unlocked {
@@ -150,8 +161,28 @@ func TestGamificationRepo(t *testing.T) {
 			break
 		}
 	}
-	if !foundMonochrome {
-		t.Fatalf("expected light-monochrome to be unlocked by quiz_master achievement")
+	if foundMonochrome {
+		t.Fatalf("expected light-monochrome to remain locked before claim")
+	}
+
+	// Claim quiz_master
+	storeAfterClaim, coinsEarned, unlockedItem, err := repo.ClaimAchievement("quiz_master")
+	if err != nil {
+		t.Fatalf("ClaimAchievement failed: %v", err)
+	}
+	if coinsEarned != 75 || unlockedItem != "light-monochrome" {
+		t.Fatalf("expected 75 coins and light-monochrome unlocked, got coins=%d item=%s", coinsEarned, unlockedItem)
+	}
+
+	foundMonochromeAfter := false
+	for _, th := range storeAfterClaim.Themes {
+		if th.ID == "light-monochrome" && th.Unlocked {
+			foundMonochromeAfter = true
+			break
+		}
+	}
+	if !foundMonochromeAfter {
+		t.Fatalf("expected light-monochrome to be unlocked after claim")
 	}
 }
 
@@ -198,20 +229,42 @@ func TestGamificationStoreAutoReconcilesFromSQL(t *testing.T) {
 		}
 	}
 
-	if firstStepAch == nil || firstStepAch.CurrentValue != 1 || firstStepAch.TargetValue != 2 || firstStepAch.Title != "First Steps II" {
-		t.Fatalf("expected First Steps II achievement (1/2), got %+v", firstStepAch)
+	if firstStepAch == nil || firstStepAch.CurrentValue != 1 || firstStepAch.TargetValue != 1 || !firstStepAch.Claimable || firstStepAch.Title != "First Steps" {
+		t.Fatalf("expected First Steps claimable (1/1), got %+v", firstStepAch)
 	}
-	if quizStarterAch == nil || quizStarterAch.CurrentValue != 1 || quizStarterAch.TargetValue != 2 || quizStarterAch.Title != "Quiz Starter II" {
-		t.Fatalf("expected Quiz Starter II achievement (1/2), got %+v", quizStarterAch)
+	if quizStarterAch == nil || quizStarterAch.CurrentValue != 1 || quizStarterAch.TargetValue != 1 || !quizStarterAch.Claimable || quizStarterAch.Title != "Quiz Starter" {
+		t.Fatalf("expected Quiz Starter claimable (1/1), got %+v", quizStarterAch)
+	}
+
+	// Claim First Steps
+	storeAfterClaim, _, _, err := repo.ClaimAchievement("first_step")
+	if err != nil {
+		t.Fatalf("failed to claim first_step: %v", err)
+	}
+
+	var firstStepTier2 *models.Achievement
+	for i := range storeAfterClaim.Achievements {
+		if storeAfterClaim.Achievements[i].ID == "first_step" {
+			firstStepTier2 = &storeAfterClaim.Achievements[i]
+			break
+		}
+	}
+	if firstStepTier2 == nil || firstStepTier2.Title != "First Steps II" || firstStepTier2.TargetValue != 2 || firstStepTier2.ClaimedTier != 1 {
+		t.Fatalf("expected First Steps II (1/2, claimed_tier 1), got %+v", firstStepTier2)
 	}
 
 	// Verify Tier II achievements clear RewardItem
 	_ = repo.IncrementStat("reading_sessions", 5)
-	storeAfterTier2, err := repo.GetGamificationStore()
+	_, _, _, err = repo.ClaimAchievement("night_scholar")
 	if err != nil {
-		t.Fatalf("GetGamificationStore after tier 2 failed: %v", err)
+		t.Fatalf("failed to claim night_scholar: %v", err)
 	}
-	for _, a := range storeAfterTier2.Achievements {
+
+	storeAfterNightClaim, err := repo.GetGamificationStore()
+	if err != nil {
+		t.Fatalf("GetGamificationStore after night_scholar claim failed: %v", err)
+	}
+	for _, a := range storeAfterNightClaim.Achievements {
 		if a.ID == "night_scholar" {
 			if a.Title != "Night Scholar II" {
 				t.Fatalf("expected Night Scholar II, got %s", a.Title)

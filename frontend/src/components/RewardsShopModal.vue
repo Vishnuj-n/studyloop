@@ -87,7 +87,7 @@ import {
   unlockCosmeticItem,
 } from '../services/appApi'
 
-const props = defineProps({
+defineProps({
   activeTheme: { type: String, default: 'dark-gruvbox' },
   coins: { type: Number, default: 0 },
 })
