@@ -6,16 +6,47 @@
     :style="containerStyle"
     @pointerdown="onPointerDown"
   >
-    <!-- Speech Bubble -->
-    <transition name="bubble-fade">
+    <!-- DEV MODE toggle button — only in dev builds -->
+    <button
+      v-if="isDev"
+      class="dev-toggle-btn"
+      :class="{ active: showDevPanel }"
+      @click.stop="showDevPanel = !showDevPanel"
+      @pointerdown.stop
+      :title="showDevPanel ? 'Hide dev panel' : 'Show dev panel'"
+    >⚙</button>
+
+    <!-- Close / Dismiss button (hides Mochi) -->
+    <button
+      class="pet-dismiss-btn"
+      @click.stop="togglePet(false)"
+      @pointerdown.stop
+      title="Close Mochi (can re-enable in Settings)"
+    >✕</button>
+
+    <!-- DEV MODE PANEL — hidden until toggle is clicked -->
+    <transition name="dev-panel-fade">
       <div
-        v-if="bubbleText"
-        class="pet-speech-bubble"
-        @click.stop="hideBubble"
+        v-if="isDev && showDevPanel"
+        class="pet-dev-panel"
         @pointerdown.stop
       >
-        <span class="bubble-content">{{ bubbleText }}</span>
-        <div class="bubble-arrow"></div>
+        <div class="dev-panel-header">
+          <span class="dev-badge">DEV</span>
+          <span class="dev-action-label">{{ currentAction }}</span>
+          <button class="dev-close-btn" @click.stop="showDevPanel = false">✕</button>
+        </div>
+        <div class="dev-action-buttons">
+          <button
+            v-for="action in allActions"
+            :key="action"
+            class="dev-action-btn"
+            :class="{ active: currentAction === action }"
+            @click.stop="forceAction(action)"
+          >
+            {{ action }}
+          </button>
+        </div>
       </div>
     </transition>
 
@@ -27,8 +58,17 @@
         { 'is-dragging': isDragging }
       ]"
       @click="onPetClick"
-      title="Click Mochi for encouragement or drag to move"
+      title="Click to interact · Drag to move"
     >
+      <!-- Floating particles on click -->
+      <TransitionGroup tag="div" name="particle" class="particle-container">
+        <span
+          v-for="p in particles"
+          :key="p.id"
+          class="particle"
+          :style="{ left: p.x + 'px', top: p.y + 'px' }"
+        >{{ p.emoji }}</span>
+      </TransitionGroup>
       <svg
         viewBox="0 0 100 100"
         class="pet-svg"
@@ -137,21 +177,29 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePet } from '../composables/usePet'
-import { PET_MESSAGES } from '../config/pets'
+import { PET_REGISTRY } from '../config/pets'
 
-const { petState, currentSkin, setPosition } = usePet()
+const { petState, currentSkin, setPosition, togglePet } = usePet()
+
+// Dev mode: auto-detected from Vite's build mode
+const isDev = import.meta.env.DEV
+const allActions = PET_REGISTRY.find((p) => p.id === 'cat')?.actions ?? ['idle', 'blink', 'wiggle', 'coffee', 'cheer', 'sleep']
+const showDevPanel = ref(false)
 
 const petContainer = ref(null)
 const currentAction = ref('idle')
-const bubbleText = ref('')
 const isDragging = ref(false)
+// Click particles: [{id, emoji, x, y}], auto-cleared after animation
+const particles = ref([])
+let particleId = 0
 
 let dragStart = { x: 0, y: 0 }
 let initialPos = { x: 0, y: 0 }
 let actionTimer = null
 let actionResetTimer = null
-let bubbleTimer = null
+// Raised from 3→8px: micro hand-tremor was suppressing clicks
 let hasMoved = false
+const DRAG_THRESHOLD_PX = 8
 
 const containerStyle = computed(() => {
   if (petState.value.position.x !== null && petState.value.position.y !== null) {
@@ -167,6 +215,10 @@ const containerStyle = computed(() => {
     bottom: '24px',
   }
 })
+
+// Interactive click reactions (excluding sleep for responsive click feel)
+const CLICK_ACTIONS = ['cheer', 'wiggle', 'coffee', 'blink']
+let lastAction = ''
 
 function clearActionResetTimer() {
   if (actionResetTimer) {
@@ -189,30 +241,64 @@ function triggerRandomAction() {
   }, duration)
 }
 
-function showSpeechBubble(msg = null) {
-  if (bubbleTimer) clearTimeout(bubbleTimer)
-  const text = msg || PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)]
-  bubbleText.value = text
-  bubbleTimer = setTimeout(() => {
-    bubbleText.value = ''
-  }, 4500)
+// Spawn a floating heart particle at a random offset above Mochi
+const CLICK_EMOJIS = ['💖', '❤️', '💕', '💗', '💓', '💘']
+function spawnParticle() {
+  const emoji = CLICK_EMOJIS[Math.floor(Math.random() * CLICK_EMOJIS.length)]
+  const x = 20 + Math.random() * 60   // random x within pet width
+  const y = 10 + Math.random() * 20   // start near top of pet
+  const id = particleId++
+  particles.value.push({ id, emoji, x, y })
+  // Remove after animation completes (900ms)
+  setTimeout(() => {
+    const idx = particles.value.findIndex((p) => p.id === id)
+    if (idx !== -1) particles.value.splice(idx, 1)
+  }, 900)
 }
 
-function hideBubble() {
-  bubbleText.value = ''
-  if (bubbleTimer) clearTimeout(bubbleTimer)
-}
-
-function onPetClick() {
-  if (hasMoved) return
+// Interactive random reaction with anti-repeat
+function triggerInteractiveReaction() {
   clearActionResetTimer()
-  currentAction.value = 'cheer'
-  showSpeechBubble()
+  const available = CLICK_ACTIONS.filter((a) => a !== lastAction)
+  const next = available[Math.floor(Math.random() * available.length)] || CLICK_ACTIONS[0]
+  lastAction = next
+  currentAction.value = next
+  console.log(`[Mochi] Random click reaction: ${next}`)
+
+  spawnParticle()
+  if (Math.random() > 0.4) {
+    setTimeout(spawnParticle, 160)
+  }
+
+  const duration = next === 'coffee' ? 3500 : next === 'wiggle' ? 1800 : next === 'blink' ? 1200 : 2000
   actionResetTimer = setTimeout(() => {
-    if (currentAction.value === 'cheer') {
+    if (currentAction.value === next) {
       currentAction.value = 'idle'
     }
-  }, 2200)
+  }, duration)
+}
+
+// Click handler
+function onPetClick() {
+  if (hasMoved) {
+    console.log('[Mochi] Click ignored: pet was dragging')
+    return
+  }
+  console.log('[Mochi] Click registered -> triggering reaction')
+  triggerInteractiveReaction()
+}
+
+// DEV: force any action directly from the panel
+function forceAction(action) {
+  clearActionResetTimer()
+  currentAction.value = action
+  console.log(`[Mochi Dev] Forced action: ${action}`)
+  const duration = action === 'sleep' ? 8000 : action === 'coffee' ? 5000 : 3000
+  actionResetTimer = setTimeout(() => {
+    if (currentAction.value === action) {
+      currentAction.value = 'idle'
+    }
+  }, duration)
 }
 
 function onPointerDown(e) {
@@ -224,7 +310,6 @@ function onPointerDown(e) {
   const rect = petContainer.value.getBoundingClientRect()
   initialPos = { x: rect.left, y: rect.top }
 
-  petContainer.value.setPointerCapture(e.pointerId)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
 }
@@ -234,12 +319,19 @@ function onPointerMove(e) {
   const dx = e.clientX - dragStart.x
   const dy = e.clientY - dragStart.y
 
-  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+  if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) {
     hasMoved = true
+    try {
+      if (petContainer.value && !petContainer.value.hasPointerCapture(e.pointerId)) {
+        petContainer.value.setPointerCapture(e.pointerId)
+      }
+    } catch (_) {}
   }
 
-  const maxX = window.innerWidth - 85
-  const maxY = window.innerHeight - 85
+  if (!hasMoved) return
+
+  const maxX = window.innerWidth - 110
+  const maxY = window.innerHeight - 110
   const newX = Math.max(10, Math.min(maxX, initialPos.x + dx))
   const newY = Math.max(10, Math.min(maxY, initialPos.y + dy))
 
@@ -249,14 +341,19 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (!isDragging.value) return
   isDragging.value = false
+  try {
+    if (petContainer.value && petContainer.value.hasPointerCapture(e.pointerId)) {
+      petContainer.value.releasePointerCapture(e.pointerId)
+    }
+  } catch (_) {}
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
 }
 
 function handleWindowResize() {
   if (petState.value.position.x !== null && petState.value.position.y !== null) {
-    const maxX = window.innerWidth - 85
-    const maxY = window.innerHeight - 85
+    const maxX = window.innerWidth - 110
+    const maxY = window.innerHeight - 110
     const clampedX = Math.max(10, Math.min(maxX, petState.value.position.x))
     const clampedY = Math.max(10, Math.min(maxY, petState.value.position.y))
     if (clampedX !== petState.value.position.x || clampedY !== petState.value.position.y) {
@@ -290,12 +387,15 @@ onUnmounted(() => {
   z-index: 9999;
   user-select: none;
   touch-action: none;
+  /* needed for dev-toggle-btn and dev-panel absolute positioning */
+  isolation: isolate;
 }
 
 .pet-avatar-wrapper {
-  width: 72px;
-  height: 72px;
+  width: 100px;
+  height: 100px;
   cursor: grab;
+  position: relative;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
 }
@@ -333,7 +433,7 @@ onUnmounted(() => {
 }
 
 .action-cheer {
-  animation: petBounce 0.4s ease-in-out 4;
+  animation: petBounce 0.35s ease-in-out 4;
 }
 
 .action-cheer .pet-tail {
@@ -346,12 +446,13 @@ onUnmounted(() => {
 
 @keyframes petBreathe {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.5px); }
+  50% { transform: translateY(-2px); }
 }
 
 @keyframes petBounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-14px) scale(1.05); }
+  70% { transform: translateY(-6px) scale(0.98); }
 }
 
 @keyframes earTwitchLeft {
@@ -375,46 +476,201 @@ onUnmounted(() => {
   100% { opacity: 0; transform: translateY(-4px); }
 }
 
-/* Speech Bubble */
-.pet-speech-bubble {
+/* ── Click Particles ───────────────────────────────────── */
+.particle-container {
   position: absolute;
-  bottom: 80px;
-  right: -10px;
-  min-width: 150px;
-  max-width: 220px;
-  background: var(--bg-surface, #1e293b);
-  color: var(--text-primary, #f8fafc);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.35;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.particle {
+  position: absolute;
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+}
+
+.particle-enter-active {
+  animation: particleFloat 0.9s ease-out forwards;
+}
+
+.particle-leave-active {
+  display: none;
+}
+
+@keyframes particleFloat {
+  0%   { transform: translateY(0)   scale(1);    opacity: 1; }
+  60%  { transform: translateY(-42px) scale(1.2); opacity: 0.9; }
+  100% { transform: translateY(-60px) scale(0.8); opacity: 0; }
+}
+
+/* ── Dismiss / Close Button ────────────────────────────── */
+/* Small ✕ button on top-right corner of Mochi */
+.pet-dismiss-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-}
-
-.bubble-arrow {
-  position: absolute;
-  bottom: -6px;
-  right: 28px;
-  width: 10px;
-  height: 10px;
-  background: var(--bg-surface, #1e293b);
-  border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  transform: rotate(45deg);
-}
-
-.bubble-fade-enter-active,
-.bubble-fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-.bubble-fade-enter-from,
-.bubble-fade-leave-to {
+  padding: 0;
+  pointer-events: auto;
+  z-index: 2;
   opacity: 0;
-  transform: translateY(6px) scale(0.95);
+  transition: opacity 0.2s, background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.floating-pet-root:hover .pet-dismiss-btn {
+  opacity: 1;
+}
+
+.pet-dismiss-btn:hover {
+  background: #ef4444;
+  border-color: #f87171;
+  color: #ffffff;
+}
+
+/* ── Dev Panel ─────────────────────────────────────────── */
+
+/* Toggle button: tiny ⚙ pill, top-left corner of the pet */
+.dev-toggle-btn {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+  z-index: 2;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dev-toggle-btn:hover {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #6366f1;
+}
+
+.dev-toggle-btn.active {
+  background: #6366f1;
+  border-color: #818cf8;
+  color: #fff;
+}
+
+/* Panel slide-fade */
+.dev-panel-fade-enter-active,
+.dev-panel-fade-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dev-panel-fade-enter-from,
+.dev-panel-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+}
+
+.pet-dev-panel {
+  position: absolute;
+  bottom: 108px;
+  right: 0;
+  width: 160px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-family: ui-monospace, monospace;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.dev-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.dev-close-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.dev-close-btn:hover {
+  color: #f1f5f9;
+}
+
+.dev-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: #f43f5e;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.dev-action-label {
+  font-size: 11px;
+  color: #94a3b8;
+  flex: 1;
+  text-align: right;
+}
+
+.dev-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dev-action-btn {
+  font-size: 10px;
+  font-family: inherit;
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dev-action-btn:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.dev-action-btn.active {
+  background: #6366f1;
+  border-color: #818cf8;
+  color: #fff;
 }
 </style>

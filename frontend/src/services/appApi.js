@@ -453,6 +453,10 @@ export function claimLootBox(boxID) {
   return appBridge().ClaimLootBox(boxID)
 }
 
+export function claimAchievement(achievementID) {
+  return appBridge().ClaimAchievement(achievementID)
+}
+
 export function buyStreakFreeze() {
   return appBridge().BuyStreakFreeze()
 }

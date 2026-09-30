@@ -45,7 +45,10 @@
         >
           <BaseIcon name="trophy" size="18" custom-class="tab-icon" />
           <span>Achievements</span>
-          <span v-if="completedAchievementsCount > 0" class="tab-badge-emerald">
+          <span v-if="claimableAchievementsCount > 0" class="tab-badge">
+            {{ claimableAchievementsCount }} ready
+          </span>
+          <span v-else-if="completedAchievementsCount > 0" class="tab-badge-emerald">
             {{ completedAchievementsCount }}/{{ achievements.length }}
           </span>
         </button>
@@ -84,6 +87,8 @@
       <AchievementsView
         v-else-if="currentView === 'achievements'"
         :achievements="achievements"
+        :claiming-id="claimingAchievementId"
+        @claim="handleClaimAchievement"
       />
 
       <div v-else-if="currentView === 'shop'">
@@ -138,10 +143,12 @@ import {
   getUserSettings,
   updateUserSettings,
   getGamificationStore,
+  claimAchievement,
 } from '../services/appApi'
 
 const loading = ref(true)
 const buying = ref(false)
+const claimingAchievementId = ref('')
 const showFreezeModal = ref(false)
 const freezeModalMode = ref('purchase')
 const activeTheme = ref('dark-gruvbox')
@@ -168,8 +175,12 @@ const activeChest = ref(null)
 const achievements = ref([])
 const activeMilestoneCelebration = ref(null)
 
+const claimableAchievementsCount = computed(() => {
+  return achievements.value.filter((a) => a.claimable).length
+})
+
 const completedAchievementsCount = computed(() => {
-  return achievements.value.filter((a) => a.completed).length
+  return achievements.value.filter((a) => (a.claimed_tier || 0) > 0).length
 })
 
 function openFreezeInfoModal() {
@@ -186,8 +197,33 @@ async function onChestClaimed(claimedBox) {
   await loadData()
 }
 
-async function loadData() {
-  loading.value = true
+async function handleClaimAchievement(ach) {
+  if (!ach || !ach.id || claimingAchievementId.value) return
+  claimingAchievementId.value = ach.id
+  try {
+    const res = await claimAchievement(ach.id)
+    if (res && res.error) {
+      console.error('Failed to claim achievement:', res.error)
+      return
+    }
+    if (res && res.store) {
+      if (res.store.profile) profile.value = res.store.profile
+      if (res.store.achievements) achievements.value = res.store.achievements
+    } else {
+      await loadData()
+    }
+    window.dispatchEvent(new Event('gamification-updated'))
+  } catch (err) {
+    console.error('Error claiming achievement:', err)
+  } finally {
+    claimingAchievementId.value = ''
+  }
+}
+
+async function loadData(silent = false) {
+  if (!silent && !achievements.value.length) {
+    loading.value = true
+  }
   loadError.value = ''
   try {
     const res = await getGamificationState()
@@ -221,7 +257,9 @@ async function loadData() {
     }
   } catch (err) {
     console.error('Failed to load gamification state:', err)
-    loadError.value = err?.message || 'Failed to load rewards. Please try again.'
+    if (!silent) {
+      loadError.value = err?.message || 'Failed to load rewards. Please try again.'
+    }
   } finally {
     loading.value = false
   }
@@ -275,24 +313,26 @@ async function onThemeChanged(newTheme) {
     const res = await updateUserSettings(updated)
     if (res && res.error) {
       rollback(res.error)
-      return
+    } else {
+      userSettings.value = updated
+      themeError.value = ''
+      window.dispatchEvent(new CustomEvent('settings-updated'))
     }
-    userSettings.value = updated
-    themeError.value = ''
-    window.dispatchEvent(new CustomEvent('settings-updated'))
   } catch (err) {
     console.error('Failed to update theme setting:', err)
     rollback(err?.message || 'Failed to save theme setting.')
   }
 }
 
+const handleSilentUpdate = () => loadData(true)
+
 onMounted(() => {
   loadData()
-  window.addEventListener('gamification-updated', loadData)
+  window.addEventListener('gamification-updated', handleSilentUpdate)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('gamification-updated', loadData)
+  window.removeEventListener('gamification-updated', handleSilentUpdate)
 })
 </script>
 

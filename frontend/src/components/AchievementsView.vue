@@ -18,6 +18,16 @@
           All ({{ totalCount }})
         </button>
         <button
+          v-if="claimableCount > 0"
+          type="button"
+          class="filter-pill-btn pill-claimable"
+          :class="{ active: currentFilter === 'CLAIMABLE' }"
+          @click="currentFilter = 'CLAIMABLE'"
+        >
+          <span class="pulse-dot"></span>
+          Ready ({{ claimableCount }})
+        </button>
+        <button
           type="button"
           class="filter-pill-btn"
           :class="{ active: currentFilter === 'IN_PROGRESS' }"
@@ -49,16 +59,20 @@
         :key="ach.id"
         class="ach-card"
         :class="{
-          completed: ach.completed,
+          claimable: ach.claimable,
+          completed: ach.completed && !ach.claimable,
           'tier-gold': (ach.reward_coins || 0) >= 100 || ach.reward_item,
           'tier-silver': (ach.reward_coins || 0) >= 50 && (ach.reward_coins || 0) < 100,
         }"
       >
         <div class="ach-icon-col">
-          <div class="ach-pedestal">
+          <div class="ach-pedestal" :class="{ 'pedestal-pulse': ach.claimable }">
             <BaseIcon :name="getAchBaseIcon(ach)" size="26" custom-class="ach-svg-icon" />
           </div>
-          <span v-if="ach.completed" class="ach-status-badge">Unlocked</span>
+          <span v-if="ach.claimable" class="ach-status-badge badge-claimable">Claimable</span>
+          <span v-else-if="ach.claimed_tier > 0" class="ach-status-badge badge-unlocked">
+            Tier {{ toRomanNumeral(ach.claimed_tier) }}
+          </span>
         </div>
 
         <div class="ach-content-col">
@@ -77,11 +91,12 @@
 
           <p class="ach-description">{{ ach.description }}</p>
 
-          <!-- Interactive Progress Meter -->
+          <!-- Interactive Progress Meter & Claim Section -->
           <div class="ach-progress-section">
             <div class="ach-progress-bar-track">
               <div
                 class="ach-progress-bar-fill"
+                :class="{ 'fill-claimable': ach.claimable }"
                 :style="{ width: getProgressPercent(ach) + '%' }"
               ></div>
             </div>
@@ -89,6 +104,20 @@
               <span>{{ ach.current_value }} / {{ ach.target_value }}</span>
               <span>{{ getProgressPercent(ach) }}%</span>
             </div>
+          </div>
+
+          <!-- Claim Action Button -->
+          <div v-if="ach.claimable" class="ach-action-row">
+            <button
+              type="button"
+              class="claim-ach-btn"
+              :disabled="claimingId === ach.id"
+              @click.stop="$emit('claim', ach)"
+            >
+              <BaseIcon name="gift" size="15" />
+              <span v-if="claimingId === ach.id">Claiming…</span>
+              <span v-else>Claim +{{ ach.reward_coins }} Coins</span>
+            </button>
           </div>
         </div>
       </div>
@@ -105,29 +134,54 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  claimingId: {
+    type: String,
+    default: '',
+  },
 })
+
+defineEmits(['claim'])
 
 const currentFilter = ref('ALL')
 
 const totalCount = computed(() => props.achievements.length)
-const completedCount = computed(() => props.achievements.filter((a) => a.completed).length)
-const inProgressCount = computed(() => props.achievements.filter((a) => !a.completed).length)
+const claimableCount = computed(() => props.achievements.filter((a) => a.claimable).length)
+const completedCount = computed(() => props.achievements.filter((a) => (a.claimed_tier || 0) > 0).length)
+const inProgressCount = computed(() => props.achievements.filter((a) => !a.claimable).length)
 
 const filteredAchievements = computed(() => {
+  if (currentFilter.value === 'CLAIMABLE') {
+    return props.achievements.filter((a) => a.claimable)
+  }
   if (currentFilter.value === 'COMPLETED') {
-    return props.achievements.filter((a) => a.completed)
+    return props.achievements.filter((a) => (a.claimed_tier || 0) > 0 || a.completed)
   }
   if (currentFilter.value === 'IN_PROGRESS') {
-    return props.achievements.filter((a) => !a.completed)
+    return props.achievements.filter((a) => !a.claimable)
   }
   return props.achievements
 })
 
 function getProgressPercent(ach) {
-  if (ach.completed) return 100
+  if (ach.claimable) return 100
   const cur = ach.current_value || 0
   const tgt = ach.target_value || 1
   return Math.min(100, Math.max(0, Math.round((cur / tgt) * 100)))
+}
+
+function toRomanNumeral(num) {
+  if (!num || num <= 0) return 'I'
+  const vals = [10, 9, 5, 4, 1]
+  const syms = ['X', 'IX', 'V', 'IV', 'I']
+  let res = ''
+  let n = num
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) {
+      n -= vals[i]
+      res += syms[i]
+    }
+  }
+  return res || 'I'
 }
 
 function getAchBaseIcon(ach) {
@@ -194,6 +248,9 @@ function getAchBaseIcon(ach) {
   padding: 6px 12px;
   border-radius: 8px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition: all 0.2s ease;
 }
 
@@ -206,6 +263,29 @@ function getAchBaseIcon(ach) {
   background: var(--surface-container-high, #2a2d36);
   color: var(--primary, #38bdf8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.filter-pill-btn.pill-claimable {
+  color: #f59e0b;
+}
+
+.filter-pill-btn.pill-claimable.active {
+  background: color-mix(in srgb, #f59e0b 20%, var(--surface-container-high));
+  color: #f59e0b;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: pulse-animation 1.5s infinite;
+}
+
+@keyframes pulse-animation {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
 }
 
 .achievements-grid {
@@ -224,12 +304,18 @@ function getAchBaseIcon(ach) {
   gap: 1.25rem;
   align-items: flex-start;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .ach-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.ach-card.claimable {
+  border-color: #f59e0b;
+  background: color-mix(in srgb, var(--surface-container) 92%, #f59e0b 8%);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.15);
 }
 
 .ach-card.completed {
@@ -256,6 +342,13 @@ function getAchBaseIcon(ach) {
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   color: var(--primary);
+  transition: all 0.2s ease;
+}
+
+.ach-card.claimable .ach-pedestal {
+  background: color-mix(in srgb, #f59e0b 16%, var(--surface-container-low));
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
 }
 
 .ach-card.completed .ach-pedestal {
@@ -273,6 +366,14 @@ function getAchBaseIcon(ach) {
   letter-spacing: 0.04em;
   padding: 2px 6px;
   border-radius: 6px;
+}
+
+.badge-claimable {
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #f59e0b;
+}
+
+.badge-unlocked {
   background: color-mix(in srgb, #10b981 15%, transparent);
   color: #10b981;
 }
@@ -351,6 +452,10 @@ function getAchBaseIcon(ach) {
   transition: width 0.4s ease;
 }
 
+.ach-progress-bar-fill.fill-claimable {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
 .ach-card.completed .ach-progress-bar-fill {
   background: #10b981;
 }
@@ -361,6 +466,38 @@ function getAchBaseIcon(ach) {
   font-size: 0.74rem;
   color: var(--muted-text);
   font-weight: 600;
+}
+
+.ach-action-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.claim-ach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.claim-ach-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.45);
+}
+
+.claim-ach-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .empty-ach-panel {
@@ -378,3 +515,4 @@ function getAchBaseIcon(ach) {
   margin-bottom: 0.5rem;
 }
 </style>
+

@@ -785,4 +785,25 @@ func (a *App) GetGamificationStore() map[string]interface{} {
 	}
 }
 
+// ClaimAchievement claims the pending reward for an achievement tier.
+func (a *App) ClaimAchievement(achievementID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	store, coinsEarned, unlockedItem, err := repo.ClaimAchievement(achievementID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	return map[string]interface{}{
+		"success":       true,
+		"store":         store,
+		"coins_earned":  coinsEarned,
+		"unlocked_item": unlockedItem,
+	}
+}
+
+
 
