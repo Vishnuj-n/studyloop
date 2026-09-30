@@ -1,18 +1,34 @@
 ## ✨ Features
-- **Flashcards** – A refreshed card library overview makes it easier to browse and manage your decks. Deleting FSRS‑based cards now includes an extra safety guard to prevent accidental loss.  
-- **Rewards Hub** – Completely redesigned with a clear roadmap, new achievement badges, and celebratory milestones to keep you motivated.  
-- **PDF Reader** – Clickable internal links are now supported, and a history back button lets you navigate PDF documents just like a web browser.
+
+- **Floating Study Pet Companion**  
+  - A draggable, animated pet that follows you around the app.  
+  - Choose from multiple skins and customize its behavior from the new **Rewards Overview** tab.  
+  - Interactive speech bubbles let the pet give tips, encouragement, or respond to your actions.  
+  - Includes a hidden dev‑mode for extra fun controls.
+
+- **Achievement Tiering & Claim System**  
+  - Earn multi‑tier achievements and claim rewards (coins, items) directly from the **Achievements** view.  
+  - New “Claim” button and visual indicators for claimable tiers.  
+  - Celebratory confetti effects and enhanced milestone modals make each win feel rewarding.  
+  - Updated **Rank Roadmap** UI shows tier lock/unlock status more clearly.
+
+- **Enhanced Settings Experience**  
+  - Instant keyword search and filter rail for quick navigation to any setting category.  
+  - Dedicated **RAG Settings** panel with real‑time status badges (Active, Setting Up, Dormant) and a “Re‑index / Setup” button for manual vector‑embedding management.  
+  - New **Privacy & Telemetry** section gives transparent control over data collection.  
 
 ## 🚀 Improvements
-- **User Interface polish**
-  - Added a subtle outline border to the flashcard session overlay for better visual separation.
-  - Cleaned up redundant `.currency-icon` CSS and resolved design lint violations, bringing the UI fully in line with the latest `DESIGN.md` guidelines.  
-- **Tokenizer safety** – Diagnostic prompt budgeting and built‑in safeguards help keep LLM interactions within token limits, reducing unexpected truncation.  
+
+- **Dashboard Clarity** – Updated subtitle on the Concept Rescue status banner for more precise information at a glance.  
+- **PDF Navigation** – Internal links, bookmarks, and cross‑references now work reliably within PDFs.  
+- **Settings Loading State** – Theme attributes no longer flicker while settings are loading, providing a smoother visual experience.  
+- **Floating Pet UI Polish** – Refined design and resolved visual inconsistencies in the pet component and related modals.  
 
 ## 🐛 Bug Fixes & Issue Resolutions
-- **Authentication** – The app now waits for the backend bridge to be ready before syncing Clerk sessions, preventing login hiccups.  
-- **Settings** – Auto‑save is now guarded against premature triggers during the initial load, ensuring your preferences are stored correctly.  
-- **Reading flow** – Force‑seeding of reading tasks works correctly when you continue after a quiz, eliminating stalls.  
 
----  
+- Prevented unintended theme changes during the Settings loading phase.  
+- Fixed PDF internal‑link navigation to correctly jump to bookmarks and cross‑references.  
+
+---
+
 *Thanks for using Studyloop!*
