@@ -513,10 +513,9 @@ async function runManualSync() {
 watch(
   () => settings.value.theme,
   (newTheme) => {
-    if (newTheme) document.documentElement.setAttribute('data-theme', newTheme)
-    else document.documentElement.removeAttribute('data-theme')
-  },
-  { immediate: true }
+    if (!newTheme || loading.value) return
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }
 )
 
 onMounted(async () => {
