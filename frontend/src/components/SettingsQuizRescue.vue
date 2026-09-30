@@ -92,14 +92,6 @@ h2 {
   box-shadow: 0 4px 20px color-mix(in srgb, var(--on-surface) 3%, transparent);
 }
 
-.rag-sub-settings {
-  margin-left: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
 .strategy-options {
   display: flex;
   gap: 16px;
