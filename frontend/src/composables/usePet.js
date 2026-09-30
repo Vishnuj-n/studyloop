@@ -28,7 +28,9 @@ watch(
   (newVal) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
-    } catch {}
+    } catch (err) {
+      console.debug('[usePet] Failed to persist pet state:', err)
+    }
   },
   { deep: true }
 )

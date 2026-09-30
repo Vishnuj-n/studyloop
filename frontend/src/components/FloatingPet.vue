@@ -11,9 +11,9 @@
       v-if="isDev"
       class="dev-toggle-btn"
       :class="{ active: showDevPanel }"
+      :title="showDevPanel ? 'Hide dev panel' : 'Show dev panel'"
       @click.stop="showDevPanel = !showDevPanel"
       @pointerdown.stop
-      :title="showDevPanel ? 'Hide dev panel' : 'Show dev panel'"
     >
       <BaseIcon name="settings" size="11" />
     </button>
@@ -21,9 +21,9 @@
     <!-- Close / Dismiss button (hides Mochi) -->
     <button
       class="pet-dismiss-btn"
+      title="Close Mochi (can re-enable in Settings)"
       @click.stop="togglePet(false)"
       @pointerdown.stop
-      title="Close Mochi (can re-enable in Settings)"
     >
       <BaseIcon name="x" size="10" />
     </button>
@@ -63,8 +63,8 @@
         `action-${currentAction}`,
         { 'is-dragging': isDragging }
       ]"
-      @click="onPetClick"
       title="Click to interact · Drag to move"
+      @click="onPetClick"
     >
       <!-- Floating particles on click -->
       <TransitionGroup tag="div" name="particle" class="particle-container">
@@ -399,7 +399,6 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)
   clearActionResetTimer()
   if (actionTimer) clearInterval(actionTimer)
-  if (bubbleTimer) clearTimeout(bubbleTimer)
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
 })
