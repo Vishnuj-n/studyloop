@@ -176,6 +176,10 @@ export function toggleNotebookCardsSuspension(notebookID, suspended) {
   return appBridge().ToggleNotebookCardsSuspension(notebookID, suspended)
 }
 
+export function updateFlashcardContent(cardID, prompt, answer) {
+  return appBridge().UpdateFlashcardContent(cardID, prompt, answer)
+}
+
 export function deleteFlashcard(cardID) {
   return appBridge().DeleteFlashcard(cardID)
 }

@@ -476,5 +476,14 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	if c2Deleted != nil {
 		t.Errorf("expected card-d2 to be deleted from database")
 	}
+
+	// 5. Test UpdateFlashcardContent
+	if err := testRepo.UpdateFlashcardContent("card-d1", "Updated Question?", "Updated Answer."); err != nil {
+		t.Fatalf("UpdateFlashcardContent failed: %v", err)
+	}
+	c1Updated, _, _ := testRepo.GetFlashcardByID("card-d1")
+	if c1Updated == nil || c1Updated.Prompt != "Updated Question?" || c1Updated.Answer != "Updated Answer." {
+		t.Fatalf("expected updated prompt and answer, got prompt=%q, answer=%q", c1Updated.Prompt, c1Updated.Answer)
+	}
 }
 

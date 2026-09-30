@@ -455,6 +455,18 @@ func (a *App) ToggleNotebookCardsSuspension(notebookID string, suspended bool) m
 	return map[string]interface{}{"ok": true, "notebook_id": notebookID, "suspended": suspended}
 }
 
+// UpdateFlashcardContent updates the question and answer of a flashcard.
+func (a *App) UpdateFlashcardContent(cardID, prompt, answer string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+	if err := repo.UpdateFlashcardContent(cardID, prompt, answer); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "card_id": cardID, "prompt": prompt, "answer": answer}
+}
+
 // DeleteFlashcard permanently deletes a flashcard and cleans queue session links.
 func (a *App) DeleteFlashcard(cardID string) map[string]interface{} {
 	repo, errMap := requireRepo(a)
