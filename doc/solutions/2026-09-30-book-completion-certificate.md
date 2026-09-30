@@ -60,7 +60,8 @@ type NotebookCertificateStats struct {
    - Clicking the badge emits `@view-certificate` to open `NotebookCertificateModal.vue`.
 
 2. **Celebration Modal (`frontend/src/components/NotebookCertificateModal.vue`)**:
-   - Displays a certificate preview card with gold borders, Studyloop watermark, user title, book title, and verified metric badges.
+   - Displays a certificate preview card with gold borders, Studyloop watermark, recipient name/title, book title, and verified metric badges.
+   - **Custom Recipient Name**: Allows students to type their full real name or handle (persisted locally with reset-to-title fallback), with dynamic Canvas font scaling.
    - Triggers gold confetti and chest opening audio fanfare on fresh unlock.
    - Offers two zero-friction export actions:
      - **Download PNG Certificate**: Generates a high-res $1920 \times 1200$ PNG file directly to local downloads.

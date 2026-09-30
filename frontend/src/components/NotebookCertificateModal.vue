@@ -22,6 +22,36 @@
           </p>
         </div>
 
+        <!-- Recipient Name Input Option -->
+        <div class="cert-name-customization">
+          <div class="cert-name-input-group">
+            <label for="cert-recipient-name" class="cert-name-label">
+              <BaseIcon name="user" size="14" />
+              <span>Recipient Name:</span>
+            </label>
+            <div class="cert-name-input-wrapper">
+              <input
+                id="cert-recipient-name"
+                v-model="recipientName"
+                type="text"
+                maxlength="50"
+                placeholder="Enter recipient name (e.g. Alex Morgan)"
+                class="cert-name-input"
+                @input="handleNameInput"
+              />
+              <button
+                v-if="recipientName.trim() && recipientName !== defaultRecipientName"
+                type="button"
+                class="cert-name-reset-btn"
+                title="Reset to default title"
+                @click="resetRecipientName"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Certificate Canvas Preview Frame -->
         <div class="cert-preview-frame">
           <div class="cert-document" ref="certDocumentRef">
@@ -43,7 +73,7 @@
               <!-- Main Certificate Text -->
               <div class="doc-body">
                 <p class="doc-present">This is to certify that</p>
-                <h3 class="doc-user-title">{{ stats?.user_title || 'The Scholar' }}</h3>
+                <h3 class="doc-user-title">{{ displayRecipientName }}</h3>
                 <p class="doc-subtext">has successfully studied and demonstrated mastery in</p>
                 <h1 class="doc-notebook-title">{{ stats?.notebook_title || 'Course Textbook' }}</h1>
               </div>
@@ -140,6 +170,27 @@ const copySuccess = ref(false)
 const certDocumentRef = ref(null)
 const exportCanvasRef = ref(null)
 let confettiCleanup = null
+
+const defaultRecipientName = computed(() => props.stats?.user_title || 'The Scholar')
+const storedName = typeof window !== 'undefined' ? localStorage.getItem('studyloop_cert_recipient_name') : null
+const recipientName = ref(storedName !== null ? storedName : defaultRecipientName.value)
+
+function handleNameInput() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('studyloop_cert_recipient_name', recipientName.value)
+  }
+}
+
+function resetRecipientName() {
+  recipientName.value = defaultRecipientName.value
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('studyloop_cert_recipient_name')
+  }
+}
+
+const displayRecipientName = computed(() => {
+  return recipientName.value.trim() || defaultRecipientName.value
+})
 
 const formattedDate = computed(() => {
   if (!props.stats?.completed_at) {
@@ -251,10 +302,17 @@ function renderCertificateToCanvas(canvas) {
   ctx.textAlign = 'center'
   ctx.fillText('THIS IS PROUDLY PRESENTED TO', width / 2, 330)
 
-  // Student Title / Name
-  ctx.font = '800 52px "Manrope", sans-serif'
+  // Student Title / Name with dynamic font size scaling
+  const nameToRender = displayRecipientName.value
+  let fontSize = 52
+  if (nameToRender.length > 32) {
+    fontSize = 36
+  } else if (nameToRender.length > 22) {
+    fontSize = 44
+  }
+  ctx.font = `800 ${fontSize}px "Manrope", sans-serif`
   ctx.fillStyle = '#d4af37'
-  ctx.fillText(props.stats?.user_title || 'The Scholar', width / 2, 400)
+  ctx.fillText(nameToRender, width / 2, 400)
 
   // Text
   ctx.font = '500 22px sans-serif'
@@ -506,6 +564,77 @@ onUnmounted(() => {
   font-size: 0.85rem;
   color: var(--muted-text, #9aa4b2);
   margin: 0;
+}
+
+.cert-name-customization {
+  margin-bottom: 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.cert-name-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cert-name-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #d4af37;
+  letter-spacing: 0.02em;
+}
+
+.cert-name-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.cert-name-input {
+  width: 100%;
+  background: #12141a;
+  border: 1px solid var(--outline-variant, #2e3644);
+  border-radius: 10px;
+  padding: 0.6rem 4rem 0.6rem 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cert-name-input:focus {
+  outline: none;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+
+.cert-name-input::placeholder {
+  color: var(--muted-text, #6b7280);
+  font-weight: 400;
+}
+
+.cert-name-reset-btn {
+  position: absolute;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--muted-text, #9aa4b2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cert-name-reset-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #d4af37;
 }
 
 .cert-preview-frame {

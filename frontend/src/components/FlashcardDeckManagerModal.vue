@@ -1202,7 +1202,7 @@ onUnmounted(() => {
 
 .action-toggle-btn.pause-mode:hover {
   background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
+  color: #dc2626;
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -1361,9 +1361,9 @@ onUnmounted(() => {
 
 .pill-due {
   background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  color: #dc2626;
 }
-.pill-due .dot { background: #f87171; }
+.pill-due .dot { background: #dc2626; }
 
 .pill-neutral,
 .pill-stability {
@@ -1488,7 +1488,7 @@ onUnmounted(() => {
   font-weight: 600;
   background: transparent;
   border: 1px solid var(--outline-variant);
-  color: #f87171;
+  color: #dc2626;
   cursor: pointer;
   transition: all 0.15s ease;
 }

@@ -339,8 +339,8 @@ const topItems = [
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(251, 191, 36, 0.18);
-  color: #fbbf24;
+  background: color-mix(in srgb, #d97706 15%, var(--surface-container-low));
+  color: #b45309;
   border: 1px solid var(--outline-variant);
   animation: chest-pulse 2.4s infinite ease-in-out;
   display: inline-flex;

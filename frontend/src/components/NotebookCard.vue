@@ -1,78 +1,95 @@
 <template>
   <div class="notebook-card" :class="variantClass">
-    <div
-      class="completion-ring-container"
-      :title="`${completionPercent}% syllabus completed`"
-    >
-      <svg class="progress-ring" width="40" height="40" viewBox="0 0 40 40">
-        <circle
-          class="progress-ring-bg"
-          cx="20"
-          cy="20"
-          r="15"
-          fill="transparent"
-          stroke-width="3"
-        />
-        <circle
-          class="progress-ring-fill"
-          cx="20"
-          cy="20"
-          r="15"
-          fill="transparent"
-          stroke-width="3"
-          transform="rotate(-90 20 20)"
-          :stroke-dasharray="circleCircumference"
-          :stroke-dashoffset="circleDashOffset"
-        />
-        <text
-          x="20"
-          y="20"
-          class="progress-ring-text"
-          text-anchor="middle"
-          dominant-baseline="central"
+    <!-- Top Bar: Type Indicator & Actions -->
+    <div class="card-top-bar">
+      <div class="file-type-chip" :class="{ 'active-chip': variant === 'active' }">
+        <BaseIcon :name="fileIconName" size="14" />
+        <span>{{ notebook.file_type.toUpperCase() }}</span>
+      </div>
+
+      <div class="card-top-actions">
+        <!-- Certificate Badge / Button when completed -->
+        <button
+          v-if="completionPercent >= 100"
+          class="btn-certificate-badge"
+          title="View & Download Completion Certificate"
+          @click="$emit('view-certificate', notebook.id)"
         >
-          {{ completionPercent }}
-        </text>
-      </svg>
+          <BaseIcon name="award" size="13" />
+          <span>Certificate</span>
+        </button>
+
+        <!-- Progress Ring -->
+        <div
+          class="completion-ring-container"
+          :title="`${completionPercent}% syllabus completed`"
+        >
+          <svg class="progress-ring" width="32" height="32" viewBox="0 0 32 32">
+            <circle
+              class="progress-ring-bg"
+              cx="16"
+              cy="16"
+              r="12"
+              fill="transparent"
+              stroke-width="2.5"
+            />
+            <circle
+              class="progress-ring-fill"
+              cx="16"
+              cy="16"
+              r="12"
+              fill="transparent"
+              stroke-width="2.5"
+              transform="rotate(-90 16 16)"
+              :stroke-dasharray="circleCircumference"
+              :stroke-dashoffset="circleDashOffset"
+            />
+            <text
+              x="16"
+              y="16"
+              class="progress-ring-text"
+              text-anchor="middle"
+              dominant-baseline="central"
+            >
+              {{ completionPercent }}
+            </text>
+          </svg>
+        </div>
+
+        <!-- Edit Pen -->
+        <button
+          class="btn-edit-pen"
+          title="Edit notebook and chapters"
+          @click="$emit('edit-syllabus', notebook.id, notebook.title)"
+        >
+          <BaseIcon name="edit" size="14" />
+        </button>
+      </div>
     </div>
 
-    <!-- Certificate Badge / Button when completed or in dev mode -->
-    <button
-      v-if="completionPercent >= 100"
-      class="btn-certificate-badge"
-      title="View & Download Completion Certificate"
-      @click="$emit('view-certificate', notebook.id)"
-    >
-      <BaseIcon name="award" size="14" />
-      <span>Certificate</span>
-    </button>
-
-    <button
-      class="btn-edit-pen"
-      title="Edit notebook and chapters"
-      @click="$emit('edit-syllabus', notebook.id, notebook.title)"
-    >
-      <BaseIcon name="edit" size="14" />
-    </button>
-
-    <div class="notebook-header-card">
-      <div class="file-icon" :class="{ 'active-icon': variant === 'active' }">
-        <BaseIcon :name="fileIconName" size="20" />
-      </div>
-      <div class="notebook-info">
-        <h3>{{ notebook.title }}</h3>
-        <p class="meta">{{ notebook.file_type.toUpperCase() }}</p>
-        <p v-if="notebook.page_count > 0" class="meta">{{ notebook.page_count }} pages</p>
-        <p v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta">{{ notebook.flashcard_count || 0 }} cards</p>
-        <p v-else class="meta">{{ notebook.chunk_count }} chunks</p>
-        <p v-if="isDeepExtracted" class="meta deep-badge">
-          <BaseIcon name="zap" size="12" />
-          <span>Deep Extracted</span>
-        </p>
-        <p v-if="variant === 'dormant'" class="meta">Status: {{ formattedStatus }}</p>
+    <!-- Title and Metadata Section -->
+    <div class="notebook-title-section">
+      <h3 :title="notebook.title">{{ notebook.title }}</h3>
+      <div class="notebook-meta-row">
+        <span v-if="notebook.page_count > 0" class="meta-item">{{ notebook.page_count }} pages</span>
+        <span v-if="notebook.page_count > 0" class="meta-bullet">•</span>
+        <span v-if="notebook.file_type === 'anki' || notebook.flashcard_count > 0" class="meta-item">{{ notebook.flashcard_count || 0 }} cards</span>
+        <span v-else class="meta-item">{{ notebook.chunk_count }} chunks</span>
+        <template v-if="isDeepExtracted">
+          <span class="meta-bullet">•</span>
+          <span class="meta-item deep-badge">
+            <BaseIcon name="zap" size="12" />
+            <span>Deep Extracted</span>
+          </span>
+        </template>
+        <template v-if="variant === 'dormant' && formattedStatus !== 'uploaded'">
+          <span class="meta-bullet">•</span>
+          <span class="meta-item">Status: {{ formattedStatus }}</span>
+        </template>
       </div>
     </div>
 
+    <!-- Topic / Chapter / Ingestion row -->
     <div v-if="needsIngestion" class="notebook-topic">
       <span class="badge new-assignment-badge" style="display: inline-flex; align-items: center; gap: 4px;">
         <BaseIcon name="zap" size="12" />
@@ -82,7 +99,6 @@
     <div
       v-else-if="notebook.topic_id"
       class="notebook-topic"
-      style="display: flex; align-items: center; gap: 8px"
     >
       <span class="badge topic-badge">{{ topicTitle }}</span>
       <RouterLink
@@ -95,24 +111,26 @@
         <span>Ask Tutor</span>
       </RouterLink>
     </div>
-
     <div v-else-if="variant === 'dormant'" class="notebook-topic">
       <span class="badge muted">No topic linked</span>
     </div>
 
-    <div class="notebook-priority">
-      <label class="priority-label">Priority:</label>
-      <select
-        :value="notebook.priority || 5"
-        class="priority-select"
-        @change="(e) => $emit('update-priority', notebook.id, Number.parseInt(e.target.value))"
-      >
-        <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
-      </select>
+    <!-- Priority and Upload Date Row -->
+    <div class="notebook-details-row">
+      <div class="notebook-priority">
+        <label class="priority-label">Priority:</label>
+        <select
+          :value="notebook.priority || 5"
+          class="priority-select"
+          @change="(e) => $emit('update-priority', notebook.id, Number.parseInt(e.target.value))"
+        >
+          <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
+        </select>
+      </div>
+      <div class="notebook-date">Uploaded: {{ formattedDate }}</div>
     </div>
 
-    <div class="notebook-date">Uploaded: {{ formattedDate }}</div>
-
+    <!-- Bottom Actions -->
     <div class="notebook-actions">
       <button
         v-if="isProcessing"
@@ -290,7 +308,7 @@ const completionPercent = computed(() => {
   return 0
 })
 
-const circleRadius = 15
+const circleRadius = 12
 const circleCircumference = computed(() => 2 * Math.PI * circleRadius)
 const circleDashOffset = computed(() => {
   const c = circleCircumference.value
@@ -300,54 +318,109 @@ const circleDashOffset = computed(() => {
 
 <style scoped>
 .notebook-card {
-  background: var(--surface-container);
+  background: var(--surface-container-lowest, #ffffff);
   border-radius: 12px;
   padding: 16px;
   border: 1px solid var(--outline-variant);
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.notebook-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--outline-variant));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.active-notebook-card {
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 1px var(--primary),
+    0 4px 14px rgba(0, 0, 0, 0.07);
+}
+
+/* ── Top Bar ────────────────────────────────────────── */
+.card-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.file-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.file-type-chip.active-chip {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.card-top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-certificate-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, #d97706 14%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+  color: #b45309;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  white-space: nowrap;
+}
+
+[data-theme^='dark'] .btn-certificate-badge {
+  background: color-mix(in srgb, #f59e0b 16%, var(--surface-container-low));
+  border-color: color-mix(in srgb, #f59e0b 35%, transparent);
+  color: #fbbf24;
+}
+
+.btn-certificate-badge:hover {
+  background: #d97706;
+  color: #ffffff;
+  border-color: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+}
+
+[data-theme^='dark'] .btn-certificate-badge:hover {
+  background: #f59e0b;
+  color: #1a1a1a;
+  border-color: #f59e0b;
 }
 
 .completion-ring-container {
-  position: absolute;
-  top: 10px;
-  right: 48px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   user-select: none;
 }
 
-.btn-certificate-badge {
-  position: absolute;
-  top: 13px;
-  right: 96px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.08));
-  border: 1px solid rgba(212, 175, 55, 0.6);
-  color: #d4af37;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  z-index: 2;
-}
-
-.btn-certificate-badge:hover {
-  background: #d4af37;
-  color: #12141a;
-  transform: translateY(-1px) scale(1.04);
-  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
-}
-
 .progress-ring-bg {
-  stroke: var(--outline-variant, rgba(255, 255, 255, 0.12));
+  stroke: var(--outline-variant, rgba(0, 0, 0, 0.1));
 }
 
 .progress-ring-fill {
@@ -357,32 +430,18 @@ const circleDashOffset = computed(() => {
 }
 
 .progress-ring-text {
-  font-size: 9.5px;
+  font-size: 8.5px;
   font-weight: 700;
   fill: var(--on-surface, #ffffff);
 }
 
-.notebook-card:hover {
-  box-shadow: 0 2px 8px rgba(45, 51, 56, 0.06);
-}
-
-.notebook-header-card {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding-right: 80px;
-}
-
 .btn-edit-pen {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   border: 0;
   border-radius: 8px;
   background: var(--surface-container-low);
-  color: var(--on-surface);
-  width: 30px;
-  height: 30px;
+  color: var(--on-surface-variant, var(--on-surface));
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -392,65 +451,64 @@ const circleDashOffset = computed(() => {
 
 .btn-edit-pen:hover {
   background: var(--surface-container-high, #e6e9ef);
+  color: var(--primary);
+  transform: translateY(-1px);
 }
 
-.file-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--surface-container-low);
-  border: 1px solid var(--outline-variant);
+/* ── Title & Meta ───────────────────────────────────── */
+.notebook-title-section {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.file-icon.active-icon {
-  background: color-mix(in srgb, var(--primary) 15%, transparent);
-  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
-  color: var(--primary);
-}
-
-.notebook-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.notebook-info h3 {
+.notebook-title-section h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
   color: var(--on-surface);
   word-break: break-word;
 }
 
-.meta {
-  margin: 4px 0 0;
+.notebook-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--muted-text);
 }
 
-.deep-badge {
-  color: #a78bfa;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.meta-bullet {
+  opacity: 0.5;
+  font-size: 10px;
 }
 
+.deep-badge {
+  color: var(--primary);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Topic ─────────────────────────────────────────── */
 .notebook-topic {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .badge {
   display: inline-block;
   background: var(--surface-container-low);
-  color: var(--primary);
-  padding: 4px 8px;
+  color: var(--on-surface-variant, var(--primary));
+  padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
+  border: 1px solid var(--outline-variant);
 }
 
 .badge.muted {
@@ -458,9 +516,10 @@ const circleDashOffset = computed(() => {
 }
 
 .new-assignment-badge {
-  background: color-mix(in srgb, #3b82f6 18%, var(--surface-container-low));
-  color: #60a5fa;
-  border: 1px solid var(--outline-variant);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
+  color: var(--primary);
+  font-weight: 700;
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .topic-badge {
@@ -478,81 +537,72 @@ const circleDashOffset = computed(() => {
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
-  background: color-mix(in srgb, #6366f1 22%, var(--surface-container-low));
-  color: #818cf8;
-  border: 1px solid var(--outline-variant);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-low));
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
   transition: all 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .tutor-link-btn:hover {
-  background: #6366f1;
-  color: #ffffff;
-  border-color: #6366f1;
+  background: var(--primary);
+  color: var(--on-primary, #ffffff);
+  border-color: var(--primary);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
-.btn-ingest {
-  display: inline-flex;
+/* ── Details row (Priority + Date) ─────────────────── */
+.notebook-details-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: color-mix(in srgb, #3b82f6 20%, var(--surface-container-low));
-  color: #60a5fa;
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-weight: 600;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-ingest:hover {
-  background: #3b82f6;
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.notebook-date {
-  font-size: 12px;
-  color: var(--muted-text);
-  margin-bottom: 12px;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
 }
 
 .notebook-priority {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
 }
 
 .priority-label {
   font-size: 12px;
   color: var(--muted-text);
+  font-weight: 500;
 }
 
 .priority-select {
-  padding: 4px 8px;
+  padding: 3px 8px;
   border: 1px solid var(--outline-variant);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--surface-container-low);
   color: var(--on-surface);
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.15s ease;
 }
 
 .priority-select:hover {
   border-color: var(--primary);
 }
 
+.notebook-date {
+  font-size: 11.5px;
+  color: var(--muted-text);
+}
+
+/* ── Action buttons ────────────────────────────────── */
 .notebook-actions {
   display: flex;
   gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
 }
 
 .btn-delete {
@@ -563,36 +613,45 @@ const circleDashOffset = computed(() => {
   font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
-  font-weight: 600;
-  background: color-mix(in srgb, #ef4444 14%, var(--surface-container-low));
-  color: #f87171;
+  font-weight: 700;
+  background: color-mix(in srgb, #dc2626 10%, var(--surface-container-low));
+  color: #dc2626;
 }
 
 .btn-delete:hover {
-  background: color-mix(in srgb, #ef4444 28%, var(--surface-container-low));
+  background: #dc2626;
   color: #ffffff;
 }
 
-/* ── Active variant ────────────────────────────────── */
-.active-notebook-card {
-  border-color: var(--primary);
-  box-shadow:
-    0 0 0 1px var(--primary),
-    0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.active-icon {
+.btn-ingest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-low));
   color: var(--primary);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* ── Action buttons ────────────────────────────────── */
+.btn-ingest:hover {
+  background: var(--primary);
+  color: var(--on-primary, #ffffff);
+  transform: translateY(-1px);
+}
+
 .btn-activate {
   background: color-mix(in srgb, var(--primary) 18%, var(--surface-container-low));
   color: var(--primary);
   border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -609,18 +668,18 @@ const circleDashOffset = computed(() => {
 }
 
 .btn-sleep {
-  background: color-mix(in srgb, #f59e0b 14%, var(--surface-container-low));
-  color: #fbbf24;
+  background: color-mix(in srgb, #d97706 12%, var(--surface-container-low));
+  color: #b45309;
   border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-sleep:hover {
-  background: color-mix(in srgb, #f59e0b 26%, var(--surface-container-low));
+  background: #d97706;
   color: #ffffff;
   transform: translateY(-1px);
 }
@@ -630,20 +689,20 @@ const circleDashOffset = computed(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.18));
-  color: #c4b5fd;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-container-low));
+  color: var(--primary);
   border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 8px 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-upgrade-deep:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.32), rgba(59, 130, 246, 0.32));
-  border-color: rgba(139, 92, 246, 0.65);
-  color: #ffffff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary, #ffffff);
   transform: translateY(-1px);
 }
 

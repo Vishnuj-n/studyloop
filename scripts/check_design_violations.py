@@ -10,6 +10,7 @@ Rules checked:
 4. Button Radius: Flags buttons missing the 'xl' (0.75rem / 12px) standard radius.
 5. Typography: Checks for dual-typeface (Manrope for headers, Inter for body).
 6. Double Read Prefix: Checks for duplicated 'Read: ' prefix pattern in templates.
+7. Low Contrast Pastel Text: Detects hardcoded pastel/washed-out text colors that cause illegibility on light surfaces.
 """
 
 import os
@@ -134,6 +135,13 @@ PATTERNS = [
         "description": "Layout Smell: Avoid brittle hardcoded viewport math (e.g., 'calc(100vh - Npx)'). Use flexbox layout with 'flex: 1; min-height: 0;' instead.",
         "severity": "WARNING",
         "regex": re.compile(r"(?:height|max-height|min-height)\s*:\s*calc\(\s*100vh\s*[-+]\s*\d+(?:\.\d+)?(?:px|rem|em)?\s*\)", re.IGNORECASE),
+    },
+    {
+        "id": "LOW_CONTRAST_PASTEL_TEXT",
+        "description": "DESIGN.md Contrast Rule: Hardcoded light pastel text colors (#f87171, #fbbf24, #c4b5fd, #818cf8, #60a5fa, #a78bfa, #34d399, #cbd5e1) have insufficient contrast on light surfaces. Use theme tokens like var(--primary), var(--on-surface), or darker high-contrast tones (#dc2626, #b45309, #059669).",
+        "severity": "ERROR",
+        "regex": re.compile(r"color\s*:\s*(?:var\(--[a-zA-Z0-9_-]+,\s*)?(#(?:f87171|fbbf24|c4b5fd|818cf8|60a5fa|a78bfa|34d399|cbd5e1))\b", re.IGNORECASE),
+        "exempt_files": EMOJI_EXEMPT_FILES,
     }
 ]
 
@@ -252,6 +260,9 @@ def test_rules():
 .exempt-line {
   content: "⏰"; /* design-lint-ignore */
 }
+.light-text {
+  color: #f87171;
+}
 """
     with tempfile.NamedTemporaryFile("w", suffix=".vue", delete=False, encoding="utf-8") as tf:
         tf.write(test_content)
@@ -261,6 +272,7 @@ def test_rules():
         assert any(v["rule_id"] == "HARSH_SHADOW" for v in violations), "Failed to detect multiline HARSH_SHADOW"
         assert any(v["rule_id"] == "EMOJI_DETECTED" and v["line_number"] == 8 for v in violations), "Failed to detect EMOJI_DETECTED"
         assert not any(v["line_number"] == 11 for v in violations), "Failed to respect inline design-lint-ignore"
+        assert any(v["rule_id"] == "LOW_CONTRAST_PASTEL_TEXT" and v["line_number"] == 14 for v in violations), "Failed to detect LOW_CONTRAST_PASTEL_TEXT"
         print(f"{GREEN}[PASS] Design lint regression tests passed.{RESET}")
     finally:
         if tf_path.exists():

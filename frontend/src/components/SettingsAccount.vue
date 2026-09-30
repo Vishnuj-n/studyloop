@@ -749,7 +749,8 @@ input:focus {
 .login-error-message {
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid var(--outline-variant);
-  color: #f87171;
+  color: #dc2626;
+  font-weight: 500;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.85rem;
