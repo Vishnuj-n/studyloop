@@ -249,7 +249,7 @@ func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []strin
 		"1. Grounding: Questions must be answerable purely from the explicit concepts in the text (no outside knowledge, no meta/author/book-structure trivia).",
 		"2. Mechanisms: Focus on cause-and-effect, mechanisms, and 'why/how' outcomes (avoid raw facts, dates, names, or shallow definitions).",
 		"3. Distractors: Incorrect options must represent plausible conceptual misunderstandings, not obviously absurd answers.",
-		"4. Uniformity: Exactly 4 options per question with similar length and detail. The correct_answer must match one option exactly.",
+		"4. Option Length & Uniformity: Exactly 4 options per question. All 4 options must be concise and of roughly equal length/detail to prevent answer-length bias. The correct_answer must match one option exactly.",
 		"5. Format: Prefer 'why', 'how', 'what happens if', and 'what causes' questions (no yes/no questions).",
 		"",
 		"JSON schema: {\"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",

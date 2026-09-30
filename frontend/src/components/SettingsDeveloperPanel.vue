@@ -166,6 +166,7 @@
 import { ref, onMounted, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import SettingsToggle from './SettingsToggle.vue'
+import { useDialog } from '../composables/useDialog'
 import {
   getReadingTaskHistory,
   getLLMPromptLogging,
@@ -176,6 +177,7 @@ import {
 
 const DEV_MODE_STORAGE_KEY = 'studyloop_dev_mode_enabled'
 
+const { confirm: confirmDialog } = useDialog()
 const devModeEnabled = ref(localStorage.getItem(DEV_MODE_STORAGE_KEY) === 'true')
 const llmPromptLogEnabled = ref(false)
 const logs = ref([])
@@ -190,9 +192,14 @@ const successMessage = ref('')
 
 async function handleRevertSession(taskID) {
   if (!taskID || revertingId.value) return
-  const confirmed = window.confirm(
-    'Are you sure you want to revert this completed reading session? This will restore the task back to ACTIVE and reset the topic cursor.'
-  )
+  const confirmed = await confirmDialog({
+    title: 'Revert Reading Session',
+    message:
+      'Are you sure you want to revert this completed reading session? This will restore the task back to ACTIVE and reset the topic cursor.',
+    confirmText: 'Revert Session',
+    cancelText: 'Cancel',
+    type: 'warning',
+  })
   if (!confirmed) return
 
   revertingId.value = taskID
