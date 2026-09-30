@@ -40,51 +40,6 @@
       </p>
     </div>
 
-    <!-- Desk Companion Settings -->
-    <div class="form-group pet-settings-card">
-      <div class="pet-header-row">
-        <div>
-          <label>Study Companion (Mochi)</label>
-          <p class="hint">A floating companion that cheers for your study milestones and stays focused with you.</p>
-        </div>
-        <button
-          type="button"
-          class="toggle-btn"
-          :class="{ active: petState.enabled }"
-          @click="togglePet()"
-        >
-          {{ petState.enabled ? 'Enabled' : 'Disabled' }}
-        </button>
-      </div>
-
-      <div v-if="petState.enabled" class="pet-skin-options">
-        <span class="skin-heading">Companion Skin</span>
-        <div class="skin-grid">
-          <button
-            v-for="skin in currentPet.skins"
-            :key="skin.id"
-            type="button"
-            class="skin-card"
-            :class="{ active: petState.activeSkinId === skin.id }"
-            @click="setSkin(skin.id)"
-          >
-            <span class="skin-color-preview" :style="{ background: skin.primaryColor }">
-              <span class="skin-color-dot" :style="{ background: skin.secondaryColor }"></span>
-            </span>
-            <span class="skin-name">{{ skin.name }}</span>
-          </button>
-        </div>
-
-        <button
-          type="button"
-          class="reset-pos-btn"
-          @click="resetPosition()"
-        >
-          Reset Screen Position
-        </button>
-      </div>
-    </div>
-
     <RewardsShopModal
       v-if="showShopModal"
       :active-theme="settings.theme"
@@ -99,14 +54,11 @@ import { ref, onMounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import RewardsShopModal from './RewardsShopModal.vue'
 import { getGamificationState } from '../services/appApi'
-import { usePet } from '../composables/usePet'
 
 const props = defineProps({
   settings: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
 })
-
-const { petState, currentPet, togglePet, setSkin, resetPosition } = usePet()
 
 const showShopModal = ref(false)
 const unlockedCosmetics = ref(['dark-gruvbox', 'light-classic', 'light-warm', 'dark-indigo'])
@@ -332,117 +284,5 @@ h2 {
   font-weight: 600;
 }
 
-/* Pet Settings */
-.pet-settings-card {
-  padding: 16px;
-  background: var(--surface-2, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-}
-
-.pet-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.toggle-btn {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--surface-3, rgba(255, 255, 255, 0.1));
-  color: var(--muted-text, #94a3b8);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-  transition: all 0.2s ease;
-}
-
-.toggle-btn.active {
-  background: var(--primary, #6366f1);
-  color: #ffffff;
-  border-color: var(--primary, #6366f1);
-}
-
-.pet-skin-options {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.skin-heading {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--on-surface);
-}
-
-.skin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px;
-}
-
-.skin-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--surface, rgba(0, 0, 0, 0.2));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.skin-card:hover {
-  border-color: var(--primary, #6366f1);
-}
-
-.skin-card.active {
-  border-color: var(--primary, #6366f1);
-  background: rgba(99, 102, 241, 0.12);
-}
-
-.skin-color-preview {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.skin-color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.skin-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--on-surface);
-}
-
-.reset-pos-btn {
-  align-self: flex-start;
-  font-size: 11px;
-  color: var(--muted-text);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 4px 0;
-}
-
-.reset-pos-btn:hover {
-  color: var(--on-surface);
-}
 </style>
 

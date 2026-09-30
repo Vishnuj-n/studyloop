@@ -116,6 +116,46 @@
         </button>
       </div>
     </div>
+
+    <!-- Study Companion (Mochi) -->
+    <div class="card companion-card">
+      <div class="companion-header">
+        <div>
+          <h3 class="card-section-title">Study Companion</h3>
+          <p class="companion-desc">Mochi sits on your screen and cheers you on while you study. Toggle it on/off and pick a skin.</p>
+        </div>
+        <button
+          type="button"
+          class="toggle-btn"
+          :class="{ active: petState.enabled }"
+          @click="togglePet()"
+        >
+          {{ petState.enabled ? 'Enabled' : 'Disabled' }}
+        </button>
+      </div>
+
+      <div v-if="petState.enabled" class="companion-body">
+        <span class="skin-heading">Companion Skin</span>
+        <div class="skin-grid">
+          <button
+            v-for="skin in currentPet.skins"
+            :key="skin.id"
+            type="button"
+            class="skin-card"
+            :class="{ active: petState.activeSkinId === skin.id }"
+            @click="setSkin(skin.id)"
+          >
+            <span class="skin-color-preview" :style="{ background: skin.primaryColor }">
+              <span class="skin-color-dot" :style="{ background: skin.secondaryColor }"></span>
+            </span>
+            <span class="skin-name">{{ skin.name }}</span>
+          </button>
+        </div>
+        <button type="button" class="reset-pos-btn" @click="resetPosition()">
+          Reset Screen Position
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -124,6 +164,9 @@ import { computed } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import GamificationIcon from './icons/GamificationIcon.vue'
 import { getTitleEmoji } from '../utils/gamification'
+import { usePet } from '../composables/usePet'
+
+const { petState, currentPet, togglePet, setSkin, resetPosition } = usePet()
 
 const props = defineProps({
   profile: {
@@ -536,4 +579,116 @@ const progressPercent = computed(() => {
   color: var(--danger, #ef4444);
   font-weight: 600;
 }
+
+/* Companion card */
+.companion-card { padding: 20px; }
+
+.companion-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.companion-desc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted-text);
+  line-height: 1.4;
+}
+
+.toggle-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted-text, #94a3b8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border-color: var(--primary, #6366f1);
+}
+
+.companion-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skin-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.skin-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.skin-card:hover { border-color: var(--primary, #6366f1); }
+
+.skin-card.active {
+  border-color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.skin-color-preview {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.skin-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.skin-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-surface);
+}
+
+.reset-pos-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  color: var(--muted-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px 0;
+}
+
+.reset-pos-btn:hover { color: var(--on-surface); }
 </style>
