@@ -221,11 +221,12 @@ func buildVivaFromQuizPrompt(notebookTitle string, startPage, endPage int, quizC
 
 	b.WriteString(`Return STRICT JSON only in this shape: {"prompt":"..."}.` + "\n")
 	b.WriteString("Your task is to synthesize ONE open-ended spoken viva question based on the concepts tested in these questions.\n")
-	b.WriteString("The viva question must require the student to explain the deeper underlying mechanism, synthesize relationships between these concepts, or explain WHY/HOW the principle works in their own words.\n\n")
+	b.WriteString("The viva question must test deep conceptual understanding and intuition—requiring the student to explain the underlying mechanism, why/how a principle works, or how concepts connect in plain words, without asking for mathematical formula memorization.\n\n")
 	b.WriteString("Rules:\n")
 	b.WriteString("- Ask exactly one clear synthesis question.\n")
-	b.WriteString("- Target the core underlying concepts tested in the quiz questions.\n")
-	b.WriteString("- Avoid simple repetition of a multiple-choice question or factual recall.\n")
+	b.WriteString("- Target core concepts, intuition, mechanisms, and cause-and-effect.\n")
+	b.WriteString("- Avoid asking for mathematical derivations, formulas, or pure rote recall.\n")
+	b.WriteString("- Avoid simple repetition of a multiple-choice question.\n")
 	b.WriteString("- Encourage a 30–90 second spoken explanation.\n")
 	b.WriteString("- Maximum 35 words.\n")
 	b.WriteString("- Do not include answer choices, rubric, hints, preamble, or markdown.\n")
@@ -242,9 +243,10 @@ func buildComprehensiveExamPrompt(notebookTitle string, startPage, endPage int, 
 		startPage, endPage, notebookTitle)
 
 	b.WriteString(`Return STRICT JSON only in this shape: {"prompt":"..."}.` + "\n")
-	b.WriteString("Test genuine understanding rather than definition recall. Target the most important concept or relationship in the material. Prefer questions requiring the student to explain WHY/HOW, apply the concept, predict an outcome, or explain cause and effect.\n\n")
+	b.WriteString("Test genuine conceptual understanding and intuition rather than definition or formula recall. Target the most important concept or mechanism in the material. Require the student to explain WHY/HOW, apply the concept, predict an outcome, or explain cause and effect in plain terms.\n\n")
 	b.WriteString("Rules:\n")
 	b.WriteString("- Ask exactly one clear question.\n")
+	b.WriteString("- Focus on conceptual understanding, mechanisms, and intuition, not formulas or mathematical derivations.\n")
 	b.WriteString("- Use ONLY information supported by the supplied material; do not rely on outside knowledge.\n")
 	b.WriteString("- Avoid trivial factual recall, yes/no questions, and questions answerable by copying a sentence.\n")
 	b.WriteString("- Encourage a 30–90 second spoken explanation.\n")
@@ -275,19 +277,29 @@ func (s *StudyService) ScoreShortAnswer(questionID, userAnswer string) map[strin
 		return map[string]interface{}{"error": "written question not found"}
 	}
 
-	scorePrompt := fmt.Sprintf(`You are grading a student's short answer.
+	scorePrompt := fmt.Sprintf(`You are grading a student's answer in a conceptual assessment.
 Return STRICT JSON only in this shape: {"score":number,"feedback":"..."}.
 
-Scoring rubric:
+Scoring Philosophy & Rubric:
 - Score must be an integer from 1 to 10.
-- 1-3 = major misunderstandings or mostly incorrect.
-- 4-5 = partially correct with clear gaps.
-- 6-8 = mostly correct with some omissions.
-- 9-10 = strong, precise, and concise.
-- Feedback MUST be formatted in Markdown (using markdown headers, bold text, lists, and code/math formatting as appropriate).
-- Feedback MUST include:
-  1. An evaluation explaining any gaps, misunderstandings, or sign/direction errors in the student's answer.
-  2. An explicit expected response section titled "**Expected Answer**" that clearly outlines the correct, complete answer.
+- Focus strictly on CONCEPTUAL UNDERSTANDING, intuitive reasoning, and core principles—NOT formulas, equations, math derivations, or rote jargon.
+- Do NOT penalize the student for omitting mathematical formulas or textbook jargon if their conceptual explanation is sound.
+- 1-3 = major conceptual misunderstanding.
+- 4-5 = partially correct intuition with notable gaps.
+- 6-8 = solid conceptual grasp with minor omissions.
+- 9-10 = clear, accurate, and insightful understanding.
+
+Feedback Guidelines:
+- Keep the feedback CONCISE, direct, and easy to read (avoid lengthy walls of text or unnecessary fluff).
+- Format in clean Markdown with clear headers and bullet points.
+- Use plain language and intuitive mental models. Format key terms with inline backticks (e.g., ` + "`term`" + `).
+- If any math is strictly needed, use $inline$ or $$display$$—never bare parentheses for math equations.
+- Feedback structure (keep each section concise, 2-4 sentences or short bullet points):
+  ### Evaluation
+  - **What was done well**: Key concepts or intuitions the student understood correctly.
+  - **Gaps and misunderstandings**: Specific conceptual gaps or misconceptions (do not critique lack of formulas).
+  ### Expected Answer
+  A concise, intuitive explanation of the core concept and mechanism in plain English (2-4 sentences max).
 
 Question: %s
 Student answer: %s`, question.Prompt, userAnswer)

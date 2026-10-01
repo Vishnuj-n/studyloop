@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { startBrowserAuth, openURLInBrowser, restoreSession, clearSession } from './appApi'
+import { startBrowserAuth, openURLInBrowser, restoreSession, clearSession, logFrontendEvent } from './appApi'
 
 const isLoaded = ref(false)
 const user = ref(null)
@@ -27,23 +27,33 @@ async function syncWithBackend() {
         console.warn('[AUTH] Wails backend bridge not ready yet during syncWithBackend')
         return
       }
+      console.log('[AUTH] Syncing session with Go backend for user:', user.value.email, 'current local isPro:', isPro.value)
+      logFrontendEvent('info', 'Auth', 'sync_session_start', { email: user.value.email, isPro: isPro.value })
       const verifiedPro = await restoreSession(
         user.value.id || '',
         user.value.email || '',
         isPro.value,
         Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
       )
+      console.log('[AUTH] Backend restoreSession returned:', verifiedPro)
+      logFrontendEvent('info', 'Auth', 'sync_session_result', { email: user.value.email, verifiedPro })
       // Only update isPro if verification completed without throwing
       if (typeof verifiedPro === 'boolean') {
+        if (isPro.value !== verifiedPro) {
+          console.warn(`[AUTH] isPro status changed by backend verification: ${isPro.value} -> ${verifiedPro}`)
+          logFrontendEvent('warn', 'Auth', 'is_pro_transition', { from: isPro.value, to: verifiedPro })
+        }
         isPro.value = verifiedPro
       }
     } catch (err) {
       console.warn('[AUTH] Could not sync session with backend:', err)
+      logFrontendEvent('error', 'Auth', 'sync_session_error', { error: String(err) })
     }
   }
 }
 
 export async function initClerk() {
+  console.log('[AUTH] initClerk() called. User:', user.value?.email, 'isPro:', isPro.value)
   isLoaded.value = true
   await syncWithBackend()
   return null
@@ -52,6 +62,8 @@ export async function initClerk() {
 // Listen for loopback authentication callback from Go backend
 if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
   window.runtime.EventsOn('clerk_auth_success', (data) => {
+    console.log('[AUTH] Received clerk_auth_success event from Go backend:', data)
+    logFrontendEvent('info', 'Auth', 'clerk_auth_success_received', data)
     if (data && data.success) {
       user.value = {
         id: data.userId || 'user_' + Date.now(),
@@ -66,6 +78,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
         isPro: isPro.value,
         lastVerifiedAt: lastVerifiedAt.value,
       }))
+      console.log('[AUTH] Updated localStorage and memory with Pro status:', isPro.value)
       syncWithBackend()
     }
   })
@@ -74,6 +87,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
 // Restore saved session if present with 10-day validity check
 try {
   const saved = localStorage.getItem('studyloop_user_session')
+  console.log('[AUTH] Checking localStorage for saved user session...')
   if (saved) {
     const parsed = JSON.parse(saved)
     if (parsed && parsed.user) {
@@ -88,8 +102,11 @@ try {
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || Date.now()
+      console.log('[AUTH] Restored session from localStorage: email =', parsed.user?.email, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
       // Do not sync immediately on file load; App.vue onMounted will call initClerk()
     }
+  } else {
+    console.log('[AUTH] No saved session found in localStorage')
   }
 } catch (err) {
   console.warn('[AUTH] Could not restore saved local user session:', err)

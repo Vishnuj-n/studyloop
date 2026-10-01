@@ -85,6 +85,10 @@ const SANITIZE_CONFIG = {
 }
 
 export function renderMarkdown(input) {
-  const source = typeof input === 'string' ? input : ''
+  let source = typeof input === 'string' ? input : ''
+  // Normalize LaTeX delimiters \( ... \) and \[ ... \] to $ ... $ and $$ ... $$ for KaTeX rendering
+  source = source
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => `\n$$\n${math.trim()}\n$$\n`)
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`)
   return DOMPurify.sanitize(md.render(source), SANITIZE_CONFIG)
 }
