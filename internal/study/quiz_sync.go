@@ -145,7 +145,11 @@ func (s *StudyService) loadChunkTextFallback(topicID string) (map[string]string,
 	}
 	chunkTextByID := make(map[string]string, len(chunks))
 	for _, chunk := range chunks {
-		chunkTextByID[chunk.ID] = strings.TrimSpace(chunk.Text)
+		text := strings.TrimSpace(chunk.CompressedText)
+		if text == "" {
+			text = strings.TrimSpace(chunk.Text)
+		}
+		chunkTextByID[chunk.ID] = text
 	}
 	return chunkTextByID, nil
 }

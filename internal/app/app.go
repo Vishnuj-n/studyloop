@@ -281,6 +281,61 @@ func (a *App) GetTopicSectionsContent(topicID string, notebookID string) map[str
 	}
 }
 
+// GetTopicCompressionStats returns token metrics and compression status for a topic.
+func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return map[string]interface{}{"error": "topic ID is required"}
+	}
+
+	chunks, err := repo.GetChunksForTopic(topicID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	totalRawTokens := 0
+	totalCompressedTokens := 0
+	compressedCount := 0
+
+	for _, c := range chunks {
+		rawTokens := len(strings.Fields(c.Text))
+		totalRawTokens += rawTokens
+
+		if strings.TrimSpace(c.CompressedText) != "" {
+			compressedCount++
+			if c.CompressedTokenCount > 0 {
+				totalCompressedTokens += c.CompressedTokenCount
+			} else {
+				totalCompressedTokens += len(strings.Fields(c.CompressedText))
+			}
+		} else {
+			totalCompressedTokens += rawTokens
+		}
+	}
+
+	isCompressed := compressedCount > 0 && len(chunks) > 0
+	savedTokens := totalRawTokens - totalCompressedTokens
+	savedPct := 0.0
+	if totalRawTokens > 0 && savedTokens > 0 {
+		savedPct = (float64(savedTokens) / float64(totalRawTokens)) * 100.0
+	}
+
+	return map[string]interface{}{
+		"topic_id":                 topicID,
+		"chunk_count":              len(chunks),
+		"compressed_chunk_count":   compressedCount,
+		"is_compressed":            isCompressed,
+		"raw_tokens":               totalRawTokens,
+		"compressed_tokens":        totalCompressedTokens,
+		"tokens_saved":             savedTokens,
+		"saved_percentage":         savedPct,
+	}
+}
+
 func (a *App) GetAvailableTopics() []map[string]string {
 	repo := a.getRepo()
 	if repo == nil {

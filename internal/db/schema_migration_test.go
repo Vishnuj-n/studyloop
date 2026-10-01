@@ -154,6 +154,10 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 		{"user_settings", "analytics_enabled", "SELECT analytics_enabled FROM user_settings WHERE id = 1"},
 		{"user_settings", "anonymous_user_id", "SELECT anonymous_user_id FROM user_settings WHERE id = 1"},
 		{"user_settings", "llm_prompt_logging", "SELECT llm_prompt_logging FROM user_settings WHERE id = 1"},
+		{"user_settings", "prompt_compression_mode", "SELECT prompt_compression_mode FROM user_settings WHERE id = 1"},
+		{"user_settings", "prompt_compression_rate", "SELECT prompt_compression_rate FROM user_settings WHERE id = 1"},
+		{"chunks", "compressed_text", "SELECT compressed_text FROM chunks LIMIT 1"},
+		{"chunks", "compressed_token_count", "SELECT compressed_token_count FROM chunks LIMIT 1"},
 	}
 
 	for _, check := range checkQueries {

@@ -54,6 +54,11 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		return errMap
 	}
 
+	// Trigger asynchronous background compression on topic opening
+	if topicID != "" && a.studyService != nil {
+		a.studyService.CompressTopicChunksAsync(context.Background(), topicID)
+	}
+
 	// Load reading task with all context
 	task, err := repo.GetReadingTask(taskID)
 	if err != nil {

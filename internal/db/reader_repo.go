@@ -16,7 +16,7 @@ import (
 
 func (r *Repository) queryChunks(filter string, args ...interface{}) ([]models.Chunk, error) {
 	query := `
-		SELECT id, topic_id, chunk_text, importance_score, weakness_score, page_num
+		SELECT id, topic_id, chunk_text, COALESCE(compressed_text, ''), COALESCE(compressed_token_count, 0), importance_score, weakness_score, page_num
 		FROM chunks ` + filter + `
 		ORDER BY page_num ASC, id ASC`
 	rows, err := r.db.Query(query, args...)
@@ -57,7 +57,7 @@ func (r *Repository) GetChunksForTopicPageRange(topicID string, startPage, endPa
 
 		// 2. Fallback: query chunks joined through notebook_chunks for the topic's notebook (same as GetReaderTopicBundle)
 		rows, err := r.db.Query(`
-			SELECT c.id, c.topic_id, c.chunk_text, c.importance_score, c.weakness_score, nc.page_num
+			SELECT c.id, c.topic_id, c.chunk_text, COALESCE(c.compressed_text, ''), COALESCE(c.compressed_token_count, 0), c.importance_score, c.weakness_score, nc.page_num
 			FROM chunks c
 			JOIN notebook_chunks nc ON nc.chunk_id = c.id
 			WHERE nc.notebook_id IN (
@@ -86,7 +86,7 @@ func (r *Repository) GetChunksForTopic(topicID string) ([]models.Chunk, error) {
 // GetChunksForNotebook retrieves all chunks associated with a notebook.
 func (r *Repository) GetChunksForNotebook(notebookID string) ([]models.Chunk, error) {
 	rows, err := r.db.Query(`
-		SELECT c.id, c.topic_id, c.chunk_text, c.importance_score, c.weakness_score, nc.page_num
+		SELECT c.id, c.topic_id, c.chunk_text, COALESCE(c.compressed_text, ''), COALESCE(c.compressed_token_count, 0), c.importance_score, c.weakness_score, nc.page_num
 		FROM chunks c
 		JOIN notebook_chunks nc ON nc.chunk_id = c.id
 		WHERE nc.notebook_id = ?
@@ -136,7 +136,7 @@ func (r *Repository) GetChunksForTopics(topicIDs []string) (map[string][]models.
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, topic_id, chunk_text, importance_score, weakness_score, page_num
+		SELECT id, topic_id, chunk_text, COALESCE(compressed_text, ''), COALESCE(compressed_token_count, 0), importance_score, weakness_score, page_num
 		FROM chunks
 		WHERE topic_id IN (%s)
 		ORDER BY page_num ASC, id ASC
@@ -153,7 +153,7 @@ func (r *Repository) GetChunksForTopics(topicIDs []string) (map[string][]models.
 	chunksByTopic := make(map[string][]models.Chunk)
 	for rows.Next() {
 		var chunk models.Chunk
-		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
+		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.CompressedText, &chunk.CompressedTokenCount, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
 			return nil, err
 		}
 		chunksByTopic[chunk.TopicID] = append(chunksByTopic[chunk.TopicID], chunk)
@@ -437,7 +437,7 @@ func (r *Repository) GetTopicHeadingPageRanges(topicID string) (map[string][2]in
 // GetAllChunks retrieves all chunks in the system.
 func (r *Repository) GetAllChunks() ([]models.Chunk, error) {
 	rows, err := r.db.Query(`
-		SELECT id, topic_id, chunk_text, importance_score, weakness_score, page_num
+		SELECT id, topic_id, chunk_text, COALESCE(compressed_text, ''), COALESCE(compressed_token_count, 0), importance_score, weakness_score, page_num
 		FROM chunks
 		ORDER BY id
 	`)
@@ -455,7 +455,7 @@ func scanChunks(rows *sql.Rows) ([]models.Chunk, error) {
 	var chunks []models.Chunk
 	for rows.Next() {
 		var chunk models.Chunk
-		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
+		if err := rows.Scan(&chunk.ID, &chunk.TopicID, &chunk.Text, &chunk.CompressedText, &chunk.CompressedTokenCount, &chunk.ImportanceScore, &chunk.WeaknessScore, &chunk.PageNum); err != nil {
 			return nil, err
 		}
 		chunks = append(chunks, chunk)
@@ -850,3 +850,14 @@ func ResolvePageWindow(
 
 	return startPage, endPage, true, tokenMap
 }
+
+// UpdateChunkCompressedText updates the compressed text and token count for a chunk.
+func (r *Repository) UpdateChunkCompressedText(chunkID string, compressedText string, compressedTokenCount int) error {
+	_, err := r.db.Exec(`
+		UPDATE chunks
+		SET compressed_text = ?, compressed_token_count = ?
+		WHERE id = ?
+	`, compressedText, compressedTokenCount, chunkID)
+	return err
+}
+

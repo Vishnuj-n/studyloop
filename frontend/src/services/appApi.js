@@ -11,6 +11,10 @@ export function getReaderTopicBundle(topicID, notebookID = '') {
   return appBridge().GetReaderTopicBundle(topicID, notebookID)
 }
 
+export function getTopicCompressionStats(topicID) {
+  return appBridge().GetTopicCompressionStats(topicID)
+}
+
 export function getAvailableTopics() {
   return appBridge().GetAvailableTopics()
 }

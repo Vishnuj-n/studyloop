@@ -1022,7 +1022,7 @@ func (r *Repository) GetChunksWithContextByNotebookPageRange(notebookID string, 
 	}
 
 	rows, err := r.db.Query(`
-		SELECT c.id, nc.page_num, c.chunk_text
+		SELECT c.id, nc.page_num, COALESCE(NULLIF(c.compressed_text, ''), c.chunk_text), COALESCE(c.compressed_text, ''), COALESCE(c.compressed_token_count, 0)
 		FROM notebook_chunks nc
 		JOIN chunks c ON c.id = nc.chunk_id
 		WHERE nc.notebook_id = ?
@@ -1037,7 +1037,7 @@ func (r *Repository) GetChunksWithContextByNotebookPageRange(notebookID string, 
 	chunks := make([]models.ChunkWithContext, 0)
 	for rows.Next() {
 		var chunk models.ChunkWithContext
-		if err := rows.Scan(&chunk.ChunkID, &chunk.PageNum, &chunk.Text); err != nil {
+		if err := rows.Scan(&chunk.ChunkID, &chunk.PageNum, &chunk.Text, &chunk.CompressedText, &chunk.CompressedTokenCount); err != nil {
 			return nil, fmt.Errorf("scan structured chunk: %w", err)
 		}
 		chunks = append(chunks, chunk)

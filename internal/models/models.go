@@ -210,19 +210,23 @@ type ReadingTopicCursor struct {
 
 // Chunk represents a retrieval chunk with metadata and future scoring hooks.
 type Chunk struct {
-	ID              string
-	TopicID         string
-	Text            string
-	ImportanceScore float64
-	WeaknessScore   float64
-	PageNum         int
+	ID                   string
+	TopicID              string
+	Text                 string
+	CompressedText       string
+	CompressedTokenCount int
+	ImportanceScore      float64
+	WeaknessScore        float64
+	PageNum              int
 }
 
 // ChunkWithContext is the structured prompt context passed to LLM generation.
 type ChunkWithContext struct {
-	ChunkID string `json:"chunk_id"`
-	PageNum int    `json:"page_num"`
-	Text    string `json:"text"`
+	ChunkID              string `json:"chunk_id"`
+	PageNum              int    `json:"page_num"`
+	Text                 string `json:"text"`
+	CompressedText       string `json:"compressed_text,omitempty"`
+	CompressedTokenCount int    `json:"compressed_token_count,omitempty"`
 }
 
 // Notebook represents a user-uploaded document (PDF, text, etc)
@@ -666,9 +670,11 @@ type UserSettings struct {
 	QuizQuestionCount       int    `json:"quiz_question_count"`
 	QuizPassingScore        int    `json:"quiz_passing_score"`
 	TutorStyle              string `json:"tutor_style"`
-	AnalyticsEnabled        bool   `json:"analytics_enabled"`
-	AnonymousUserID         string `json:"anonymous_user_id"`
-	LLMPromptLogging        bool   `json:"llm_prompt_logging"`
+	AnalyticsEnabled        bool    `json:"analytics_enabled"`
+	AnonymousUserID         string  `json:"anonymous_user_id"`
+	LLMPromptLogging        bool    `json:"llm_prompt_logging"`
+	PromptCompressionMode   string  `json:"prompt_compression_mode"`
+	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
 }
 
 type AnalyticsEventSync struct {

@@ -43,6 +43,8 @@ var alterStatements = []struct {
 	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
 	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
 	{"user_settings", "llm_prompt_logging", "ALTER TABLE user_settings ADD COLUMN llm_prompt_logging BOOLEAN DEFAULT 0"},
+	{"user_settings", "prompt_compression_mode", "ALTER TABLE user_settings ADD COLUMN prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT'"},
+	{"user_settings", "prompt_compression_rate", "ALTER TABLE user_settings ADD COLUMN prompt_compression_rate REAL NOT NULL DEFAULT 0.80"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 
 	// study_profiles
@@ -82,6 +84,8 @@ var alterStatements = []struct {
 
 	// chunks
 	{"chunks", "chunk_hash", "ALTER TABLE chunks ADD COLUMN chunk_hash TEXT DEFAULT ''"},
+	{"chunks", "compressed_text", "ALTER TABLE chunks ADD COLUMN compressed_text TEXT DEFAULT NULL"},
+	{"chunks", "compressed_token_count", "ALTER TABLE chunks ADD COLUMN compressed_token_count INTEGER DEFAULT 0"},
 
 	// written_questions & fsrs_cards
 	{"written_questions", "source_chunk_id", "ALTER TABLE written_questions ADD COLUMN source_chunk_id TEXT"},
