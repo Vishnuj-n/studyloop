@@ -1,33 +1,46 @@
 ## ✨ Features
 
-- **Floating Study Pet Companion**  
-  - A draggable, animated pet that follows you around the app.  
-  - Choose from multiple skins and customize its behavior from the new **Rewards Overview** tab.  
-  - Interactive speech bubbles let the pet give tips, encouragement, or respond to your actions.  
-  - Includes a hidden dev‑mode for extra fun controls.
+- **Mastery Certificates**  
+  - Earn a downloadable certificate when you complete a notebook (100% progress).  
+  - View the certificate in a new modal, with customizable recipient name and a polished design that respects your chosen theme.  
+  - Developers can instantly unlock certificates from the Settings → Developer panel for testing.
 
-- **Achievement Tiering & Claim System**  
-  - Earn multi‑tier achievements and claim rewards (coins, items) directly from the **Achievements** view.  
-  - New “Claim” button and visual indicators for claimable tiers.  
-  - Celebratory confetti effects and enhanced milestone modals make each win feel rewarding.  
-  - Updated **Rank Roadmap** UI shows tier lock/unlock status more clearly.
+- **Export & Copy Certificates**  
+  - Export certificates as images or copy them directly to the clipboard with a single click.  
+  - Visual feedback lets you know when the copy succeeds or if an error occurs.
 
-- **Enhanced Settings Experience**  
-  - Instant keyword search and filter rail for quick navigation to any setting category.  
-  - Dedicated **RAG Settings** panel with real‑time status badges (Active, Setting Up, Dormant) and a “Re‑index / Setup” button for manual vector‑embedding management.  
-  - New **Privacy & Telemetry** section gives transparent control over data collection.  
+- **Viva Exam Generation**  
+  - After finishing a quiz, you can now generate a written “viva” exam that re‑uses the same questions and concepts, providing a seamless follow‑up assessment.
+
+- **Inline Flashcard Editing**  
+  - Edit flashcard questions and answers directly inside the deck manager modal. Changes are saved instantly, making it easy to keep your study material up‑to‑date.
+
+- **Predicted Review Intervals**  
+  - While reviewing flashcards, each rating button now shows the estimated next review time (e.g., “1 d”, “3 mo”), helping you understand the impact of your rating choices.
 
 ## 🚀 Improvements
 
-- **Dashboard Clarity** – Updated subtitle on the Concept Rescue status banner for more precise information at a glance.  
-- **PDF Navigation** – Internal links, bookmarks, and cross‑references now work reliably within PDFs.  
-- **Settings Loading State** – Theme attributes no longer flicker while settings are loading, providing a smoother visual experience.  
-- **Floating Pet UI Polish** – Refined design and resolved visual inconsistencies in the pet component and related modals.  
+- **Flashcard UI Refresh**  
+  - Updated layout and styling for a cleaner, more readable flashcard experience.  
+  - Added a top bar with file‑type indicators and quick‑action buttons on notebook cards.
+
+- **Certificate UI & Accessibility**  
+  - Refactored colors to use theme tokens and improved contrast for better accessibility.  
+  - Added error handling and alerts for clipboard copy failures.  
+  - Simplified navigation between quiz and assessment pages, preserving the `flashcardsPending` flag only when needed.
+
+- **Consistent Styling**  
+  - Unified border styles using the `outline-variant` token across the app.  
+  - Introduced a design‑rule check to prevent low‑contrast pastel text.
+
+- **Developer Experience**  
+  - Replaced native confirmation dialogs with a custom dialog component for a consistent look and feel.
 
 ## 🐛 Bug Fixes & Issue Resolutions
 
-- Prevented unintended theme changes during the Settings loading phase.  
-- Fixed PDF internal‑link navigation to correctly jump to bookmarks and cross‑references.  
+- Fixed clipboard copy errors on the certificate modal, now showing a clear alert and auto‑reset timer when copying fails.  
+- Resolved navigation glitches that could cause redundant flashcard generation when moving from quizzes to written assessments.  
+- Corrected quiz task ID handling to ensure proper redirection to the examiner view.  
 
 ---
 
