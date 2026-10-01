@@ -137,7 +137,7 @@
             @click="copyCertificateToClipboard"
           >
             <BaseIcon :name="copyFailed ? 'alert-circle' : 'copy'" size="16" />
-            <span>{{ copySuccess ? 'Copied to Clipboard!' : copyFailed ? 'Failed to Copy' : 'Copy to Clipboard' }}</span>
+            <span>{{ copyButtonText }}</span>
           </button>
         </div>
       </div>
@@ -168,6 +168,11 @@ const visible = ref(true)
 const isExporting = ref(false)
 const copySuccess = ref(false)
 const copyFailed = ref(false)
+const copyButtonText = computed(() => {
+  if (copySuccess.value) return 'Copied to Clipboard!'
+  if (copyFailed.value) return 'Failed to Copy'
+  return 'Copy to Clipboard'
+})
 let copyTimer = null
 const certDocumentRef = ref(null)
 const exportCanvasRef = ref(null)
