@@ -19,7 +19,37 @@ func (s *StudyService) GetReviewSession(taskID string) (*models.ReviewSession, e
 	if taskID == "" {
 		return nil, fmt.Errorf("task ID is required")
 	}
-	return s.repo.GetReviewSession(taskID)
+	session, err := s.repo.GetReviewSession(taskID)
+	if err != nil || session == nil {
+		return session, err
+	}
+
+	now := time.Now()
+	for i := range session.Cards {
+		cardID := session.Cards[i].CardID
+		_, state, stateErr := s.repo.GetFlashcardByID(cardID)
+		if stateErr != nil || state == nil {
+			// Fallback defaults for brand new cards
+			intervals := models.NextReviewIntervals{
+				Again: "<10m",
+				Hard:  "1d",
+				Good:  "3d",
+				Easy:  "7d",
+			}
+			session.Cards[i].Intervals = &intervals
+			continue
+		}
+		lastReviewedAt, _ := s.repo.GetLastFlashcardReviewTime(cardID)
+		fsrsCard := scheduler.FlashcardStateToCard(*state, session.Cards[i].DueAt, lastReviewedAt)
+		intervals := scheduler.CalculateNextIntervals(fsrsCard, now)
+		session.Cards[i].Intervals = (*models.NextReviewIntervals)(&intervals)
+	}
+
+	if session.NextPendingIdx >= 0 && session.NextPendingIdx < len(session.Cards) {
+		session.CurrentCard = &session.Cards[session.NextPendingIdx]
+	}
+
+	return session, nil
 }
 
 

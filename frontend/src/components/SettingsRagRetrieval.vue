@@ -352,7 +352,7 @@ h2 {
   cursor: pointer;
   transition: all 0.2s ease;
   background: var(--surface-container-low);
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
   color: var(--on-surface);
 }
 

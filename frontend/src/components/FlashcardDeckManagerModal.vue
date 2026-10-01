@@ -294,46 +294,110 @@
 
                         <!-- Expanded Card Details Panel -->
                         <div v-if="isCardExpanded(card.id)" class="card-expanded-panel">
-                          <!-- Full Answer -->
-                          <div class="expanded-answer-box">
-                            <div class="answer-badge-label">
-                              <span class="qa-indicator ans-ind">A</span>
-                              <span>Answer</span>
-                            </div>
-                            <div class="answer-content-text">{{ card.answer }}</div>
-                          </div>
-
-                          <!-- FSRS Telemetry & Safe Actions Footer -->
-                          <div class="expanded-footer">
-                            <div class="fsrs-stats-group">
-                              <span class="fsrs-stat">
-                                <strong>Reps:</strong> {{ card.reps || 0 }}
-                              </span>
-                              <span class="fsrs-stat">
-                                <strong>Interval:</strong> {{ formatInterval(card.stability) }}
-                              </span>
-                              <span class="fsrs-stat">
-                                <strong>Next Due:</strong> {{ formatDetailedDue(card.due_at) }}
-                              </span>
-                              <span v-if="card.lapses !== undefined" class="fsrs-stat">
-                                <strong>Lapses:</strong> {{ card.lapses }}
-                              </span>
+                          <!-- Inline Edit Mode -->
+                          <div v-if="editingCardId === card.id" class="card-edit-container">
+                            <div class="edit-field-group">
+                              <label class="edit-field-label">
+                                <span class="qa-indicator">Q</span>
+                                <span>Question (Prompt)</span>
+                              </label>
+                              <textarea
+                                v-model="editPrompt"
+                                class="edit-field-textarea"
+                                rows="3"
+                                placeholder="Enter flashcard question..."
+                                :disabled="savingEdit"
+                              ></textarea>
                             </div>
 
-                            <!-- Guarded Danger Action (Safe secondary delete) -->
-                            <div class="expanded-actions">
+                            <div class="edit-field-group">
+                              <label class="edit-field-label">
+                                <span class="qa-indicator ans-ind">A</span>
+                                <span>Answer</span>
+                              </label>
+                              <textarea
+                                v-model="editAnswer"
+                                class="edit-field-textarea"
+                                rows="4"
+                                placeholder="Enter flashcard answer..."
+                                :disabled="savingEdit"
+                              ></textarea>
+                            </div>
+
+                            <div class="edit-form-actions">
                               <button
                                 type="button"
-                                class="guarded-delete-btn"
-                                title="Permanently delete this card"
-                                :disabled="pendingCardIds.has(card.id)"
-                                @click="confirmDeleteCard(card)"
+                                class="edit-cancel-btn"
+                                :disabled="savingEdit"
+                                @click="cancelEditingCard"
                               >
-                                <BaseIcon name="trash" size="12" />
-                                <span>Delete Card</span>
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                class="edit-save-btn"
+                                :disabled="savingEdit"
+                                @click="saveCardEdit(card)"
+                              >
+                                <BaseIcon v-if="savingEdit" name="refresh" size="12" class="spin-anim" />
+                                <BaseIcon v-else name="check" size="12" />
+                                <span>{{ savingEdit ? 'Saving...' : 'Save Changes' }}</span>
                               </button>
                             </div>
                           </div>
+
+                          <!-- Read-only View Mode -->
+                          <template v-else>
+                            <!-- Full Answer -->
+                            <div class="expanded-answer-box">
+                              <div class="answer-badge-label">
+                                <span class="qa-indicator ans-ind">A</span>
+                                <span>Answer</span>
+                              </div>
+                              <div class="answer-content-text">{{ card.answer }}</div>
+                            </div>
+
+                            <!-- FSRS Telemetry & Safe Actions Footer -->
+                            <div class="expanded-footer">
+                              <div class="fsrs-stats-group">
+                                <span class="fsrs-stat">
+                                  <strong>Reps:</strong> {{ card.reps || 0 }}
+                                </span>
+                                <span class="fsrs-stat">
+                                  <strong>Interval:</strong> {{ formatInterval(card.stability) }}
+                                </span>
+                                <span class="fsrs-stat">
+                                  <strong>Next Due:</strong> {{ formatDetailedDue(card.due_at) }}
+                                </span>
+                                <span v-if="card.lapses !== undefined" class="fsrs-stat">
+                                  <strong>Lapses:</strong> {{ card.lapses }}
+                                </span>
+                              </div>
+
+                              <div class="expanded-actions">
+                                <button
+                                  type="button"
+                                  class="guarded-edit-btn"
+                                  title="Edit card prompt and answer"
+                                  :disabled="pendingCardIds.has(card.id)"
+                                  @click="startEditingCard(card)"
+                                >
+                                  <BaseIcon name="edit" size="12" />
+                                  <span>Edit Card</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class="guarded-delete-btn"
+                                  title="Permanently delete this card"
+                                  :disabled="pendingCardIds.has(card.id)"
+                                  @click="confirmDeleteCard(card)"
+                                >
+                                  <BaseIcon name="trash" size="12" />
+                                  <span>Delete Card</span>
+                                </button>
+                              </div>
+                            </div>
+                          </template>
                         </div>
                       </div>
                     </div>
@@ -356,6 +420,7 @@ import {
   toggleCardSuspension,
   toggleNotebookCardsSuspension,
   deleteFlashcard,
+  updateFlashcardContent,
 } from '../services/appApi.js'
 import { useDialog } from '../composables/useDialog'
 import { useToast } from '../composables/useToast'
@@ -383,6 +448,61 @@ const searchQuery = ref('')
 const statusFilter = ref('all') // 'all' | 'due' | 'active' | 'suspended'
 const expandedNotebooks = ref(new Set())
 const expandedCardIds = ref(new Set())
+
+// Inline Edit State
+const editingCardId = ref(null)
+const editPrompt = ref('')
+const editAnswer = ref('')
+const savingEdit = ref(false)
+
+function startEditingCard(card) {
+  editingCardId.value = card.id
+  editPrompt.value = card.prompt || ''
+  editAnswer.value = card.answer || ''
+  if (!expandedCardIds.value.has(card.id)) {
+    expandedCardIds.value = new Set(expandedCardIds.value).add(card.id)
+  }
+}
+
+function cancelEditingCard() {
+  editingCardId.value = null
+  editPrompt.value = ''
+  editAnswer.value = ''
+}
+
+async function saveCardEdit(card) {
+  const trimmedPrompt = editPrompt.value.trim()
+  const trimmedAnswer = editAnswer.value.trim()
+
+  if (!trimmedPrompt) {
+    showError('Card question cannot be empty')
+    return
+  }
+  if (!trimmedAnswer) {
+    showError('Card answer cannot be empty')
+    return
+  }
+
+  savingEdit.value = true
+  try {
+    const res = await updateFlashcardContent(card.id, trimmedPrompt, trimmedAnswer)
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
+    if (res && res.ok) {
+      card.prompt = trimmedPrompt
+      card.answer = trimmedAnswer
+      editingCardId.value = null
+      showNotice('Flashcard updated')
+      emit('updated')
+    }
+  } catch (err) {
+    showError(err?.message || 'Failed to update flashcard')
+  } finally {
+    savingEdit.value = false
+  }
+}
 
 const metrics = ref({
   total_cards: 0,
@@ -1202,7 +1322,7 @@ onUnmounted(() => {
 
 .action-toggle-btn.pause-mode:hover {
   background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
+  color: #dc2626;
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -1361,9 +1481,9 @@ onUnmounted(() => {
 
 .pill-due {
   background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  color: #dc2626;
 }
-.pill-due .dot { background: #f87171; }
+.pill-due .dot { background: #dc2626; }
 
 .pill-neutral,
 .pill-stability {
@@ -1478,6 +1598,33 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
+.expanded-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guarded-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.guarded-edit-btn:hover {
+  background: var(--surface-container-high, #3c3836);
+  border-color: var(--outline);
+  color: var(--accent-color, #fabd2f);
+}
+
 .guarded-delete-btn {
   display: flex;
   align-items: center;
@@ -1488,7 +1635,7 @@ onUnmounted(() => {
   font-weight: 600;
   background: transparent;
   border: 1px solid var(--outline-variant);
-  color: #f87171;
+  color: #dc2626;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1496,6 +1643,111 @@ onUnmounted(() => {
 .guarded-delete-btn:hover {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Inline Edit Card Form */
+.card-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface-container-low, #1d2021);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+}
+
+.edit-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.edit-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.edit-field-textarea {
+  width: 100%;
+  background: var(--surface-container-lowest, #141617);
+  border: 1px solid var(--outline-variant);
+  border-radius: 6px;
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.edit-field-textarea:focus {
+  border-color: var(--accent-color, #fabd2f);
+}
+
+.edit-field-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.edit-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.edit-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--muted-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-cancel-btn:hover:not(:disabled) {
+  background: var(--surface-container-high, #3c3836);
+  color: var(--on-surface);
+}
+
+.edit-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent-color, #fabd2f);
+  color: #1a1a1a;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.edit-save-btn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.edit-save-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.edit-save-btn:disabled,
+.edit-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Modal Transition */

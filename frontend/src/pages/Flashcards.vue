@@ -223,8 +223,11 @@
                   :disabled="isSubmittingReview"
                   @click="rate(r.key)"
                 >
-                  <BaseIcon v-if="r.icon" :name="r.icon" size="13" />
-                  <span>{{ r.label }}</span>
+                  <span v-if="getCardInterval(r.key)" class="rating-interval">{{ getCardInterval(r.key) }}</span>
+                  <div class="rating-label-wrap">
+                    <BaseIcon v-if="r.icon" :name="r.icon" size="13" />
+                    <span>{{ r.label }}</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -352,6 +355,17 @@ const ratings = [
   { key: 'good', label: 'Good', icon: 'check', value: 3 },
   { key: 'easy', label: 'Easy', icon: 'zap', value: 4 },
 ]
+
+function getCardInterval(key) {
+  const card = currentCard.value
+  if (!card) return ''
+  if (card.intervals && card.intervals[key]) {
+    return card.intervals[key]
+  }
+  // Default fallback for brand-new/manual sandbox cards
+  const defaults = { again: '<10m', hard: '1d', good: '3d', easy: '7d' }
+  return defaults[key] || ''
+}
 
 const canGenerate = computed(
   () =>
@@ -813,7 +827,7 @@ async function loadQueueSession(taskID, notebookID = '') {
 }
 .progress-row {
   width: 100%;
-  max-width: 560px;
+  max-width: 720px;
   display: grid;
   gap: 6px;
 }
@@ -861,16 +875,17 @@ async function loadQueueSession(taskID, notebookID = '') {
 /* Flashcard Flip */
 .flashcard {
   width: 100%;
-  max-width: 560px;
+  max-width: 720px;
   perspective: 1200px;
 }
 .card-inner {
   position: relative;
   width: 100%;
-  padding-bottom: 62%;
+  min-height: 420px;
+  padding-bottom: 58%;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 16px;
+  border-radius: 20px;
 }
 .flashcard.flipped .card-inner {
   transform: rotateY(180deg);
@@ -879,14 +894,14 @@ async function loadQueueSession(taskID, notebookID = '') {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid var(--outline-variant);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 32px 28px;
+  gap: 20px;
+  padding: 40px 36px;
 }
 .card-front {
   background: var(--surface-container-lowest);
@@ -897,28 +912,29 @@ async function loadQueueSession(taskID, notebookID = '') {
 }
 .card-text {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--on-surface);
   text-align: center;
-  line-height: 1.6;
-  max-width: 48ch;
+  line-height: 1.65;
+  max-width: 54ch;
   white-space: pre-line;
 }
 .card-text :deep(img),
 .card-text img {
   max-width: 100%;
-  max-height: 220px;
+  max-height: 260px;
   object-fit: contain;
-  border-radius: 8px;
-  margin: 8px auto;
+  border-radius: 10px;
+  margin: 12px auto;
   display: block;
 }
 .card-text :deep(audio),
 .card-text audio {
   max-width: 100%;
-  height: 36px;
-  margin: 8px auto;
+  width: 320px;
+  height: 40px;
+  margin: 12px auto;
   display: block;
 }
 .answer-text {
@@ -956,9 +972,12 @@ async function loadQueueSession(taskID, notebookID = '') {
 }
 .rating-btn {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 3px;
   padding: 8px 16px;
+  min-width: 82px;
   border: 0;
   border-radius: 10px;
   font: inherit;
@@ -970,6 +989,17 @@ async function loadQueueSession(taskID, notebookID = '') {
     filter 0.12s ease;
   background: var(--surface-container-lowest);
   color: var(--on-surface);
+}
+.rating-interval {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+}
+.rating-label-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .rating-btn:active:not(:disabled) {
   transform: scale(0.95);

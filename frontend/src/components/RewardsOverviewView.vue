@@ -568,10 +568,10 @@ const progressPercent = computed(() => {
   display: block;
 }
 
-.tier-bronze .chest-vault-tier { color: #d97706; }
-.tier-silver .chest-vault-tier { color: #cbd5e1; }
-.tier-gold .chest-vault-tier { color: #fbbf24; }
-.tier-mythic .chest-vault-tier { color: #c084fc; }
+.tier-bronze .chest-vault-tier { color: #b45309; }
+.tier-silver .chest-vault-tier { color: var(--on-surface-variant); }
+.tier-gold .chest-vault-tier { color: #b45309; }
+.tier-mythic .chest-vault-tier { color: #7c3aed; }
 
 .buy-error-msg {
   margin-top: 0.5rem;

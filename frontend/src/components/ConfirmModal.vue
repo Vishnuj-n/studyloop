@@ -215,20 +215,20 @@ onUnmounted(() => {
 }
 
 .dialog-icon-wrapper.danger {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: color-mix(in srgb, #dc2626 14%, transparent);
+  color: #dc2626;
   border: 1px solid var(--outline-variant);
 }
 
 .dialog-icon-wrapper.warning {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  color: #d97706;
   border: 1px solid var(--outline-variant);
 }
 
 .dialog-icon-wrapper.info {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
   border: 1px solid var(--outline-variant);
 }
 
@@ -239,9 +239,9 @@ onUnmounted(() => {
 .dialog-title {
   margin: 0;
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
-  color: var(--on-surface, #f4f4f5);
+  color: var(--on-surface);
 }
 
 .dialog-body {
@@ -251,7 +251,7 @@ onUnmounted(() => {
 .dialog-message {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--muted-text, #a1a1aa);
+  color: var(--on-surface-variant);
   line-height: 1.5;
 }
 

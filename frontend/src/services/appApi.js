@@ -137,7 +137,10 @@ export function generateManualFlashcards(notebookID, startPage, endPage) {
   return appBridge().GenerateManualFlashcards(notebookID, startPage, endPage)
 }
 
-export function generateComprehensiveExam(notebookID, startPage, endPage) {
+export function generateComprehensiveExam(notebookID, startPage, endPage, quizTaskID = '') {
+  if (appBridge().GenerateVivaExam) {
+    return appBridge().GenerateVivaExam(notebookID, startPage, endPage, quizTaskID)
+  }
   return appBridge().GenerateComprehensiveExam(notebookID, startPage, endPage)
 }
 
@@ -171,6 +174,10 @@ export function toggleCardSuspension(cardID, suspended) {
 
 export function toggleNotebookCardsSuspension(notebookID, suspended) {
   return appBridge().ToggleNotebookCardsSuspension(notebookID, suspended)
+}
+
+export function updateFlashcardContent(cardID, prompt, answer) {
+  return appBridge().UpdateFlashcardContent(cardID, prompt, answer)
 }
 
 export function deleteFlashcard(cardID) {
@@ -504,6 +511,25 @@ export function openDataDirectory(subDir = '') {
     return { error: err.message }
   }
 }
+
+export function getNotebookCertificateStats(notebookID) {
+  try {
+    return appBridge().GetNotebookCertificateStats(notebookID)
+  } catch (err) {
+    console.error('Failed fetching notebook certificate stats:', err)
+    throw err
+  }
+}
+
+export function devUnlockNotebookCertificate(notebookID) {
+  try {
+    return appBridge().DevUnlockNotebookCertificate(notebookID)
+  } catch (err) {
+    console.error('Failed dev-unlocking notebook certificate:', err)
+    throw err
+  }
+}
+
 
 
 

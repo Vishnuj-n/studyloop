@@ -301,23 +301,23 @@ function profileTaskSubtitle(profile) {
 }
 
 .profile-pace-badge.pace-ontrack {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
+  background: color-mix(in srgb, #059669 14%, transparent);
+  color: #059669;
 }
 
 .profile-pace-badge.pace-behind {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background: color-mix(in srgb, #dc2626 14%, transparent);
+  color: #dc2626;
 }
 
 .profile-pace-badge.pace-ahead {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
 }
 
 .profile-pace-badge.pace-unavailable {
-  background: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
+  background: color-mix(in srgb, var(--on-surface-variant) 14%, transparent);
+  color: var(--on-surface-variant);
 }
 
 .profile-menu-divider {

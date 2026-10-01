@@ -1367,3 +1367,23 @@ func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{}
 		"status":      "processing",
 	}
 }
+
+// GetNotebookCertificateStats retrieves aggregated study stats and unlock criteria for a notebook certificate.
+func (a *App) GetNotebookCertificateStats(notebookID string) (*db.NotebookCertificateStats, error) {
+	repo := a.getRepo()
+	if repo == nil {
+		return nil, errors.New("database not initialized")
+	}
+	return repo.GetNotebookCertificateStats(notebookID)
+}
+
+// DevUnlockNotebookCertificate is a developer bypass that completes remaining reading tasks & topic cursors for a notebook so the user can immediately test 100% completion & certificates.
+func (a *App) DevUnlockNotebookCertificate(notebookID string) (*db.NotebookCertificateStats, error) {
+	repo := a.getRepo()
+	if repo == nil {
+		return nil, errors.New("database not initialized")
+	}
+
+	return repo.DevUnlockNotebookCertificate(notebookID)
+}
+

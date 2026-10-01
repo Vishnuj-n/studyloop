@@ -39,6 +39,32 @@
         </div>
       </div>
 
+      <!-- Dev Certificate Testing Card -->
+      <div class="dev-actions-card" style="margin-top: 12px;">
+        <div class="actions-header">
+          <h4>Certificate Testing Bypass</h4>
+          <p class="hint">Instantly advance all chapters and complete queue tasks for any textbook to test 100% completion &amp; certificate rendering.</p>
+        </div>
+        <div class="actions-buttons" style="display: flex; gap: 8px; align-items: center;">
+          <select v-model="selectedDevNotebookId" class="priority-select" style="max-width: 240px;">
+            <option value="" disabled>Select a Notebook</option>
+            <option v-for="nb in devNotebooks" :key="nb.id" :value="nb.id">
+              {{ nb.title }} ({{ nb.completion_percent || 0 }}%)
+            </option>
+          </select>
+          <button
+            type="button"
+            class="action-btn"
+            style="background: #d4af37; color: #12141a;"
+            :disabled="!selectedDevNotebookId || devUnlocking"
+            @click="handleDevUnlockCertificate"
+          >
+            <BaseIcon name="award" size="14" />
+            <span>{{ devUnlocking ? 'Completing...' : 'Unlock 100% & Certificate' }}</span>
+          </button>
+        </div>
+      </div>
+
       <div class="section-title-row">
         <div>
           <h3>Reading Queue &amp; Task History</h3>
@@ -166,16 +192,20 @@
 import { ref, onMounted, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import SettingsToggle from './SettingsToggle.vue'
+import { useDialog } from '../composables/useDialog'
 import {
   getReadingTaskHistory,
   getLLMPromptLogging,
   setLLMPromptLogging,
   openDataDirectory,
   revertReadingTaskSession,
+  getNotebooks,
+  devUnlockNotebookCertificate,
 } from '../services/appApi'
 
 const DEV_MODE_STORAGE_KEY = 'studyloop_dev_mode_enabled'
 
+const { confirm: confirmDialog } = useDialog()
 const devModeEnabled = ref(localStorage.getItem(DEV_MODE_STORAGE_KEY) === 'true')
 const llmPromptLogEnabled = ref(false)
 const logs = ref([])
@@ -187,12 +217,55 @@ const loading = ref(false)
 const revertingId = ref('')
 const error = ref('')
 const successMessage = ref('')
+const devNotebooks = ref([])
+const selectedDevNotebookId = ref('')
+const devUnlocking = ref(false)
+
+async function handleDevUnlockCertificate() {
+  if (!selectedDevNotebookId.value || devUnlocking.value) return
+  devUnlocking.value = true
+  error.value = ''
+  successMessage.value = ''
+  try {
+    const res = await devUnlockNotebookCertificate(selectedDevNotebookId.value)
+    if (res?.error) {
+      error.value = res.error
+    } else {
+      successMessage.value = `Successfully unlocked 100% completion & certificate for "${res?.notebook_title || 'textbook'}". Visit the Notebooks page to view your Certificate!`
+      await loadDevNotebooks()
+    }
+  } catch (err) {
+    console.error('Failed dev unlock:', err)
+    error.value = err.message || 'Failed to complete notebook'
+  } finally {
+    devUnlocking.value = false
+  }
+}
+
+async function loadDevNotebooks() {
+  try {
+    const list = await getNotebooks('', '')
+    if (Array.isArray(list)) {
+      devNotebooks.value = list
+      if (!selectedDevNotebookId.value && list.length > 0) {
+        selectedDevNotebookId.value = list[0].id
+      }
+    }
+  } catch (err) {
+    console.warn('Failed loading notebooks for dev panel:', err)
+  }
+}
 
 async function handleRevertSession(taskID) {
   if (!taskID || revertingId.value) return
-  const confirmed = window.confirm(
-    'Are you sure you want to revert this completed reading session? This will restore the task back to ACTIVE and reset the topic cursor.'
-  )
+  const confirmed = await confirmDialog({
+    title: 'Revert Reading Session',
+    message:
+      'Are you sure you want to revert this completed reading session? This will restore the task back to ACTIVE and reset the topic cursor.',
+    confirmText: 'Revert Session',
+    cancelText: 'Cancel',
+    type: 'warning',
+  })
   if (!confirmed) return
 
   revertingId.value = taskID
@@ -226,6 +299,7 @@ async function handleOpenDataDir(subDir = '') {
 onMounted(async () => {
   if (devModeEnabled.value) {
     resetAndFetch()
+    loadDevNotebooks()
   }
   try {
     llmPromptLogEnabled.value = await getLLMPromptLogging()
@@ -247,8 +321,9 @@ watch(llmPromptLogEnabled, async (newVal) => {
 
 watch(devModeEnabled, (newVal) => {
   localStorage.setItem(DEV_MODE_STORAGE_KEY, String(newVal))
-  if (newVal && logs.value.length === 0) {
-    resetAndFetch()
+  if (newVal) {
+    if (logs.value.length === 0) resetAndFetch()
+    loadDevNotebooks()
   }
 })
 

@@ -143,13 +143,13 @@ function handleAcknowledge() {
 .main-msg {
   margin: 0;
   font-size: 14px;
-  color: var(--on-surface, #f8fafc);
+  color: var(--on-surface);
   line-height: 1.5;
 }
 
 .privacy-highlights {
-  background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -162,19 +162,20 @@ function handleAcknowledge() {
   align-items: flex-start;
   gap: 8px;
   font-size: 13px;
-  color: var(--on-surface-variant, #cbd5e1);
+  color: var(--on-surface-variant);
   line-height: 1.4;
+  font-weight: 500;
 }
 
 .status-icon {
-  color: #10b981;
+  color: #059669;
   font-weight: bold;
 }
 
 .sub-msg {
   margin: 0;
   font-size: 12px;
-  color: var(--muted-text, #94a3b8);
+  color: var(--on-surface-variant);
   line-height: 1.4;
 }
 

@@ -1,6 +1,7 @@
 package study
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,63 +13,128 @@ import (
 )
 
 // GenerateComprehensiveExam generates a short-answer written assessment question
-// from the raw text of a notebook's page range (no RAG / ONNX).
+// synthesized from quiz questions or from the raw text of a notebook's page range (no RAG / ONNX).
 func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, endPage int) map[string]interface{} {
+	return s.GenerateVivaExam(notebookID, startPage, endPage, "")
+}
+
+// GenerateVivaExam generates a viva question from either a quiz task or page range.
+func (s *StudyService) GenerateVivaExam(notebookID string, startPage, endPage int, quizTaskID string) map[string]interface{} {
 	notebookID = strings.TrimSpace(notebookID)
-	if notebookID == "" {
-		return map[string]interface{}{"error": "notebook ID is required"}
-	}
-	if startPage <= 0 || endPage <= 0 || endPage < startPage {
-		return map[string]interface{}{"error": fmt.Sprintf("invalid page range: start=%d end=%d", startPage, endPage)}
-	}
-
-	contextChunks, tokenCount, err := s.buildPageBoundedContext(notebookID, startPage, endPage)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	if len(contextChunks) == 0 {
-		nb, nbErr := s.repo.GetNotebookByID(notebookID)
-		if nbErr == nil && nb != nil && nb.StartPage > 0 && nb.EndPage > 0 {
-			return map[string]interface{}{
-				"error": fmt.Sprintf("no content found in page range %d-%d (notebook content is on pages %d-%d)", startPage, endPage, nb.StartPage, nb.EndPage),
-			}
-		}
-		return map[string]interface{}{"error": fmt.Sprintf("no content found in page range %d-%d", startPage, endPage)}
-	}
-
-	rawContextText := buildContextTextFromChunks(contextChunks)
-
-	llm, tier := s.selectLLM(rawContextText)
-	if llm == nil {
-		return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
+	quizTaskID = strings.TrimSpace(quizTaskID)
+	if notebookID == "" && quizTaskID == "" {
+		return map[string]interface{}{"error": "notebook ID or quiz task ID is required"}
 	}
 
 	notebookTitle := notebookID
+	var quizQuestions []models.QuizTaskQuestion
+
+	// If quizTaskID is provided, attempt to load questions from the quiz task
+	if quizTaskID != "" {
+		task, err := s.repo.GetTaskByID(quizTaskID)
+		if err == nil {
+			if notebookID == "" {
+				notebookID = task.NotebookID
+			}
+			if startPage <= 0 {
+				startPage = task.StartPage
+			}
+			if endPage <= 0 {
+				endPage = task.EndPage
+			}
+
+			if task.TaskType == models.StudyTaskTypeMilestoneExam {
+				if compiledPayload, cErr := CompileMilestonePayload(s.repo, &task); cErr == nil && len(compiledPayload.Questions) > 0 {
+					quizQuestions = compiledPayload.Questions
+				}
+			} else if strings.TrimSpace(task.PayloadJSON) != "" {
+				var payload models.QuizTaskPayload
+				if uErr := json.Unmarshal([]byte(task.PayloadJSON), &payload); uErr == nil && len(payload.Questions) > 0 {
+					quizQuestions = payload.Questions
+				}
+			}
+		}
+	}
+
 	if nb, nbErr := s.repo.GetNotebookByID(notebookID); nbErr == nil && nb != nil && strings.TrimSpace(nb.Title) != "" {
 		notebookTitle = strings.TrimSpace(nb.Title)
 	}
 
-	limits := llm.GetLimits()
-	templatePrompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, "")
-	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+	var prompt string
+	var llm LLMProvider
+	var tier string
+
+	if len(quizQuestions) > 0 {
+		// MCQ-derived Viva Synthesis
+		rawContextText := buildContextTextFromQuizQuestions(quizQuestions)
+		llm, tier = s.selectLLM(rawContextText)
+		if llm == nil {
+			return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
+		}
+
+		limits := llm.GetLimits()
+		templatePrompt := buildVivaFromQuizPrompt(notebookTitle, startPage, endPage, "")
+		availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+
+		contextText, err := BudgetTextSample(rawContextText, availableBudget)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		if strings.TrimSpace(contextText) == "" {
+			return map[string]interface{}{"error": fmt.Sprintf("no quiz context fits within configured Max Input Tokens (%d)", limits.MaxInputTokens)}
+		}
+
+		prompt = buildVivaFromQuizPrompt(notebookTitle, startPage, endPage, contextText)
+	} else {
+		if startPage <= 0 || endPage <= 0 || endPage < startPage {
+			return map[string]interface{}{"error": fmt.Sprintf("invalid page range: start=%d end=%d", startPage, endPage)}
+		}
+
+		contextChunks, tokenCount, err := s.buildPageBoundedContext(notebookID, startPage, endPage)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		if len(contextChunks) == 0 {
+			nb, nbErr := s.repo.GetNotebookByID(notebookID)
+			if nbErr == nil && nb != nil && nb.StartPage > 0 && nb.EndPage > 0 {
+				return map[string]interface{}{
+					"error": fmt.Sprintf("no content found in page range %d-%d (notebook content is on pages %d-%d)", startPage, endPage, nb.StartPage, nb.EndPage),
+				}
+			}
+			return map[string]interface{}{"error": fmt.Sprintf("no content found in page range %d-%d", startPage, endPage)}
+		}
+
+		rawContextText := buildContextTextFromChunks(contextChunks)
+		llm, tier = s.selectLLM(rawContextText)
+		if llm == nil {
+			return map[string]interface{}{"error": "no LLM provider available (tier: " + tier + ")"}
+		}
+
+		limits := llm.GetLimits()
+		templatePrompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, "")
+		availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templatePrompt)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+
+		budgetedChunks, err := BudgetChunksToLimit(contextChunks, availableBudget)
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		if len(budgetedChunks) == 0 {
+			return map[string]interface{}{"error": fmt.Sprintf("no content chunks fit within configured Max Input Tokens (%d)", limits.MaxInputTokens)}
+		}
+		contextText := buildContextTextFromChunks(budgetedChunks)
+
+		utils.Warnf("[EXAMINER] generate_exam notebookID=%s page_range=%d-%d total_chunks=%d included_chunks=%d est_tokens=%d max_input=%d tier=%s model=%s",
+			notebookID, startPage, endPage, len(contextChunks), len(budgetedChunks), tokenCount, limits.MaxInputTokens, tier, providerModelName(llm))
+
+		prompt = buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, contextText)
 	}
 
-	// Budget context chunks strictly to fit within available budget
-	budgetedChunks, err := BudgetChunksToLimit(contextChunks, availableBudget)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	if len(budgetedChunks) == 0 {
-		return map[string]interface{}{"error": fmt.Sprintf("no content chunks fit within configured Max Input Tokens (%d)", limits.MaxInputTokens)}
-	}
-	contextText := buildContextTextFromChunks(budgetedChunks)
-
-	utils.Warnf("[EXAMINER] generate_exam notebookID=%s page_range=%d-%d total_chunks=%d included_chunks=%d est_tokens=%d max_input=%d tier=%s model=%s",
-		notebookID, startPage, endPage, len(contextChunks), len(budgetedChunks), tokenCount, limits.MaxInputTokens, tier, providerModelName(llm))
-
-	prompt := buildComprehensiveExamPrompt(notebookTitle, startPage, endPage, contextText)
 	raw, err := llm.GenerateAnswer(prompt)
 	if err != nil {
 		formattedErr := s.FormatLLMError(err, tier)
@@ -111,7 +177,7 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 		SourcePageStart: startPage,
 		SourcePageEnd:   endPage,
 		LLMModel:        providerModelName(llm),
-		PromptVersion:   "comprehensive-exam-v1",
+		PromptVersion:   "comprehensive-exam-v2",
 	}
 	if err := s.repo.CreateWrittenQuestionTx(tx, question); err != nil {
 		return map[string]interface{}{"error": "failed to persist comprehensive exam question: " + err.Error()}
@@ -133,6 +199,40 @@ func (s *StudyService) GenerateComprehensiveExam(notebookID string, startPage, e
 		"source_page_start": startPage,
 		"source_page_end":   endPage,
 	}
+}
+
+func buildContextTextFromQuizQuestions(questions []models.QuizTaskQuestion) string {
+	var b strings.Builder
+	for i, q := range questions {
+		fmt.Fprintf(&b, "Question %d: %s\n", i+1, strings.TrimSpace(q.Prompt))
+		if strings.TrimSpace(q.CorrectAnswer) != "" {
+			fmt.Fprintf(&b, "Correct Answer: %s\n", strings.TrimSpace(q.CorrectAnswer))
+		}
+		b.WriteString("\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func buildVivaFromQuizPrompt(notebookTitle string, startPage, endPage int, quizContext string) string {
+	var b strings.Builder
+	b.WriteString("You are an expert AI tutor conducting an oral viva examination.\n")
+	fmt.Fprintf(&b, "The student just answered the following multiple-choice questions from pages %d-%d of notebook '%s'.\n\n",
+		startPage, endPage, notebookTitle)
+
+	b.WriteString(`Return STRICT JSON only in this shape: {"prompt":"..."}.` + "\n")
+	b.WriteString("Your task is to synthesize ONE open-ended spoken viva question based on the concepts tested in these questions.\n")
+	b.WriteString("The viva question must require the student to explain the deeper underlying mechanism, synthesize relationships between these concepts, or explain WHY/HOW the principle works in their own words.\n\n")
+	b.WriteString("Rules:\n")
+	b.WriteString("- Ask exactly one clear synthesis question.\n")
+	b.WriteString("- Target the core underlying concepts tested in the quiz questions.\n")
+	b.WriteString("- Avoid simple repetition of a multiple-choice question or factual recall.\n")
+	b.WriteString("- Encourage a 30–90 second spoken explanation.\n")
+	b.WriteString("- Maximum 35 words.\n")
+	b.WriteString("- Do not include answer choices, rubric, hints, preamble, or markdown.\n")
+	b.WriteString("\n=== QUIZ QUESTIONS AND CONCEPTS ===\n")
+	b.WriteString(quizContext)
+
+	return b.String()
 }
 
 func buildComprehensiveExamPrompt(notebookTitle string, startPage, endPage int, contextText string) string {

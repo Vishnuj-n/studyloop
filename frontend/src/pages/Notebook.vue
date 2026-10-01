@@ -53,6 +53,7 @@
           @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
+          @view-certificate="openCertificateModal"
           @delete="deleteNotebook"
         />
       </div>
@@ -95,6 +96,7 @@
           @upgrade-deep="handleUpgradeToDeepPDF"
           @update-priority="updatePriority"
           @change-status="setStudyStatus"
+          @view-certificate="openCertificateModal"
           @delete="deleteNotebook"
         />
       </div>
@@ -116,6 +118,14 @@
       @close="closeSyllabusModal"
       @ai-cleanup="aiCleanupChapters"
       @confirm="handleConfirmSyllabus"
+    />
+
+    <!-- Certificate Modal -->
+    <NotebookCertificateModal
+      v-if="showCertificateModal && certificateStats"
+      :stats="certificateStats"
+      :fresh-unlock="certificateFreshUnlock"
+      @close="closeCertificateModal"
     />
 
     <div class="toast-stack">
@@ -173,6 +183,8 @@ import {
   upgradeNotebookToDeepPDF as apiUpgradeNotebookToDeepPDF,
   updateNotebookStudyStatus,
   getUserSettings,
+  getNotebookCertificateStats,
+  devUnlockNotebookCertificate,
 } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import {
@@ -183,6 +195,7 @@ import {
 import NotebookUpload from '../components/NotebookUpload.vue'
 import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
+import NotebookCertificateModal from '../components/NotebookCertificateModal.vue'
 import BaseIcon from '../components/BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
 
@@ -232,6 +245,34 @@ let loadNotebooksToken = 0
 const ragEnabled = ref(false)
 const ragNotebookChapter = ref(true)
 const maxActiveNotebooks = ref(4)
+
+const showCertificateModal = ref(false)
+const certificateStats = ref(null)
+const certificateFreshUnlock = ref(false)
+
+async function openCertificateModal(notebookID, isFresh = false) {
+  try {
+    const stats = await getNotebookCertificateStats(notebookID)
+    if (stats) {
+      certificateStats.value = stats
+      certificateFreshUnlock.value = isFresh
+      showCertificateModal.value = true
+    }
+  } catch (err) {
+    console.error('Failed opening certificate modal:', err)
+    alertDialog({
+      title: 'Certificate Unavailable',
+      message: 'Failed to retrieve certificate details for this notebook.',
+      type: 'error',
+    })
+  }
+}
+
+function closeCertificateModal() {
+  showCertificateModal.value = false
+  certificateStats.value = null
+  certificateFreshUnlock.value = false
+}
 
 const activeNotebooks = computed(() => {
   if (!Array.isArray(notebooks.value)) return []

@@ -750,11 +750,8 @@ async function handleGoToExaminer() {
   const startP = taskMeta.value?.start_page || startPage.value || 1
   const endP = taskMeta.value?.end_page || endPage.value || startP
 
-  // Defer flashcard generation to avoid double LLM calls (429 TPM limit) when Examiner auto-generates
-  const quizTaskId =
-    result.value?.passed && result.value?.flashcards_pending
-      ? result.value?.task_id || taskID.value || ''
-      : ''
+  const quizTaskId = result.value?.task_id || taskID.value || ''
+  const hasPendingFlashcards = Boolean(result.value?.passed && result.value?.flashcards_pending)
 
   const query = {
     notebookID: nbID,
@@ -764,6 +761,9 @@ async function handleGoToExaminer() {
   }
   if (quizTaskId) {
     query.quizTaskId = quizTaskId
+  }
+  if (hasPendingFlashcards) {
+    query.flashcardsPending = 'true'
   }
 
   router.push({

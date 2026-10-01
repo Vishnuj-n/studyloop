@@ -716,7 +716,7 @@ onUnmounted(() => {
 }
 
 .update-modal {
-  background: var(--surface-container-lowest, #0f172a);
+  background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   border-radius: 20px;
   padding: 32px;
@@ -748,25 +748,27 @@ onUnmounted(() => {
 
 .warning-icon {
   font-size: 28px;
+  color: var(--primary);
 }
 
 .update-modal-header h2 {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
-  color: var(--on-surface, #ffffff);
+  color: var(--on-surface);
 }
 
 .update-modal-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: var(--on-surface, #f8fafc);
+  color: var(--on-surface);
 }
 
 .update-msg {
   margin: 0;
   font-size: 15px;
+  color: var(--on-surface);
 }
 
 .version-badge-container {
@@ -774,7 +776,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: var(--surface-container-low, rgba(255, 255, 255, 0.03));
+  background: var(--surface-container-low);
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--outline-variant);
@@ -789,26 +791,26 @@ onUnmounted(() => {
 }
 
 .version-badge.current {
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+  color: #dc2626;
   border: 1px solid var(--outline-variant);
 }
 
 .version-badge.latest {
-  background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
+  background: color-mix(in srgb, #059669 12%, transparent);
+  color: #059669;
   border: 1px solid var(--outline-variant);
 }
 
 .version-arrow {
-  color: var(--muted-text, #94a3b8);
+  color: var(--on-surface-variant);
   font-weight: bold;
 }
 
 .warning-text {
   margin: 0;
   font-size: 13px;
-  color: var(--muted-text, #94a3b8);
+  color: var(--on-surface-variant);
   line-height: 1.5;
 }
 

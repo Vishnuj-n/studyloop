@@ -461,6 +461,13 @@ type ReviewSessionPayload struct {
 	CreatedAtUnix int64 `json:"created_at_unix"`
 }
 
+type NextReviewIntervals struct {
+	Again string `json:"again"`
+	Hard  string `json:"hard"`
+	Good  string `json:"good"`
+	Easy  string `json:"easy"`
+}
+
 type ReviewSessionCard struct {
 	CardID        string               `json:"card_id"`
 	TaskID        string               `json:"task_id"`
@@ -472,6 +479,7 @@ type ReviewSessionCard struct {
 	Answer        string               `json:"answer"`
 	DueAt         int64                `json:"due_at,omitempty"`
 	Suspended     bool                 `json:"suspended"`
+	Intervals     *NextReviewIntervals `json:"intervals,omitempty"`
 }
 
 type ReviewSession struct {
@@ -691,37 +699,24 @@ type LLMSettings struct {
 	Heavy           LLMTierSettings `json:"heavy"`
 }
 
-// UserWager represents an active coin wager on daily or weekly task goals.
-type UserWager struct {
-	ID             string `json:"id"`
-	StakedCoins    int    `json:"staked_coins"`
-	TargetTasks    int    `json:"target_tasks"`
-	CompletedTasks int    `json:"completed_tasks"`
-	RewardCoins    int    `json:"reward_coins"`
-	ExpiresAt      string `json:"expires_at"`
-	Status         string `json:"status"` // "ACTIVE", "WON", "LOST"
-	WagerType      string `json:"wager_type,omitempty"` // "DAILY" or "WEEKLY"
-}
-
 // GamificationProfile represents the persistent user progression and title stats.
 type GamificationProfile struct {
-	UserID                int        `json:"user_id"`
-	Level                 int        `json:"level"`
-	TotalXP               int        `json:"total_xp"`
-	Coins                 int        `json:"coins"`
-	CurrentTitle          string     `json:"current_title"`
-	NextTitle             string     `json:"next_title"`
-	NextTitleXP           int        `json:"next_title_xp"`
-	CurrentTitleMinXP     int        `json:"current_title_min_xp"`
-	StreakFreezesOwned    int        `json:"streak_freezes_owned"`
-	LastFreezePurchasedAt int64      `json:"last_freeze_purchased_at"`
-	FrozenDatesJSON       string     `json:"frozen_dates_json"`
-	UnlockedCosmeticsJSON string     `json:"unlocked_cosmetics_json"`
-	StatsJSON             string     `json:"stats_json"`
-	XPElixirCharges       int        `json:"xp_elixir_charges"`
-	LuckCharmCharges      int        `json:"luck_charm_charges"`
-	ActiveWager           *UserWager `json:"active_wager,omitempty"`
-	UpdatedAt             string     `json:"updated_at"`
+	UserID                int    `json:"user_id"`
+	Level                 int    `json:"level"`
+	TotalXP               int    `json:"total_xp"`
+	Coins                 int    `json:"coins"`
+	CurrentTitle          string `json:"current_title"`
+	NextTitle             string `json:"next_title"`
+	NextTitleXP           int    `json:"next_title_xp"`
+	CurrentTitleMinXP     int    `json:"current_title_min_xp"`
+	StreakFreezesOwned    int    `json:"streak_freezes_owned"`
+	LastFreezePurchasedAt int64  `json:"last_freeze_purchased_at"`
+	FrozenDatesJSON       string `json:"frozen_dates_json"`
+	UnlockedCosmeticsJSON string `json:"unlocked_cosmetics_json"`
+	StatsJSON             string `json:"stats_json"`
+	XPElixirCharges       int    `json:"xp_elixir_charges"`
+	LuckCharmCharges      int    `json:"luck_charm_charges"`
+	UpdatedAt             string `json:"updated_at"`
 }
 
 type CosmeticItem struct {

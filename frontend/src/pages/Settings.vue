@@ -694,7 +694,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .no-search-results {

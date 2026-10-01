@@ -905,3 +905,38 @@ func (r *Repository) DeleteFlashcardByID(cardID string) error {
 	})
 }
 
+// UpdateFlashcardContent updates the prompt and answer text of an existing flashcard.
+func (r *Repository) UpdateFlashcardContent(cardID, prompt, answer string) error {
+	cardID = strings.TrimSpace(cardID)
+	prompt = strings.TrimSpace(prompt)
+	answer = strings.TrimSpace(answer)
+
+	if cardID == "" {
+		return fmt.Errorf("flashcard id is required")
+	}
+	if prompt == "" {
+		return fmt.Errorf("flashcard question cannot be empty")
+	}
+	if answer == "" {
+		return fmt.Errorf("flashcard answer cannot be empty")
+	}
+
+	res, err := r.db.Exec(`
+		UPDATE fsrs_cards
+		SET prompt = ?, answer = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, prompt, answer, cardID)
+	if err != nil {
+		return fmt.Errorf("failed to update flashcard content: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("card not found: %s", cardID)
+	}
+	return nil
+}
+
+
