@@ -55,7 +55,9 @@ func TestDynamicCompressionThreshold(t *testing.T) {
 	// Case 2: Mode = OVER_LIMIT, but tokens (small seeded text) <= Dynamic Budget (3000 * 1.33 = ~3990) -> skips
 	settings.PromptCompressionMode = "OVER_LIMIT"
 	settings.TargetSessionWords = 3000
-	_ = repo.UpdateUserSettings(*settings)
+	if err := repo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("failed to save settings for Case 2: %v", err)
+	}
 
 	err = service.CompressTopicChunks(context.Background(), topicID)
 	if err != nil {

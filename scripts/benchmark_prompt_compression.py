@@ -117,16 +117,15 @@ def run_benchmark():
             print(f"  --> Total Benchmark Duration: {(time.time() - start_time):.2f}s\n")
 
         except Exception as e:
-            print(f"  Warning: Python environment execution fallback: {e}")
-            print("  Falling back to simulated pipeline token metrics.\n")
-            break
+            print(f"  Error: Python environment execution failed: {e}")
+            sys.exit(1)
 
     print("=========================================================================")
     print("  SUMMARY & CONCLUSION")
     print("=========================================================================")
     print("1. Embedding Generation & Vector Search stay 100% accurate (runs on raw text).")
-    print("2. Background Prompt Compression reduces downstream LLM input tokens by ~20-40%.")
-    print("3. High keyword retention (>85%) ensures quiz/flashcard context quality.")
+    print("2. Background Prompt Compression reduces downstream LLM input tokens.")
+    print("3. High keyword retention ensures quiz/flashcard context quality.")
     print("=========================================================================\n")
 
 if __name__ == "__main__":

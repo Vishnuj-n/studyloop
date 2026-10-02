@@ -60,10 +60,10 @@ async function syncWithBackend(force = false) {
 
       // Retrieve active session details from Go backend (persisted session.json)
       const backendSession = await getUserSession()
-      if (backendSession && backendSession.email) {
+      if (backendSession && backendSession.email && backendSession.userId) {
         if (!user.value) {
           user.value = {
-            id: backendSession.userId || 'user_' + Date.now(),
+            id: backendSession.userId,
             email: backendSession.email,
             fullName: 'Authenticated User',
           }
@@ -95,7 +95,7 @@ async function syncWithBackend(force = false) {
 }
 
 export async function initClerk() {
-  console.log('[AUTH] initClerk() called. Initial User:', user.value?.email, 'isPro:', isPro.value)
+  console.log('[AUTH] initClerk() called. isSignedIn:', !!user.value, 'isPro:', isPro.value)
   isLoaded.value = true
   await syncWithBackend()
   return null
@@ -104,8 +104,9 @@ export async function initClerk() {
 // Listen for loopback authentication callback from Go backend
 if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
   window.runtime.EventsOn('clerk_auth_success', (data) => {
-    console.log('[AUTH] Received clerk_auth_success event from Go backend:', data)
-    logFrontendEvent('info', 'Auth', 'clerk_auth_success_received', data)
+    const safeData = { success: data?.success, isPro: data?.isPro }
+    console.log('[AUTH] Received clerk_auth_success event from Go backend:', safeData)
+    logFrontendEvent('info', 'Auth', 'clerk_auth_success_received', safeData)
     if (data && data.success) {
       user.value = {
         id: data.userId || 'user_' + Date.now(),
@@ -140,7 +141,7 @@ try {
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || Date.now()
-      console.log('[AUTH] Restored session from localStorage: email =', parsed.user?.email, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
+      console.log('[AUTH] Restored session from localStorage: isSignedIn =', !!parsed.user, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
     }
   } else {
     console.log('[AUTH] No saved session found in localStorage')

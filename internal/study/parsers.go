@@ -22,27 +22,58 @@ func repairLLMJSON(raw string) string {
 
 func extractValidQuizQuestions(raw string) []quizLLMQuestion {
 	var valid []quizLLMQuestion
+
+	scanStart := 0
+	if idx := strings.Index(raw, `"questions"`); idx != -1 {
+		if arrIdx := strings.IndexByte(raw[idx:], '['); arrIdx != -1 {
+			scanStart = idx + arrIdx + 1
+		}
+	}
+
 	depth := 0
 	startIdx := -1
-	for i, ch := range raw {
-		switch ch {
-		case '{':
-			if depth == 0 {
-				startIdx = i
-			}
-			depth++
-		case '}':
-			depth--
-			if depth == 0 && startIdx != -1 {
-				block := raw[startIdx : i+1]
-				if strings.Contains(block, `"prompt"`) && strings.Contains(block, `"options"`) {
-					var q quizLLMQuestion
-					repaired := repairLLMJSON(block)
-					if err := json.Unmarshal([]byte(repaired), &q); err == nil && q.Prompt != "" && len(q.Options) > 0 {
-						valid = append(valid, q)
+	inString := false
+	escaped := false
+
+	for i := scanStart; i < len(raw); i++ {
+		ch := raw[i]
+
+		if escaped {
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+
+		if !inString {
+			if ch == '{' {
+				if depth == 0 {
+					startIdx = i
+				}
+				depth++
+			} else if ch == '}' {
+				if depth > 0 {
+					depth--
+					if depth == 0 && startIdx != -1 {
+						block := raw[startIdx : i+1]
+						if strings.Contains(block, `"prompt"`) && strings.Contains(block, `"options"`) {
+							var q quizLLMQuestion
+							repaired := repairLLMJSON(block)
+							if err := json.Unmarshal([]byte(repaired), &q); err == nil && q.Prompt != "" && len(q.Options) > 0 {
+								valid = append(valid, q)
+							}
+						}
+						startIdx = -1
 					}
 				}
-				startIdx = -1
 			}
 		}
 	}

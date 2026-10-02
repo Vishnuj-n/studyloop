@@ -353,7 +353,7 @@ async function refreshCompressionStats() {
   }
   try {
     const stats = await getTopicCompressionStats(tid)
-    if (stats && !stats.error) {
+    if (tid === reader.selectedTopicID.value && stats && !stats.error) {
       compressionStats.value = stats
     }
   } catch (e) {

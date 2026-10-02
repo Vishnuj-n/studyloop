@@ -208,20 +208,20 @@ func (a *App) SetupExtension(id string) map[string]interface{} {
 	}()
 
 	var logs []string
+	currentStep := 1
 	logCallback := func(line string) {
 		logs = append(logs, line)
 		if a.ctx != nil {
-			step := 1
 			if strings.Contains(line, "Step 2/3") || strings.Contains(line, "Installing extension dependencies") {
-				step = 2
+				currentStep = 2
 			} else if strings.Contains(line, "Step 3/3") || strings.Contains(line, "Running extension verification") {
-				step = 3
+				currentStep = 3
 			}
 			wailsruntime.EventsEmit(a.ctx, "extension:setup:progress", map[string]interface{}{
 				"id":   id,
 				"log":  line,
 				"logs": logs,
-				"step": step,
+				"step": currentStep,
 			})
 		}
 	}

@@ -285,11 +285,7 @@ func TestCompressedTextSelection(t *testing.T) {
 	chunkTextByID := make(map[string]string, len(chunks))
 	for _, chunk := range chunks {
 		chunkIDs = append(chunkIDs, chunk.ID)
-		text := chunk.CompressedText
-		if text == "" {
-			text = chunk.Text
-		}
-		chunkTextByID[chunk.ID] = text
+		chunkTextByID[chunk.ID] = SelectChunkText(chunk, "")
 	}
 
 	if chunkTextByID["c1"] != "Original text chunk one compressed." {
@@ -297,6 +293,12 @@ func TestCompressedTextSelection(t *testing.T) {
 	}
 	if chunkTextByID["c2"] != "This is the original text for chunk two with no compression yet." {
 		t.Errorf("expected fallback uncompressed text for c2, got %q", chunkTextByID["c2"])
+	}
+
+	// Test DISABLED mode preserves raw text
+	disabledTextC1 := SelectChunkText(chunks[0], "DISABLED")
+	if disabledTextC1 != "This is the original full length uncompressed text for chunk one." {
+		t.Errorf("expected raw text when DISABLED, got %q", disabledTextC1)
 	}
 
 	res, err := buildQuizContext(chunkIDs, chunkTextByID, 1000)

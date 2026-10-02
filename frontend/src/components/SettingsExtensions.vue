@@ -86,6 +86,10 @@
         </select>
         <p class="hint">Target token retention ratio. LLMLingua-2 removes redundant syntax while preserving core entities and logic.</p>
       </div>
+
+      <div v-if="configError" class="error-banner">
+        {{ configError }}
+      </div>
     </article>
 
     <!-- Text Simplifier -->
@@ -185,12 +189,12 @@ const simplifierLevel = computed({
 
 const compressorMode = computed({
   get: () => extensionConfig.value?.prompt_compressor?.mode || 'OVER_LIMIT',
-  set: (val) => setExtensionSetting('prompt_compressor', 'mode', val),
+  set: (val) => { setExtensionSetting('prompt_compressor', 'mode', val).catch(() => {}) },
 })
 
 const compressorRate = computed({
   get: () => extensionConfig.value?.prompt_compressor?.rate ?? 0.80,
-  set: (val) => setExtensionSetting('prompt_compressor', 'rate', Number(val)),
+  set: (val) => { setExtensionSetting('prompt_compressor', 'rate', Number(val)).catch(() => {}) },
 })
 
 const youtubeAutoDownload = computed({

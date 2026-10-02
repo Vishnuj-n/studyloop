@@ -1022,7 +1022,7 @@ func (r *Repository) GetChunksWithContextByNotebookPageRange(notebookID string, 
 	}
 
 	rows, err := r.db.Query(`
-		SELECT c.id, nc.page_num, COALESCE(NULLIF(c.compressed_text, ''), c.chunk_text), COALESCE(c.compressed_text, ''), COALESCE(c.compressed_token_count, 0)
+		SELECT c.id, nc.page_num, c.chunk_text, COALESCE(c.compressed_text, ''), COALESCE(c.compressed_token_count, 0)
 		FROM notebook_chunks nc
 		JOIN chunks c ON c.id = nc.chunk_id
 		WHERE nc.notebook_id = ?

@@ -522,14 +522,7 @@ export async function setLogLevel(level) {
     if (bridge.SetLogLevel) {
       return await bridge.SetLogLevel(level)
     }
-    // Fallback if Wails dev server is running older Go binary before recompilation
-    if (bridge.GetUserSettings && bridge.UpdateUserSettings) {
-      const current = await bridge.GetUserSettings()
-      current.log_level = level
-      const res = await bridge.UpdateUserSettings(current)
-      return res || { ok: true, log_level: level }
-    }
-    return { ok: true, log_level: level }
+    return { error: 'SetLogLevel implementation unavailable' }
   } catch (err) {
     console.warn('[DEV] SetLogLevel bridge error:', err)
     return { error: err.message }

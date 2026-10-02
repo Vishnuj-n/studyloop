@@ -132,7 +132,7 @@ async function refreshExtensionConfig() {
       try {
         parsed = JSON.parse(raw)
       } catch (_) {
-        // Ignore JSON parse error
+        parsed = {}
       }
     }
 
@@ -151,6 +151,7 @@ async function refreshExtensionConfig() {
     }
 
     extensionConfig.value = {
+      ...parsed,
       audio_overview: { ...DEFAULT_EXTENSION_CONFIG.audio_overview, ...(parsed.audio_overview || {}) },
       text_simplifier: { ...DEFAULT_EXTENSION_CONFIG.text_simplifier, ...(parsed.text_simplifier || {}) },
       youtube: { ...DEFAULT_EXTENSION_CONFIG.youtube, ...(parsed.youtube || {}) },
@@ -160,7 +161,6 @@ async function refreshExtensionConfig() {
         ...(userMode ? { mode: userMode } : {}),
         ...(userRate ? { rate: userRate } : {}),
       },
-      ...parsed,
     }
     configFetched = true
   } catch (_) {
@@ -252,6 +252,7 @@ export function useExtensions() {
               current.prompt_compression_rate = Number(value)
             }
             await updateUserSettings(current)
+            window.dispatchEvent(new CustomEvent('settings-updated'))
           }
         } catch (syncErr) {
           console.warn('[useExtensions] Failed syncing prompt_compressor to user_settings:', syncErr)
@@ -284,6 +285,8 @@ export function useExtensions() {
     activeSetup.value.visibleToast = false
   }
 
+  let currentSetupRunId = 0
+
   async function startSetup(ext) {
     if (!ext || !ext.id) return
 
@@ -292,6 +295,8 @@ export function useExtensions() {
       console.warn('[useExtensions] Another setup is currently running:', activeSetup.value.extensionId)
       return
     }
+
+    const runId = ++currentSetupRunId
 
     activeSetup.value = {
       extensionId: ext.id,
@@ -305,6 +310,7 @@ export function useExtensions() {
 
     try {
       const res = await setupExtension(ext.id)
+      if (runId !== currentSetupRunId) return
       if (res && res.success) {
         activeSetup.value.logs = res.logs || ['Setup completed successfully.']
         activeSetup.value.step = 3
@@ -320,12 +326,14 @@ export function useExtensions() {
         activeSetup.value.errorMessage = res?.error || 'Setup failed to complete.'
       }
     } catch (err) {
+      if (runId !== currentSetupRunId) return
       activeSetup.value.status = 'error'
       activeSetup.value.errorMessage = err?.message || String(err)
     }
   }
 
   async function cancelSetup() {
+    currentSetupRunId++
     if (activeSetup.value.status === 'running') {
       try {
         await cancelExtensionSetup()

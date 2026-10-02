@@ -93,7 +93,7 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 		return
 	}
 
-	machineID := getMachineID()
+	machineID := getNormalizedMachineID()
 	sig := computeSessionSignature(machineID, userID, email, isPro, verifiedAt)
 	sess := persistentSession{
 		UserID:     userID,
@@ -118,15 +118,15 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		utils.Warnf("[AUTH] Failed to write session file to %s: %v", filePath, err)
 	} else {
-		utils.Infof("[AUTH] Successfully persisted session to %s (user=%s, email=%s, isPro=%v, verifiedAt=%d, machineID=%s, sig=%s)",
-			filePath, userID, email, isPro, verifiedAt, machineID, sig)
+		utils.Infof("[AUTH] Successfully persisted session to %s (user=%s, isPro=%v, verifiedAt=%d)",
+			filePath, userID, isPro, verifiedAt)
 	}
 }
 
 // setSession sets the active session in memory and persists signed session to disk.
 func (a *App) setSession(userID, email string, isPro bool) {
 	now := time.Now().Unix()
-	utils.Infof("[AUTH] setSession called: user=%s, email=%s, isPro=%v, now=%d", userID, email, isPro, now)
+	utils.Infof("[AUTH] setSession called: user=%s, isPro=%v, now=%d", userID, isPro, now)
 	a.sessionMu.Lock()
 	a.sessionUserID = userID
 	a.sessionEmail = email
@@ -160,7 +160,7 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 
 	var sess persistentSession
 	if err := json.Unmarshal(data, &sess); err != nil {
-		utils.Warnf("[AUTH] Invalid session JSON format in %s: %v. Raw content: %s", filePath, err, string(data))
+		utils.Warnf("[AUTH] Invalid session JSON format in %s: %v", filePath, err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
@@ -173,8 +173,7 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 
 	isValidSig := hmac.Equal([]byte(sess.Signature), []byte(sig1)) || hmac.Equal([]byte(sess.Signature), []byte(sig2))
 	if !isValidSig {
-		utils.Warnf("[AUTH] Session signature mismatch at %s. FileSig=%s, ExpectedSig1=%s (machine=%s), ExpectedSig2=%s (normMachine=%s). Downgrading to free.",
-			filePath, sess.Signature, sig1, machineID, sig2, normalizedMachineID)
+		utils.Warnf("[AUTH] Session signature mismatch at %s. Downgrading to free.", filePath)
 		a.applyRestoredSession(sess.UserID, sess.Email, false, 0)
 		return false
 	}

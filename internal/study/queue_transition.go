@@ -227,15 +227,16 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 			return TransitionResult{}, fmt.Errorf("failed to load chunks for socratic task: %w", err)
 		}
 
+		mode := ""
+		if userSettings, err := s.repo.GetUserSettings(); err == nil && userSettings != nil {
+			mode = userSettings.PromptCompressionMode
+		}
+
 		chunkIDs := make([]string, 0, len(chunks))
 		chunkTextByID := make(map[string]string, len(chunks))
 		for _, chunk := range chunks {
 			chunkIDs = append(chunkIDs, chunk.ID)
-			text := strings.TrimSpace(chunk.CompressedText)
-			if text == "" {
-				text = strings.TrimSpace(chunk.Text)
-			}
-			chunkTextByID[chunk.ID] = text
+			chunkTextByID[chunk.ID] = SelectChunkText(chunk, mode)
 		}
 
 		generatedQuiz, err := s.GenerateQuizSync(task.TopicID, chunkIDs, chunkTextByID)

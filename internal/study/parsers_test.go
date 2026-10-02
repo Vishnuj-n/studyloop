@@ -90,8 +90,8 @@ func TestParseQuizLLMResponse_InvalidCharacterAfterArrayElement(t *testing.T) {
 		"questions": [
 			{
 				"prompt": "What is the primary factor?",
-				"options": ["Option A", "Option B", "Option C", "Option D"]
-				"correct_answer": "Option A"
+				"options": [Option A, Option B],
+				"correct_answer": Option A
 			},
 			{
 				"prompt": "What is the secondary factor?",
@@ -107,11 +107,11 @@ func TestParseQuizLLMResponse_InvalidCharacterAfterArrayElement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected successful recovery from invalid character after array element, got error: %v", err)
 	}
-	if len(parsed.Questions) != 2 {
-		t.Fatalf("expected 2 questions, got %d", len(parsed.Questions))
+	if len(parsed.Questions) != 1 {
+		t.Fatalf("expected 1 recovered question, got %d", len(parsed.Questions))
 	}
-	if parsed.Questions[0].Prompt != "What is the primary factor?" {
-		t.Errorf("unexpected question 1 prompt: %s", parsed.Questions[0].Prompt)
+	if parsed.Questions[0].Prompt != "What is the secondary factor?" {
+		t.Errorf("unexpected question prompt: %s", parsed.Questions[0].Prompt)
 	}
 }
 

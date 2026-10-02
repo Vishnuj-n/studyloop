@@ -307,11 +307,7 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 
 		if strings.TrimSpace(c.CompressedText) != "" {
 			compressedCount++
-			if c.CompressedTokenCount > 0 {
-				totalCompressedTokens += c.CompressedTokenCount
-			} else {
-				totalCompressedTokens += len(strings.Fields(c.CompressedText))
-			}
+			totalCompressedTokens += len(strings.Fields(c.CompressedText))
 		} else {
 			totalCompressedTokens += rawTokens
 		}

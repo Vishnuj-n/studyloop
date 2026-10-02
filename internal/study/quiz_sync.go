@@ -138,18 +138,25 @@ func normalizeChunkIDs(chunkIDs []string) ([]string, error) {
 	return normalizedChunkIDs, nil
 }
 
-func (s *StudyService) loadChunkTextFallback(topicID string) (map[string]string, error) {
+// SelectChunkText selects trimmed compressed or raw chunk text according to PromptCompressionMode.
+func SelectChunkText(chunk models.Chunk, mode string) string {
+	if strings.EqualFold(strings.TrimSpace(mode), "DISABLED") {
+		return strings.TrimSpace(chunk.Text)
+	}
+	if text := strings.TrimSpace(chunk.CompressedText); text != "" {
+		return text
+	}
+	return strings.TrimSpace(chunk.Text)
+}
+
+func (s *StudyService) loadChunkTextFallback(topicID string, mode string) (map[string]string, error) {
 	chunks, err := s.repo.GetChunksForTopic(topicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load topic chunks: %w", err)
 	}
 	chunkTextByID := make(map[string]string, len(chunks))
 	for _, chunk := range chunks {
-		text := strings.TrimSpace(chunk.CompressedText)
-		if text == "" {
-			text = strings.TrimSpace(chunk.Text)
-		}
-		chunkTextByID[chunk.ID] = text
+		chunkTextByID[chunk.ID] = SelectChunkText(chunk, mode)
 	}
 	return chunkTextByID, nil
 }
@@ -309,7 +316,11 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 	// ponytail: fall back to DB lookup if chunkTextByID is nil or empty
 	if len(chunkTextByID) == 0 {
-		chunkTextByID, err = s.loadChunkTextFallback(topicID)
+		mode := ""
+		if userSettings, err := s.repo.GetUserSettings(); err == nil && userSettings != nil {
+			mode = userSettings.PromptCompressionMode
+		}
+		chunkTextByID, err = s.loadChunkTextFallback(topicID, mode)
 		if err != nil {
 			return models.QuizTaskPayload{}, err
 		}

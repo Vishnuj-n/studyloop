@@ -144,7 +144,13 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 
 	// Dynamically apply active log level
 	if s.LogLevel != "" {
-		_ = utils.SetLogLevel(s.LogLevel)
+		normLevel, err := repo.GetLogLevel()
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		if err := utils.SetLogLevel(normLevel); err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
 	}
 
 	// Only mutate runtime after successful persistence.
@@ -1172,11 +1178,6 @@ func (a *App) SetLogLevel(level string) map[string]interface{} {
 
 // GetLogLevel returns the current active log level.
 func (a *App) GetLogLevel() string {
-	if repo := a.getRepo(); repo != nil {
-		if level, err := repo.GetLogLevel(); err == nil && level != "" {
-			_ = utils.SetLogLevel(level)
-		}
-	}
 	return utils.GetLogLevel()
 }
 

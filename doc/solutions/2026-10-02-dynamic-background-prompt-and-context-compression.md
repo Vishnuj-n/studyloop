@@ -67,8 +67,8 @@ Empirical performance measured via `scripts/benchmark_prompt_compression.py`:
 
 ## Core Component Reference
 
-- **Database Migrations & Schema**: [`internal/db/schema.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/db/schema.go), [`doc/SCHEMA.md`](file:///c:/Users/vishn/PROJECT/ai-tutor/doc/SCHEMA.md)
-- **Extension Sidecar**: [`extensions/prompt_compressor/compress.py`](file:///c:/Users/vishn/PROJECT/ai-tutor/extensions/prompt_compressor/compress.py), [`internal/extension/tiers.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/extension/tiers.go)
-- **Benchmark Script**: [`scripts/benchmark_prompt_compression.py`](file:///c:/Users/vishn/PROJECT/ai-tutor/scripts/benchmark_prompt_compression.py)
-- **Study Compression Service**: [`internal/study/compression_service.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/compression_service.go), [`internal/study/compression_test.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/compression_test.go)
-- **Queue Transition Trigger**: [`internal/study/queue_transition.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/queue_transition.go)
+- **Database Migrations & Schema**: [`internal/db/schema.go`](../../internal/db/schema.go), [`doc/SCHEMA.md`](../SCHEMA.md)
+- **Extension Sidecar**: [`extensions/prompt_compressor/compress.py`](../../extensions/prompt_compressor/compress.py), [`internal/extension/tiers.go`](../../internal/extension/tiers.go)
+- **Benchmark Script**: [`scripts/benchmark_prompt_compression.py`](../../scripts/benchmark_prompt_compression.py)
+- **Study Compression Service**: [`internal/study/compression_service.go`](../../internal/study/compression_service.go), [`internal/study/compression_test.go`](../../internal/study/compression_test.go)
+- **Queue Transition Trigger**: [`internal/study/queue_transition.go`](../../internal/study/queue_transition.go)

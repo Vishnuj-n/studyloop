@@ -396,6 +396,10 @@ function handleProToggle(ext) {
 }
 
 function triggerSetup(ext) {
+  if (activeSetup.value.status === 'running' && activeSetup.value.extensionId !== ext.id) {
+    errorMessage.value = `Setup for ${activeSetup.value.extensionName || 'another extension'} is currently running.`
+    return
+  }
   openSetupModal(ext)
   if (activeSetup.value.extensionId !== ext.id || activeSetup.value.status === 'idle') {
     startSetup(ext)

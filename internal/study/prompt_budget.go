@@ -24,6 +24,19 @@ func (s *StudyService) buildPageBoundedContext(notebookID string, startPage, end
 		return []models.ChunkWithContext{}, 0, nil
 	}
 
+	// Check user settings for prompt compression mode
+	mode := ""
+	if settings, err := s.repo.GetUserSettings(); err == nil && settings != nil {
+		mode = settings.PromptCompressionMode
+	}
+	if !strings.EqualFold(strings.TrimSpace(mode), "DISABLED") {
+		for i := range chunks {
+			if text := strings.TrimSpace(chunks[i].CompressedText); text != "" {
+				chunks[i].Text = text
+			}
+		}
+	}
+
 	// Filter out front matter chunks if substantive chunks are present
 	substantive := make([]models.ChunkWithContext, 0, len(chunks))
 	for _, c := range chunks {

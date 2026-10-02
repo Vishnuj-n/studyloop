@@ -53,11 +53,6 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		return errMap
 	}
 
-	// Trigger asynchronous background compression on topic opening
-	if topicID != "" && a.studyService != nil {
-		a.studyService.CompressTopicChunksAsync(context.Background(), topicID)
-	}
-
 	// Load reading task with all context
 	task, err := repo.GetReadingTask(taskID)
 	if err != nil {
@@ -65,6 +60,11 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 			return map[string]interface{}{"error": "ErrNotFound", "code": 404}
 		}
 		return map[string]interface{}{"error": err.Error()}
+	}
+
+	// Trigger asynchronous background compression on topic opening
+	if task.TopicID != "" && a.studyService != nil {
+		a.studyService.CompressTopicChunksAsync(context.Background(), task.TopicID)
 	}
 
 	currentPage := task.CurrentPage
@@ -207,15 +207,16 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		}
 	}
 
+	mode := ""
+	if userSettings, err := repo.GetUserSettings(); err == nil && userSettings != nil {
+		mode = userSettings.PromptCompressionMode
+	}
+
 	chunkIDs := make([]string, 0, len(chunks))
 	chunkTextByID := make(map[string]string, len(chunks))
 	for _, chunk := range chunks {
 		chunkIDs = append(chunkIDs, chunk.ID)
-		text := strings.TrimSpace(chunk.CompressedText)
-		if text == "" {
-			text = strings.TrimSpace(chunk.Text)
-		}
-		chunkTextByID[chunk.ID] = text
+		chunkTextByID[chunk.ID] = studypkg.SelectChunkText(chunk, mode)
 	}
 
 	if reserveErr := repo.ReserveTask(taskID); reserveErr != nil {

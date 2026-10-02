@@ -37,6 +37,8 @@ type StudyService struct {
 	audioScriptCache     map[string][]string
 	rateLimitMu          sync.RWMutex
 	fastRateLimitedUntil time.Time
+	inFlightCompressMu   sync.Mutex
+	inFlightCompress     map[string]bool
 }
 
 // NewStudyService constructs a StudyService from injected dependencies.
@@ -50,6 +52,7 @@ func NewStudyService(cfg Config) *StudyService {
 		heavyLLMProvider: cfg.HeavyLLMProvider,
 		retrievalEngine:  cfg.RetrievalEngine,
 		audioScriptCache: make(map[string][]string),
+		inFlightCompress: make(map[string]bool),
 	}
 }
 

@@ -152,7 +152,7 @@ func StartCloudSyncLoop(repo *db.Repository) {
 
 			// 2. Run Anonymous Research Telemetry independently (if opted-in)
 			if err := TriggerAnonymousTelemetrySync(repo); err != nil {
-				utils.Debugf("[SYNC-ANALYTICS] Periodic anonymous telemetry warning: %v", err)
+				utils.Warnf("[SYNC-ANALYTICS] Periodic anonymous telemetry warning: %v", err)
 			}
 		}
 	}()

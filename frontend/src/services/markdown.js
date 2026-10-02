@@ -86,9 +86,15 @@ const SANITIZE_CONFIG = {
 
 export function renderMarkdown(input) {
   let source = typeof input === 'string' ? input : ''
-  // Normalize LaTeX delimiters \( ... \) and \[ ... \] to $ ... $ and $$ ... $$ for KaTeX rendering
-  source = source
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => `\n$$\n${math.trim()}\n$$\n`)
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`)
+  // Normalize LaTeX delimiters \( ... \) and \[ ... \] to $ ... $ and $$ ... $$ only in Markdown prose
+  const parts = source.split(/(```[\s\S]*?```|`[^`\n]+`)/g)
+  source = parts
+    .map((part, index) => {
+      if (index % 2 === 1) return part
+      return part
+        .replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => `\n$$\n${math.trim()}\n$$\n`)
+        .replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`)
+    })
+    .join('')
   return DOMPurify.sanitize(md.render(source), SANITIZE_CONFIG)
 }

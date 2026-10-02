@@ -229,9 +229,11 @@ const loading = ref(false)
 const revertingId = ref('')
 const error = ref('')
 const successMessage = ref('')
+const userInteractedLogLevel = ref(false)
 
 async function handleLogLevelChange() {
   if (savingLogLevel.value) return
+  userInteractedLogLevel.value = true
   savingLogLevel.value = true
   error.value = ''
   successMessage.value = ''
@@ -239,6 +241,10 @@ async function handleLogLevelChange() {
     const res = await setLogLevel(selectedLogLevel.value)
     if (res?.error) {
       error.value = res.error
+      try {
+        const activeLvl = await getLogLevel()
+        if (activeLvl) selectedLogLevel.value = activeLvl
+      } catch (_) {}
     } else {
       successMessage.value = `Log level set to ${selectedLogLevel.value}`
       setTimeout(() => {
@@ -250,6 +256,10 @@ async function handleLogLevelChange() {
   } catch (err) {
     console.error('Failed to change log level:', err)
     error.value = err.message || 'Failed to update log level'
+    try {
+      const activeLvl = await getLogLevel()
+      if (activeLvl) selectedLogLevel.value = activeLvl
+    } catch (_) {}
   } finally {
     savingLogLevel.value = false
   }
@@ -306,7 +316,7 @@ onMounted(async () => {
   }
   try {
     const lvl = await getLogLevel()
-    if (lvl) selectedLogLevel.value = lvl
+    if (lvl && !userInteractedLogLevel.value) selectedLogLevel.value = lvl
   } catch (err) {
     console.warn('Failed fetching log level:', err)
   }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ai-tutor/internal/extension"
 	"ai-tutor/internal/models"
@@ -45,14 +46,35 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 		return
 	}
 
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	s.inFlightCompressMu.Lock()
+	if s.inFlightCompress == nil {
+		s.inFlightCompress = make(map[string]bool)
+	}
+	if s.inFlightCompress[topicID] {
+		s.inFlightCompressMu.Unlock()
+		return
+	}
+	s.inFlightCompress[topicID] = true
+	s.inFlightCompressMu.Unlock()
+
 	go func() {
 		defer func() {
+			s.inFlightCompressMu.Lock()
+			delete(s.inFlightCompress, topicID)
+			s.inFlightCompressMu.Unlock()
+
 			if r := recover(); r != nil {
 				utils.Errorf("[COMPRESSION] panic in CompressTopicChunksAsync: %v", r)
 			}
 		}()
 
-		bgCtx := context.Background()
+		bgCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+		defer cancel()
+
 		if err := s.CompressTopicChunks(bgCtx, topicID); err != nil {
 			utils.Warnf("[COMPRESSION] CompressTopicChunks failed for topic %s: %v", topicID, err)
 		}
