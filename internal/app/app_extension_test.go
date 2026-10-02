@@ -62,7 +62,7 @@ func TestRunExtension_ProEntitlementEnforced(t *testing.T) {
 		t.Fatal("expected IsProUser to be true after SetSession")
 	}
 
-	session := a.getUserSession()
+	session := a.GetUserSession()
 	if session["userId"] != "user_123" || session["isPro"] != true {
 		t.Fatalf("unexpected session state: %#v", session)
 	}

@@ -361,9 +361,6 @@ async function refreshCompressionStats() {
   }
 }
 
-watch(() => reader.selectedTopicID.value, () => {
-  refreshCompressionStats()
-})
 
 async function handleSimplify() {
   if (simplifying.value) return
@@ -449,6 +446,10 @@ const reader = useReaderBase(routeTaskID)
 const chat = useChat()
 const { showError, showNotice } = useToast()
 provide('chat', chat)
+
+watch(() => reader.selectedTopicID?.value, () => {
+  refreshCompressionStats()
+})
 
 // Local state for completion
 const completingSession = ref(false)

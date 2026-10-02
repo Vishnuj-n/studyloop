@@ -226,8 +226,8 @@ func (a *App) IsProUser() bool {
 	return a.sessionIsPro
 }
 
-// getUserSession returns the current active session state.
-func (a *App) getUserSession() map[string]interface{} {
+// GetUserSession returns the current active session state.
+func (a *App) GetUserSession() map[string]interface{} {
 	a.sessionMu.RLock()
 	defer a.sessionMu.RUnlock()
 	return map[string]interface{}{
@@ -237,10 +237,6 @@ func (a *App) getUserSession() map[string]interface{} {
 		"verifiedAt": a.sessionVerifiedAt,
 	}
 }
-
-const (
-	DefaultClerkPublishableKey = "pk_test_aW5ub2NlbnQtb3JjYS01NjA1LmNsZXJrLmFjY291bnRzLmRldiQ"
-)
 
 func resolveClerkPublishableKey() string {
 	if ClerkPublishableKey != "" {
@@ -252,7 +248,7 @@ func resolveClerkPublishableKey() string {
 	if k := os.Getenv("CLERK_PUBLISHABLE_KEY"); k != "" {
 		return k
 	}
-	return DefaultClerkPublishableKey
+	return ""
 }
 
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.

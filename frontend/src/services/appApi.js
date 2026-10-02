@@ -481,6 +481,15 @@ export function restoreSession(userID, email, isPro, verifiedAt) {
   }
 }
 
+export function getUserSession() {
+  try {
+    return appBridge().GetUserSession()
+  } catch (err) {
+    console.warn('[AUTH] GetUserSession bridge error:', err)
+    return null
+  }
+}
+
 export function clearSession() {
   try {
     return appBridge().ClearSession()

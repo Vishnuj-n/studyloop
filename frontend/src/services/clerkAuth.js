@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { startBrowserAuth, openURLInBrowser, restoreSession, clearSession, logFrontendEvent } from './appApi'
+import { startBrowserAuth, openURLInBrowser, restoreSession, getUserSession, clearSession, logFrontendEvent } from './appApi'
 
 const isLoaded = ref(false)
 const user = ref(null)
@@ -7,6 +7,18 @@ const isPro = ref(false)
 const authError = ref('')
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
+
+function saveLocalSession(u, proStatus, verifiedTime) {
+  if (u) {
+    localStorage.setItem('studyloop_user_session', JSON.stringify({
+      user: u,
+      isPro: !!proStatus,
+      lastVerifiedAt: verifiedTime || Date.now(),
+    }))
+  } else {
+    localStorage.removeItem('studyloop_user_session')
+  }
+}
 
 async function waitForBridge(timeoutMs = 3000) {
   const start = Date.now()
@@ -20,40 +32,56 @@ async function waitForBridge(timeoutMs = 3000) {
 }
 
 async function syncWithBackend() {
-  if (user.value) {
-    try {
-      const bridgeReady = await waitForBridge(2000)
-      if (!bridgeReady) {
-        console.warn('[AUTH] Wails backend bridge not ready yet during syncWithBackend')
-        return
-      }
-      console.log('[AUTH] Syncing session with Go backend for user:', user.value.email, 'current local isPro:', isPro.value)
-      logFrontendEvent('info', 'Auth', 'sync_session_start', { email: user.value.email, isPro: isPro.value })
-      const verifiedPro = await restoreSession(
-        user.value.id || '',
-        user.value.email || '',
-        isPro.value,
-        Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
-      )
-      console.log('[AUTH] Backend restoreSession returned:', verifiedPro)
-      logFrontendEvent('info', 'Auth', 'sync_session_result', { email: user.value.email, verifiedPro })
-      // Only update isPro if verification completed without throwing
-      if (typeof verifiedPro === 'boolean') {
-        if (isPro.value !== verifiedPro) {
-          console.warn(`[AUTH] isPro status changed by backend verification: ${isPro.value} -> ${verifiedPro}`)
-          logFrontendEvent('warn', 'Auth', 'is_pro_transition', { from: isPro.value, to: verifiedPro })
-        }
-        isPro.value = verifiedPro
-      }
-    } catch (err) {
-      console.warn('[AUTH] Could not sync session with backend:', err)
-      logFrontendEvent('error', 'Auth', 'sync_session_error', { error: String(err) })
+  try {
+    const bridgeReady = await waitForBridge(2000)
+    if (!bridgeReady) {
+      console.warn('[AUTH] Wails backend bridge not ready yet during syncWithBackend')
+      return
     }
+
+    // First call backend restoreSession to validate / hydrate session from disk
+    const verifiedPro = await restoreSession(
+      user.value?.id || '',
+      user.value?.email || '',
+      isPro.value,
+      Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
+    )
+    console.log('[AUTH] Backend restoreSession returned:', verifiedPro)
+
+    // Retrieve active session details from Go backend (persisted session.json)
+    const backendSession = await getUserSession()
+    if (backendSession && backendSession.email) {
+      if (!user.value) {
+        user.value = {
+          id: backendSession.userId || 'user_' + Date.now(),
+          email: backendSession.email,
+          fullName: 'Authenticated User',
+        }
+      }
+      if (backendSession.verifiedAt) {
+        lastVerifiedAt.value = backendSession.verifiedAt * 1000
+      }
+      isPro.value = !!backendSession.isPro
+      saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+      logFrontendEvent('info', 'Auth', 'sync_session_hydrated', { email: backendSession.email, isPro: isPro.value })
+    } else if (typeof verifiedPro === 'boolean') {
+      if (isPro.value !== verifiedPro) {
+        console.warn(`[AUTH] isPro status changed by backend verification: ${isPro.value} -> ${verifiedPro}`)
+        logFrontendEvent('warn', 'Auth', 'is_pro_transition', { from: isPro.value, to: verifiedPro })
+      }
+      isPro.value = verifiedPro
+      if (user.value) {
+        saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+      }
+    }
+  } catch (err) {
+    console.warn('[AUTH] Could not sync session with backend:', err)
+    logFrontendEvent('error', 'Auth', 'sync_session_error', { error: String(err) })
   }
 }
 
 export async function initClerk() {
-  console.log('[AUTH] initClerk() called. User:', user.value?.email, 'isPro:', isPro.value)
+  console.log('[AUTH] initClerk() called. Initial User:', user.value?.email, 'isPro:', isPro.value)
   isLoaded.value = true
   await syncWithBackend()
   return null
@@ -73,11 +101,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
       isPro.value = !!data.isPro
       lastVerifiedAt.value = Date.now()
       authError.value = ''
-      localStorage.setItem('studyloop_user_session', JSON.stringify({
-        user: user.value,
-        isPro: isPro.value,
-        lastVerifiedAt: lastVerifiedAt.value,
-      }))
+      saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
       console.log('[AUTH] Updated localStorage and memory with Pro status:', isPro.value)
       syncWithBackend()
     }
@@ -103,7 +127,6 @@ try {
       }
       lastVerifiedAt.value = savedTime || Date.now()
       console.log('[AUTH] Restored session from localStorage: email =', parsed.user?.email, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
-      // Do not sync immediately on file load; App.vue onMounted will call initClerk()
     }
   } else {
     console.log('[AUTH] No saved session found in localStorage')
