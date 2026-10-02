@@ -82,9 +82,9 @@ func (s *StudyService) FormatLLMError(err error, tier string) error {
 			s.MarkFastRateLimited(45 * time.Second)
 		}
 		if s.heavyLLMProvider != nil && (s.fastLLMProvider == nil || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName()) {
-			return fmt.Errorf("fast provider rate-limited (status 429). Please try again — next attempt will use Heavy provider (%s)", s.heavyLLMProvider.ModelName())
+			return fmt.Errorf("Fast provider rate-limited (status 429). Please try again — next attempt will use Heavy provider (%s).", s.heavyLLMProvider.ModelName())
 		}
-		return fmt.Errorf("fast provider rate-limited (status 429: TPM limit reached). Please try again in a few seconds, or configure a Heavy provider (e.g. Gemini AI Studio) in Settings")
+		return fmt.Errorf("Fast provider rate-limited (status 429: TPM limit reached). Please try again in a few seconds, or configure a Heavy provider (e.g. Gemini AI Studio) in Settings.")
 	}
 	return err
 }

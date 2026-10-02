@@ -8,13 +8,7 @@
         <span v-if="reader.selectedNotebookTitle.value"
           >Notebook: {{ reader.selectedNotebookTitle.value }}</span
         >
-        <span
-          v-if="compressionStats.is_compressed"
-          class="compression-badge"
-          :title="`Original: ${compressionStats.raw_tokens} tokens | Compressed: ${compressionStats.compressed_tokens} tokens (Pruned ~${Math.round(compressionStats.saved_percentage)}%)`"
-        >
-          Compressed{{ compressionStats.saved_percentage > 0 ? ` (Saved ~${Math.round(compressionStats.saved_percentage)}%)` : '' }}
-        </span>
+        <CompressionBadge :stats="compressionStats" />
         <span v-if="isTaskFlow" class="task-badge">Task Mode</span>
         <span v-else class="browse-badge">Browse Mode</span>
       </p>
@@ -326,6 +320,7 @@ import { useExtensions } from '../composables/useExtensions'
 import { useDialog } from '../composables/useDialog'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import ReaderChat from '../components/ReaderChat.vue'
+import CompressionBadge from '../components/CompressionBadge.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
@@ -1387,19 +1382,4 @@ button:disabled {
   background: #faeedd !important;
   border-color: #c49a6c !important;
 }
-
-.compression-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(184, 187, 38, 0.15);
-  color: var(--color-success, #b8bb26);
-  border: 1px solid var(--outline-variant);
-  cursor: help;
-  user-select: none;
-}
-
 </style>
