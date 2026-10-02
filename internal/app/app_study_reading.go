@@ -48,7 +48,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 	if taskID == "" {
 		return map[string]interface{}{"error": "task ID is required", "code": 400}
 	}
-	utils.Infof("[READER_INIT] InitializeReadingSession entry taskID=%s", taskID)
+	utils.Debugf("[READER_INIT] InitializeReadingSession entry taskID=%s", taskID)
 
 	if errMap := a.activateReadingSessionTask(taskID); errMap != nil {
 		return errMap
@@ -94,7 +94,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		}
 	}
 
-	utils.Infof("[READER_INIT] InitializeReadingSession response payload canonicalTaskID=%s", task.TaskID)
+	utils.Debugf("[READER_INIT] InitializeReadingSession response payload canonicalTaskID=%s", task.TaskID)
 
 	return map[string]interface{}{
 		"ok":     true,

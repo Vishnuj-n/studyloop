@@ -187,8 +187,11 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	// 1. Create venv with uv (uv venv <venvDir> --allow-existing --system-site-packages)
 	// uv automatically detects system Python and reuses already-installed global packages (e.g. yt-dlp, edge-tts)
 	logLine("Step 1/3: Initializing Python virtual environment...")
-	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--allow-existing", "--system-site-packages")
-	venvCmd.Dir = ext.Dir
+	absExtDir, _ := filepath.Abs(ext.Dir)
+	absVenvDir, _ := filepath.Abs(venvDir)
+
+	venvCmd := exec.CommandContext(ctx, uvPath, "venv", absVenvDir, "--allow-existing", "--system-site-packages")
+	venvCmd.Dir = absExtDir
 	hideConsoleWindow(venvCmd)
 
 	var venvOut, venvErr bytes.Buffer
@@ -211,8 +214,9 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	reqPath := filepath.Join(ext.Dir, "requirements.txt")
 	if info, err := os.Stat(reqPath); err == nil && !info.IsDir() {
 		logLine("Step 2/3: Installing extension dependencies from requirements.txt...")
-		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--python", venvDir, "-r", reqPath)
-		pipCmd.Dir = ext.Dir
+		absReqPath, _ := filepath.Abs(reqPath)
+		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--python", absVenvDir, "-r", absReqPath)
+		pipCmd.Dir = absExtDir
 		hideConsoleWindow(pipCmd)
 
 		var pipOut, pipErr bytes.Buffer

@@ -148,12 +148,12 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 		return false
 	}
 
-	utils.Infof("[AUTH] RestoreSession called with frontend args: user=%q, email=%q, isPro=%v, verifiedAt=%d. Target session path: %s",
+	utils.Debugf("[AUTH] RestoreSession called with frontend args: user=%q, email=%q, isPro=%v, verifiedAt=%d. Target session path: %s",
 		userID, email, isPro, verifiedAt, filePath)
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		utils.Warnf("[AUTH] Offline session file unreadable or not found at %s: %v. Resetting active session to Free.", filePath, err)
+		utils.Debugf("[AUTH] Offline session file unreadable or not found at %s: %v. Resetting active session to Free.", filePath, err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
@@ -187,12 +187,12 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 			filePath, sess.VerifiedAt, now, (now - sess.VerifiedAt), tenDaysSec)
 		actualIsPro = false
 	} else {
-		utils.Infof("[AUTH] Session 10-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
+		utils.Debugf("[AUTH] Session 10-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
 			sess.VerifiedAt, now, (now - sess.VerifiedAt), actualIsPro)
 	}
 
 	a.applyRestoredSession(sess.UserID, sess.Email, actualIsPro, sess.VerifiedAt)
-	utils.Infof("[AUTH] Session restoration complete: user=%s, email=%s, isPro=%v", sess.UserID, sess.Email, actualIsPro)
+	utils.Debugf("[AUTH] Session restoration complete: user=%s, email=%s, isPro=%v", sess.UserID, sess.Email, actualIsPro)
 	return actualIsPro
 }
 
