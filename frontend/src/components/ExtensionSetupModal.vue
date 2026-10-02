@@ -102,8 +102,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { setupExtension, cancelExtensionSetup } from '../services/appApi'
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 
 const props = defineProps({
   isOpen: {
@@ -122,6 +123,34 @@ const status = ref('running') // 'running' | 'success' | 'error'
 const logs = ref([])
 const errorMessage = ref('')
 const currentStep = ref(1)
+let unsubProgress = null
+
+function handleProgressEvent(data) {
+  if (!data || !props.extension || data.id !== props.extension.id) return
+  if (Array.isArray(data.logs) && data.logs.length > 0) {
+    logs.value = data.logs
+  } else if (data.log) {
+    logs.value.push(data.log)
+  }
+  if (data.step && Number.isInteger(data.step)) {
+    currentStep.value = data.step
+  }
+}
+
+onMounted(() => {
+  if (typeof EventsOn === 'function') {
+    unsubProgress = EventsOn('extension:setup:progress', handleProgressEvent)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof unsubProgress === 'function') {
+    unsubProgress()
+    unsubProgress = null
+  } else if (typeof EventsOff === 'function') {
+    EventsOff('extension:setup:progress')
+  }
+})
 
 function getStepClass(stepNum) {
   if (status.value === 'success') return 'completed'

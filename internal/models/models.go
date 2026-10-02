@@ -673,6 +673,7 @@ type UserSettings struct {
 	AnalyticsEnabled        bool    `json:"analytics_enabled"`
 	AnonymousUserID         string  `json:"anonymous_user_id"`
 	LLMPromptLogging        bool    `json:"llm_prompt_logging"`
+	LogLevel                string  `json:"log_level"`
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
 }

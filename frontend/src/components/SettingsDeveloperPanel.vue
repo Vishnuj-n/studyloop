@@ -12,6 +12,40 @@
 
     <!-- Developer Tools & History Panel -->
     <div v-if="devModeEnabled" class="dev-content-box animate-fade-in">
+      <!-- Log Level Configuration Card -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div>
+            <h4>Diagnostic Log Level</h4>
+            <p class="hint">Control the threshold of log detail recorded to <code>app.log</code>, <code>queue.log</code>, and <code>rag_engine.log</code>.</p>
+          </div>
+          <div class="log-level-selector-wrapper">
+            <select
+              v-model="selectedLogLevel"
+              class="log-level-select"
+              :disabled="savingLogLevel"
+              @change="handleLogLevelChange"
+            >
+              <option value="DEBUG">DEBUG (Verbose / Deep Traces)</option>
+              <option value="INFO">INFO (Default / Balanced)</option>
+              <option value="WARN">WARN (Warnings & Errors Only)</option>
+              <option value="ERROR">ERROR (Errors Only / Quiet)</option>
+            </select>
+          </div>
+        </div>
+        <div class="log-level-note">
+          <span v-if="selectedLogLevel === 'DEBUG'" class="level-desc">
+            <BaseIcon name="info" size="12" /> Verbose mode captures full reading estimates, RAG retrieval traces, IPC events, and subtopic scoring.
+          </span>
+          <span v-else-if="selectedLogLevel === 'INFO'" class="level-desc">
+            <BaseIcon name="info" size="12" /> Standard production mode: logs user milestones, queue transitions, and health audits.
+          </span>
+          <span v-else class="level-desc">
+            <BaseIcon name="alert-triangle" size="12" /> High-filter mode: minimizes log writes to actionable warnings or exceptions.
+          </span>
+        </div>
+      </div>
+
       <!-- LLM Prompt Logging Toggle Card -->
       <div class="dev-toggle-card">
         <SettingsToggle
@@ -173,6 +207,8 @@ import {
   getReadingTaskHistory,
   getLLMPromptLogging,
   setLLMPromptLogging,
+  getLogLevel,
+  setLogLevel,
   openDataDirectory,
   revertReadingTaskSession,
 } from '../services/appApi'
@@ -182,6 +218,8 @@ const DEV_MODE_STORAGE_KEY = 'studyloop_dev_mode_enabled'
 const { confirm: confirmDialog } = useDialog()
 const devModeEnabled = ref(localStorage.getItem(DEV_MODE_STORAGE_KEY) === 'true')
 const llmPromptLogEnabled = ref(false)
+const selectedLogLevel = ref('INFO')
+const savingLogLevel = ref(false)
 const logs = ref([])
 const totalCount = ref(0)
 const hasMore = ref(false)
@@ -191,6 +229,31 @@ const loading = ref(false)
 const revertingId = ref('')
 const error = ref('')
 const successMessage = ref('')
+
+async function handleLogLevelChange() {
+  if (savingLogLevel.value) return
+  savingLogLevel.value = true
+  error.value = ''
+  successMessage.value = ''
+  try {
+    const res = await setLogLevel(selectedLogLevel.value)
+    if (res?.error) {
+      error.value = res.error
+    } else {
+      successMessage.value = `Log level set to ${selectedLogLevel.value}`
+      setTimeout(() => {
+        if (successMessage.value.startsWith('Log level set to')) {
+          successMessage.value = ''
+        }
+      }, 3000)
+    }
+  } catch (err) {
+    console.error('Failed to change log level:', err)
+    error.value = err.message || 'Failed to update log level'
+  } finally {
+    savingLogLevel.value = false
+  }
+}
 
 async function handleRevertSession(taskID) {
   if (!taskID || revertingId.value) return
@@ -240,6 +303,12 @@ onMounted(async () => {
     llmPromptLogEnabled.value = await getLLMPromptLogging()
   } catch (err) {
     console.warn('Failed fetching LLM prompt logging status:', err)
+  }
+  try {
+    const lvl = await getLogLevel()
+    if (lvl) selectedLogLevel.value = lvl
+  } catch (err) {
+    console.warn('Failed fetching log level:', err)
   }
 })
 
@@ -302,6 +371,67 @@ async function fetchMore() {
 </script>
 
 <style scoped>
+.dev-card {
+  padding: 16px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dev-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dev-card-header h4 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-family: 'Manrope', sans-serif;
+  color: var(--on-surface);
+}
+
+.log-level-selector-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.log-level-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.log-level-select:focus {
+  border-color: var(--primary);
+}
+
+.log-level-note {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted-text);
+  line-height: 1.4;
+}
+
+.level-desc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .dev-toggle-card {
   padding: 16px;
   background: var(--surface-container-low);

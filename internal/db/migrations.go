@@ -43,6 +43,7 @@ var alterStatements = []struct {
 	{"user_settings", "analytics_enabled", "ALTER TABLE user_settings ADD COLUMN analytics_enabled BOOLEAN DEFAULT 0"},
 	{"user_settings", "anonymous_user_id", "ALTER TABLE user_settings ADD COLUMN anonymous_user_id TEXT DEFAULT ''"},
 	{"user_settings", "llm_prompt_logging", "ALTER TABLE user_settings ADD COLUMN llm_prompt_logging BOOLEAN DEFAULT 0"},
+	{"user_settings", "log_level", "ALTER TABLE user_settings ADD COLUMN log_level TEXT NOT NULL DEFAULT 'INFO'"},
 	{"user_settings", "prompt_compression_mode", "ALTER TABLE user_settings ADD COLUMN prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT'"},
 	{"user_settings", "prompt_compression_rate", "ALTER TABLE user_settings ADD COLUMN prompt_compression_rate REAL NOT NULL DEFAULT 0.80"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},

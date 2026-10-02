@@ -376,6 +376,7 @@ Singleton table for global preferences.
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
 | `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |
 | `llm_prompt_logging` | BOOLEAN DEFAULT 0 | Whether raw LLM prompt inputs and model parameters are logged to `logs/llm_prompt.log` |
+| `log_level` | TEXT NOT NULL DEFAULT 'INFO' | Active diagnostic logging threshold (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `prompt_compression_mode` | TEXT NOT NULL DEFAULT 'OVER_LIMIT' | Background prompt compression mode (`OVER_LIMIT`, `ALWAYS`, `DISABLED`) |
 | `prompt_compression_rate` | REAL NOT NULL DEFAULT 0.80 | Compression rate / preserved token retention factor (0.1 to 1.0) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |

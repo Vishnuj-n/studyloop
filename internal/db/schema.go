@@ -152,6 +152,7 @@ func InitSchema(tx *sql.Tx) error {
 			analytics_enabled BOOLEAN DEFAULT 0,
 			anonymous_user_id TEXT DEFAULT '',
 			llm_prompt_logging BOOLEAN DEFAULT 0,
+			log_level TEXT NOT NULL DEFAULT 'INFO',
 			prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT',
 			prompt_compression_rate REAL NOT NULL DEFAULT 0.80,
 			extension_settings TEXT DEFAULT '{}',

@@ -71,6 +71,12 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 	res.Repo = repo
 	utils.Infof("Database initialized at %s (extension pre-load phase)", dbPath)
 
+	// Apply persisted log level immediately upon DB initialization
+	if savedLogLevel, lErr := repo.GetLogLevel(); lErr == nil && savedLogLevel != "" {
+		_ = utils.SetLogLevel(savedLogLevel)
+		utils.Debugf("Active log level initialized to: %s", savedLogLevel)
+	}
+
 	// Clean up any interrupted extractions from a crash or sudden app close
 	if resetErr := res.Repo.ResetInterruptedNotebookStatuses(); resetErr != nil {
 		utils.Warnf("failed to reset interrupted notebook statuses: %v", resetErr)

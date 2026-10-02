@@ -516,6 +516,24 @@ export function getLLMPromptLogging() {
   }
 }
 
+export function setLogLevel(level) {
+  try {
+    return appBridge().SetLogLevel(level)
+  } catch (err) {
+    console.warn('[DEV] SetLogLevel bridge error:', err)
+    return { error: err.message }
+  }
+}
+
+export function getLogLevel() {
+  try {
+    return appBridge().GetLogLevel()
+  } catch (err) {
+    console.warn('[DEV] GetLogLevel bridge error:', err)
+    return 'INFO'
+  }
+}
+
 export function openDataDirectory(subDir = '') {
   try {
     return appBridge().OpenDataDirectory(subDir)
