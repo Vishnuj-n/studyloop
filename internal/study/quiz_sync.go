@@ -702,7 +702,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 	if err != nil {
 		return models.QuizResult{}, fmt.Errorf("failed to begin quiz transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	isRescueRequiz := false
 	if task.PayloadJSON != "" {

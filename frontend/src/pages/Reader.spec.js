@@ -31,10 +31,14 @@ vi.mock('../services/appApi', () => ({
   completeReading: vi.fn(),
   getUserSettings: vi.fn(),
   logFrontendEvent: vi.fn(),
+  trackAnalyticsEvent: vi.fn(),
   getNotebookTopicTree: vi.fn(),
   getReaderTopicBundle: vi.fn(),
   initializeReadingSession: vi.fn(),
   askReaderAI: vi.fn(),
+  getTopicSectionsContent: vi.fn().mockResolvedValue({ sections: [] }),
+  getTopicCompressionStats: vi.fn().mockResolvedValue({ is_compressed: false }),
+  skipReadingTask: vi.fn(),
 }))
 
 // Mock VuePdfEmbed since we cannot load PDF canvas in JSDOM
@@ -113,6 +117,8 @@ describe('Reader.vue Integration', () => {
       start_page: 1,
       end_page: 5,
     })
+    appApi.getTopicCompressionStats.mockResolvedValue({ is_compressed: false })
+    appApi.getTopicSectionsContent.mockResolvedValue({ sections: [] })
   })
 
   it('initializes reading session and displays PDF viewer placeholder', async () => {
