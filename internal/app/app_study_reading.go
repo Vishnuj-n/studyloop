@@ -122,7 +122,7 @@ func (a *App) fetchSessionChunks(repo *db.Repository, task models.ReadingTask) (
 	var chunks []models.Chunk
 	var err error
 
-	// Step 1: Bounded page range for the specific topic
+	// Bounded page range for the specific topic
 	if task.TopicID != "" && task.StartPage > 0 && task.EndPage >= task.StartPage {
 		chunks, err = repo.GetChunksForTopicPageRange(task.TopicID, task.StartPage, task.EndPage)
 		if err != nil {
@@ -130,7 +130,7 @@ func (a *App) fetchSessionChunks(repo *db.Repository, task models.ReadingTask) (
 		}
 	}
 
-	// Step 2: Fallback to all topic chunks if page-bounded query found nothing
+	// Fallback to all topic chunks if page-bounded query found nothing
 	if len(chunks) == 0 && task.TopicID != "" {
 		chunks, err = repo.GetChunksForTopic(task.TopicID)
 		if err != nil {
@@ -138,7 +138,7 @@ func (a *App) fetchSessionChunks(repo *db.Repository, task models.ReadingTask) (
 		}
 	}
 
-	// Step 3: Fallback to whole notebook page range if topic chunks are not yet indexed
+	// Fallback to whole notebook page range if topic chunks are not yet indexed
 	if len(chunks) == 0 && task.NotebookID != "" && task.StartPage > 0 && task.EndPage >= task.StartPage {
 		chunks, err = repo.GetChunksForNotebookPageRange(task.NotebookID, task.StartPage, task.EndPage)
 		if err != nil {

@@ -244,7 +244,9 @@ async function handleLogLevelChange() {
       try {
         const activeLvl = await getLogLevel()
         if (activeLvl) selectedLogLevel.value = activeLvl
-      } catch (_) {}
+      } catch (restoreErr) {
+        console.warn('Failed to restore active log level:', restoreErr)
+      }
     } else {
       successMessage.value = `Log level set to ${selectedLogLevel.value}`
       setTimeout(() => {
@@ -259,7 +261,9 @@ async function handleLogLevelChange() {
     try {
       const activeLvl = await getLogLevel()
       if (activeLvl) selectedLogLevel.value = activeLvl
-    } catch (_) {}
+    } catch (restoreErr) {
+      console.warn('Failed to restore active log level:', restoreErr)
+    }
   } finally {
     savingLogLevel.value = false
   }
