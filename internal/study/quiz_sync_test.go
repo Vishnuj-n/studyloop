@@ -301,6 +301,12 @@ func TestCompressedTextSelection(t *testing.T) {
 		t.Errorf("expected raw text when DISABLED, got %q", disabledTextC1)
 	}
 
+	// Test AUTO/DYNAMIC modes prefer compressed
+	autoTextC1 := SelectChunkText(chunks[0], "AUTO")
+	if autoTextC1 != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text when AUTO, got %q", autoTextC1)
+	}
+
 	res, err := buildQuizContext(chunkIDs, chunkTextByID, 1000)
 	if err != nil {
 		t.Fatalf("buildQuizContext failed: %v", err)
@@ -313,4 +319,19 @@ func TestCompressedTextSelection(t *testing.T) {
 		t.Errorf("expected compressed text in contextParts[0], got %q", res.contextParts[0])
 	}
 }
+
+func TestBuildQuizContext_BudgetExhaustionDoesNotFallbackToFrontMatter(t *testing.T) {
+	chunkText := map[string]string{
+		"c_license":  "Licensed to Pat McDonald <patmcdonald@me.com>",
+		"c_content1": "Neural networks learn representations through layers of linear transforms and non-linear activations.",
+	}
+
+	// Budget is 2 tokens, which cannot fit c_content1.
+	// It should fail with budget error rather than returning the license front matter.
+	_, err := buildQuizContext([]string{"c_license", "c_content1"}, chunkText, 2)
+	if err == nil {
+		t.Fatalf("expected error when substantive chunk exceeds budget, got nil")
+	}
+}
+
 

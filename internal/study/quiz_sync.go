@@ -105,8 +105,16 @@ func (s *StudyService) GenerateQuizForPageRange(notebookID string, startPage, en
 
 func (s *StudyService) resolveNotebookTitle(topicID string) string {
 	notebookTitle := topicID
-	if nbID, err := s.repo.GetNotebookIDByTopic(topicID); err == nil && nbID != "" {
-		if nb, err := s.repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.Title != "" {
+	if nbID, err := s.repo.GetNotebookIDByTopic(topicID); err != nil || nbID == "" {
+		if err != nil {
+			utils.Debugf("[QUIZ_PIPELINE] failed to resolve notebook ID for topic %s: %v", topicID, err)
+		}
+	} else {
+		if nb, err := s.repo.GetNotebookByID(nbID); err != nil || nb == nil || nb.Title == "" {
+			if err != nil {
+				utils.Debugf("[QUIZ_PIPELINE] failed to get notebook by ID %s: %v", nbID, err)
+			}
+		} else {
 			notebookTitle = nb.Title
 		}
 	}
@@ -140,13 +148,19 @@ func normalizeChunkIDs(chunkIDs []string) ([]string, error) {
 
 // SelectChunkText selects trimmed compressed or raw chunk text according to PromptCompressionMode.
 func SelectChunkText(chunk models.Chunk, mode string) string {
-	if strings.EqualFold(strings.TrimSpace(mode), "DISABLED") {
+	cleanMode := strings.ToUpper(strings.TrimSpace(mode))
+	switch cleanMode {
+	case "DISABLED":
+		return strings.TrimSpace(chunk.Text)
+	case "AUTO", "DYNAMIC", "EXTRACTIVE", "COMPRESSED", "":
+		if text := strings.TrimSpace(chunk.CompressedText); text != "" {
+			return text
+		}
+		return strings.TrimSpace(chunk.Text)
+	default:
+		// Fall back to raw text on unknown mode
 		return strings.TrimSpace(chunk.Text)
 	}
-	if text := strings.TrimSpace(chunk.CompressedText); text != "" {
-		return text
-	}
-	return strings.TrimSpace(chunk.Text)
 }
 
 func (s *StudyService) loadChunkTextFallback(topicID string, mode string) (map[string]string, error) {
@@ -211,7 +225,8 @@ func buildQuizContext(
 	}
 
 	targetIDs := substantiveIDs
-	if len(targetIDs) == 0 {
+	// Only fall back to front matter if there were genuinely NO substantive chunks in the entire input
+	if len(substantiveIDs) == 0 {
 		targetIDs = frontMatterIDs
 	}
 
@@ -238,6 +253,9 @@ func buildQuizContext(
 	}
 
 	if len(contextParts) == 0 {
+		if truncatedCount > 0 {
+			return quizContextResult{}, fmt.Errorf("all available substantive chunks exceeded token budget (%d)", availableBudget)
+		}
 		return quizContextResult{}, fmt.Errorf("no chunk context found for quiz generation")
 	}
 
@@ -269,6 +287,11 @@ func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []strin
 	}, "\n")
 }
 
+const (
+	defaultQuizQuestionCount = 8
+	defaultQuizPassingScore  = 70
+)
+
 func validateAndConvertQuestions(parsed *quizLLMResponse) []models.QuizTaskQuestion {
 	if parsed == nil {
 		return nil
@@ -284,6 +307,7 @@ func validateAndConvertQuestions(parsed *quizLLMResponse) []models.QuizTaskQuest
 		}
 		shuffledOptions := make([]string, len(q.Options))
 		copy(shuffledOptions, q.Options)
+		// rand.Shuffle from math/rand/v2 provides fast pseudorandom option shuffling for UI display without crypto overhead
 		rand.Shuffle(len(shuffledOptions), func(i, j int) {
 			shuffledOptions[i], shuffledOptions[j] = shuffledOptions[j], shuffledOptions[i]
 		})
@@ -311,7 +335,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 	normalizedChunkIDs, err := normalizeChunkIDs(chunkIDs)
 	if err != nil {
-		return models.QuizTaskPayload{}, err
+		return models.QuizTaskPayload{}, fmt.Errorf("invalid chunk IDs: %w", err)
 	}
 
 	// ponytail: fall back to DB lookup if chunkTextByID is nil or empty
@@ -322,7 +346,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		}
 		chunkTextByID, err = s.loadChunkTextFallback(topicID, mode)
 		if err != nil {
-			return models.QuizTaskPayload{}, err
+			return models.QuizTaskPayload{}, fmt.Errorf("failed to load fallback chunk text: %w", err)
 		}
 	}
 
@@ -336,8 +360,8 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	}
 
 	// Load user settings for quiz preferences (fallback to defaults: 8 questions, 70% passing)
-	userQuizCount := 8
-	userPassingScore := 70
+	userQuizCount := defaultQuizQuestionCount
+	userPassingScore := defaultQuizPassingScore
 	userSettings, err := s.repo.GetUserSettings()
 	if err != nil {
 		return models.QuizTaskPayload{}, fmt.Errorf("failed to get user settings: %w", err)
@@ -368,7 +392,7 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 	ctxRes, err := buildQuizContext(normalizedChunkIDs, chunkTextByID, availableBudget)
 	if err != nil {
-		return models.QuizTaskPayload{}, err
+		return models.QuizTaskPayload{}, fmt.Errorf("failed to build quiz context: %w", err)
 	}
 
 	utils.Infof("[QUIZ_PIPELINE] built context parts=%d total_words=%d tokens=%d available_budget=%d topic=%s",
@@ -410,7 +434,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 
 	// Safety transaction: Delete FSRS cards to protect purity from rote clutter
 	if err := s.repo.DeleteFSRSCardsByTopicIDTx(tx, task.TopicID); err != nil {
-		return "", "", false, models.StudyQueueTask{}, fmt.Errorf("failed to delete FSRS cards: %w", err)
+		utils.Warnf("[SOCRATIC_RESCUE] failed to clean up FSRS cards topicID=%s: %v — continuing with socratic rescue creation", task.TopicID, err)
 	}
 
 	// Shift session into Socratic Rescue Lane by generating a SOCRATIC_REMEDIAL task
@@ -442,6 +466,113 @@ type quizScoringResult struct {
 	score           int
 	passed          bool
 	failedQuestions []models.FailedQuestionDetail
+}
+
+type remediationOutcome struct {
+	followUps               []models.StudyQueueTask
+	feedback                string
+	rereadTaskID            string
+	socraticTaskID          string
+	manualReviewRecommended bool
+	rereadAttemptCount      int
+	completionStatus        models.StudyTaskStatus
+}
+
+func (s *StudyService) planRemediation(
+	tx *sql.Tx,
+	task models.StudyQueueTask,
+	attempt *models.QuizAttemptRecord,
+	scoreRes quizScoringResult,
+	strategy string,
+	isRescueRequiz bool,
+) (remediationOutcome, error) {
+	outcome := remediationOutcome{
+		feedback:         "Review the missed concepts and retry the material.",
+		completionStatus: models.StudyTaskStatusCompleted,
+	}
+
+	if scoreRes.passed {
+		outcome.feedback = "Strong work. You can move forward."
+		if task.TopicID != "" {
+			if err := s.repo.ResetRereadAttemptCountTx(tx, task.TopicID); err != nil {
+				return outcome, fmt.Errorf("failed to reset reread attempts: %w", err)
+			}
+			// Only mark topic as completed if all pages in the topic have been read and completed
+			fullyRead, err := s.repo.IsTopicFullyReadTx(tx, task.TopicID)
+			if err != nil {
+				return outcome, fmt.Errorf("failed to check topic completion: %w", err)
+			}
+			if fullyRead {
+				if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
+					return outcome, fmt.Errorf("failed to mark topic completed: %w", err)
+				}
+			}
+		}
+		return outcome, nil
+	}
+
+	if task.TopicID == "" {
+		return outcome, nil
+	}
+
+	if isRescueRequiz {
+		outcome.manualReviewRecommended = true
+		outcome.feedback = "This concept requires external review. Your next reading task has been unlocked."
+		attempt.Feedback = outcome.feedback
+
+		if err := s.repo.MarkTopicExternalHelpRequiredTx(tx, task.TopicID); err != nil {
+			return outcome, fmt.Errorf("failed to mark topic as requiring external help: %w", err)
+		}
+		utils.Warnf("[SOCRATIC_RESCUE] requiz_failed topicID=%s — external help required", task.TopicID)
+		return outcome, nil
+	}
+
+	if strategy == "FAST" {
+		socraticTaskID, feedback, manualReview, followUp, err := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
+		if err != nil {
+			return outcome, err
+		}
+		outcome.socraticTaskID = socraticTaskID
+		outcome.feedback = feedback
+		outcome.manualReviewRecommended = manualReview
+		outcome.followUps = append(outcome.followUps, followUp)
+		return outcome, nil
+	}
+
+	rereadAttemptCount, err := s.repo.IncrementRereadAttemptCountTx(tx, task.TopicID)
+	if err != nil {
+		return outcome, fmt.Errorf("failed to increment reread attempts: %w", err)
+	}
+	outcome.rereadAttemptCount = rereadAttemptCount
+
+	if rereadAttemptCount <= maxAutomaticRereadAttempts {
+		rereadTaskID := uuid.NewString()
+		feedbackPayload, _ := json.Marshal(map[string]string{"feedback": outcome.feedback})
+		outcome.rereadTaskID = rereadTaskID
+		outcome.followUps = append(outcome.followUps, models.StudyQueueTask{
+			ID:          rereadTaskID,
+			NotebookID:  task.NotebookID,
+			TopicID:     task.TopicID,
+			TaskType:    models.StudyTaskTypeReread,
+			Status:      models.StudyTaskStatusPending,
+			Priority:    0,
+			PayloadJSON: string(feedbackPayload),
+			StartPage:   task.StartPage,
+			EndPage:     task.EndPage,
+		})
+		return outcome, nil
+	}
+
+	// Strike 3: SOCRATIC_REMEDIAL rescue
+	socraticTaskID, feedback, manualReview, followUp, err := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
+	if err != nil {
+		return outcome, err
+	}
+	outcome.socraticTaskID = socraticTaskID
+	outcome.feedback = feedback
+	outcome.manualReviewRecommended = manualReview
+	outcome.followUps = append(outcome.followUps, followUp)
+	return outcome, nil
 }
 
 func calculateQuizScore(questions []models.QuizTaskQuestion, answers []models.QuizAnswer, passingScore int) quizScoringResult {
@@ -509,7 +640,6 @@ func buildQuizResultPayload(
 		RereadAttemptCount:      rereadAttemptCount,
 		MaxRereadAttempts:       maxAutomaticRereadAttempts,
 		RereadTaskID:            rereadTaskID,
-		FlashcardTaskID:         "",
 		AttemptRecord:           attemptID,
 		FlashcardsPending:       flashcardsPending,
 	}
@@ -559,22 +689,12 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 	}
 
 	scoreRes := calculateQuizScore(payload.Questions, answers, payload.PassingScore)
-	feedback := "Review the missed concepts and retry the material."
-	if scoreRes.passed {
-		feedback = "Strong work. You can move forward."
-	}
 
 	answersJSONBytes, err := json.Marshal(answers)
 	if err != nil {
 		return models.QuizResult{}, fmt.Errorf("failed to encode answers: %w", err)
 	}
 	attemptID := uuid.NewString()
-	followUps := make([]models.StudyQueueTask, 0, 1)
-	rereadTaskID := ""
-	socraticTaskID := ""
-	rereadAttemptCount := 0
-	manualReviewRecommended := false
-	completionStatus := models.StudyTaskStatusCompleted
 
 	strategy, _ := s.repo.GetRemedialStrategy()
 
@@ -582,9 +702,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 	if err != nil {
 		return models.QuizResult{}, fmt.Errorf("failed to begin quiz transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer tx.Rollback()
 
 	isRescueRequiz := false
 	if task.PayloadJSON != "" {
@@ -602,86 +720,24 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		Score:       scoreRes.score,
 		Passed:      scoreRes.passed,
 		AnswersJSON: string(answersJSONBytes),
-		Feedback:    feedback,
+		Feedback:    "",
 		CompletedAt: time.Now().Unix(),
 	}
-	if scoreRes.passed {
-		if task.TopicID != "" {
-			if err := s.repo.ResetRereadAttemptCountTx(tx, task.TopicID); err != nil {
-				return models.QuizResult{}, fmt.Errorf("failed to reset reread attempts: %w", err)
-			}
-			// Only mark topic as completed if all pages in the topic have been read and completed
-			fullyRead, err := s.repo.IsTopicFullyReadTx(tx, task.TopicID)
-			if err != nil {
-				return models.QuizResult{}, fmt.Errorf("failed to check topic completion: %w", err)
-			}
-			if fullyRead {
-				if err := s.repo.MarkTopicCompletedTx(tx, task.TopicID); err != nil {
-					return models.QuizResult{}, fmt.Errorf("failed to mark topic completed: %w", err)
-				}
-			}
-		}
-	} else if task.TopicID != "" {
-		if isRescueRequiz {
-			// Student failed re-quiz — mark as EXTERNAL_HELP_REQUIRED, unblock queue
-			completionStatus = models.StudyTaskStatusCompleted // Still mark as completed
-			manualReviewRecommended = true
-			feedback = "This concept requires external review. Your next reading task has been unlocked."
-			attempt.Feedback = feedback
 
-			// Mark topic as needing external help — abort transaction on failure to prevent infinite rescue loop
-			if err := s.repo.MarkTopicExternalHelpRequiredTx(tx, task.TopicID); err != nil {
-				return models.QuizResult{}, fmt.Errorf("failed to mark topic as requiring external help: %w", err)
-			}
-			utils.Warnf("[SOCRATIC_RESCUE] requiz_failed topicID=%s — external help required", task.TopicID)
-		} else {
-			if strategy == "FAST" {
-				var followUp models.StudyQueueTask
-				socraticTaskID, feedback, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
-				if err != nil {
-					return models.QuizResult{}, err
-				}
-				followUps = append(followUps, followUp)
-			} else {
-				rereadAttemptCount, err = s.repo.IncrementRereadAttemptCountTx(tx, task.TopicID)
-				if err != nil {
-					return models.QuizResult{}, fmt.Errorf("failed to increment reread attempts: %w", err)
-				}
-				if rereadAttemptCount <= maxAutomaticRereadAttempts {
-					rereadTaskID = uuid.NewString()
-					feedbackPayload, _ := json.Marshal(map[string]string{"feedback": feedback})
-					followUps = append(followUps, models.StudyQueueTask{
-						ID:          rereadTaskID,
-						NotebookID:  task.NotebookID,
-						TopicID:     task.TopicID,
-						TaskType:    models.StudyTaskTypeReread,
-						Status:      models.StudyTaskStatusPending,
-						Priority:    0,
-						PayloadJSON: string(feedbackPayload),
-						StartPage:   task.StartPage,
-						EndPage:     task.EndPage,
-					})
-				} else {
-					// Strike 3: SOCRATIC_REMEDIAL rescue
-					var followUp models.StudyQueueTask
-					socraticTaskID, feedback, manualReviewRecommended, followUp, err = s.triggerSocraticRescueHandoffTx(tx, task, &attempt, scoreRes.failedQuestions)
-					if err != nil {
-						return models.QuizResult{}, err
-					}
-					followUps = append(followUps, followUp)
-				}
-			}
-		}
+	remediation, err := s.planRemediation(tx, task, &attempt, scoreRes, strategy, isRescueRequiz)
+	if err != nil {
+		return models.QuizResult{}, err
 	}
+	attempt.Feedback = remediation.feedback
 
 	if err := s.repo.SaveQuizAttemptTx(tx, attempt); err != nil {
 		return models.QuizResult{}, fmt.Errorf("failed to save quiz attempt: %w", err)
 	}
 
 	if err := s.repo.CompleteTaskTx(tx, task.ID, models.CompletionResult{
-		Status:    completionStatus,
+		Status:    remediation.completionStatus,
 		Payload:   "", // ponytail: preserve original questions payload in study_queue for milestone exams
-		FollowUps: followUps,
+		FollowUps: remediation.followUps,
 	}); err != nil {
 		return models.QuizResult{}, err
 	}
@@ -694,7 +750,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 	}
 
 	// Log quiz scoring completed immediately
-	utils.Warnf("[QUIZ] quiz_scoring_completed taskID=%s score=%d passed=%t rereadTaskID=%s flashcardsPending=%t", task.ID, scoreRes.score, scoreRes.passed, rereadTaskID, flashcardsPending)
+	utils.Warnf("[QUIZ] quiz_scoring_completed taskID=%s score=%d passed=%t rereadTaskID=%s flashcardsPending=%t", task.ID, scoreRes.score, scoreRes.passed, remediation.rereadTaskID, flashcardsPending)
 
 	// Log after successful commit to ensure consistency with persisted state
 	if scoreRes.passed {
@@ -713,13 +769,13 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 			if ensureErr := s.repo.EnsurePendingReadingTaskForNotebook(task.NotebookID, targetWords, minWords); ensureErr != nil {
 				utils.Warnf("[QUIZ] failed to seed next reading task after failed requiz notebookID=%s: %v", task.NotebookID, ensureErr)
 			}
-		} else if socraticTaskID != "" {
+		} else if remediation.socraticTaskID != "" {
 			utils.LogQuizResult(task.ID, scoreRes.score, false, "")
-			utils.Warnf("[QUIZ] quiz_failed_socratic_rescue_created notebookID=%s topicID=%s socraticTaskID=%s", task.NotebookID, task.TopicID, socraticTaskID)
-		} else if rereadTaskID != "" {
-			utils.LogRereadInsertion(rereadTaskID, task.TopicID, strconv.Itoa(rereadAttemptCount), strconv.Itoa(maxAutomaticRereadAttempts))
-			utils.LogQuizResult(task.ID, scoreRes.score, false, rereadTaskID)
-			utils.Warnf("[QUIZ] quiz_failed_reread_created notebookID=%s topicID=%s rereadTaskID=%s", task.NotebookID, task.TopicID, rereadTaskID)
+			utils.Warnf("[QUIZ] quiz_failed_socratic_rescue_created notebookID=%s topicID=%s socraticTaskID=%s", task.NotebookID, task.TopicID, remediation.socraticTaskID)
+		} else if remediation.rereadTaskID != "" {
+			utils.LogRereadInsertion(remediation.rereadTaskID, task.TopicID, strconv.Itoa(remediation.rereadAttemptCount), strconv.Itoa(maxAutomaticRereadAttempts))
+			utils.LogQuizResult(task.ID, scoreRes.score, false, remediation.rereadTaskID)
+			utils.Warnf("[QUIZ] quiz_failed_reread_created notebookID=%s topicID=%s rereadTaskID=%s", task.NotebookID, task.TopicID, remediation.rereadTaskID)
 		} else {
 			utils.LogQuizResult(task.ID, scoreRes.score, false, "")
 		}
@@ -729,12 +785,11 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		task.ID,
 		scoreRes,
 		payload.PassingScore,
-		feedback,
-		manualReviewRecommended,
-		rereadAttemptCount,
-		rereadTaskID,
+		remediation.feedback,
+		remediation.manualReviewRecommended,
+		remediation.rereadAttemptCount,
+		remediation.rereadTaskID,
 		attemptID,
 		flashcardsPending,
 	), nil
 }
-

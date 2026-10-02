@@ -54,12 +54,13 @@ func extractValidQuizQuestions(raw string) []quizLLMQuestion {
 		}
 
 		if !inString {
-			if ch == '{' {
+			switch ch {
+			case '{':
 				if depth == 0 {
 					startIdx = i
 				}
 				depth++
-			} else if ch == '}' {
+			case '}':
 				if depth > 0 {
 					depth--
 					if depth == 0 && startIdx != -1 {

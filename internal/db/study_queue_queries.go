@@ -9,6 +9,12 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
+)
+
+const (
+	defaultTargetWords            = 3000
+	defaultCompletedFallbackWords = 2500
 )
 
 // GetTaskByID returns one queue task by id.
@@ -101,7 +107,7 @@ func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]model
 		LEFT JOIN topics t ON sq.topic_id = t.id
 		WHERE sq.status = 'PENDING'
 		  AND ( ? = '' OR n.profile_id = ? )
-		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
+		  AND ( ? = '' OR sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active' )
 		ORDER BY
 			CASE sq.task_type
 				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
@@ -151,7 +157,7 @@ func (r *Repository) GetProfilePendingTaskCount(profileID string) (int, error) {
 		JOIN notebooks n ON sq.notebook_id = n.id
 		WHERE sq.status = 'PENDING'
 		  AND ( ? = '' OR n.profile_id = ? )
-		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
+		  AND ( ? = '' OR sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active' )
 	`
 	var count int
 	err := r.db.QueryRow(query, profileID, profileID, profileID).Scan(&count)
@@ -284,7 +290,7 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 		query += ` AND sq.notebook_id = ?`
 		args = append(args, notebookID)
 	} else {
-		query += ` AND (sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active')`
+		query += ` AND (sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')`
 	}
 
 	query += `

@@ -14,6 +14,14 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	DefaultPassingScore            = 70
+	DefaultTargetWords             = 3000
+	SemanticMaxExtensionPages      = 3
+	SemanticMinSimilarityThreshold = 0.85
+	SemanticMinExtensionPageWords  = 50
+)
+
 var (
 	ErrNoPendingTasks = errors.New("no pending tasks in queue")
 	ErrTaskNotPending = errors.New("task is not in PENDING status")
@@ -78,9 +86,9 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 	}
 	res, err := tx.Exec(`
 		UPDATE study_queue
-		SET status = 'ACTIVE', activated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND status = 'PENDING'
-	`, taskID)
+		SET status = ?, activated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status = ?
+	`, string(models.StudyTaskStatusActive), taskID, string(models.StudyTaskStatusPending))
 	if err != nil {
 		return err
 	}
@@ -130,13 +138,13 @@ func (r *Repository) ActivateTask(taskID string) error {
 	})
 }
 
-// CompleteTaskTx marks ACTIVE task as terminal and inserts explicit follow-up tasks transactionally.
+// CompleteTaskTx marks ACTIVE or RESERVED task as terminal and inserts explicit follow-up tasks transactionally.
 func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.CompletionResult) error {
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	utils.Debugf("[QUEUE] CompleteTaskTx reading task completion update start taskID=%s", taskID)
+	utils.Debugf("[QUEUE] CompleteTaskTx task completion update start taskID=%s", taskID)
 	status := strings.TrimSpace(string(result.Status))
 	if status == "" {
 		status = string(models.StudyTaskStatusCompleted)
@@ -147,69 +155,40 @@ func (r *Repository) CompleteTaskTx(tx *sql.Tx, taskID string, result models.Com
 
 	// Empty string preserves existing payload; non-empty string overwrites it.
 	payloadVal := strings.TrimSpace(result.Payload)
-	res, err := tx.Exec(`
+	var taskType string
+	err := tx.QueryRow(`
 		UPDATE study_queue
 		SET status = ?, completed_at = CURRENT_TIMESTAMP,
 		    payload_json = CASE WHEN ? = '' THEN payload_json ELSE ? END
-		WHERE id = ? AND status IN ('ACTIVE', 'RESERVED')
-	`, status, payloadVal, payloadVal, taskID)
-	if err != nil {
-		utils.Warnf("[QUEUE] CompleteTaskTx reading task completion update error taskID=%s err=%v", taskID, err)
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		utils.Warnf("[QUEUE] CompleteTaskTx reading task completion rows affected error taskID=%s err=%v", taskID, err)
-		return err
-	}
-	if affected == 0 {
+		WHERE id = ? AND status IN (?, ?)
+		RETURNING COALESCE(task_type, '')
+	`, status, payloadVal, payloadVal, taskID, string(models.StudyTaskStatusActive), string(models.StudyTaskStatusReserved)).Scan(&taskType)
+	if errors.Is(err, sql.ErrNoRows) {
 		var exists int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM study_queue WHERE id = ?`, taskID).Scan(&exists); err != nil {
-			utils.Warnf("[QUEUE] CompleteTaskTx reading task completion existence check error taskID=%s err=%v", taskID, err)
-			return err
+		if checkErr := tx.QueryRow(`SELECT COUNT(*) FROM study_queue WHERE id = ?`, taskID).Scan(&exists); checkErr != nil {
+			utils.Warnf("[QUEUE] CompleteTaskTx completion existence check error taskID=%s err=%v", taskID, checkErr)
+			return checkErr
 		}
 		if exists == 0 {
-			utils.Warnf("[QUEUE] CompleteTaskTx reading task completion task not found taskID=%s", taskID)
+			utils.Warnf("[QUEUE] CompleteTaskTx completion task not found taskID=%s", taskID)
 			return ErrTaskNotFound
 		}
-		utils.Warnf("[QUEUE] CompleteTaskTx reading task completion task not active taskID=%s", taskID)
+		utils.Warnf("[QUEUE] CompleteTaskTx completion task not active taskID=%s", taskID)
 		return ErrTaskNotActive
 	}
-	var taskType string
-	if err := tx.QueryRow(`SELECT COALESCE(task_type, '') FROM study_queue WHERE id = ?`, taskID).Scan(&taskType); err != nil {
-		utils.Warnf("[QUEUE] CompleteTaskTx task_type lookup error taskID=%s err=%v", taskID, err)
+	if err != nil {
+		utils.Warnf("[QUEUE] CompleteTaskTx completion update error taskID=%s err=%v", taskID, err)
 		return err
 	}
-	utils.LogQueueTransition(taskID, taskType, "ACTIVE", status, "task_completed")
+
+	utils.LogQueueTransition(taskID, taskType, string(models.StudyTaskStatusActive), status, "task_completed")
 
 	for _, followUp := range result.FollowUps {
-		followUp.ID = strings.TrimSpace(followUp.ID)
-		followUp.NotebookID = strings.TrimSpace(followUp.NotebookID)
-		followUp.TopicID = strings.TrimSpace(followUp.TopicID)
-		followUp.PayloadJSON = strings.TrimSpace(followUp.PayloadJSON)
-		if followUp.ID == "" {
-			return fmt.Errorf("follow-up task id is required")
-		}
-		if followUp.NotebookID == "" {
-			return fmt.Errorf("follow-up notebook id is required")
-		}
-		if strings.TrimSpace(string(followUp.TaskType)) == "" {
-			return fmt.Errorf("follow-up task type is required")
-		}
-		if strings.TrimSpace(string(followUp.Status)) == "" {
-			followUp.Status = models.StudyTaskStatusPending
-		}
-
-		if _, err := tx.Exec(`
-			INSERT INTO study_queue (
-				id, notebook_id, topic_id, task_type, status, priority, payload_json, start_page, end_page
-			) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, ?)
-		`, followUp.ID, followUp.NotebookID, followUp.TopicID, string(followUp.TaskType), string(followUp.Status), followUp.Priority, followUp.PayloadJSON, followUp.StartPage, followUp.EndPage); err != nil {
+		if err := r.InsertStudyTaskTx(tx, followUp); err != nil {
 			utils.Warnf("[QUEUE] CompleteTaskTx follow-up insertion error taskID=%s followUpID=%s err=%v", taskID, followUp.ID, err)
 			return err
 		}
 		utils.Warnf("[FLASHCARD_PIPELINE] queue_insertion source=completion_followup parentTaskID=%s followUpID=%s taskType=%s notebookID=%s topicID=%s", taskID, followUp.ID, followUp.TaskType, followUp.NotebookID, followUp.TopicID)
-		utils.LogQueueTaskCreated(followUp.ID, string(followUp.TaskType), followUp.NotebookID, followUp.TopicID)
 	}
 
 	return nil
@@ -221,18 +200,20 @@ func (r *Repository) UpdateTaskEndPage(taskID string, endPage int) error {
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	res, err := r.db.Exec(`UPDATE study_queue SET end_page = ? WHERE id = ? AND status = 'ACTIVE'`, endPage, taskID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return ErrTaskNotActive
-	}
-	return nil
+	return r.withTx(func(tx *sql.Tx) error {
+		res, err := tx.Exec(`UPDATE study_queue SET end_page = ? WHERE id = ? AND status = ?`, endPage, taskID, string(models.StudyTaskStatusActive))
+		if err != nil {
+			return err
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrTaskNotActive
+		}
+		return nil
+	})
 }
 
 // CompleteTask marks ACTIVE task as terminal and inserts explicit follow-up tasks transactionally.
@@ -300,34 +281,55 @@ func (r *Repository) SkipReadingTask(taskID string) error {
 // PersistReadingProgress persists page progress directly to study_queue.current_page and topics.current_page_cursor.
 // Used in trust-based completion model where user decides when reading is complete.
 func (r *Repository) PersistReadingProgress(taskID string, finalPage int) (bool, error) {
-	task, err := r.GetReadingTask(taskID)
-	if err != nil {
-		return false, err
-	}
-	reachedEnd := finalPage >= task.EndPage
-	if finalPage < task.StartPage {
-		finalPage = task.StartPage
-	}
-	if finalPage > task.EndPage {
-		finalPage = task.EndPage
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return false, fmt.Errorf("task id is required")
 	}
 
-	err = r.withTx(func(tx *sql.Tx) error {
+	var reachedEnd bool
+	err := r.withTx(func(tx *sql.Tx) error {
+		var startPage, endPage int
+		var topicID string
+		err := tx.QueryRow(`
+			SELECT COALESCE(start_page, 0), COALESCE(end_page, 0), COALESCE(topic_id, '')
+			FROM study_queue
+			WHERE id = ?
+		`, taskID).Scan(&startPage, &endPage, &topicID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTaskNotFound
+		}
+		if err != nil {
+			return err
+		}
+
+		// Trust-based completion considers reachedEnd true if user's reported page is at or beyond assigned endPage
+		reachedEnd = finalPage >= endPage
+
+		clampedPage := finalPage
+		if clampedPage < startPage {
+			clampedPage = startPage
+		}
+		if clampedPage > endPage && endPage > 0 {
+			clampedPage = endPage
+		}
+
 		if _, err := tx.Exec(`
 			UPDATE study_queue
 			SET current_page = ?
 			WHERE id = ?
-		`, finalPage, taskID); err != nil {
+		`, clampedPage, taskID); err != nil {
 			return err
 		}
-		if task.TopicID != "" {
+		if topicID != "" {
 			_, err = tx.Exec(`
 				UPDATE topics
 				SET current_page_cursor = ?,
 				    updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND current_page_cursor < ?
-			`, finalPage, task.TopicID, finalPage)
-			return err
+			`, clampedPage, topicID, clampedPage)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -348,7 +350,7 @@ func (r *Repository) CompleteReadingWithGeneratedQuiz(taskID string, quizPayload
 		return "", fmt.Errorf("quiz payload must include questions")
 	}
 	if quizPayload.PassingScore <= 0 {
-		quizPayload.PassingScore = 70
+		quizPayload.PassingScore = DefaultPassingScore
 	}
 	payloadBytes, err := json.Marshal(quizPayload)
 	if err != nil {
@@ -583,13 +585,13 @@ func (r *Repository) EnsurePendingFlashcardGenerateTask(notebookID, topicID stri
 		if topicID == "" {
 			err = tx.QueryRow(`
 				SELECT COUNT(*) FROM study_queue
-				WHERE task_type = 'FLASHCARD_GENERATE' AND (topic_id IS NULL OR topic_id = '') AND status IN ('PENDING', 'ACTIVE')
-			`).Scan(&count)
+				WHERE task_type = 'FLASHCARD_GENERATE' AND notebook_id = ? AND (topic_id IS NULL OR topic_id = '') AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID).Scan(&count)
 		} else {
 			err = tx.QueryRow(`
 				SELECT COUNT(*) FROM study_queue
-				WHERE task_type = 'FLASHCARD_GENERATE' AND topic_id = ? AND status IN ('PENDING', 'ACTIVE')
-			`, topicID).Scan(&count)
+				WHERE task_type = 'FLASHCARD_GENERATE' AND notebook_id = ? AND topic_id = ? AND status IN ('PENDING', 'ACTIVE')
+			`, notebookID, topicID).Scan(&count)
 		}
 		if err != nil {
 			return err
@@ -616,20 +618,14 @@ func (r *Repository) EnsurePendingFlashcardGenerateTask(notebookID, topicID stri
 // ResolveFlashcardGenerateTasksForTopic marks all pending/active FLASHCARD_GENERATE tasks for a topic as COMPLETED.
 func (r *Repository) ResolveFlashcardGenerateTasksForTopic(topicID string) error {
 	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return nil
+	}
 	return r.withTx(func(tx *sql.Tx) error {
-		var rows *sql.Rows
-		var err error
-		if topicID == "" {
-			rows, err = tx.Query(`
-				SELECT id, status FROM study_queue
-				WHERE task_type = 'FLASHCARD_GENERATE' AND (topic_id IS NULL OR topic_id = '') AND status IN ('PENDING', 'ACTIVE')
-			`)
-		} else {
-			rows, err = tx.Query(`
-				SELECT id, status FROM study_queue
-				WHERE task_type = 'FLASHCARD_GENERATE' AND topic_id = ? AND status IN ('PENDING', 'ACTIVE')
-			`, topicID)
-		}
+		rows, err := tx.Query(`
+			SELECT id, status FROM study_queue
+			WHERE task_type = 'FLASHCARD_GENERATE' AND topic_id = ? AND status IN (?, ?)
+		`, topicID, string(models.StudyTaskStatusPending), string(models.StudyTaskStatusActive))
 		if err != nil {
 			return err
 		}
@@ -804,10 +800,7 @@ func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID stri
 				currentWords += pWords
 			}
 
-			// Semantic extension: check up to +3 additional pages
-			const maxExtensionPages = 3
-			const minSimilarityThreshold = 0.85
-			const minExtensionPageWords = 50
+			// Semantic extension: check up to +SemanticMaxExtensionPages additional pages
 			maxTotalWords := maxWordsCeiling
 			if maxTotalWords < targetSessionWords {
 				maxTotalWords = targetSessionWords + int(float64(targetSessionWords)*0.5)
@@ -815,7 +808,7 @@ func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID stri
 
 			baseEndPage := endPage
 			stopReason := "max_pages"
-			for ext := 1; ext <= maxExtensionPages; ext++ {
+			for ext := 1; ext <= SemanticMaxExtensionPages; ext++ {
 				nextPage := endPage + 1
 				if nextPage > topicEndPage {
 					stopReason = "topic_end"
@@ -827,7 +820,7 @@ func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID stri
 				if nextPageWords <= 0 {
 					nextPageWords = FallbackWordsPerPage
 				}
-				if wordMap[nextPage] > 0 && wordMap[nextPage] < minExtensionPageWords {
+				if wordMap[nextPage] > 0 && wordMap[nextPage] < SemanticMinExtensionPageWords {
 					stopReason = "sparse_page"
 					break
 				}
@@ -842,7 +835,7 @@ func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID stri
 					stopReason = "query_err"
 					break
 				}
-				if sim < minSimilarityThreshold {
+				if sim < SemanticMinSimilarityThreshold {
 					stopReason = fmt.Sprintf("similarity_low(%.2f)", sim)
 					break
 				}
@@ -965,71 +958,68 @@ func (r *Repository) EnsurePendingReadingTasksForActiveNotebooks(activeProfileID
 		return err
 	}
 
+	var errs []string
 	for _, nID := range notebookIDs {
 		if err := r.EnsurePendingReadingTaskForNotebook(nID, targetWords, minWords); err != nil {
 			utils.Warnf("[QUEUE] failed to ensure reading task for active notebook %s: %v", nID, err)
+			errs = append(errs, fmt.Sprintf("notebook %s: %v", nID, err))
 		}
+	}
+	if len(errs) > 0 && len(errs) == len(notebookIDs) {
+		return fmt.Errorf("failed to ensure reading tasks for all active notebooks: %s", strings.Join(errs, "; "))
 	}
 	return nil
 }
 
 // ReserveTask updates a task status from ACTIVE to RESERVED.
 func (r *Repository) ReserveTask(taskID string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	var status string
-	err = tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrTaskNotFound
+	return r.withTx(func(tx *sql.Tx) error {
+		var status string
+		err := tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTaskNotFound
+			}
+			return err
 		}
-		return err
-	}
-	if status != string(models.StudyTaskStatusActive) {
-		return fmt.Errorf("task %s cannot be reserved because it is in status %s (expected ACTIVE)", taskID, status)
-	}
+		if status != string(models.StudyTaskStatusActive) {
+			return fmt.Errorf("task %s cannot be reserved because it is in status %s (expected ACTIVE)", taskID, status)
+		}
 
-	_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, models.StudyTaskStatusReserved, taskID)
-	if err != nil {
+		_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, string(models.StudyTaskStatusReserved), taskID)
 		return err
-	}
-
-	return tx.Commit()
+	})
 }
 
 // RevertTaskReservation reverts a task status from RESERVED to ACTIVE.
 func (r *Repository) RevertTaskReservation(taskID string) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return fmt.Errorf("task id is required")
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	var status string
-	err = tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrTaskNotFound
+	return r.withTx(func(tx *sql.Tx) error {
+		var status string
+		err := tx.QueryRow(`SELECT COALESCE(status, '') FROM study_queue WHERE id = ?`, taskID).Scan(&status)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrTaskNotFound
+			}
+			return err
 		}
-		return err
-	}
-	if status != string(models.StudyTaskStatusReserved) {
-		return fmt.Errorf("task %s is not reserved (status: %s)", taskID, status)
-	}
+		if status != string(models.StudyTaskStatusReserved) {
+			return fmt.Errorf("task %s is not reserved (status: %s)", taskID, status)
+		}
 
-	_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, models.StudyTaskStatusActive, taskID)
-	if err != nil {
+		_, err = tx.Exec(`UPDATE study_queue SET status = ? WHERE id = ?`, string(models.StudyTaskStatusActive), taskID)
 		return err
-	}
-
-	return tx.Commit()
+	})
 }
 
-// GetRereadAttemptCount returns the retry/reread count for a given topic.
+// GetRereadAttemptCount returns the retry/reread count for a given topic (returns 0 if no attempts exist).
 func (r *Repository) GetRereadAttemptCount(topicID string) (int, error) {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
@@ -1118,7 +1108,10 @@ func scanQuizAttemptsWithPayload(rows *sql.Rows) ([]QuizAttemptWithPayload, erro
 		if err := json.Unmarshal([]byte(attempt.QuizPayload), &payload); err == nil && payload.PassingScore > 0 {
 			attempt.PassingScore = payload.PassingScore
 		} else {
-			attempt.PassingScore = 70
+			if err != nil && strings.TrimSpace(attempt.QuizPayload) != "" {
+				utils.Warnf("[QUEUE] scanQuizAttemptsWithPayload unmarshal warning attemptID=%s: %v", attempt.ID, err)
+			}
+			attempt.PassingScore = DefaultPassingScore
 		}
 
 		attempts = append(attempts, attempt)
@@ -1151,8 +1144,10 @@ func assignTaskTitle(task *models.StudyQueueTask, topicTitle, notebookTitle stri
 		task.Title = topicTitle
 	} else if notebookTitle != "" {
 		task.Title = notebookTitle
+	} else if task.TopicID != "" {
+		task.Title = fmt.Sprintf("Topic %s", task.TopicID)
 	} else {
-		task.Title = "Task"
+		task.Title = string(task.TaskType)
 	}
 }
 

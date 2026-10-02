@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -95,7 +96,7 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 		return fmt.Errorf("cannot test nil extension")
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	testCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	if abs, err := filepath.Abs(pythonPath); err == nil {
@@ -111,16 +112,35 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		errStr := strings.TrimSpace(stderr.String())
-		if errStr != "" {
-			return fmt.Errorf("smoke test failed: %s", errStr)
+	runErr := cmd.Run()
+	outStr := strings.TrimSpace(stdout.String())
+	errStr := strings.TrimSpace(stderr.String())
+
+	// If stdout contains valid JSON status reporting an error, prefer that error message
+	if outStr != "" {
+		var statusResp struct {
+			Status string `json:"status"`
+			Error  string `json:"error"`
 		}
-		outStr := strings.TrimSpace(stdout.String())
+		if jsonErr := json.Unmarshal([]byte(outStr), &statusResp); jsonErr == nil {
+			if statusResp.Status == "error" || statusResp.Error != "" {
+				errMsg := statusResp.Error
+				if errMsg == "" {
+					errMsg = "unknown extension error"
+				}
+				return fmt.Errorf("smoke test failed: %s", errMsg)
+			}
+		}
+	}
+
+	if runErr != nil {
 		if outStr != "" {
 			return fmt.Errorf("smoke test failed: %s", outStr)
 		}
-		return fmt.Errorf("smoke test failed: %w", err)
+		if errStr != "" {
+			return fmt.Errorf("smoke test failed: %s", errStr)
+		}
+		return fmt.Errorf("smoke test failed: %w", runErr)
 	}
 
 	return nil

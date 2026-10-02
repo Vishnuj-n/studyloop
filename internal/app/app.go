@@ -60,6 +60,7 @@ type App struct {
 	audioOverviewCancel context.CancelFunc
 	extSetupMu          sync.Mutex
 	extSetupCancel      context.CancelFunc
+	extSetupToken       string
 	pomoTimer           *pomotimer.Service
 	pomoAudio           *pomoaudio.Service
 	sessionMu           sync.RWMutex
