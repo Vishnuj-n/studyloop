@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ErrSetupCanceled indicates extension setup was aborted via user cancellation.
@@ -96,14 +95,11 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 		return fmt.Errorf("cannot test nil extension")
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
 	if abs, err := filepath.Abs(pythonPath); err == nil {
 		pythonPath = abs
 	}
 
-	cmd := exec.CommandContext(testCtx, pythonPath, ext.Entrypoint(), "--test")
+	cmd := exec.CommandContext(ctx, pythonPath, ext.Entrypoint(), "--test")
 	cmd.Dir = ext.Dir
 	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
