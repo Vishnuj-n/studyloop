@@ -49,18 +49,51 @@ foreach ($file in $files) {
     $hashes[$file] = $hashVal
 }
 
-# Generate manifest.json content
-$manifest = [ordered]@{
-    assetVersion = $normalizedVersion
-    downloadUrl = "https://github.com/Vishnuj-n/studyloop/releases/download/$appVersion/rag-assets.zip"
-    requiredFiles = $files
-    fileHashes = $hashes
+# Component metadata map
+$components = [ordered]@{
+    "model_int8.onnx" = [ordered]@{
+        model        = "nomic-ai/nomic-embed-text-v1.5"
+        quantization = "INT8 (onnxruntime.quant)"
+        dimension    = 768
+        source       = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5"
+        sha256       = $hashes["model_int8.onnx"]
+        sizeBytes    = (Get-Item (Join-Path $assetDir "model_int8.onnx")).Length
+    }
+    "tokenizer.json" = [ordered]@{
+        type      = "Hugging Face Tokenizer (Fast/WordPiece)"
+        source    = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/blob/main/tokenizer.json"
+        sha256    = $hashes["tokenizer.json"]
+        sizeBytes = (Get-Item (Join-Path $assetDir "tokenizer.json")).Length
+    }
+    "onnxruntime.dll" = [ordered]@{
+        product   = "Microsoft ONNX Runtime (Win x64)"
+        version   = "1.24.20260203.3.470ae16"
+        source    = "https://github.com/microsoft/onnxruntime/releases"
+        sha256    = $hashes["onnxruntime.dll"]
+        sizeBytes = (Get-Item (Join-Path $assetDir "onnxruntime.dll")).Length
+    }
+    "vec0.dll" = [ordered]@{
+        product   = "sqlite-vec extension (Win x64)"
+        version   = "v0.1.9"
+        source    = "https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9"
+        sha256    = $hashes["vec0.dll"]
+        sizeBytes = (Get-Item (Join-Path $assetDir "vec0.dll")).Length
+    }
 }
 
-# Save manifest.json inside asset directory temporarily
+# Generate manifest.json content
+$manifest = [ordered]@{
+    assetVersion  = $normalizedVersion
+    downloadUrl   = "https://github.com/Vishnuj-n/studyloop/releases/download/$appVersion/rag-assets.zip"
+    requiredFiles = $files
+    components    = $components
+    fileHashes    = $hashes
+}
+
+# Save manifest.json inside asset directory
 $manifestPath = Join-Path $assetDir "manifest.json"
-$manifest | ConvertTo-Json | Set-Content -Path $manifestPath -Force
-Write-Host "Generated temporary manifest.json at $manifestPath"
+$manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Force
+Write-Host "Generated manifest.json at $manifestPath"
 
 # Zip them up
 $zipPath = Join-Path $outDir "rag-assets.zip"
@@ -75,8 +108,7 @@ $compressFiles += $manifestPath
 # Create Zip Archive
 Compress-Archive -Path $compressFiles -DestinationPath $zipPath -Force
 
-# Clean up temp manifest
-Remove-Item $manifestPath -Force
+# Retain manifest.json in asset directory for repository source tracking
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green

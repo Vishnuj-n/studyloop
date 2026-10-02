@@ -106,10 +106,17 @@ No global knowledge search. No chat memory. No agent planning. No background aut
 4. Retrieve top-k: embed query → pre-filter by topic_id/page_num → hybrid vector + lexical search via Reciprocal Rank Fusion (RRF, K=60)
 5. Build token-budgeted prompt → call LLM once → return answer + citations
 
-## 13. Windows Runtime Assets
+## 13. Windows Runtime Assets & Provenance
 
-Required in `asset/`: `onnxruntime.dll`, `vec0.dll`. Missing = explicit setup error, no synthetic fallback.
+Required in `asset/`:
+- `onnxruntime.dll` (Microsoft ONNX Runtime v1.24.x)
+- `vec0.dll` (`sqlite-vec` v0.1.9)
+- `model_int8.onnx` (`nomic-ai/nomic-embed-text-v1.5` INT8 quantized)
+- `tokenizer.json` (`nomic-ai/nomic-embed-text-v1.5` Hugging Face tokenizer)
+
+Missing = explicit setup error, no synthetic fallback. Full metadata, hashes, and upstream URLs are tracked in [`asset/manifest.json`](../asset/manifest.json) and [`asset/README.md`](../asset/README.md).
 
 ## 14. Build Constraints
 
 CGO required (`CGO_ENABLED=1`). SQLite extension support: `go build -tags sqlite_extension .`
+

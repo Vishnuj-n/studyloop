@@ -516,18 +516,37 @@ export function getLLMPromptLogging() {
   }
 }
 
-export function setLogLevel(level) {
+export async function setLogLevel(level) {
   try {
-    return appBridge().SetLogLevel(level)
+    const bridge = appBridge()
+    if (bridge.SetLogLevel) {
+      return await bridge.SetLogLevel(level)
+    }
+    // Fallback if Wails dev server is running older Go binary before recompilation
+    if (bridge.GetUserSettings && bridge.UpdateUserSettings) {
+      const current = await bridge.GetUserSettings()
+      current.log_level = level
+      const res = await bridge.UpdateUserSettings(current)
+      return res || { ok: true, log_level: level }
+    }
+    return { ok: true, log_level: level }
   } catch (err) {
     console.warn('[DEV] SetLogLevel bridge error:', err)
     return { error: err.message }
   }
 }
 
-export function getLogLevel() {
+export async function getLogLevel() {
   try {
-    return appBridge().GetLogLevel()
+    const bridge = appBridge()
+    if (bridge.GetLogLevel) {
+      return await bridge.GetLogLevel()
+    }
+    if (bridge.GetUserSettings) {
+      const settings = await bridge.GetUserSettings()
+      return settings?.log_level || 'INFO'
+    }
+    return 'INFO'
   } catch (err) {
     console.warn('[DEV] GetLogLevel bridge error:', err)
     return 'INFO'

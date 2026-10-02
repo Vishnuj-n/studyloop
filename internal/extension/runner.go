@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 // ExtensionAuthKey is injected at build-time via -ldflags. Defaults to dev fallback.
@@ -61,7 +63,14 @@ func (r *Runner) Run(ctx context.Context, ext *Extension, executable string, arg
 		return nil, fmt.Errorf("cannot run nil extension")
 	}
 
-	cmd := exec.CommandContext(ctx, executable, args...)
+	execPath := executable
+	if strings.ContainsAny(execPath, `/\`) {
+		if abs, err := filepath.Abs(execPath); err == nil {
+			execPath = abs
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, execPath, args...)
 	cmd.Dir = ext.Dir
 	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
@@ -86,7 +95,14 @@ func (r *Runner) Run(ctx context.Context, ext *Extension, executable string, arg
 
 // RunStreamWithInput runs an executable, streams `input` to its stdin, and calls `onLine` for every line printed to stdout.
 func (r *Runner) RunStreamWithInput(ctx context.Context, dir string, executable string, input []byte, onLine func(line string) error, args ...string) error {
-	cmd := exec.CommandContext(ctx, executable, args...)
+	execPath := executable
+	if strings.ContainsAny(execPath, `/\`) {
+		if abs, err := filepath.Abs(execPath); err == nil {
+			execPath = abs
+		}
+	}
+
+	cmd := exec.CommandContext(ctx, execPath, args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
