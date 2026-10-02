@@ -27,6 +27,7 @@ Compression is controlled dynamically via `user_settings.prompt_compression_mode
 ┌──────────────────────────────▼──────────────────────────────┐
 │ 2. Python Sidecar (`extensions/prompt_compressor`)          │
 │    - Uses llmlingua-2-bert-base-multilingual-cased          │
+│    - Restricted to torch.set_num_threads(2) for CPU safety │
 │    - Registered in internal/extension/tiers.go ("free")    │
 └──────────────────────────────┬──────────────────────────────┘
                                │
@@ -45,9 +46,31 @@ Compression is controlled dynamically via `user_settings.prompt_compression_mode
 
 ---
 
+## Empirical Benchmarks
+
+Empirical performance measured via `scripts/benchmark_prompt_compression.py`:
+
+| Compression Rate | Token Savings (% Reduction) | Keyword / Term Retention | Per-Chunk Latency (CPU) |
+| :--- | :--- | :--- | :--- |
+| **80% Target (Default)** | **23.2% Token Savings** | **88.8%** term retention | **~750 ms** / chunk |
+| **60% Target (Aggressive)** | **43.5% Token Savings** | **75.0%** term retention | **~700 ms** / chunk |
+
+---
+
+## Multi-Threaded Concurrency & CPU Safety
+
+When PDF Extraction, Embedding Generation, and Prompt Compression execute concurrently:
+
+1. **CPU Core Protection (`torch.set_num_threads(2)`)**: PyTorch in `compress.py` is bounded to 2 threads. This prevents PyTorch from thrashing all CPU cores while Go worker goroutines process PDF pages and ONNX embeddings.
+2. **Vector Index Precision**: Embeddings are generated 100% from raw `chunk_text`, keeping vector search rankings and retrieval accuracy completely untouched.
+3. **SQLite WAL Concurrency**: SQLite operates in WAL mode with a 5000ms busy handler, gracefully serializing background single-row `UPDATE` operations without UI lockups.
+
+---
+
 ## Core Component Reference
 
 - **Database Migrations & Schema**: [`internal/db/schema.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/db/schema.go), [`doc/SCHEMA.md`](file:///c:/Users/vishn/PROJECT/ai-tutor/doc/SCHEMA.md)
-- **Extension Sidecar**: `extensions/prompt_compressor/compress.py`, [`internal/extension/tiers.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/extension/tiers.go)
+- **Extension Sidecar**: [`extensions/prompt_compressor/compress.py`](file:///c:/Users/vishn/PROJECT/ai-tutor/extensions/prompt_compressor/compress.py), [`internal/extension/tiers.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/extension/tiers.go)
+- **Benchmark Script**: [`scripts/benchmark_prompt_compression.py`](file:///c:/Users/vishn/PROJECT/ai-tutor/scripts/benchmark_prompt_compression.py)
 - **Study Compression Service**: [`internal/study/compression_service.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/compression_service.go), [`internal/study/compression_test.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/compression_test.go)
 - **Queue Transition Trigger**: [`internal/study/queue_transition.go`](file:///c:/Users/vishn/PROJECT/ai-tutor/internal/study/queue_transition.go)

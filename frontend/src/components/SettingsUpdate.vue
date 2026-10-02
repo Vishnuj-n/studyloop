@@ -232,7 +232,7 @@ function starRepo() {
 }
 
 function openRepoPrivacy() {
-  openURLInBrowser('https://github.com/Vishnuj-n/studyloop#privacy')
+  openURLInBrowser('https://github.com/Vishnuj-n/studyloop/blob/main/PRIVACY.md')
 }
 
 let unlistenProgress = null
