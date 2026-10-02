@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"ai-tutor/internal/db"
@@ -132,14 +133,21 @@ type AssignedNotebook struct {
 // DO NOT conflate, chain, or make one a fallback of the other.
 // ---------------------------------------------------------------------------
 
+var (
+	lastSyncErrMu   sync.Mutex
+	lastSyncErrMsg  string
+	lastSyncErrTime time.Time
+	suppressedCount int
+)
+
 func StartCloudSyncLoop(repo *db.Repository) {
 	ticker := time.NewTicker(15 * time.Minute)
 	go func() {
-		utils.Warnf("[SYNC] Background cloud sync & telemetry worker started.")
+		utils.Infof("[SYNC] Background cloud sync & telemetry worker started.")
 		for range ticker.C {
 			// 1. Run Teacher / Classroom Sync (if configured)
 			if err := TriggerCloudSync(repo); err != nil {
-				utils.Warnf("[SYNC] Periodic classroom sync warning: %v", err)
+				utils.Debugf("[SYNC] Periodic classroom sync failed: %v", err)
 			}
 
 			// 2. Run Anonymous Research Telemetry independently (if opted-in)
@@ -162,15 +170,16 @@ func TriggerCloudSync(repo *db.Repository) error {
 	userToken := ResolveCloudAPIToken(settings.CloudAPIToken)
 	anonKey := ResolveAnonKey()
 
-	if settings.ClassroomCode == "" && syncURL == "" {
+	// Strictly require classroom pairing OR an explicit custom sync URL
+	if strings.TrimSpace(settings.ClassroomCode) == "" && strings.TrimSpace(settings.CloudSyncURL) == "" {
 		return nil // Local profile without explicit classroom pairing or custom cloud sync URL; skip classroom sync
 	}
 
-	if syncURL == "" {
+	if strings.TrimSpace(syncURL) == "" {
 		return nil // Classroom cloud sync not configured for this profile
 	}
 
-	utils.Warnf("[SYNC] Running classroom cloud sync to: %s", syncURL)
+	utils.Debugf("[SYNC] Running classroom cloud sync to: %s", syncURL)
 
 	// Build slim notebook records — filename only, no local paths or internal IDs
 	notebooks, err := repo.GetNotebooks("", "")
@@ -180,7 +189,7 @@ func TriggerCloudSync(repo *db.Repository) error {
 	notebookRecords := make([]NotebookSyncRecord, 0, len(notebooks))
 	for _, nb := range notebooks {
 		if nb.FileHash == "" {
-			utils.Warnf("[SYNC] skipping notebook with empty FileHash: title=%q, path=%q", nb.Title, nb.FilePath)
+			utils.Debugf("[SYNC] skipping notebook with empty FileHash: title=%q, path=%q", nb.Title, nb.FilePath)
 			continue
 		}
 		notebookRecords = append(notebookRecords, NotebookSyncRecord{
@@ -198,7 +207,7 @@ func TriggerCloudSync(repo *db.Repository) error {
 		utils.Warnf("[SYNC] failed to fetch delta review logs: %v", err)
 		return err
 	}
-	utils.Warnf("[SYNC] delta logs to send: %d (since %d)", len(logs), settings.LastSyncedAt)
+	utils.Debugf("[SYNC] delta logs to send: %d (since %d)", len(logs), settings.LastSyncedAt)
 
 	payload := SyncPayload{
 		UserToken:     userToken,
@@ -227,7 +236,7 @@ func TriggerCloudSync(repo *db.Repository) error {
 	if lastErr == nil {
 		// Handle assigned notebooks from teacher
 		if len(syncResp.NewNotebooks) > 0 {
-			utils.Warnf("[SYNC] Found %d new teacher assignments", len(syncResp.NewNotebooks))
+			utils.Infof("[SYNC] Found %d new teacher assignments", len(syncResp.NewNotebooks))
 			for _, assigned := range syncResp.NewNotebooks {
 				if err := downloadAndRegisterNotebook(repo, assigned); err != nil {
 					utils.Warnf("[SYNC] Failed to download assigned notebook %s: %v", assigned.Title, err)
@@ -248,11 +257,36 @@ func TriggerCloudSync(repo *db.Repository) error {
 	}
 
 	if lastErr != nil {
-		utils.Warnf("[SYNC] Classroom sync failed after %d attempts: %v", 3, lastErr)
+		lastSyncErrMu.Lock()
+		errMsg := lastErr.Error()
+		now := time.Now()
+		// Suppress repeating identical error logs within 30 minutes
+		if errMsg == lastSyncErrMsg && now.Sub(lastSyncErrTime) < 30*time.Minute {
+			suppressedCount++
+			lastSyncErrMu.Unlock()
+			return lastErr
+		}
+		if suppressedCount > 0 {
+			utils.Warnf("[SYNC] Classroom sync failed after 3 attempts (%d identical failures suppressed): %v", suppressedCount, lastErr)
+		} else {
+			utils.Warnf("[SYNC] Classroom sync failed after 3 attempts: %v", lastErr)
+		}
+		lastSyncErrMsg = errMsg
+		lastSyncErrTime = now
+		suppressedCount = 0
+		lastSyncErrMu.Unlock()
 		return lastErr
 	}
 
-	utils.Warnf("[SYNC] Classroom sync completed successfully.")
+	lastSyncErrMu.Lock()
+	if lastSyncErrMsg != "" {
+		utils.Infof("[SYNC] Classroom sync recovered and succeeded.")
+		lastSyncErrMsg = ""
+		suppressedCount = 0
+	}
+	lastSyncErrMu.Unlock()
+
+	utils.Debugf("[SYNC] Classroom sync completed successfully.")
 	return nil
 }
 
@@ -311,7 +345,7 @@ func TriggerAnonymousTelemetrySync(repo *db.Repository) error {
 	if err := repo.MarkAnalyticsSynced(ids); err != nil {
 		utils.Warnf("[SYNC-ANALYTICS] failed to mark anonymous events synced: %v", err)
 	}
-	utils.Warnf("[SYNC-ANALYTICS] Anonymous research telemetry sync of %d events succeeded.", len(events))
+	utils.Debugf("[SYNC-ANALYTICS] Anonymous research telemetry sync of %d events succeeded.", len(events))
 	return nil
 }
 
@@ -321,7 +355,7 @@ func postJSONWithRetry(url string, jsonBytes []byte, headers map[string]string, 
 
 	for i := 0; i < attempts; i++ {
 		if i > 0 {
-			utils.Warnf("[SYNC-RETRY] Attempt %d/%d due to: %v", i+1, attempts, lastErr)
+			utils.Debugf("[SYNC-RETRY] Attempt %d/%d due to: %v", i+1, attempts, lastErr)
 			time.Sleep(1 * time.Second)
 		}
 

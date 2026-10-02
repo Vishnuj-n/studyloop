@@ -1,8 +1,10 @@
 package extension
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -94,10 +96,14 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 		return fmt.Errorf("cannot test nil extension")
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	testCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(testCtx, pythonPath, ext.EntrypointPath(), "--test")
+	if abs, err := filepath.Abs(pythonPath); err == nil {
+		pythonPath = abs
+	}
+
+	cmd := exec.CommandContext(testCtx, pythonPath, ext.Entrypoint(), "--test")
 	cmd.Dir = ext.Dir
 	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
@@ -106,16 +112,35 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		errStr := strings.TrimSpace(stderr.String())
-		if errStr != "" {
-			return fmt.Errorf("smoke test failed: %s", errStr)
+	runErr := cmd.Run()
+	outStr := strings.TrimSpace(stdout.String())
+	errStr := strings.TrimSpace(stderr.String())
+
+	// If stdout contains valid JSON status reporting an error, prefer that error message
+	if outStr != "" {
+		var statusResp struct {
+			Status string `json:"status"`
+			Error  string `json:"error"`
 		}
-		outStr := strings.TrimSpace(stdout.String())
+		if jsonErr := json.Unmarshal([]byte(outStr), &statusResp); jsonErr == nil {
+			if statusResp.Status == "error" || statusResp.Error != "" {
+				errMsg := statusResp.Error
+				if errMsg == "" {
+					errMsg = "unknown extension error"
+				}
+				return fmt.Errorf("smoke test failed: %s", errMsg)
+			}
+		}
+	}
+
+	if runErr != nil {
 		if outStr != "" {
 			return fmt.Errorf("smoke test failed: %s", outStr)
 		}
-		return fmt.Errorf("smoke test failed: %w", err)
+		if errStr != "" {
+			return fmt.Errorf("smoke test failed: %s", errStr)
+		}
+		return fmt.Errorf("smoke test failed: %w", runErr)
 	}
 
 	return nil
@@ -187,8 +212,11 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	// 1. Create venv with uv (uv venv <venvDir> --allow-existing --system-site-packages)
 	// uv automatically detects system Python and reuses already-installed global packages (e.g. yt-dlp, edge-tts)
 	logLine("Step 1/3: Initializing Python virtual environment...")
-	venvCmd := exec.CommandContext(ctx, uvPath, "venv", venvDir, "--allow-existing", "--system-site-packages")
-	venvCmd.Dir = ext.Dir
+	absExtDir, _ := filepath.Abs(ext.Dir)
+	absVenvDir, _ := filepath.Abs(venvDir)
+
+	venvCmd := exec.CommandContext(ctx, uvPath, "venv", absVenvDir, "--allow-existing", "--system-site-packages")
+	venvCmd.Dir = absExtDir
 	hideConsoleWindow(venvCmd)
 
 	var venvOut, venvErr bytes.Buffer
@@ -211,23 +239,44 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	reqPath := filepath.Join(ext.Dir, "requirements.txt")
 	if info, err := os.Stat(reqPath); err == nil && !info.IsDir() {
 		logLine("Step 2/3: Installing extension dependencies from requirements.txt...")
-		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--python", venvDir, "-r", reqPath)
-		pipCmd.Dir = ext.Dir
+		absReqPath, _ := filepath.Abs(reqPath)
+		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--python", absVenvDir, "-r", absReqPath)
+		pipCmd.Dir = absExtDir
 		hideConsoleWindow(pipCmd)
 
-		var pipOut, pipErr bytes.Buffer
-		pipCmd.Stdout = &pipOut
-		pipCmd.Stderr = &pipErr
+		// Stream pip installation output in real-time to the log callback
+		stdoutPipe, err := pipCmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open stdout pipe: %w", err)
+		}
+		pipCmd.Stderr = pipCmd.Stdout
 
-		if err := pipCmd.Run(); err != nil {
+		if err := pipCmd.Start(); err != nil {
 			if ctx.Err() == context.Canceled {
 				return ErrSetupCanceled
 			}
-			errMsg := strings.TrimSpace(pipErr.String())
-			if errMsg == "" {
-				errMsg = strings.TrimSpace(pipOut.String())
+			return fmt.Errorf("failed to start uv pip install: %w", err)
+		}
+
+		scanner := bufio.NewScanner(stdoutPipe)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				logLine(line)
 			}
-			return fmt.Errorf("failed to install dependencies with uv pip: %w (output: %s)", err, errMsg)
+		}
+		if scanErr := scanner.Err(); scanErr != nil {
+			if ctx.Err() == context.Canceled {
+				return ErrSetupCanceled
+			}
+			logLine(fmt.Sprintf("[WARN] Error reading pip output: %v", scanErr))
+		}
+
+		if err := pipCmd.Wait(); err != nil {
+			if ctx.Err() == context.Canceled {
+				return ErrSetupCanceled
+			}
+			return fmt.Errorf("failed to install dependencies with uv pip: %w", err)
 		}
 		logLine("[OK] Dependencies installed successfully.")
 	} else {

@@ -20,7 +20,7 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite3 db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Simulate an older v1 database with legacy tables missing modern columns
 	legacySchema := []string{
@@ -154,6 +154,10 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 		{"user_settings", "analytics_enabled", "SELECT analytics_enabled FROM user_settings WHERE id = 1"},
 		{"user_settings", "anonymous_user_id", "SELECT anonymous_user_id FROM user_settings WHERE id = 1"},
 		{"user_settings", "llm_prompt_logging", "SELECT llm_prompt_logging FROM user_settings WHERE id = 1"},
+		{"user_settings", "prompt_compression_mode", "SELECT prompt_compression_mode FROM user_settings WHERE id = 1"},
+		{"user_settings", "prompt_compression_rate", "SELECT prompt_compression_rate FROM user_settings WHERE id = 1"},
+		{"chunks", "compressed_text", "SELECT compressed_text FROM chunks LIMIT 1"},
+		{"chunks", "compressed_token_count", "SELECT compressed_token_count FROM chunks LIMIT 1"},
 	}
 
 	for _, check := range checkQueries {
@@ -174,7 +178,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open fresh db: %v", err)
 	}
-	defer freshDB.Close()
+	defer func() { _ = freshDB.Close() }()
 
 	freshTx, err := freshDB.Begin()
 	if err != nil {
@@ -193,7 +197,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open upgraded db: %v", err)
 	}
-	defer upgradedDB.Close()
+	defer func() { _ = upgradedDB.Close() }()
 
 	// Seed historical initial table definitions from when each table was first introduced in git
 	legacyTables := []string{
@@ -331,7 +335,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to query tables: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var tableNames []string
 		for rows.Next() {
@@ -363,7 +367,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 			if err := infoRows.Err(); err != nil {
 				t.Fatalf("infoRows iteration error for %s: %v", tbl, err)
 			}
-			infoRows.Close()
+			_ = infoRows.Close()
 			sort.Strings(cols)
 			tables[tbl] = cols
 		}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	"ai-tutor/internal/utils"
@@ -15,9 +16,14 @@ import (
 
 const maxBackups = 3
 
+var backupMu sync.Mutex
+
 // BackupDatabase creates a compressed timestamped backup of Studyloop.db (using VACUUM INTO when available)
 // and retains the last 3 copies.
 func BackupDatabase(dbPath string) error {
+	backupMu.Lock()
+	defer backupMu.Unlock()
+
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		// First run before DB creation: nothing to back up yet
 		return nil
@@ -85,7 +91,7 @@ func BackupDatabase(dbPath string) error {
 	}
 
 	success = true
-	utils.Warnf("[BACKUP] Successfully created database backup: %s", backupPath)
+	utils.Infof("[BACKUP] Successfully created database backup: %s", backupPath)
 
 	pruneOldBackups(destDir, baseName, maxBackups)
 	return nil

@@ -208,8 +208,12 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
 		ctx := context.Background()
 
+		lastLoggedPercent := -1
 		onProgress := func(processed, total, percent int, message string) {
-			utils.Infof("[DEEP_PDF] %s (%s): %s (%d%%)", fileName, nbID, message, percent)
+			if lastLoggedPercent == -1 || percent >= lastLoggedPercent+10 || percent == 100 || processed == total {
+				utils.Infof("[DEEP_PDF] %s (%s): %s (%d%%)", fileName, nbID, message, percent)
+				lastLoggedPercent = percent
+			}
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
 				Status:     "processing",
@@ -597,7 +601,7 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 			for _, et := range existingTopics {
 				// Match if exact page bounds match OR page ranges overlap
 				if (et.StartPage == ch.StartPage && et.EndPage == ch.EndPage) ||
-					(ch.StartPage > 0 && et.StartPage > 0 && !(ch.EndPage < et.StartPage || ch.StartPage > et.EndPage)) {
+					(ch.StartPage > 0 && et.StartPage > 0 && ch.EndPage >= et.StartPage && ch.StartPage <= et.EndPage) {
 					annotated[i].InQueue = true
 					break
 				}
@@ -1236,7 +1240,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to load user settings: %v", err)}
 	}
 
-	targetWords := 0
+	var targetWords int
 	if p.TargetSessionWords != nil && *p.TargetSessionWords > 0 {
 		targetWords = *p.TargetSessionWords
 	} else if settings != nil && settings.TargetSessionWords > 0 {

@@ -62,7 +62,7 @@ func TestRunExtension_ProEntitlementEnforced(t *testing.T) {
 		t.Fatal("expected IsProUser to be true after SetSession")
 	}
 
-	session := a.getUserSession()
+	session := a.GetUserSession()
 	if session["userId"] != "user_123" || session["isPro"] != true {
 		t.Fatalf("unexpected session state: %#v", session)
 	}
@@ -72,3 +72,35 @@ func TestRunExtension_ProEntitlementEnforced(t *testing.T) {
 		t.Fatal("expected IsProUser to be false after ClearSession")
 	}
 }
+
+func TestRunExtension_InputSizeCap(t *testing.T) {
+	a := &App{}
+	bigInput := strings.Repeat("a", maxExtensionInputBytes+10)
+	res := a.RunExtension("test_id", bigInput)
+	if res["error"] == nil || !strings.Contains(res["error"].(string), "exceeds maximum allowable size") {
+		t.Fatalf("expected input size cap error, got: %#v", res)
+	}
+	if res["id"] != "test_id" {
+		t.Fatalf("expected id to be preserved in error map, got: %#v", res)
+	}
+}
+
+func TestCancelExtensionSetup_Tracking(t *testing.T) {
+	a := &App{}
+	res := a.CancelExtensionSetup()
+	if res["success"] != true || res["was_running"] != false {
+		t.Fatalf("unexpected cancel result when no setup running: %#v", res)
+	}
+}
+
+func TestSaveExtensionConfig_Validation(t *testing.T) {
+	a := &App{}
+	err := a.SaveExtensionConfig("{invalid json")
+	if err == nil || !strings.Contains(err.Error(), "repository not initialized") {
+		// repo is nil first
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	}
+}
+

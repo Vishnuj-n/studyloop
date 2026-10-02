@@ -30,12 +30,8 @@ func TestSendHeartbeat_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	os.Setenv("TELEMETRY_ENDPOINT_URL", server.URL)
-	os.Setenv("TELEMETRY_ANON_KEY", "test-anon-key")
-	defer func() {
-		os.Unsetenv("TELEMETRY_ENDPOINT_URL")
-		os.Unsetenv("TELEMETRY_ANON_KEY")
-	}()
+	t.Setenv("TELEMETRY_ENDPOINT_URL", server.URL)
+	t.Setenv("TELEMETRY_ANON_KEY", "test-anon-key")
 
 	tempDB := "test_heartbeat.db"
 	_ = os.Remove(tempDB)
@@ -78,8 +74,7 @@ func TestSendHeartbeat_Success(t *testing.T) {
 
 func TestSendHeartbeat_ServerDownFailSilent(t *testing.T) {
 	// Point to closed/invalid server port
-	os.Setenv("TELEMETRY_ENDPOINT_URL", "http://127.0.0.1:54321/rest/v1/app_telemetry")
-	defer os.Unsetenv("TELEMETRY_ENDPOINT_URL")
+	t.Setenv("TELEMETRY_ENDPOINT_URL", "http://127.0.0.1:54321/rest/v1/app_telemetry")
 
 	tempDB := "test_heartbeat_silent.db"
 	_ = os.Remove(tempDB)
@@ -111,7 +106,7 @@ func (r *recordingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 func TestSendHeartbeat_NoEndpointInTestsSkipsProductionTarget(t *testing.T) {
 	// Ensure no custom endpoint is set
-	os.Unsetenv("TELEMETRY_ENDPOINT_URL")
+	_ = os.Unsetenv("TELEMETRY_ENDPOINT_URL")
 
 	tempDB := "test_heartbeat_skip.db"
 	_ = os.Remove(tempDB)

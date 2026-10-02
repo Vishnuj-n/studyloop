@@ -66,6 +66,12 @@
               <div class="title-line">
                 <h3 class="ext-name">{{ ext.name }}</h3>
                 <span class="tier-tag free">FREE</span>
+                <span v-if="isExtensionSettingUp(ext.id)" class="setup-badge running">
+                  <BaseIcon name="loader" size="12" class="spin-icon" /> Step {{ getSetupStep(ext.id) }}/3
+                </span>
+                <span v-else-if="isExtensionSetupError(ext.id)" class="setup-badge error">
+                  <BaseIcon name="alert-triangle" size="12" /> Failed
+                </span>
               </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Reader' }}</span>
             </div>
@@ -78,7 +84,7 @@
               class="switch"
               :class="{ 'is-active': isExtensionEnabled(ext.id) }"
               :title="isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension'"
-              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="isExtensionSettingUp(ext.id)"
               @click.stop="handleToggle(ext)"
             >
               <span class="slider"></span>
@@ -97,43 +103,48 @@
               Open Simplifier <BaseIcon name="arrow-right" size="13" />
             </button>
             <button
+              v-else-if="isExtensionSettingUp(ext.id)"
+              class="action-btn setup-status-action"
+              @click="triggerSetup(ext)"
+            >
+              <span>Installing Step {{ getSetupStep(ext.id) }}/3...</span>
+            </button>
+            <button
               v-else-if="ext.id === 'youtube' || ext.id === 'anki_importer'"
               class="action-btn primary-action"
-              :disabled="!isExtensionEnabled(ext.id) || isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/notebooks')"
             >
-              <span v-if="isSettingUp(ext.id)">Setting up...</span>
-              <span v-else-if="isChecking(ext.id)">Checking environment...</span>
-              <span v-else>Import in Notebooks <BaseIcon name="arrow-right" size="13" /></span>
+              Import in Notebooks <BaseIcon name="arrow-right" size="13" />
             </button>
             <button
               v-else
               class="action-btn primary-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
               @click="handleRun(ext)"
             >
               {{ getActionButtonLabel(ext.id) }}
             </button>
 
-            <!-- Re-verify / Setup details trigger for Python tools -->
+            <!-- Settings button on left side of icon tools (for extensions with settings) -->
             <button
-              v-if="isPythonExtension(ext)"
-              class="config-icon-btn"
-              title="Verify or Reinstall Extension Environment"
-              :disabled="isSettingUp(ext.id)"
-              @click="triggerSetup(ext)"
-            >
-              <BaseIcon name="wrench" size="14" />
-            </button>
-
-            <button
-              v-if="ext.id === 'text_simplifier'"
+              v-if="hasExtensionSettings(ext.id)"
               class="config-icon-btn"
               title="Configure in Settings"
               :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/settings?category=extensions')"
             >
               <BaseIcon name="settings" size="14" />
+            </button>
+
+            <!-- Tool / Setup trigger on right side (visible for all extensions) -->
+            <button
+              class="config-icon-btn"
+              :class="{ 'active-setup': isExtensionSettingUp(ext.id) }"
+              title="Verify or Reinstall Extension Environment"
+              @click="triggerSetup(ext)"
+            >
+              <BaseIcon name="wrench" size="14" />
             </button>
           </div>
         </div>
@@ -185,6 +196,12 @@
               <div class="title-line">
                 <h3 class="ext-name">{{ ext.name }}</h3>
                 <span class="tier-tag pro">EARLY ACCESS</span>
+                <span v-if="isExtensionSettingUp(ext.id)" class="setup-badge running">
+                  <BaseIcon name="loader" size="12" class="spin-icon" /> Step {{ getSetupStep(ext.id) }}/3
+                </span>
+                <span v-else-if="isExtensionSetupError(ext.id)" class="setup-badge error">
+                  <BaseIcon name="alert-triangle" size="12" /> Failed
+                </span>
               </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Advanced' }}</span>
             </div>
@@ -197,7 +214,7 @@
               class="switch"
               :class="{ 'is-active': isPro && isExtensionEnabled(ext.id) }"
               :title="isPro ? (isExtensionEnabled(ext.id) ? 'Disable extension' : 'Enable extension') : 'Unlock with Early Access'"
-              :disabled="isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="isExtensionSettingUp(ext.id)"
               @click.stop="handleProToggle(ext)"
             >
               <span class="slider"></span>
@@ -208,19 +225,24 @@
 
           <div class="card-bottom">
             <button
-              v-if="isPro && (ext.id === 'deep_pdf' || ext.id.includes('pdf'))"
+              v-if="isPro && isExtensionSettingUp(ext.id)"
+              class="action-btn setup-status-action"
+              @click="triggerSetup(ext)"
+            >
+              <span>Installing Step {{ getSetupStep(ext.id) }}/3...</span>
+            </button>
+            <button
+              v-else-if="isPro && (ext.id === 'deep_pdf' || ext.id.includes('pdf'))"
               class="action-btn pro-action"
-              :disabled="!isExtensionEnabled(ext.id) || isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id)"
               @click="router.push('/notebooks')"
             >
-              <span v-if="isSettingUp(ext.id)">Setting up...</span>
-              <span v-else-if="isChecking(ext.id)">Checking environment...</span>
-              <span v-else>Import in Notebooks <BaseIcon name="arrow-right" size="13" /></span>
+              Import in Notebooks <BaseIcon name="arrow-right" size="13" />
             </button>
             <button
               v-else-if="isPro"
               class="action-btn pro-action"
-              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id || isSettingUp(ext.id) || isChecking(ext.id)"
+              :disabled="!isExtensionEnabled(ext.id) || runningId === ext.id"
               @click="handleRun(ext)"
             >
               {{ getActionButtonLabel(ext.id) }}
@@ -234,38 +256,33 @@
               <span>Support Dev &bull; Get Early Access</span>
             </button>
 
-            <!-- Re-verify / Setup details trigger for Python tools -->
+            <!-- Settings button on left side of icon tools (for extensions with settings) -->
             <button
-              v-if="isPro && isPythonExtension(ext)"
-              class="config-icon-btn"
-              title="Verify or Reinstall Extension Environment"
-              :disabled="isSettingUp(ext.id)"
-              @click="triggerSetup(ext)"
-            >
-              <BaseIcon name="wrench" size="14" />
-            </button>
-
-            <button
-              v-if="isPro && ext.id === 'audio_overview'"
+              v-if="hasExtensionSettings(ext.id)"
               class="config-icon-btn"
               title="Configure in Settings"
-              :disabled="!isExtensionEnabled(ext.id)"
+              :disabled="!isPro || !isExtensionEnabled(ext.id)"
               @click="router.push('/settings?category=extensions')"
             >
               <BaseIcon name="settings" size="14" />
+            </button>
+
+            <!-- Tool / Setup trigger on right side (visible for all early access tools) -->
+            <button
+              v-if="isPro"
+              class="config-icon-btn"
+              :class="{ 'active-setup': isExtensionSettingUp(ext.id) }"
+              title="Verify or Reinstall Extension Environment"
+              @click="triggerSetup(ext)"
+            >
+              <BaseIcon name="wrench" size="14" />
             </button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Reusable Setup / Verification Progress Popup Modal -->
-    <ExtensionSetupModal
-      :is-open="setupModalOpen"
-      :extension="currentSetupExt"
-      @close="closeSetupModal"
-      @success="handleSetupSuccess"
-    />
+
 
     <!-- Output Modal (Aligned with Digital Sanctuary elevation & typography) -->
     <div v-if="outputModalOpen" class="modal-overlay" @click.self="outputModalOpen = false">
@@ -292,7 +309,6 @@ import BaseIcon from '../components/BaseIcon.vue'
 import { listExtensions, runExtension } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import { useExtensions } from '../composables/useExtensions'
-import ExtensionSetupModal from '../components/ExtensionSetupModal.vue'
 
 const router = useRouter()
 const clerkAuth = useClerkAuth()
@@ -301,21 +317,18 @@ const {
   isEnabled: isExtensionEnabled,
   setExtensionEnabled,
   hasCompletedSetup,
-  markSetupCompleted
+  activeSetup,
+  startSetup,
+  openSetupModal,
 } = useExtensions()
 
 const extensions = ref([])
 const runningId = ref(null)
-const settingUpMap = ref({})
 const errorMessage = ref('')
 
 const outputModalOpen = ref(false)
 const activeExtName = ref('')
 const extensionOutput = ref('')
-
-// Setup Modal State
-const setupModalOpen = ref(false)
-const currentSetupExt = ref(null)
 
 const freeExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'free')
@@ -325,19 +338,28 @@ const proExtensions = computed(() =>
   extensions.value.filter((e) => (e.tier || 'free').toLowerCase() === 'pro')
 )
 
-const checkingMap = ref({})
-
-function isSettingUp(id) {
-  return !!settingUpMap.value[id]
+function hasExtensionSettings(extId) {
+  const idsWithSettings = ['text_simplifier', 'prompt_compressor', 'youtube', 'audio_overview']
+  return idsWithSettings.includes(extId)
 }
 
-function isChecking(id) {
-  return !!checkingMap.value[id]
+function isExtensionSettingUp(id) {
+  return activeSetup.value.extensionId === id && activeSetup.value.status === 'running'
+}
+
+function isExtensionSetupError(id) {
+  return activeSetup.value.extensionId === id && activeSetup.value.status === 'error'
+}
+
+function getSetupStep(id) {
+  if (activeSetup.value.extensionId === id) {
+    return activeSetup.value.step || 1
+  }
+  return 1
 }
 
 function getActionButtonLabel(extId) {
-  if (isChecking(extId)) return 'Checking environment...'
-  if (isSettingUp(extId)) return 'Setting up...'
+  if (isExtensionSettingUp(extId)) return `Installing Step ${getSetupStep(extId)}/3...`
   if (runningId.value === extId) return 'Running...'
   return 'Run Extension'
 }
@@ -374,20 +396,13 @@ function handleProToggle(ext) {
 }
 
 function triggerSetup(ext) {
-  currentSetupExt.value = ext
-  activeExtName.value = ext.name
-  setupModalOpen.value = true
-}
-
-function closeSetupModal() {
-  setupModalOpen.value = false
-  currentSetupExt.value = null
-}
-
-function handleSetupSuccess(ext) {
-  if (ext && ext.id) {
-    markSetupCompleted(ext.id, true)
-    setExtensionEnabled(ext.id, true)
+  if (activeSetup.value.status === 'running' && activeSetup.value.extensionId !== ext.id) {
+    errorMessage.value = `Setup for ${activeSetup.value.extensionName || 'another extension'} is currently running.`
+    return
+  }
+  openSetupModal(ext)
+  if (activeSetup.value.extensionId !== ext.id || activeSetup.value.status === 'idle') {
+    startSetup(ext)
   }
 }
 
@@ -924,4 +939,45 @@ onMounted(async () => {
   background: var(--surface-container);
 }
 
+/* Setup Badges & Status */
+.setup-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.setup-badge.running {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary, #3b82f6);
+  border: 1px solid var(--outline-variant);
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.setup-badge.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid var(--outline-variant);
+}
+
+.setup-status-action {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary, #3b82f6);
+  border: 1px solid var(--outline-variant);
+}
+
+.setup-status-action:hover {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.config-icon-btn.active-setup {
+  border-color: var(--primary);
+  color: var(--primary);
+}
 </style>

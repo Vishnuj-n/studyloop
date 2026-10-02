@@ -11,6 +11,10 @@ export function getReaderTopicBundle(topicID, notebookID = '') {
   return appBridge().GetReaderTopicBundle(topicID, notebookID)
 }
 
+export function getTopicCompressionStats(topicID) {
+  return appBridge().GetTopicCompressionStats(topicID)
+}
+
 export function getAvailableTopics() {
   return appBridge().GetAvailableTopics()
 }
@@ -477,6 +481,15 @@ export function restoreSession(userID, email, isPro, verifiedAt) {
   }
 }
 
+export function getUserSession() {
+  try {
+    return appBridge().GetUserSession()
+  } catch (err) {
+    console.warn('[AUTH] GetUserSession bridge error:', err)
+    return null
+  }
+}
+
 export function clearSession() {
   try {
     return appBridge().ClearSession()
@@ -500,6 +513,36 @@ export function getLLMPromptLogging() {
   } catch (err) {
     console.warn('[DEV] GetLLMPromptLogging bridge error:', err)
     return false
+  }
+}
+
+export async function setLogLevel(level) {
+  try {
+    const bridge = appBridge()
+    if (bridge.SetLogLevel) {
+      return await bridge.SetLogLevel(level)
+    }
+    return { error: 'SetLogLevel implementation unavailable' }
+  } catch (err) {
+    console.warn('[DEV] SetLogLevel bridge error:', err)
+    return { error: err.message }
+  }
+}
+
+export async function getLogLevel() {
+  try {
+    const bridge = appBridge()
+    if (bridge.GetLogLevel) {
+      return await bridge.GetLogLevel()
+    }
+    if (bridge.GetUserSettings) {
+      const settings = await bridge.GetUserSettings()
+      return settings?.log_level || 'INFO'
+    }
+    return 'INFO'
+  } catch (err) {
+    console.warn('[DEV] GetLogLevel bridge error:', err)
+    return 'INFO'
   }
 }
 

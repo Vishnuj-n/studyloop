@@ -1344,3 +1344,44 @@ func TestLLMPromptLoggingPersistence(t *testing.T) {
 	}
 }
 
+func TestLogLevelPersistence(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	// Default should be INFO
+	lvl, err := testRepo.GetLogLevel()
+	if err != nil {
+		t.Fatalf("GetLogLevel failed: %v", err)
+	}
+	if lvl != "INFO" {
+		t.Fatalf("expected default log_level to be INFO, got %s", lvl)
+	}
+
+	// Update to DEBUG via SetLogLevel
+	if err := testRepo.SetLogLevel("DEBUG"); err != nil {
+		t.Fatalf("SetLogLevel(DEBUG) failed: %v", err)
+	}
+	lvl, err = testRepo.GetLogLevel()
+	if err != nil || lvl != "DEBUG" {
+		t.Fatalf("expected log_level DEBUG, got %v (err: %v)", lvl, err)
+	}
+
+	// Verify GetUserSettings also reflects this
+	settings, err := testRepo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("GetUserSettings failed: %v", err)
+	}
+	if settings.LogLevel != "DEBUG" {
+		t.Fatalf("expected UserSettings.LogLevel DEBUG, got %s", settings.LogLevel)
+	}
+
+	// Update via UpdateUserSettings
+	settings.LogLevel = "WARN"
+	if err := testRepo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+	lvl, err = testRepo.GetLogLevel()
+	if err != nil || lvl != "WARN" {
+		t.Fatalf("expected log_level WARN, got %v (err: %v)", lvl, err)
+	}
+}
+

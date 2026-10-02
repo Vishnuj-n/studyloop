@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -9,18 +10,37 @@ import (
 	"time"
 
 	"ai-tutor/internal/extension"
+	"github.com/google/uuid"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+const (
+	extensionRunTimeout    = 60 * time.Second
+	maxExtensionInputBytes = 256 * 1024 // 256 KB safety limit for CLI argument passing
 )
 
 // ExtensionDTO represents an extension serialized for the frontend.
 type ExtensionDTO struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Runtime     string `json:"runtime"`
-	Tier        string `json:"tier"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
-	Dir         string `json:"dir"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Version      string `json:"version"`
+	Runtime      string `json:"runtime"`
+	Tier         string `json:"tier"`
+	Description  string `json:"description"`
+	Category     string `json:"category"`
+	DownloadSize string `json:"download_size"`
+	SetupNotice  string `json:"setup_notice"`
+	Dir          string `json:"dir"`
+}
+
+// baseCtxWithTimeout derives a timeout context from the application root context if active,
+// falling back to context.Background().
+func (a *App) baseCtxWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
+	base := a.ctx
+	if base == nil {
+		base = context.Background()
+	}
+	return context.WithTimeout(base, d)
 }
 
 // ListExtensions returns all discovered local extensions.
@@ -39,14 +59,16 @@ func (a *App) ListExtensions() ([]ExtensionDTO, error) {
 	dtos := make([]ExtensionDTO, 0, len(exts))
 	for _, ext := range exts {
 		dtos = append(dtos, ExtensionDTO{
-			ID:          ext.ID(),
-			Name:        ext.Name(),
-			Version:     ext.Version(),
-			Runtime:     ext.Runtime(),
-			Tier:        extension.GetEffectiveTier(ext),
-			Description: ext.Manifest.Description,
-			Category:    ext.Manifest.Category,
-			Dir:         ext.Dir,
+			ID:           ext.ID(),
+			Name:         ext.Name(),
+			Version:      ext.Version(),
+			Runtime:      ext.Runtime(),
+			Tier:         extension.GetEffectiveTier(ext),
+			Description:  ext.Manifest.Description,
+			Category:     ext.Manifest.Category,
+			DownloadSize: ext.Manifest.DownloadSize,
+			SetupNotice:  ext.Manifest.SetupNotice,
+			Dir:          ext.Dir,
 		})
 	}
 	return dtos, nil
@@ -55,19 +77,26 @@ func (a *App) ListExtensions() ([]ExtensionDTO, error) {
 // RunExtension executes an extension by ID.
 // If the extension is marked "pro" and active session is not Pro, it returns an entitlement error.
 func (a *App) RunExtension(id string, input string) map[string]interface{} {
+	if len(input) > maxExtensionInputBytes {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("input payload exceeds maximum allowable size of %d bytes", maxExtensionInputBytes),
+			"id":    id,
+		}
+	}
+
 	if a.extManager == nil || a.extRunner == nil {
 		if a.extInitError != "" {
-			return map[string]interface{}{"error": fmt.Sprintf("extension system not initialized: %s", a.extInitError)}
+			return map[string]interface{}{"error": fmt.Sprintf("extension system not initialized: %s", a.extInitError), "id": id}
 		}
-		return map[string]interface{}{"error": "extension system not initialized"}
+		return map[string]interface{}{"error": "extension system not initialized", "id": id}
 	}
 
 	ext, ok := a.extManager.Get(id)
 	if !ok {
 		if a.extInitError != "" {
-			return map[string]interface{}{"error": fmt.Sprintf("extension %q not found (initialization error: %s)", id, a.extInitError)}
+			return map[string]interface{}{"error": fmt.Sprintf("extension %q not found (initialization error: %s)", id, a.extInitError), "id": id}
 		}
-		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id)}
+		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id), "id": id}
 	}
 
 	effectiveTier := extension.GetEffectiveTier(ext)
@@ -76,10 +105,11 @@ func (a *App) RunExtension(id string, input string) map[string]interface{} {
 		return map[string]interface{}{
 			"error":           fmt.Sprintf("extension %q requires a Pro subscription", ext.Name()),
 			"is_pro_required": true,
+			"id":              id,
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := a.baseCtxWithTimeout(extensionRunTimeout)
 	defer cancel()
 
 	var output []byte
@@ -107,7 +137,7 @@ func (a *App) RunExtension(id string, input string) map[string]interface{} {
 		venvDir := extension.ResolveExtensionVenvDir(ext)
 		pyExe := extension.GetVenvPython(venvDir)
 		if info, sErr := os.Stat(pyExe); sErr != nil || info.IsDir() {
-			return map[string]interface{}{"error": fmt.Sprintf("Python virtual environment not initialized for extension %q. Please initialize environment via Setup.", ext.Name())}
+			return map[string]interface{}{"error": fmt.Sprintf("Python virtual environment not initialized for extension %q. Please initialize environment via Setup.", ext.Name()), "id": id}
 		}
 		var args []string
 		args = append(args, ext.EntrypointPath())
@@ -158,7 +188,7 @@ func (a *App) CheckExtensionReadiness(id string) extension.ReadinessStatus {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := a.baseCtxWithTimeout(extensionRunTimeout)
 	defer cancel()
 
 	return extension.CheckReadiness(ctx, ext)
@@ -167,48 +197,71 @@ func (a *App) CheckExtensionReadiness(id string) extension.ReadinessStatus {
 // CancelExtensionSetup aborts any ongoing extension environment setup.
 func (a *App) CancelExtensionSetup() map[string]interface{} {
 	a.extSetupMu.Lock()
+	wasRunning := a.extSetupCancel != nil
 	if a.extSetupCancel != nil {
 		a.extSetupCancel()
 		a.extSetupCancel = nil
+		a.extSetupToken = ""
 	}
 	a.extSetupMu.Unlock()
-	return map[string]interface{}{"success": true}
+	return map[string]interface{}{"success": true, "was_running": wasRunning}
 }
 
 // SetupExtension automatically provisions the Python virtual environment via uv,
 // installs requirements, and runs verification self-tests.
 func (a *App) SetupExtension(id string) map[string]interface{} {
 	if a.extManager == nil {
-		return map[string]interface{}{"error": "extension manager not initialized"}
+		return map[string]interface{}{"error": "extension manager not initialized", "id": id}
 	}
 
 	ext, ok := a.extManager.Get(id)
 	if !ok {
-		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id)}
+		return map[string]interface{}{"error": fmt.Sprintf("extension %q not found", id), "id": id}
 	}
 
-	// ponytail: cancelable context without arbitrary hardcoded timeout limit; cancel via user action
+	// ponytail: cancelable context without arbitrary hardcoded timeout limit; cancel via user action or new setup
+	myToken := uuid.NewString()
+
 	a.extSetupMu.Lock()
 	if a.extSetupCancel != nil {
 		a.extSetupCancel()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(baseCtx)
 	a.extSetupCancel = cancel
+	a.extSetupToken = myToken
 	a.extSetupMu.Unlock()
 
 	defer func() {
 		a.extSetupMu.Lock()
-		if a.extSetupCancel != nil {
-			// ponytail: ensure we only clear if this setup was the active one
+		if a.extSetupToken == myToken {
 			a.extSetupCancel = nil
+			a.extSetupToken = ""
 		}
 		a.extSetupMu.Unlock()
 		cancel()
 	}()
 
 	var logs []string
+	currentStep := 1
 	logCallback := func(line string) {
 		logs = append(logs, line)
+		if a.ctx != nil {
+			if strings.Contains(line, "Step 2/3") || strings.Contains(line, "Installing extension dependencies") {
+				currentStep = 2
+			} else if strings.Contains(line, "Step 3/3") || strings.Contains(line, "Running extension verification") {
+				currentStep = 3
+			}
+			wailsruntime.EventsEmit(a.ctx, "extension:setup:progress", map[string]interface{}{
+				"id":   id,
+				"log":  line,
+				"logs": logs,
+				"step": currentStep,
+			})
+		}
 	}
 
 	err := extension.SetupExtensionEnv(ctx, ext, logCallback)
@@ -245,7 +298,13 @@ func (a *App) SimplifyReadingContent(content string, level string) map[string]in
 		return map[string]interface{}{"error": "study service not available"}
 	}
 
-	simplified, err := a.studyService.SimplifyReadingContent(context.Background(), content, level)
+	normalizedLevel := strings.ToLower(strings.TrimSpace(level))
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	simplified, err := a.studyService.SimplifyReadingContent(baseCtx, content, normalizedLevel)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
@@ -266,6 +325,10 @@ func (a *App) GetExtensionConfig() (string, error) {
 func (a *App) SaveExtensionConfig(configJSON string) error {
 	if a.repo == nil {
 		return errors.New("repository not initialized")
+	}
+	var js json.RawMessage
+	if err := json.Unmarshal([]byte(configJSON), &js); err != nil {
+		return fmt.Errorf("invalid JSON config: %w", err)
 	}
 	return a.repo.SaveExtensionConfig(configJSON)
 }

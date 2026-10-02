@@ -274,3 +274,64 @@ func TestFrontMatterFilteringInQuizContext(t *testing.T) {
 		}
 	}
 }
+
+func TestCompressedTextSelection(t *testing.T) {
+	chunks := []models.Chunk{
+		{ID: "c1", Text: "This is the original full length uncompressed text for chunk one.", CompressedText: "Original text chunk one compressed."},
+		{ID: "c2", Text: "This is the original text for chunk two with no compression yet.", CompressedText: ""},
+	}
+
+	chunkIDs := make([]string, 0, len(chunks))
+	chunkTextByID := make(map[string]string, len(chunks))
+	for _, chunk := range chunks {
+		chunkIDs = append(chunkIDs, chunk.ID)
+		chunkTextByID[chunk.ID] = SelectChunkText(chunk, "")
+	}
+
+	if chunkTextByID["c1"] != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text for c1, got %q", chunkTextByID["c1"])
+	}
+	if chunkTextByID["c2"] != "This is the original text for chunk two with no compression yet." {
+		t.Errorf("expected fallback uncompressed text for c2, got %q", chunkTextByID["c2"])
+	}
+
+	// Test DISABLED mode preserves raw text
+	disabledTextC1 := SelectChunkText(chunks[0], "DISABLED")
+	if disabledTextC1 != "This is the original full length uncompressed text for chunk one." {
+		t.Errorf("expected raw text when DISABLED, got %q", disabledTextC1)
+	}
+
+	// Test AUTO/DYNAMIC modes prefer compressed
+	autoTextC1 := SelectChunkText(chunks[0], "AUTO")
+	if autoTextC1 != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text when AUTO, got %q", autoTextC1)
+	}
+
+	res, err := buildQuizContext(chunkIDs, chunkTextByID, 1000)
+	if err != nil {
+		t.Fatalf("buildQuizContext failed: %v", err)
+	}
+
+	if len(res.contextParts) != 2 {
+		t.Fatalf("expected 2 context parts, got %d", len(res.contextParts))
+	}
+	if res.contextParts[0] != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text in contextParts[0], got %q", res.contextParts[0])
+	}
+}
+
+func TestBuildQuizContext_BudgetExhaustionDoesNotFallbackToFrontMatter(t *testing.T) {
+	chunkText := map[string]string{
+		"c_license":  "Licensed to Pat McDonald <patmcdonald@me.com>",
+		"c_content1": "Neural networks learn representations through layers of linear transforms and non-linear activations.",
+	}
+
+	// Budget is 2 tokens, which cannot fit c_content1.
+	// It should fail with budget error rather than returning the license front matter.
+	_, err := buildQuizContext([]string{"c_license", "c_content1"}, chunkText, 2)
+	if err == nil {
+		t.Fatalf("expected error when substantive chunk exceeds budget, got nil")
+	}
+}
+
+

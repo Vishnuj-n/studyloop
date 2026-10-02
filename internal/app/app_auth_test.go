@@ -36,7 +36,7 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 	if !a2.IsProUser() {
 		t.Fatalf("expected a2 to be pro")
 	}
-	sess := a2.getUserSession()
+	sess := a2.GetUserSession()
 	if sess["userId"] != "user_123" || sess["email"] != "pro@example.com" {
 		t.Fatalf("unexpected restored session: %#v", sess)
 	}

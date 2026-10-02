@@ -325,11 +325,11 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	baseURLCheck := strings.ToLower(p.config.BaseURL)
 	if strings.Contains(baseURLCheck, "googleapis.com") {
 		if strings.HasPrefix(apiKey, "gsk_") {
-			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings.")
+			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings")
 		}
 	} else if strings.Contains(baseURLCheck, "groq.com") {
 		if strings.HasPrefix(apiKey, "AIza") {
-			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings.")
+			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings")
 		}
 	}
 
@@ -340,7 +340,7 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	limits := p.GetLimits()
-	utils.Warnf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
+	utils.Debugf("[LLM_REQUEST] model=%s base_url=%s max_input_tokens=%d est_prompt_tokens=%d prompt_chars=%d prompt_words=%d",
 		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
@@ -433,12 +433,12 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	}
 
 	if apiResp.Usage.TotalTokens > 0 {
-		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d prompt_tokens=%d completion_tokens=%d total_tokens=%d configured_max_input=%d",
+		utils.Debugf("[LLM_RESPONSE] model=%s duration_ms=%d prompt_tokens=%d completion_tokens=%d total_tokens=%d configured_max_input=%d",
 			p.config.Model, respDuration.Milliseconds(), apiResp.Usage.PromptTokens, apiResp.Usage.CompletionTokens, apiResp.Usage.TotalTokens, limits.MaxInputTokens)
 	} else {
 		outWords := len(strings.Fields(apiResp.Choices[0].Message.Content))
 		estCompletionTokens := int(float64(outWords) * 1.3)
-		utils.Warnf("[LLM_RESPONSE] model=%s duration_ms=%d est_completion_tokens=%d resp_chars=%d configured_max_input=%d",
+		utils.Debugf("[LLM_RESPONSE] model=%s duration_ms=%d est_completion_tokens=%d resp_chars=%d configured_max_input=%d",
 			p.config.Model, respDuration.Milliseconds(), estCompletionTokens, len(apiResp.Choices[0].Message.Content), limits.MaxInputTokens)
 	}
 

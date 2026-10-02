@@ -66,6 +66,15 @@ func getMachineID() string {
 	return strings.TrimSpace(h + "::" + u)
 }
 
+func getNormalizedMachineID() string {
+	h, _ := os.Hostname()
+	u := os.Getenv("USERNAME")
+	if u == "" {
+		u = os.Getenv("USER")
+	}
+	return strings.ToLower(strings.TrimSpace(h)) + "::" + strings.ToLower(strings.TrimSpace(u))
+}
+
 func computeSessionSignature(machineID, userID, email string, isPro bool, verifiedAt int64) string {
 	payload := fmt.Sprintf("%s|%s|%s|%t|%d", machineID, userID, email, isPro, verifiedAt)
 	mac := hmac.New(sha256.New, []byte(sessionSecretSalt))
@@ -84,7 +93,8 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 		return
 	}
 
-	sig := computeSessionSignature(getMachineID(), userID, email, isPro, verifiedAt)
+	machineID := getNormalizedMachineID()
+	sig := computeSessionSignature(machineID, userID, email, isPro, verifiedAt)
 	sess := persistentSession{
 		UserID:     userID,
 		Email:      email,
@@ -107,12 +117,16 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 
 	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		utils.Warnf("[AUTH] Failed to write session file to %s: %v", filePath, err)
+	} else {
+		utils.Infof("[AUTH] Successfully persisted session to %s (user=%s, isPro=%v, verifiedAt=%d)",
+			filePath, userID, isPro, verifiedAt)
 	}
 }
 
 // setSession sets the active session in memory and persists signed session to disk.
 func (a *App) setSession(userID, email string, isPro bool) {
 	now := time.Now().Unix()
+	utils.Infof("[AUTH] setSession called: user=%s, isPro=%v, now=%d", userID, isPro, now)
 	a.sessionMu.Lock()
 	a.sessionUserID = userID
 	a.sessionEmail = email
@@ -134,9 +148,12 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 		return false
 	}
 
+	utils.Debugf("[AUTH] RestoreSession called with frontend args: user=%q, email=%q, isPro=%v, verifiedAt=%d. Target session path: %s",
+		userID, email, isPro, verifiedAt, filePath)
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		// File does not exist or unreadable -> no offline session
+		utils.Debugf("[AUTH] Offline session file unreadable or not found at %s: %v. Resetting active session to Free.", filePath, err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
@@ -148,10 +165,15 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 		return false
 	}
 
-	// Verify HMAC signature
-	expectedSig := computeSessionSignature(getMachineID(), sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
-	if !hmac.Equal([]byte(sess.Signature), []byte(expectedSig)) {
-		utils.Warnf("[AUTH] Session signature mismatch or tampering detected. Downgrading to free.")
+	// Verify HMAC signature across machine ID variations
+	machineID := getMachineID()
+	normalizedMachineID := getNormalizedMachineID()
+	sig1 := computeSessionSignature(machineID, sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
+	sig2 := computeSessionSignature(normalizedMachineID, sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
+
+	isValidSig := hmac.Equal([]byte(sess.Signature), []byte(sig1)) || hmac.Equal([]byte(sess.Signature), []byte(sig2))
+	if !isValidSig {
+		utils.Warnf("[AUTH] Session signature mismatch at %s. Downgrading to free.", filePath)
 		a.applyRestoredSession(sess.UserID, sess.Email, false, 0)
 		return false
 	}
@@ -160,11 +182,16 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 	now := time.Now().Unix()
 	actualIsPro := sess.IsPro
 	if actualIsPro && sess.VerifiedAt > 0 && (now-sess.VerifiedAt) > tenDaysSec {
-		utils.Warnf("[AUTH] Session 10-day grace period expired. Re-verification required.")
+		utils.Warnf("[AUTH] Session 10-day grace period expired at %s. VerifiedAt=%d, Now=%d, DiffSec=%d, MaxSec=%d. Re-verification required.",
+			filePath, sess.VerifiedAt, now, (now - sess.VerifiedAt), tenDaysSec)
 		actualIsPro = false
+	} else {
+		utils.Debugf("[AUTH] Session 10-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
+			sess.VerifiedAt, now, (now - sess.VerifiedAt), actualIsPro)
 	}
 
 	a.applyRestoredSession(sess.UserID, sess.Email, actualIsPro, sess.VerifiedAt)
+	utils.Debugf("[AUTH] Session restoration complete: user=%s, email=%s, isPro=%v", sess.UserID, sess.Email, actualIsPro)
 	return actualIsPro
 }
 
@@ -198,8 +225,8 @@ func (a *App) IsProUser() bool {
 	return a.sessionIsPro
 }
 
-// getUserSession returns the current active session state.
-func (a *App) getUserSession() map[string]interface{} {
+// GetUserSession returns the current active session state.
+func (a *App) GetUserSession() map[string]interface{} {
 	a.sessionMu.RLock()
 	defer a.sessionMu.RUnlock()
 	return map[string]interface{}{
@@ -209,10 +236,6 @@ func (a *App) getUserSession() map[string]interface{} {
 		"verifiedAt": a.sessionVerifiedAt,
 	}
 }
-
-const (
-	DefaultClerkPublishableKey = "pk_test_aW5ub2NlbnQtb3JjYS01NjA1LmNsZXJrLmFjY291bnRzLmRldiQ"
-)
 
 func resolveClerkPublishableKey() string {
 	if ClerkPublishableKey != "" {
@@ -224,7 +247,7 @@ func resolveClerkPublishableKey() string {
 	if k := os.Getenv("CLERK_PUBLISHABLE_KEY"); k != "" {
 		return k
 	}
-	return DefaultClerkPublishableKey
+	return ""
 }
 
 // StartBrowserAuth spins up an ephemeral HTTP server on 127.0.0.1:0 and returns the browser login URL.

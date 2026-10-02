@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { startBrowserAuth, openURLInBrowser, restoreSession, clearSession } from './appApi'
+import { startBrowserAuth, openURLInBrowser, restoreSession, getUserSession, clearSession, logFrontendEvent } from './appApi'
 
 const isLoaded = ref(false)
 const user = ref(null)
@@ -7,6 +7,18 @@ const isPro = ref(false)
 const authError = ref('')
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(Date.now())
+
+function saveLocalSession(u, proStatus, verifiedTime) {
+  if (u) {
+    localStorage.setItem('studyloop_user_session', JSON.stringify({
+      user: u,
+      isPro: !!proStatus,
+      lastVerifiedAt: verifiedTime || Date.now(),
+    }))
+  } else {
+    localStorage.removeItem('studyloop_user_session')
+  }
+}
 
 async function waitForBridge(timeoutMs = 3000) {
   const start = Date.now()
@@ -19,31 +31,71 @@ async function waitForBridge(timeoutMs = 3000) {
   return false
 }
 
-async function syncWithBackend() {
-  if (user.value) {
+let inFlightSync = null
+let lastSyncSuccessTime = 0
+const SYNC_THROTTLE_MS = 15000
+
+async function syncWithBackend(force = false) {
+  if (!force && lastSyncSuccessTime > 0 && Date.now() - lastSyncSuccessTime < SYNC_THROTTLE_MS) {
+    return
+  }
+  if (inFlightSync) {
+    return inFlightSync
+  }
+
+  inFlightSync = (async () => {
     try {
       const bridgeReady = await waitForBridge(2000)
       if (!bridgeReady) {
-        console.warn('[AUTH] Wails backend bridge not ready yet during syncWithBackend')
         return
       }
+
+      // First call backend restoreSession to validate / hydrate session from disk
       const verifiedPro = await restoreSession(
-        user.value.id || '',
-        user.value.email || '',
+        user.value?.id || '',
+        user.value?.email || '',
         isPro.value,
         Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
       )
-      // Only update isPro if verification completed without throwing
-      if (typeof verifiedPro === 'boolean') {
+
+      // Retrieve active session details from Go backend (persisted session.json)
+      const backendSession = await getUserSession()
+      if (backendSession && backendSession.email && backendSession.userId) {
+        if (!user.value) {
+          user.value = {
+            id: backendSession.userId,
+            email: backendSession.email,
+            fullName: 'Authenticated User',
+          }
+        }
+        if (backendSession.verifiedAt) {
+          lastVerifiedAt.value = backendSession.verifiedAt * 1000
+        }
+        isPro.value = !!backendSession.isPro
+        saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+      } else if (typeof verifiedPro === 'boolean') {
+        if (isPro.value !== verifiedPro) {
+          console.warn(`[AUTH] isPro status changed by backend verification: ${isPro.value} -> ${verifiedPro}`)
+          logFrontendEvent('warn', 'Auth', 'is_pro_transition', { from: isPro.value, to: verifiedPro })
+        }
         isPro.value = verifiedPro
+        if (user.value) {
+          saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+        }
       }
+      lastSyncSuccessTime = Date.now()
     } catch (err) {
       console.warn('[AUTH] Could not sync session with backend:', err)
+    } finally {
+      inFlightSync = null
     }
-  }
+  })()
+
+  return inFlightSync
 }
 
 export async function initClerk() {
+  console.log('[AUTH] initClerk() called. isSignedIn:', !!user.value, 'isPro:', isPro.value)
   isLoaded.value = true
   await syncWithBackend()
   return null
@@ -52,6 +104,9 @@ export async function initClerk() {
 // Listen for loopback authentication callback from Go backend
 if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
   window.runtime.EventsOn('clerk_auth_success', (data) => {
+    const safeData = { success: data?.success, isPro: data?.isPro }
+    console.log('[AUTH] Received clerk_auth_success event from Go backend:', safeData)
+    logFrontendEvent('info', 'Auth', 'clerk_auth_success_received', safeData)
     if (data && data.success) {
       user.value = {
         id: data.userId || 'user_' + Date.now(),
@@ -61,11 +116,8 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
       isPro.value = !!data.isPro
       lastVerifiedAt.value = Date.now()
       authError.value = ''
-      localStorage.setItem('studyloop_user_session', JSON.stringify({
-        user: user.value,
-        isPro: isPro.value,
-        lastVerifiedAt: lastVerifiedAt.value,
-      }))
+      saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+      console.log('[AUTH] Updated localStorage and memory with Pro status:', isPro.value)
       syncWithBackend()
     }
   })
@@ -74,6 +126,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
 // Restore saved session if present with 10-day validity check
 try {
   const saved = localStorage.getItem('studyloop_user_session')
+  console.log('[AUTH] Checking localStorage for saved user session...')
   if (saved) {
     const parsed = JSON.parse(saved)
     if (parsed && parsed.user) {
@@ -88,8 +141,10 @@ try {
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || Date.now()
-      // Do not sync immediately on file load; App.vue onMounted will call initClerk()
+      console.log('[AUTH] Restored session from localStorage: isSignedIn =', !!parsed.user, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
     }
+  } else {
+    console.log('[AUTH] No saved session found in localStorage')
   }
 } catch (err) {
   console.warn('[AUTH] Could not restore saved local user session:', err)

@@ -8,6 +8,7 @@
         <span v-if="reader.selectedNotebookTitle.value"
           >Notebook: {{ reader.selectedNotebookTitle.value }}</span
         >
+        <CompressionBadge :stats="compressionStats" />
         <span v-if="isTaskFlow" class="task-badge">Task Mode</span>
         <span v-else class="browse-badge">Browse Mode</span>
       </p>
@@ -309,6 +310,7 @@ import {
   logFrontendEvent,
   trackAnalyticsEvent,
   getTopicSectionsContent,
+  getTopicCompressionStats,
   skipReadingTask,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
@@ -318,6 +320,7 @@ import { useExtensions } from '../composables/useExtensions'
 import { useDialog } from '../composables/useDialog'
 import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import ReaderChat from '../components/ReaderChat.vue'
+import CompressionBadge from '../components/CompressionBadge.vue'
 import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
@@ -328,6 +331,31 @@ const { isExtensionActive } = useExtensions()
 const { confirm } = useDialog()
 const showAudioOverview = ref(false)
 const simplifying = ref(false)
+
+const compressionStats = ref({
+  is_compressed: false,
+  raw_tokens: 0,
+  compressed_tokens: 0,
+  tokens_saved: 0,
+  saved_percentage: 0,
+})
+
+async function refreshCompressionStats() {
+  const tid = reader.selectedTopicID.value
+  if (!tid) {
+    compressionStats.value = { is_compressed: false, raw_tokens: 0, compressed_tokens: 0, tokens_saved: 0, saved_percentage: 0 }
+    return
+  }
+  try {
+    const stats = await getTopicCompressionStats(tid)
+    if (tid === reader.selectedTopicID.value && stats && !stats.error) {
+      compressionStats.value = stats
+    }
+  } catch (e) {
+    console.debug('[Reader] failed to fetch compression stats:', e)
+  }
+}
+
 
 async function handleSimplify() {
   if (simplifying.value) return
@@ -413,6 +441,10 @@ const reader = useReaderBase(routeTaskID)
 const chat = useChat()
 const { showError, showNotice } = useToast()
 provide('chat', chat)
+
+watch(() => reader.selectedTopicID?.value, () => {
+  refreshCompressionStats()
+})
 
 // Local state for completion
 const completingSession = ref(false)
@@ -618,6 +650,8 @@ onMounted(async () => {
   } else {
     await resolveBrowseContext()
   }
+
+  await refreshCompressionStats()
 })
 
 function reloadPage() {
@@ -1348,5 +1382,4 @@ button:disabled {
   background: #faeedd !important;
   border-color: #c49a6c !important;
 }
-
 </style>

@@ -148,11 +148,8 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 		return nil, "", fmt.Errorf("invalid or unconfigured MaxInputTokens (%d) for model %s", maxInputTokens, modelName)
 	}
 
-	// Default to 5 flashcards
-	targetCount := 5
-
 	// Build prompt with token budgeting
-	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, targetCount, maxInputTokens)
+	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, maxInputTokens)
 	if len(includedChunkIDs) == 0 {
 		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
 	}
@@ -227,9 +224,9 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	return cards, tier, nil
 }
 
-func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, targetCount, maxInputTokens int) (string, int, []string) {
+func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, maxInputTokens int) (string, int, []string) {
 	// Template with empty chunks to calculate static template prompt overhead
-	emptyTemplate := buildFlashcardStaticTemplate(notebookTitle, startPage, endPage, targetCount)
+	emptyTemplate := buildFlashcardStaticTemplate(notebookTitle, startPage, endPage)
 	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, emptyTemplate)
 	if err != nil || availableBudget < 1000 {
 		availableBudget = 1000 // Minimum budget for meaningful content
@@ -248,7 +245,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	b.WriteString("- Avoid shallow definitions, trivia, rhetorical questions, and duplicate/filler cards.\n")
 	b.WriteString("- Answers must be concise (1–3 sentences), technically accurate, self-contained, and explain the underlying mechanism.\n")
 	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
-	fmt.Fprintf(&b, "\nGenerate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	fmt.Fprintf(&b, "\nGenerate up to 5 flashcards from the provided source material (pages %d-%d).\n", startPage, endPage)
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 
@@ -299,7 +296,7 @@ func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, end
 	return b.String(), currentTokens, includedChunkIDs
 }
 
-func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targetCount int) string {
+func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage int) string {
 	var b strings.Builder
 	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
 	b.WriteString("CRITICAL: Return ONLY valid JSON. No markdown. No code blocks. No explanations.\n")
@@ -313,7 +310,7 @@ func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage, targ
 	b.WriteString("- Avoid shallow definitions, trivia, rhetorical questions, and duplicate/filler cards.\n")
 	b.WriteString("- Answers must be concise (1–3 sentences), technically accurate, self-contained, and explain the underlying mechanism.\n")
 	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
-	fmt.Fprintf(&b, "\nGenerate up to %d flashcards from the provided source material (pages %d-%d).\n", targetCount, startPage, endPage)
+	fmt.Fprintf(&b, "\nGenerate up to 5 flashcards from the provided source material (pages %d-%d).\n", startPage, endPage)
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 	return b.String()

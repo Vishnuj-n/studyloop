@@ -1,14 +1,42 @@
 {
-  "assetVersion": "0.0.0-dev",
-  "downloadUrl": "https://github.com/Vishnuj-n/studyloop/releases/download/v1.13.0/rag-assets.zip",
-  "sha256": "",
-  "sizeBytes": 0,
+  "assetVersion": "1.15.0",
+  "downloadUrl": "https://github.com/Vishnuj-n/studyloop/releases/download/v1.15.0/rag-assets.zip",
   "requiredFiles": [
     "tokenizer.json",
     "model_int8.onnx",
     "onnxruntime.dll",
     "vec0.dll"
   ],
+  "components": {
+    "model_int8.onnx": {
+      "model": "nomic-ai/nomic-embed-text-v1.5",
+      "quantization": "INT8 (onnxruntime.quant)",
+      "dimension": 768,
+      "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5",
+      "sha256": "B4342336DEBAEA79DE872370664B0AAEB67DEA4605513D00EE236EA871A81F27",
+      "sizeBytes": 137296292
+    },
+    "tokenizer.json": {
+      "type": "Hugging Face Tokenizer (Fast/WordPiece)",
+      "source": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/blob/main/tokenizer.json",
+      "sha256": "FFB28886478B9B17A8C06F4FE6741B970D5DD3DE13330CCC3B9F686DF8A0545A",
+      "sizeBytes": 742067
+    },
+    "onnxruntime.dll": {
+      "product": "Microsoft ONNX Runtime (Win x64)",
+      "version": "1.24.20260203.3.470ae16",
+      "source": "https://github.com/microsoft/onnxruntime/releases",
+      "sha256": "8A1AAD8D59D02A5337D4E3F5BBD1158C3F7BF84FE3B3F0052F957DD3E75A91CB",
+      "sizeBytes": 14131232
+    },
+    "vec0.dll": {
+      "product": "sqlite-vec extension (Win x64)",
+      "version": "v0.1.9",
+      "source": "https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9",
+      "sha256": "FCF98662A7AD9DCE394B96A88F91032047823831B951C76636787C312A6476E6",
+      "sizeBytes": 289280
+    }
+  },
   "fileHashes": {
     "model_int8.onnx": "B4342336DEBAEA79DE872370664B0AAEB67DEA4605513D00EE236EA871A81F27",
     "onnxruntime.dll": "8A1AAD8D59D02A5337D4E3F5BBD1158C3F7BF84FE3B3F0052F957DD3E75A91CB",

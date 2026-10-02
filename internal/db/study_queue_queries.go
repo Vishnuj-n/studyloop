@@ -9,6 +9,12 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
+)
+
+const (
+	defaultTargetWords            = 3000
+	defaultCompletedFallbackWords = 2500
 )
 
 // GetTaskByID returns one queue task by id.
@@ -38,6 +44,29 @@ func (r *Repository) GetTaskByID(taskID string) (models.StudyQueueTask, error) {
 	return task, nil
 }
 
+const queueTaskSelectColumns = `
+	sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
+	COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
+	COALESCE(sq.payload_json, ''),
+	COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
+	COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
+	COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+`
+
+const queueTaskOrderBy = `
+	ORDER BY
+		CASE sq.task_type
+			WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
+			WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
+			WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
+			WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
+		END DESC,
+		COALESCE(n.priority, 5) DESC,
+		sq.priority DESC,
+		(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
+		COALESCE(sq.created_at, '') ASC, sq.id ASC
+`
+
 // GetAllPendingTasks returns all pending tasks ordered by deterministic queue rules.
 func (r *Repository) GetAllPendingTasks() ([]models.StudyQueueTask, error) {
 	activeProfileID, err := r.readActiveProfileID()
@@ -45,76 +74,21 @@ func (r *Repository) GetAllPendingTasks() ([]models.StudyQueueTask, error) {
 		return nil, fmt.Errorf("GetAllPendingTasks: %w", err)
 	}
 
-	if activeProfileID == "" {
-		return r.getPendingTasksNoProfile()
-	}
-	return r.getPendingTasksWithProfile(activeProfileID)
-}
-
-// getPendingTasksNoProfile returns pending tasks without profile filtering.
-func (r *Repository) getPendingTasksNoProfile() ([]models.StudyQueueTask, error) {
 	query := `
-		SELECT
-			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
-			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
-			COALESCE(sq.payload_json, ''),
-			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
-			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
-			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+		SELECT ` + queueTaskSelectColumns + `
 		FROM study_queue sq
 		JOIN notebooks n ON sq.notebook_id = n.id
 		LEFT JOIN topics t ON sq.topic_id = t.id
 		WHERE sq.status = 'PENDING'
-		ORDER BY
-			CASE sq.task_type
-				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
-				WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
-				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
-				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
-			END DESC,
-			COALESCE(n.priority, 5) DESC,
-			sq.priority DESC,
-			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			COALESCE(sq.created_at, '') ASC, sq.id ASC
 	`
-	rows, err := r.db.Query(query)
-	if err != nil {
-		return nil, err
+	var args []interface{}
+	if activeProfileID != "" {
+		query += ` AND n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')`
+		args = append(args, activeProfileID)
 	}
-	defer func() { _ = rows.Close() }()
+	query += queueTaskOrderBy
 
-	return r.scanPendingTaskRows(rows)
-}
-
-// getPendingTasksWithProfile returns pending tasks filtered by active profile.
-func (r *Repository) getPendingTasksWithProfile(activeProfileID string) ([]models.StudyQueueTask, error) {
-	query := `
-		SELECT
-			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
-			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
-			COALESCE(sq.payload_json, ''),
-			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
-			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
-			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
-		FROM study_queue sq
-		JOIN notebooks n ON sq.notebook_id = n.id
-		LEFT JOIN topics t ON sq.topic_id = t.id
-		WHERE sq.status = 'PENDING'
-		  AND ( ? = '' OR n.profile_id = ? )
-		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
-		ORDER BY
-			CASE sq.task_type
-				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
-				WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
-				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
-				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
-			END DESC,
-			COALESCE(n.priority, 5) DESC,
-			sq.priority DESC,
-			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			COALESCE(sq.created_at, '') ASC, sq.id ASC
-	`
-	rows, err := r.db.Query(query, activeProfileID, activeProfileID, activeProfileID)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -150,11 +124,14 @@ func (r *Repository) GetProfilePendingTaskCount(profileID string) (int, error) {
 		FROM study_queue sq
 		JOIN notebooks n ON sq.notebook_id = n.id
 		WHERE sq.status = 'PENDING'
-		  AND ( ? = '' OR n.profile_id = ? )
-		  AND ( ? = '' OR sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active' )
 	`
+	var args []interface{}
+	if profileID != "" {
+		query += ` AND n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')`
+		args = append(args, profileID)
+	}
 	var count int
-	err := r.db.QueryRow(query, profileID, profileID, profileID).Scan(&count)
+	err := r.db.QueryRow(query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("GetProfilePendingTaskCount: %w", err)
 	}
@@ -169,42 +146,26 @@ func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 	}
 
 	query := `
-		SELECT
-			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
-			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
-			COALESCE(sq.payload_json, ''),
-			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
-			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
-			COALESCE(t.title, ''), COALESCE(n.title, '')
+		SELECT ` + queueTaskSelectColumns + `
 		FROM study_queue sq
 		JOIN notebooks n ON sq.notebook_id = n.id
 		LEFT JOIN topics t ON sq.topic_id = t.id
 		WHERE sq.status = 'ACTIVE'
-		  AND ( ? = '' OR n.profile_id = ? )
-		ORDER BY sq.activated_at ASC
 	`
+	var args []interface{}
+	if activeProfileID != "" {
+		query += ` AND n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')`
+		args = append(args, activeProfileID)
+	}
+	query += ` ORDER BY sq.activated_at ASC, sq.id ASC`
 
-	rows, err := r.db.Query(query, activeProfileID, activeProfileID)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	tasks := make([]models.StudyQueueTask, 0)
-	for rows.Next() {
-		var task models.StudyQueueTask
-		var topicTitle, notebookTitle string
-		if err := rows.Scan(
-			&task.ID, &task.NotebookID, &task.TopicID, &task.TaskType, &task.Status, &task.Priority,
-			&task.CreatedAt, &task.ActivatedAt, &task.CompletedAt, &task.PayloadJSON,
-			&task.StartPage, &task.EndPage, &topicTitle, &notebookTitle,
-		); err != nil {
-			return nil, err
-		}
-		assignTaskTitle(&task, topicTitle, notebookTitle)
-		tasks = append(tasks, task)
-	}
-	return tasks, rows.Err()
+	return r.scanPendingTaskRows(rows)
 }
 
 // GetNextTask returns the next pending task ordered by deterministic queue rules.
@@ -217,65 +178,14 @@ func (r *Repository) GetNextTask(notebookID string) (models.StudyQueueTask, erro
 		return models.StudyQueueTask{}, fmt.Errorf("GetNextTask: %w", err)
 	}
 
-	if activeProfileID == "" {
-		return r.getNextTaskNoProfile(notebookID)
-	}
-	return r.getNextTaskWithProfile(notebookID, activeProfileID)
-}
-
-// getNextTaskNoProfile returns the next pending task without profile filtering.
-func (r *Repository) getNextTaskNoProfile(notebookID string) (models.StudyQueueTask, error) {
 	query := `
-		SELECT
-			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
-			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
-			COALESCE(sq.payload_json, ''),
-			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
-			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
-			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
+		SELECT ` + queueTaskSelectColumns + `
 		FROM study_queue sq
 		JOIN notebooks n ON sq.notebook_id = n.id
 		LEFT JOIN topics t ON sq.topic_id = t.id
 		WHERE sq.status = 'PENDING'
 	`
-	args := make([]interface{}, 0, 2)
-	if notebookID != "" {
-		query += ` AND sq.notebook_id = ?`
-		args = append(args, notebookID)
-	}
-	query += `
-		ORDER BY
-			CASE sq.task_type
-				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
-				WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
-				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
-				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
-			END DESC,
-			COALESCE(n.priority, 5) DESC,
-			sq.priority DESC,
-			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			COALESCE(sq.created_at, '') ASC, sq.id ASC
-		LIMIT 1
-	`
-	return r.scanNextPendingTask(query, args...)
-}
-
-// getNextTaskWithProfile returns the next pending task filtered by active profile.
-func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) (models.StudyQueueTask, error) {
-	query := `
-		SELECT
-			sq.id, sq.notebook_id, COALESCE(sq.topic_id, ''), sq.task_type, sq.status, sq.priority,
-			COALESCE(sq.created_at, ''), COALESCE(sq.activated_at, ''), COALESCE(sq.completed_at, ''),
-			COALESCE(sq.payload_json, ''),
-			COALESCE(NULLIF(sq.start_page, 0), COALESCE(t.start_page, 0)),
-			COALESCE(NULLIF(sq.end_page, 0), COALESCE(t.end_page, 0)),
-			COALESCE(t.title, ''), COALESCE(n.title, ''), COALESCE(n.priority, 5)
-		FROM study_queue sq
-		JOIN notebooks n ON sq.notebook_id = n.id
-		LEFT JOIN topics t ON sq.topic_id = t.id
-		WHERE sq.status = 'PENDING'
-	`
-	args := make([]interface{}, 0, 5)
+	var args []interface{}
 	if activeProfileID != "" {
 		query += ` AND n.profile_id = ?`
 		args = append(args, activeProfileID)
@@ -283,24 +193,11 @@ func (r *Repository) getNextTaskWithProfile(notebookID, activeProfileID string) 
 	if notebookID != "" {
 		query += ` AND sq.notebook_id = ?`
 		args = append(args, notebookID)
-	} else {
-		query += ` AND (sq.task_type = 'FLASHCARD_REVIEW' OR sq.task_type = 'FLASHCARD_GENERATE' OR n.study_status = 'active')`
+	} else if activeProfileID != "" {
+		query += ` AND (sq.task_type IN ('FLASHCARD_REVIEW', 'FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')`
 	}
 
-	query += `
-		ORDER BY
-			CASE sq.task_type
-				WHEN 'FLASHCARD_GENERATE' THEN 7 WHEN 'SOCRATIC_REMEDIAL' THEN 6
-				WHEN 'FLASHCARD_REVIEW' THEN 5 WHEN 'REREAD' THEN 4
-				WHEN 'QUIZ' THEN 3 WHEN 'MILESTONE_EXAM' THEN 2
-				WHEN 'READING' THEN 1 WHEN 'EXAMINER' THEN 0 ELSE 0
-			END DESC,
-			COALESCE(n.priority, 5) DESC,
-			sq.priority DESC,
-			(SELECT COALESCE(MAX(sq2.completed_at), '') FROM study_queue sq2 WHERE sq2.notebook_id = sq.notebook_id AND sq2.status = 'COMPLETED') ASC,
-			COALESCE(sq.created_at, '') ASC, sq.id ASC
-		LIMIT 1
-	`
+	query += queueTaskOrderBy + ` LIMIT 1`
 	return r.scanNextPendingTask(query, args...)
 }
 
@@ -409,7 +306,7 @@ func (r *Repository) countWordsInPageRange(topicID string, startPage, endPage in
 	for rows.Next() {
 		var text string
 		if err := rows.Scan(&text); err == nil {
-			totalWords += len(strings.Fields(text))
+			totalWords += countWords(text)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -437,7 +334,7 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 		var pNum int
 		var text string
 		if err := rows.Scan(&pNum, &text); err == nil {
-			pageWords[pNum] += len(strings.Fields(text))
+			pageWords[pNum] += countWords(text)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -458,6 +355,19 @@ func (r *Repository) capEndPageByWordBudget(topicID string, startPage, maxEndPag
 	}
 
 	return currentEnd
+}
+
+// countWords estimates word count reliably across whitespace-delimited (English) and CJK text.
+func countWords(text string) int {
+	words := len(strings.Fields(text))
+	if words == 0 {
+		return 0
+	}
+	// ponytail: if space-split yields words return it, otherwise fallback to rune count / 4 for non-spaced scripts
+	if runes := utf8.RuneCountInString(text); runes > words*4 {
+		return runes / 4
+	}
+	return words
 }
 
 func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int) (int, int, error) {
@@ -487,7 +397,7 @@ func (r *Repository) resolveReadingBounds(topicID string, startPage, endPage int
 		}
 	}
 
-	targetWords := 3000
+	targetWords := defaultTargetWords
 	if settings, sErr := r.GetUserSettings(); sErr == nil && settings != nil && settings.TargetSessionWords > 0 {
 		targetWords = settings.TargetSessionWords
 	}
@@ -521,6 +431,10 @@ func validateReadingBounds(startPage, endPage int) error {
 
 // GetReadingProgressPage retrieves the current page progress for a task from the topic cursor.
 func (r *Repository) GetReadingProgressPage(taskID string) (int, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return 0, fmt.Errorf("task id is required")
+	}
 	var currentPage int
 	err := r.db.QueryRow(`
 		SELECT COALESCE(t.current_page_cursor, sq.start_page, 0)
@@ -528,8 +442,8 @@ func (r *Repository) GetReadingProgressPage(taskID string) (int, error) {
 		LEFT JOIN topics t ON t.id = sq.topic_id
 		WHERE sq.id = ?
 	`, taskID).Scan(&currentPage)
-	if err == sql.ErrNoRows {
-		return 0, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrTaskNotFound
 	}
 	return currentPage, err
 }
@@ -561,7 +475,7 @@ func (r *Repository) GetLatestQuizAttemptScoreByTopic(topicID string) (int, bool
 		FROM quiz_attempts qa
 		JOIN study_queue sq ON qa.task_id = sq.id
 		WHERE sq.topic_id = ? AND sq.task_type = 'QUIZ'
-		ORDER BY qa.completed_at DESC
+		ORDER BY qa.completed_at DESC, qa.id DESC
 		LIMIT 1
 	`, topicID).Scan(&score, &passed)
 	if err != nil {
@@ -615,7 +529,7 @@ func (r *Repository) GetLastNQuizAttemptsWithCorrectness(notebookID string, n in
 		WHERE sq.notebook_id = ?
 		  AND sq.task_type = 'QUIZ'
 		  AND qa.passed = 1
-		ORDER BY qa.completed_at DESC
+		ORDER BY qa.completed_at DESC, qa.id DESC
 		LIMIT ?
 	`, notebookID, n)
 	if err != nil {
@@ -690,7 +604,7 @@ func (r *Repository) GetPassedQuizAttempts(notebookID string) ([]QuizAttemptWith
 		WHERE sq.notebook_id = ?
 		  AND sq.task_type = 'QUIZ'
 		  AND qa.passed = 1
-		ORDER BY qa.completed_at ASC
+		ORDER BY qa.completed_at ASC, qa.id ASC
 	`, notebookID)
 	if err != nil {
 		return nil, err
@@ -752,55 +666,49 @@ func (r *Repository) GetProfileCompletedReadingStatsPastNDays(profileID string, 
 	cutoff := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
 
 	rows, err := r.db.Query(`
-		SELECT sq.id, sq.start_page, sq.end_page, sq.topic_id
+		SELECT
+			sq.id,
+			COALESCE(SUM(
+				CASE
+					WHEN c.chunk_text IS NOT NULL THEN (LENGTH(c.chunk_text) - LENGTH(REPLACE(c.chunk_text, ' ', '')) + 1)
+					ELSE 0
+				END
+			), 0) AS chunk_words
 		FROM study_queue sq
 		JOIN notebooks n ON sq.notebook_id = n.id
+		LEFT JOIN chunks c ON c.topic_id = sq.topic_id
+			AND sq.start_page > 0
+			AND sq.end_page >= sq.start_page
+			AND c.page_num BETWEEN sq.start_page AND sq.end_page
 		WHERE sq.status = 'COMPLETED'
 		  AND sq.task_type IN ('READING', 'REREAD')
 		  AND sq.completed_at >= ?
 		  AND ( ? = '' OR n.profile_id = ? )
+		GROUP BY sq.id
 	`, cutoff, profileID, profileID)
 	if err != nil {
 		return 0, 0, fmt.Errorf("GetProfileCompletedReadingStatsPastNDays query error: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	type taskItem struct {
-		id        string
-		startPage int
-		endPage   int
-		topicID   string
-	}
-	var completedTasks []taskItem
+	sessionCount := 0
+	totalWords := 0
+
 	for rows.Next() {
-		var item taskItem
-		if err := rows.Scan(&item.id, &item.startPage, &item.endPage, &item.topicID); err != nil {
+		var taskID string
+		var words int
+		if err := rows.Scan(&taskID, &words); err != nil {
 			return 0, 0, err
 		}
-		completedTasks = append(completedTasks, item)
+		sessionCount++
+		if words > 0 {
+			totalWords += words
+		} else {
+			totalWords += defaultCompletedFallbackWords
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return 0, 0, err
-	}
-
-	sessionCount := len(completedTasks)
-	totalWords := 0
-
-	for _, task := range completedTasks {
-		if task.topicID != "" && task.startPage > 0 && task.endPage >= task.startPage {
-			var wordsOnPages int
-			err := r.db.QueryRow(`
-				SELECT COALESCE(SUM(LENGTH(chunk_text) - LENGTH(REPLACE(chunk_text, ' ', '')) + 1), 0)
-				FROM chunks
-				WHERE topic_id = ? AND page_num BETWEEN ? AND ?
-			`, task.topicID, task.startPage, task.endPage).Scan(&wordsOnPages)
-			if err == nil && wordsOnPages > 0 {
-				totalWords += wordsOnPages
-				continue
-			}
-		}
-		// Fallback if chunks were not linked to topic pages: default to 2500 per completed reading task
-		totalWords += 2500
 	}
 
 	return totalWords, sessionCount, nil

@@ -3,10 +3,83 @@ package study
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"ai-tutor/internal/utils"
 )
+
+var (
+	reMissingComma  = regexp.MustCompile(`([\]}"\d])\s*\n\s*("[\w_]+"\s*:)`)
+	reTrailingComma = regexp.MustCompile(`,(\s*[\]}])`)
+)
+
+func repairLLMJSON(raw string) string {
+	raw = reMissingComma.ReplaceAllString(raw, "$1,\n$2")
+	raw = reTrailingComma.ReplaceAllString(raw, "$1")
+	return raw
+}
+
+func extractValidQuizQuestions(raw string) []quizLLMQuestion {
+	var valid []quizLLMQuestion
+
+	scanStart := 0
+	if idx := strings.Index(raw, `"questions"`); idx != -1 {
+		if arrIdx := strings.IndexByte(raw[idx:], '['); arrIdx != -1 {
+			scanStart = idx + arrIdx + 1
+		}
+	}
+
+	depth := 0
+	startIdx := -1
+	inString := false
+	escaped := false
+
+	for i := scanStart; i < len(raw); i++ {
+		ch := raw[i]
+
+		if escaped {
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+
+		if !inString {
+			switch ch {
+			case '{':
+				if depth == 0 {
+					startIdx = i
+				}
+				depth++
+			case '}':
+				if depth > 0 {
+					depth--
+					if depth == 0 && startIdx != -1 {
+						block := raw[startIdx : i+1]
+						if strings.Contains(block, `"prompt"`) && strings.Contains(block, `"options"`) {
+							var q quizLLMQuestion
+							repaired := repairLLMJSON(block)
+							if err := json.Unmarshal([]byte(repaired), &q); err == nil && q.Prompt != "" && len(q.Options) > 0 {
+								valid = append(valid, q)
+							}
+						}
+						startIdx = -1
+					}
+				}
+			}
+		}
+	}
+	return valid
+}
 
 // ---------- LLM response types (shared across study sub-files) ----------
 
@@ -142,11 +215,26 @@ func parseQuizLLMResponse(raw string) (*quizLLMResponse, error) {
 		return out, nil
 	}
 
+	repaired := repairLLMJSON(raw)
+	if repOut, repErr := parseLLMJSON[quizLLMResponse](repaired); repErr == nil && len(repOut.Questions) > 0 {
+		utils.Infof("[QUIZ_PARSER] successfully parsed quiz after JSON syntax repair")
+		return repOut, nil
+	}
+
 	if recoveredRaw := recoverTruncatedQuizJSON(raw); recoveredRaw != "" {
 		if recOut, recErr := parseLLMJSON[quizLLMResponse](recoveredRaw); recErr == nil && len(recOut.Questions) > 0 {
 			utils.Warnf("[QUIZ_RECOVERY] recovered %d valid questions from truncated LLM response", len(recOut.Questions))
 			return recOut, nil
 		}
+		if recRepOut, recRepErr := parseLLMJSON[quizLLMResponse](repairLLMJSON(recoveredRaw)); recRepErr == nil && len(recRepOut.Questions) > 0 {
+			utils.Warnf("[QUIZ_RECOVERY] recovered %d valid questions from repaired truncated LLM response", len(recRepOut.Questions))
+			return recRepOut, nil
+		}
+	}
+
+	if extracted := extractValidQuizQuestions(raw); len(extracted) > 0 {
+		utils.Warnf("[QUIZ_RECOVERY] extracted %d valid question objects from malformed LLM response", len(extracted))
+		return &quizLLMResponse{Questions: extracted}, nil
 	}
 
 	if err != nil {

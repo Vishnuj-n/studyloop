@@ -13,9 +13,11 @@ type Manifest struct {
 	Version     string `json:"version"`
 	Runtime     string `json:"runtime"`
 	Entrypoint  string `json:"entrypoint"`
-	Tier        string `json:"tier,omitempty"`        // "free" (default) or "pro"
-	Description string `json:"description,omitempty"` // Brief summary
-	Category    string `json:"category,omitempty"`    // "reader", "study", "utility", etc.
+	Tier         string `json:"tier,omitempty"`         // "free" (default) or "pro"
+	Description  string `json:"description,omitempty"`  // Brief summary
+	Category     string `json:"category,omitempty"`     // "reader", "study", "utility", etc.
+	DownloadSize string `json:"download_size,omitempty"` // E.g. "~400 MB"
+	SetupNotice  string `json:"setup_notice,omitempty"`  // Notice banner in UI setup
 }
 
 // Validate checks that required fields are present and safe.

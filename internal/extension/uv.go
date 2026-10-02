@@ -100,6 +100,9 @@ func ResolveExtensionVenvDir(ext *Extension) string {
 
 	// In dev mode or when extension directory is writable, default to <ext.Dir>/.venv
 	localVenv := filepath.Join(ext.Dir, ".venv")
+	if abs, err := filepath.Abs(localVenv); err == nil {
+		localVenv = abs
+	}
 	
 	// Test if ext.Dir is writable
 	testFile := filepath.Join(ext.Dir, ".write_test")
@@ -112,13 +115,21 @@ func ResolveExtensionVenvDir(ext *Extension) string {
 	if runtime.GOOS == "windows" {
 		appData := os.Getenv("APPDATA")
 		if appData != "" {
-			return filepath.Join(appData, "Studyloop", "extensions", ext.ID(), ".venv")
+			venvPath := filepath.Join(appData, "Studyloop", "extensions", ext.ID(), ".venv")
+			if abs, err := filepath.Abs(venvPath); err == nil {
+				return abs
+			}
+			return venvPath
 		}
 	}
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil && homeDir != "" {
-		return filepath.Join(homeDir, ".local", "share", "studyloop", "extensions", ext.ID(), ".venv")
+		venvPath := filepath.Join(homeDir, ".local", "share", "studyloop", "extensions", ext.ID(), ".venv")
+		if abs, err := filepath.Abs(venvPath); err == nil {
+			return abs
+		}
+		return venvPath
 	}
 
 	return localVenv

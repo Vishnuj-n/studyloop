@@ -184,7 +184,6 @@ import {
   updateNotebookStudyStatus,
   getUserSettings,
   getNotebookCertificateStats,
-  devUnlockNotebookCertificate,
 } from '../services/appApi'
 import { useClerkAuth } from '../services/clerkAuth'
 import {

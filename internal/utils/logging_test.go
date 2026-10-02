@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,60 @@ func TestInitMultiFileLoggerRotation(t *testing.T) {
 	// Verify fresh queue.log was created and opened
 	if _, err := os.Stat(queueLogPath); err != nil {
 		t.Errorf("expected fresh queue.log to exist: %v", err)
+	}
+}
+
+func TestSetLogLevelAndFiltering(t *testing.T) {
+	tempDir := t.TempDir()
+	if err := InitMultiFileLogger(tempDir); err != nil {
+		t.Fatalf("InitMultiFileLogger failed: %v", err)
+	}
+	defer CloseMultiFileLogger()
+
+	// Default log level should be INFO
+	if err := SetLogLevel("INFO"); err != nil {
+		t.Fatalf("SetLogLevel INFO failed: %v", err)
+	}
+	if lvl := GetLogLevel(); lvl != "INFO" {
+		t.Errorf("expected GetLogLevel to return INFO, got %s", lvl)
+	}
+
+	appLogPath := filepath.Join(tempDir, "logs", "app.log")
+
+	// Emit Debug message under INFO level — should not appear in app.log
+	Debugf("this_is_a_filtered_debug_message")
+	_ = appLogWriter.Sync()
+
+	content, err := os.ReadFile(appLogPath)
+	if err != nil {
+		t.Fatalf("failed to read app.log: %v", err)
+	}
+	if string(content) != "" && strings.Contains(string(content), "this_is_a_filtered_debug_message") {
+		t.Errorf("expected debug message to be filtered out when log level is INFO")
+	}
+
+	// Switch log level dynamically to DEBUG
+	if err := SetLogLevel("DEBUG"); err != nil {
+		t.Fatalf("SetLogLevel DEBUG failed: %v", err)
+	}
+	if lvl := GetLogLevel(); lvl != "DEBUG" {
+		t.Errorf("expected GetLogLevel to return DEBUG, got %s", lvl)
+	}
+
+	// Emit Debug message under DEBUG level — should appear in app.log
+	Debugf("this_is_an_active_debug_message")
+	_ = appLogWriter.Sync()
+
+	content, err = os.ReadFile(appLogPath)
+	if err != nil {
+		t.Fatalf("failed to read app.log: %v", err)
+	}
+	if !strings.Contains(string(content), "this_is_an_active_debug_message") {
+		t.Errorf("expected debug message to be written when log level is DEBUG")
+	}
+
+	// Test invalid level
+	if err := SetLogLevel("INVALID_LEVEL"); err == nil {
+		t.Errorf("expected error for invalid log level")
 	}
 }

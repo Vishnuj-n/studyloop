@@ -83,6 +83,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"quiz_passing_score":         s.QuizPassingScore,
 		"tutor_style":                s.TutorStyle,
 		"llm_prompt_logging":         s.LLMPromptLogging,
+		"log_level":                  s.LogLevel,
 	}
 }
 
@@ -139,6 +140,17 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	// Persist settings first so SQLite is never stale if runtime mutation fails.
 	if err := repo.UpdateUserSettings(s); err != nil {
 		return map[string]interface{}{"error": err.Error()}
+	}
+
+	// Dynamically apply active log level
+	if s.LogLevel != "" {
+		normLevel, err := repo.GetLogLevel()
+		if err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+		if err := utils.SetLogLevel(normLevel); err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
 	}
 
 	// Only mutate runtime after successful persistence.
@@ -1149,6 +1161,24 @@ func (a *App) GetLLMPromptLogging() bool {
 		}
 	}
 	return llm.IsPromptLoggingEnabled()
+}
+
+// SetLogLevel sets the active logging level dynamically and persists it to user_settings.
+func (a *App) SetLogLevel(level string) map[string]interface{} {
+	if err := utils.SetLogLevel(level); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if repo := a.getRepo(); repo != nil {
+		if err := repo.SetLogLevel(level); err != nil {
+			utils.Warnf("failed to persist log level setting: %v", err)
+		}
+	}
+	return map[string]interface{}{"ok": true, "log_level": utils.GetLogLevel()}
+}
+
+// GetLogLevel returns the current active log level.
+func (a *App) GetLogLevel() string {
+	return utils.GetLogLevel()
 }
 
 // OpenDataDirectory opens the active application data directory (or optional subDir like "logs") in File Explorer.

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -19,14 +20,18 @@ var (
 	// RagLogger writes structured RAG/boot events to rag_engine.log.
 	RagLogger *slog.Logger
 
+	currentLogLevel = new(slog.LevelVar)
+
 	logMutex sync.Mutex
 )
 
 func init() {
+	currentLogLevel.Set(slog.LevelInfo)
+	handlerOpts := &slog.HandlerOptions{Level: currentLogLevel}
 	// Default loggers write to io.Discard until InitMultiFileLogger is called to avoid leaking console lines on Windows.
-	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, handlerOpts)))
 }
 
 const maxLogSizeBytes int64 = 5 * 1024 * 1024 // 5 MB per log file
@@ -149,10 +154,11 @@ func InitMultiFileLogger(appDataDir string) error {
 		appLogWriter = nil
 	}
 
+	handlerOpts := &slog.HandlerOptions{Level: currentLogLevel}
 	// Install io.Discard fallback loggers immediately after closing existing file handles.
-	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, handlerOpts)))
 
 	queuePath := filepath.Join(logDir, "queue.log")
 	ragPath := filepath.Join(logDir, "rag_engine.log")
@@ -180,9 +186,9 @@ func InitMultiFileLogger(appDataDir string) error {
 		return fmt.Errorf("failed to open app log file: %w", err)
 	}
 
-	QueueLogger = slog.New(slog.NewJSONHandler(queueLogWriter, nil))
-	RagLogger = slog.New(slog.NewJSONHandler(ragLogWriter, nil))
-	slog.SetDefault(slog.New(slog.NewJSONHandler(appLogWriter, nil)))
+	QueueLogger = slog.New(slog.NewJSONHandler(queueLogWriter, handlerOpts))
+	RagLogger = slog.New(slog.NewJSONHandler(ragLogWriter, handlerOpts))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(appLogWriter, handlerOpts)))
 
 	return nil
 }
@@ -205,10 +211,43 @@ func CloseMultiFileLogger() {
 		appLogWriter = nil
 	}
 
+	handlerOpts := &slog.HandlerOptions{Level: currentLogLevel}
 	// Revert to io.Discard fallback loggers on close to avoid leaking console streams or nil dereference.
-	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
-	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	QueueLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	RagLogger = slog.New(slog.NewJSONHandler(io.Discard, handlerOpts))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, handlerOpts)))
+}
+
+// SetLogLevel dynamically alters the active log level threshold across all file loggers.
+func SetLogLevel(level string) error {
+	switch strings.ToUpper(strings.TrimSpace(level)) {
+	case "DEBUG":
+		currentLogLevel.Set(slog.LevelDebug)
+	case "INFO":
+		currentLogLevel.Set(slog.LevelInfo)
+	case "WARN", "WARNING":
+		currentLogLevel.Set(slog.LevelWarn)
+	case "ERROR":
+		currentLogLevel.Set(slog.LevelError)
+	default:
+		return fmt.Errorf("invalid log level %q: must be DEBUG, INFO, WARN, or ERROR", level)
+	}
+	return nil
+}
+
+// GetLogLevel returns the current active log level string.
+func GetLogLevel() string {
+	lvl := currentLogLevel.Level()
+	switch {
+	case lvl <= slog.LevelDebug:
+		return "DEBUG"
+	case lvl <= slog.LevelInfo:
+		return "INFO"
+	case lvl <= slog.LevelWarn:
+		return "WARN"
+	default:
+		return "ERROR"
+	}
 }
 
 // ---------- Global Level Helpers ----------
@@ -315,10 +354,11 @@ func LogReadingEstimate(taskID, topicID string, startPage, endPage, wordCount, e
 	if taskID == "" {
 		taskID = "unknown"
 	}
-	QueueLogger.Info("reading_estimate",
+	QueueLogger.Debug("reading_estimate",
 		"task", taskID, "topic", topicID,
 		"pages", fmt.Sprintf("%d-%d", startPage, endPage),
 		"word_count", wordCount, "estimate_minutes", estimateMinutes, "source", source)
 }
+
 
 

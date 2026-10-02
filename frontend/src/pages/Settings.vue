@@ -161,7 +161,7 @@
           <header class="pane-header">
             <h2>Extensions &amp; Tools</h2>
             <p class="pane-subtitle">
-              Configure local AI tools, podcast voice personas, and simplifier comprehension levels.
+              Configure local AI tools, context compressor, podcast voice personas, and simplifier comprehension levels.
             </p>
           </header>
 
