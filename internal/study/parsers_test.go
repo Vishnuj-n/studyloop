@@ -84,3 +84,34 @@ func TestParseQuizLLMResponse_PartialRecoveryWithTrailingComma(t *testing.T) {
 		t.Errorf("unexpected recovered question prompt: %s", parsed.Questions[0].Prompt)
 	}
 }
+
+func TestParseQuizLLMResponse_InvalidCharacterAfterArrayElement(t *testing.T) {
+	raw := `{
+		"questions": [
+			{
+				"prompt": "What is the primary factor?",
+				"options": ["Option A", "Option B", "Option C", "Option D"]
+				"correct_answer": "Option A"
+			},
+			{
+				"prompt": "What is the secondary factor?",
+				"options": ["Opt 1", "Opt 2", "Opt 3", "Opt 4"],
+				"correct_answer": "Opt 1"
+			}
+		]
+	}
+	Important note: The above questions are grounded in Chapter 5.
+	`
+
+	parsed, err := parseQuizLLMResponse(raw)
+	if err != nil {
+		t.Fatalf("expected successful recovery from invalid character after array element, got error: %v", err)
+	}
+	if len(parsed.Questions) != 2 {
+		t.Fatalf("expected 2 questions, got %d", len(parsed.Questions))
+	}
+	if parsed.Questions[0].Prompt != "What is the primary factor?" {
+		t.Errorf("unexpected question 1 prompt: %s", parsed.Questions[0].Prompt)
+	}
+}
+
