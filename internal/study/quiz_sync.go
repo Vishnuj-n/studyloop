@@ -427,7 +427,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 	task models.StudyQueueTask,
 	attempt *models.QuizAttemptRecord,
 	failedQuestions []models.FailedQuestionDetail,
-) (string, string, bool, models.StudyQueueTask, error) {
+) (string, string, bool, models.StudyQueueTask) {
 	feedback := "Concept rescue activated. Complete the Socratic session to retry."
 	attempt.Feedback = feedback
 	manualReviewRecommended := true
@@ -457,7 +457,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 		EndPage:     task.EndPage,
 	}
 
-	return socraticTaskID, feedback, manualReviewRecommended, followUp, nil
+	return socraticTaskID, feedback, manualReviewRecommended, followUp
 }
 
 type quizScoringResult struct {
@@ -528,10 +528,7 @@ func (s *StudyService) planRemediation(
 	}
 
 	if strategy == "FAST" {
-		socraticTaskID, feedback, manualReview, followUp, err := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
-		if err != nil {
-			return outcome, err
-		}
+		socraticTaskID, feedback, manualReview, followUp := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
 		outcome.socraticTaskID = socraticTaskID
 		outcome.feedback = feedback
 		outcome.manualReviewRecommended = manualReview
@@ -564,10 +561,7 @@ func (s *StudyService) planRemediation(
 	}
 
 	// Strike 3: SOCRATIC_REMEDIAL rescue
-	socraticTaskID, feedback, manualReview, followUp, err := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
-	if err != nil {
-		return outcome, err
-	}
+	socraticTaskID, feedback, manualReview, followUp := s.triggerSocraticRescueHandoffTx(tx, task, attempt, scoreRes.failedQuestions)
 	outcome.socraticTaskID = socraticTaskID
 	outcome.feedback = feedback
 	outcome.manualReviewRecommended = manualReview

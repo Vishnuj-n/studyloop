@@ -15,7 +15,7 @@ func TestDynamicCompressionThreshold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to init db: %v", err)
 	}
-	defer repo.Close()
+	defer func() { _ = repo.Close() }()
 
 	if err := repo.SeedDemoDataForTests(); err != nil {
 		t.Fatalf("failed to seed demo data: %v", err)

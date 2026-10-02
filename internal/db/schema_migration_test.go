@@ -20,7 +20,7 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite3 db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Simulate an older v1 database with legacy tables missing modern columns
 	legacySchema := []string{
@@ -178,7 +178,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open fresh db: %v", err)
 	}
-	defer freshDB.Close()
+	defer func() { _ = freshDB.Close() }()
 
 	freshTx, err := freshDB.Begin()
 	if err != nil {
@@ -197,7 +197,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open upgraded db: %v", err)
 	}
-	defer upgradedDB.Close()
+	defer func() { _ = upgradedDB.Close() }()
 
 	// Seed historical initial table definitions from when each table was first introduced in git
 	legacyTables := []string{
@@ -335,7 +335,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to query tables: %v", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var tableNames []string
 		for rows.Next() {
@@ -367,7 +367,7 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 			if err := infoRows.Err(); err != nil {
 				t.Fatalf("infoRows iteration error for %s: %v", tbl, err)
 			}
-			infoRows.Close()
+			_ = infoRows.Close()
 			sort.Strings(cols)
 			tables[tbl] = cols
 		}

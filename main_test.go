@@ -53,7 +53,7 @@ func TestNotebookHandler_NotebookPath_ValidFile_ServesContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	dummyFile := filepath.Join(tmpDir, "test.pdf")
 	if err := os.WriteFile(dummyFile, []byte("dummy pdf content"), 0644); err != nil {

@@ -325,11 +325,11 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 	baseURLCheck := strings.ToLower(p.config.BaseURL)
 	if strings.Contains(baseURLCheck, "googleapis.com") {
 		if strings.HasPrefix(apiKey, "gsk_") {
-			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings.")
+			return "", fmt.Errorf("invalid API key for Gemini provider: key starts with 'gsk_' (Groq key format). Please check your AI provider settings in Settings")
 		}
 	} else if strings.Contains(baseURLCheck, "groq.com") {
 		if strings.HasPrefix(apiKey, "AIza") {
-			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings.")
+			return "", fmt.Errorf("invalid API key for Groq provider: key starts with 'AIza' (Gemini key format). Please check your AI provider settings in Settings")
 		}
 	}
 

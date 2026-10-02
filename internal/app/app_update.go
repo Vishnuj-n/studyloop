@@ -194,7 +194,7 @@ func (a *App) DownloadAndApplyUpdate() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"success": false, "error": "failed to fetch latest release: " + err.Error()}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return map[string]interface{}{"success": false, "error": fmt.Sprintf("github API returned status: %d", resp.StatusCode)}
@@ -238,7 +238,7 @@ func (a *App) DownloadAndApplyUpdate() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"success": false, "error": "failed to create installer target file: " + err.Error()}
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	// Stream download with progress
 	dlClient := http.Client{Timeout: 15 * time.Minute}
@@ -246,7 +246,7 @@ func (a *App) DownloadAndApplyUpdate() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"success": false, "error": "failed to initiate download: " + err.Error()}
 	}
-	defer dlResp.Body.Close()
+	defer func() { _ = dlResp.Body.Close() }()
 
 	if dlResp.StatusCode != http.StatusOK {
 		return map[string]interface{}{"success": false, "error": fmt.Sprintf("download returned status: %d", dlResp.StatusCode)}

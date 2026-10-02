@@ -320,12 +320,12 @@ func (r *Repository) IngestNotebookContentByTopic(notebookID string, groups []No
 		for rows.Next() {
 			var cid string
 			if err := rows.Scan(&cid); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return err
 			}
 			chunkIDs = append(chunkIDs, cid)
 		}
-		rows.Close()
+		_ = rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
 		}
