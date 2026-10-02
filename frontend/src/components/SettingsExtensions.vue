@@ -42,6 +42,52 @@
       </div>
     </article>
 
+    <!-- Prompt & Context Compressor -->
+    <article class="panel form-grid">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h2 style="margin: 0;">Prompt &amp; Context Compressor (LLMLingua-2)</h2>
+        <span class="global-badge"><BaseIcon name="globe" size="12" /> Global</span>
+      </div>
+      <div class="form-group">
+        <label for="compressor-mode">Compression Operating Mode</label>
+        <select
+          id="compressor-mode"
+          v-model="compressorMode"
+          class="setting-select"
+          :disabled="disabled"
+        >
+          <option value="OVER_LIMIT">Dynamic Budget (Default - Compresses only when exceeding session/model limit)</option>
+          <option value="ALWAYS">Always Compress (Max efficiency - Compresses all chunks)</option>
+          <option value="DISABLED">Disabled (Bypass compression - Full raw text)</option>
+        </select>
+        <p v-if="compressorMode === 'OVER_LIMIT'" class="hint">
+           <strong>Dynamic Budget:</strong> Automatically evaluates token counts and triggers LLMLingua-2 compression only if notes exceed your session budget or 70% of LLM max context.
+        </p>
+        <p v-else-if="compressorMode === 'ALWAYS'" class="hint">
+           <strong>Always Compress:</strong> Unconditionally runs background BERT compression on all study chunks (≥ 25 words) down to the target retention rate.
+        </p>
+        <p v-else class="hint">
+           <strong>Disabled:</strong> Background token compression is disabled. Raw notes and textbook text are passed directly to LLM prompts.
+        </p>
+      </div>
+
+      <div v-if="compressorMode !== 'DISABLED'" class="form-group">
+        <label for="compressor-rate">Target Token Retention Rate</label>
+        <select
+          id="compressor-rate"
+          v-model.number="compressorRate"
+          class="setting-select"
+          :disabled="disabled"
+        >
+          <option :value="0.80">80% Retention (Recommended - ~20% token savings, full nuance preserved)</option>
+          <option :value="0.70">70% Retention (~30% token savings, balanced)</option>
+          <option :value="0.60">60% Retention (~40% token savings, high pruning)</option>
+          <option :value="0.50">50% Retention (~50% token savings, maximum compactness)</option>
+        </select>
+        <p class="hint">Target token retention ratio. LLMLingua-2 removes redundant syntax while preserving core entities and logic.</p>
+      </div>
+    </article>
+
     <!-- Text Simplifier -->
     <article class="panel form-grid">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -135,6 +181,16 @@ const audioSpeed = computed({
 const simplifierLevel = computed({
   get: () => extensionConfig.value?.text_simplifier?.level || 'simple',
   set: (val) => setExtensionSetting('text_simplifier', 'level', val),
+})
+
+const compressorMode = computed({
+  get: () => extensionConfig.value?.prompt_compressor?.mode || 'OVER_LIMIT',
+  set: (val) => setExtensionSetting('prompt_compressor', 'mode', val),
+})
+
+const compressorRate = computed({
+  get: () => extensionConfig.value?.prompt_compressor?.rate ?? 0.80,
+  set: (val) => setExtensionSetting('prompt_compressor', 'rate', Number(val)),
 })
 
 const youtubeAutoDownload = computed({

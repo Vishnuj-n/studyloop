@@ -30,6 +30,8 @@ export function useSettings(errorRef, successRef) {
     quiz_question_count: 8,
     quiz_passing_score: 70,
     tutor_style: 'socratic',
+    prompt_compression_mode: 'OVER_LIMIT',
+    prompt_compression_rate: 0.80,
   })
 
   const studyDuration = ref('')

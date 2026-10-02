@@ -13,7 +13,7 @@
           class="compression-badge"
           :title="`Original: ${compressionStats.raw_tokens} tokens | Compressed: ${compressionStats.compressed_tokens} tokens (Pruned ~${Math.round(compressionStats.saved_percentage)}%)`"
         >
-          ⚡ Compressed (Saved ~{{ Math.round(compressionStats.saved_percentage) }}%)
+           Compressed (Saved ~{{ Math.round(compressionStats.saved_percentage) }}%)
         </span>
         <span v-if="isTaskFlow" class="task-badge">Task Mode</span>
         <span v-else class="browse-badge">Browse Mode</span>

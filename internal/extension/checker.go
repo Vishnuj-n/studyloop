@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -223,19 +224,39 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 		pipCmd.Dir = absExtDir
 		hideConsoleWindow(pipCmd)
 
-		var pipOut, pipErr bytes.Buffer
-		pipCmd.Stdout = &pipOut
-		pipCmd.Stderr = &pipErr
+		// Stream pip installation output in real-time to the log callback
+		stdoutPipe, err := pipCmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open stdout pipe: %w", err)
+		}
+		pipCmd.Stderr = pipCmd.Stdout
 
-		if err := pipCmd.Run(); err != nil {
+		if err := pipCmd.Start(); err != nil {
 			if ctx.Err() == context.Canceled {
 				return ErrSetupCanceled
 			}
-			errMsg := strings.TrimSpace(pipErr.String())
-			if errMsg == "" {
-				errMsg = strings.TrimSpace(pipOut.String())
+			return fmt.Errorf("failed to start uv pip install: %w", err)
+		}
+
+		scanner := bufio.NewScanner(stdoutPipe)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				logLine(line)
 			}
-			return fmt.Errorf("failed to install dependencies with uv pip: %w (output: %s)", err, errMsg)
+		}
+		if scanErr := scanner.Err(); scanErr != nil {
+			if ctx.Err() == context.Canceled {
+				return ErrSetupCanceled
+			}
+			logLine(fmt.Sprintf("[WARN] Error reading pip output: %v", scanErr))
+		}
+
+		if err := pipCmd.Wait(); err != nil {
+			if ctx.Err() == context.Canceled {
+				return ErrSetupCanceled
+			}
+			return fmt.Errorf("failed to install dependencies with uv pip: %w", err)
 		}
 		logLine("[OK] Dependencies installed successfully.")
 	} else {

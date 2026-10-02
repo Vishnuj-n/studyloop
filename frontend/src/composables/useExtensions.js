@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
-import { listExtensions, getExtensionConfig, saveExtensionConfig } from '../services/appApi'
+import { listExtensions, getExtensionConfig, saveExtensionConfig, setupExtension, cancelExtensionSetup, getUserSettings, updateUserSettings } from '../services/appApi'
+import { EventsOn } from '../../wailsjs/runtime/runtime'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 const SETUP_COMPLETED_KEY = 'studyloop_extensions_setup_completed'
@@ -8,6 +9,7 @@ const SETUP_COMPLETED_KEY = 'studyloop_extensions_setup_completed'
 // Built-in lightweight extensions are enabled by default; external/python tools require explicit setup & opt-in
 const DEFAULT_ENABLED_EXTENSIONS = {
   text_simplifier: true,
+  prompt_compressor: true,
   deep_pdf: false,
   youtube: false,
   audio_overview: false,
@@ -24,6 +26,10 @@ export const DEFAULT_EXTENSION_CONFIG = {
   youtube: {
     auto_download: false,
     download_quality: '720p',
+  },
+  prompt_compressor: {
+    mode: 'OVER_LIMIT',
+    rate: 0.80,
   },
 }
 
@@ -70,6 +76,42 @@ const extensionConfig = ref(JSON.parse(JSON.stringify(DEFAULT_EXTENSION_CONFIG))
 let metadataFetched = false
 let configFetched = false
 
+// Singleton Extension Setup State across entire app
+export const activeSetup = ref({
+  extensionId: null,
+  extensionName: '',
+  status: 'idle', // 'idle' | 'running' | 'success' | 'error'
+  step: 1, // 1: Runtime, 2: Requirements, 3: Probe
+  logs: [],
+  errorMessage: '',
+  visibleToast: false,
+})
+
+export const setupModalState = ref({
+  isOpen: false,
+  extension: null,
+})
+
+let setupEventsInitialized = false
+function initSetupEventListener() {
+  if (setupEventsInitialized) return
+  if (typeof EventsOn === 'function') {
+    EventsOn('extension:setup:progress', (data) => {
+      if (!data || !activeSetup.value.extensionId || data.id !== activeSetup.value.extensionId) return
+      if (Array.isArray(data.logs) && data.logs.length > 0) {
+        activeSetup.value.logs = data.logs
+      } else if (data.log) {
+        activeSetup.value.logs.push(data.log)
+      }
+      if (data.step && Number.isInteger(data.step)) {
+        activeSetup.value.step = data.step
+      }
+    })
+    setupEventsInitialized = true
+  }
+}
+initSetupEventListener()
+
 async function refreshExtensionsMetadata() {
   try {
     const exts = await listExtensions()
@@ -85,14 +127,36 @@ async function refreshExtensionsMetadata() {
 async function refreshExtensionConfig() {
   try {
     const raw = await getExtensionConfig()
+    let parsed = {}
     if (raw && typeof raw === 'string' && raw.trim() !== '') {
-      const parsed = JSON.parse(raw)
-      extensionConfig.value = {
-        audio_overview: { ...DEFAULT_EXTENSION_CONFIG.audio_overview, ...(parsed.audio_overview || {}) },
-        text_simplifier: { ...DEFAULT_EXTENSION_CONFIG.text_simplifier, ...(parsed.text_simplifier || {}) },
-        youtube: { ...DEFAULT_EXTENSION_CONFIG.youtube, ...(parsed.youtube || {}) },
-        ...parsed,
+      try {
+        parsed = JSON.parse(raw)
+      } catch {}
+    }
+
+    let userMode = null
+    let userRate = null
+    try {
+      const u = await getUserSettings()
+      if (u) {
+        if (u.prompt_compression_mode) userMode = u.prompt_compression_mode
+        if (typeof u.prompt_compression_rate === 'number' && u.prompt_compression_rate > 0) {
+          userRate = u.prompt_compression_rate
+        }
       }
+    } catch {}
+
+    extensionConfig.value = {
+      audio_overview: { ...DEFAULT_EXTENSION_CONFIG.audio_overview, ...(parsed.audio_overview || {}) },
+      text_simplifier: { ...DEFAULT_EXTENSION_CONFIG.text_simplifier, ...(parsed.text_simplifier || {}) },
+      youtube: { ...DEFAULT_EXTENSION_CONFIG.youtube, ...(parsed.youtube || {}) },
+      prompt_compressor: {
+        ...DEFAULT_EXTENSION_CONFIG.prompt_compressor,
+        ...(parsed.prompt_compressor || {}),
+        ...(userMode ? { mode: userMode } : {}),
+        ...(userRate ? { rate: userRate } : {}),
+      },
+      ...parsed,
     }
     configFetched = true
   } catch (_) {
@@ -173,6 +237,22 @@ export function useExtensions() {
       const payload = JSON.stringify(extensionConfig.value)
       await saveExtensionConfig(payload)
       console.log(`[useExtensions] Successfully persisted extension config:`, extensionConfig.value)
+
+      if (extensionId === 'prompt_compressor') {
+        try {
+          const current = await getUserSettings()
+          if (current) {
+            if (key === 'mode') {
+              current.prompt_compression_mode = String(value)
+            } else if (key === 'rate') {
+              current.prompt_compression_rate = Number(value)
+            }
+            await updateUserSettings(current)
+          }
+        } catch (syncErr) {
+          console.warn('[useExtensions] Failed syncing prompt_compressor to user_settings:', syncErr)
+        }
+      }
     } catch (err) {
       extensionConfig.value[extensionId][key] = priorValue
       configError.value = err?.message || String(err)
@@ -181,11 +261,86 @@ export function useExtensions() {
     }
   }
 
+  function openSetupModal(ext) {
+    if (!ext) return
+    setupModalState.value = {
+      isOpen: true,
+      extension: ext,
+    }
+  }
+
+  function closeSetupModal() {
+    setupModalState.value = {
+      isOpen: false,
+      extension: null,
+    }
+  }
+
+  function dismissSetupToast() {
+    activeSetup.value.visibleToast = false
+  }
+
+  async function startSetup(ext) {
+    if (!ext || !ext.id) return
+
+    // If a different setup is currently running, don't clobber
+    if (activeSetup.value.status === 'running' && activeSetup.value.extensionId !== ext.id) {
+      console.warn('[useExtensions] Another setup is currently running:', activeSetup.value.extensionId)
+      return
+    }
+
+    activeSetup.value = {
+      extensionId: ext.id,
+      extensionName: ext.name || 'Extension',
+      status: 'running',
+      step: 1,
+      logs: ['Checking environment...'],
+      errorMessage: '',
+      visibleToast: true,
+    }
+
+    try {
+      const res = await setupExtension(ext.id)
+      if (res && res.success) {
+        activeSetup.value.logs = res.logs || ['Setup completed successfully.']
+        activeSetup.value.step = 3
+        activeSetup.value.status = 'success'
+        markSetupCompleted(ext.id, true)
+        setExtensionEnabled(ext.id, true)
+      } else if (res && res.canceled) {
+        activeSetup.value.status = 'idle'
+        activeSetup.value.visibleToast = false
+      } else {
+        activeSetup.value.status = 'error'
+        activeSetup.value.logs = res?.logs || activeSetup.value.logs
+        activeSetup.value.errorMessage = res?.error || 'Setup failed to complete.'
+      }
+    } catch (err) {
+      activeSetup.value.status = 'error'
+      activeSetup.value.errorMessage = err?.message || String(err)
+    }
+  }
+
+  async function cancelSetup() {
+    if (activeSetup.value.status === 'running') {
+      try {
+        await cancelExtensionSetup()
+      } catch (err) {
+        console.error('[useExtensions] Failed to cancel setup:', err)
+      }
+    }
+    activeSetup.value.status = 'idle'
+    activeSetup.value.visibleToast = false
+    closeSetupModal()
+  }
+
   return {
     enabledMap,
     extensionsMetadata,
     extensionConfig,
     configError,
+    activeSetup,
+    setupModalState,
     isPro,
     isEnabled,
     isExtensionActive,
@@ -197,6 +352,11 @@ export function useExtensions() {
     markSetupCompleted,
     getExtensionSetting,
     setExtensionSetting,
+    openSetupModal,
+    closeSetupModal,
+    dismissSetupToast,
+    startSetup,
+    cancelSetup,
   }
 }
 

@@ -1,43 +1,43 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="handleOverlayClick">
+  <div v-if="isOpen" class="modal-overlay" @click.self="handleDismissBackground">
     <div class="modal-card setup-card">
       <div class="modal-header">
         <div class="setup-header-title">
-          <div v-if="status === 'running'" class="setup-icon-spinner">
+          <div v-if="setupStatus === 'running'" class="setup-icon-spinner">
             <div class="loading-spin-circle"></div>
           </div>
-          <div v-else-if="status === 'success'" class="setup-icon-success"><BaseIcon name="check" size="14" /></div>
+          <div v-else-if="setupStatus === 'success'" class="setup-icon-success"><BaseIcon name="check" size="14" /></div>
           <div v-else class="setup-icon-error">!</div>
           <h3>
             {{
-              status === 'running'
+              setupStatus === 'running'
                 ? 'Configuring Extension'
-                : status === 'success'
+                : setupStatus === 'success'
                 ? 'Extension Ready'
                 : 'Setup Failed'
-            }}: {{ extension?.name || 'Python Tool' }}
+            }}: {{ currentExtension?.name || 'Python Tool' }}
           </h3>
         </div>
-        <button class="close-modal-btn" title="Close / Cancel Setup" @click="handleCancelOrClose"><BaseIcon name="x" size="14" /></button>
+        <button class="close-modal-btn" title="Run in Background / Close" @click="handleDismissBackground"><BaseIcon name="x" size="14" /></button>
       </div>
 
       <div class="modal-body">
         <p class="setup-desc">
           {{
-            status === 'running'
+            setupStatus === 'running'
               ? 'Setting up isolated Python virtual environment via uv and verifying dependencies...'
-              : status === 'success'
+              : setupStatus === 'success'
               ? 'Extension dependencies and smoke test verified successfully!'
-              : errorMessage
+              : setupErrorMessage || 'Setup encountered an error.'
           }}
         </p>
 
         <!-- Download Size & Patience Notice Callout -->
-        <div v-if="extension?.setup_notice || extension?.download_size" class="setup-notice-banner">
+        <div v-if="currentExtension?.setup_notice || currentExtension?.download_size" class="setup-notice-banner">
           <span class="notice-icon"><BaseIcon name="clock" size="14" /></span>
           <div class="notice-text">
-            <strong>Package Size: {{ extension.download_size || '~1 GB' }}</strong>
-            <p>{{ extension.setup_notice || 'First-time setup downloads required models. Please keep the app open.' }}</p>
+            <strong>Package Size: {{ currentExtension.download_size || '~1 GB' }}</strong>
+            <p>{{ currentExtension.setup_notice || 'First-time setup downloads required models. You can keep this app open or run setup in the background.' }}</p>
           </div>
         </div>
 
@@ -58,10 +58,10 @@
         </div>
 
         <div class="setup-logs-box">
-          <div v-for="(log, idx) in logs" :key="idx" class="setup-log-line">
+          <div v-for="(log, idx) in setupLogs" :key="idx" class="setup-log-line">
             {{ log }}
           </div>
-          <div v-if="status === 'running'" class="setup-log-line log-pending">
+          <div v-if="setupStatus === 'running'" class="setup-log-line log-pending">
             Running setup pipeline...
           </div>
         </div>
@@ -69,32 +69,43 @@
 
       <div class="modal-footer">
         <button
-          v-if="status === 'running'"
-          class="modal-close-btn"
-          @click="handleCancelOrClose"
+          v-if="setupStatus === 'running'"
+          class="modal-close-btn cancel-btn"
+          title="Abort setup process"
+          @click="handleCancelSetup"
         >
-          Cancel
+          Cancel Setup
         </button>
         <button
-          v-if="status === 'error'"
+          v-if="setupStatus === 'running'"
+          class="modal-action-btn bg-btn"
+          title="Close modal and continue installation in background"
+          @click="handleDismissBackground"
+        >
+          Run in Background
+        </button>
+
+        <button
+          v-if="setupStatus === 'error'"
           class="modal-action-btn retry-btn"
-          @click="startSetup"
+          @click="handleRetry"
         >
           Retry Setup
         </button>
         <button
-          v-if="status === 'success'"
-          class="modal-action-btn done-btn"
-          @click="emitClose"
-        >
-          Done
-        </button>
-        <button
-          v-if="status === 'error'"
+          v-if="setupStatus === 'error'"
           class="modal-close-btn"
-          @click="emitClose"
+          @click="handleDismissBackground"
         >
           Close
+        </button>
+
+        <button
+          v-if="setupStatus === 'success'"
+          class="modal-action-btn done-btn"
+          @click="handleDismissBackground"
+        >
+          Done
         </button>
       </div>
     </div>
@@ -102,9 +113,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { setupExtension, cancelExtensionSetup } from '../services/appApi'
-import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
+import { computed } from 'vue'
+import BaseIcon from './BaseIcon.vue'
+import { useExtensions } from '../composables/useExtensions'
 
 const props = defineProps({
   isOpen: {
@@ -119,108 +130,68 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success', 'error'])
 
-const status = ref('running') // 'running' | 'success' | 'error'
-const logs = ref([])
-const errorMessage = ref('')
-const currentStep = ref(1)
-let unsubProgress = null
+const {
+  activeSetup,
+  setupModalState,
+  startSetup,
+  cancelSetup,
+  closeSetupModal,
+} = useExtensions()
 
-function handleProgressEvent(data) {
-  if (!data || !props.extension || data.id !== props.extension.id) return
-  if (Array.isArray(data.logs) && data.logs.length > 0) {
-    logs.value = data.logs
-  } else if (data.log) {
-    logs.value.push(data.log)
-  }
-  if (data.step && Number.isInteger(data.step)) {
-    currentStep.value = data.step
-  }
-}
+const currentExtension = computed(() => props.extension || setupModalState.value?.extension)
 
-onMounted(() => {
-  if (typeof EventsOn === 'function') {
-    unsubProgress = EventsOn('extension:setup:progress', handleProgressEvent)
+const setupStatus = computed(() => {
+  if (!currentExtension.value) return 'idle'
+  if (activeSetup.value.extensionId === currentExtension.value.id) {
+    return activeSetup.value.status
   }
+  return 'idle'
 })
 
-onUnmounted(() => {
-  if (typeof unsubProgress === 'function') {
-    unsubProgress()
-    unsubProgress = null
-  } else if (typeof EventsOff === 'function') {
-    EventsOff('extension:setup:progress')
+const currentStep = computed(() => {
+  if (activeSetup.value.extensionId === currentExtension.value?.id) {
+    return activeSetup.value.step || 1
   }
+  return 1
+})
+
+const setupLogs = computed(() => {
+  if (activeSetup.value.extensionId === currentExtension.value?.id) {
+    return activeSetup.value.logs || []
+  }
+  return []
+})
+
+const setupErrorMessage = computed(() => {
+  if (activeSetup.value.extensionId === currentExtension.value?.id) {
+    return activeSetup.value.errorMessage
+  }
+  return ''
 })
 
 function getStepClass(stepNum) {
-  if (status.value === 'success') return 'completed'
-  if (status.value === 'error' && currentStep.value === stepNum) return 'error'
+  if (setupStatus.value === 'success') return 'completed'
+  if (setupStatus.value === 'error' && currentStep.value === stepNum) return 'error'
   if (currentStep.value > stepNum) return 'completed'
   if (currentStep.value === stepNum) return 'active'
   return 'pending'
 }
 
-function handleOverlayClick() {
-  handleCancelOrClose()
-}
-
-async function handleCancelOrClose() {
-  if (status.value === 'running') {
-    try {
-      await cancelExtensionSetup()
-    } catch (err) {
-      status.value = 'error'
-      errorMessage.value = err?.message || String(err) || 'Failed to cancel setup'
-      return
-    }
-  }
-  emitClose()
-}
-
-function emitClose() {
+function handleDismissBackground() {
+  closeSetupModal()
   emit('close')
 }
 
-async function startSetup() {
-  if (!props.extension || !props.extension.id) return
-
-  status.value = 'running'
-  logs.value = ['Checking environment...']
-  errorMessage.value = ''
-  currentStep.value = 1
-
-  try {
-    const res = await setupExtension(props.extension.id)
-    if (res && res.success) {
-      logs.value = res.logs || ['Setup completed successfully.']
-      currentStep.value = 3
-      status.value = 'success'
-      emit('success', props.extension)
-    } else if (res && res.canceled) {
-      logs.value = res?.logs || []
-      // Do not emit error when setup is canceled by user
-    } else {
-      status.value = 'error'
-      logs.value = res?.logs || []
-      errorMessage.value = res?.error || 'Setup failed to complete.'
-      emit('error', errorMessage.value)
-    }
-  } catch (err) {
-    status.value = 'error'
-    errorMessage.value = String(err)
-    emit('error', errorMessage.value)
-  }
+async function handleCancelSetup() {
+  await cancelSetup()
+  emit('close')
 }
 
-watch(
-  () => [props.isOpen, props.extension],
-  ([isOpen, ext]) => {
-    if (isOpen && ext) {
-      startSetup()
-    }
-  },
-  { immediate: true }
-)
+async function handleRetry() {
+  if (currentExtension.value) {
+    await startSetup(currentExtension.value)
+  }
+}
 </script>
 
 <style scoped>
@@ -440,7 +411,8 @@ watch(
 }
 
 .modal-action-btn.retry-btn,
-.modal-action-btn.done-btn {
+.modal-action-btn.done-btn,
+.modal-action-btn.bg-btn {
   padding: 8px 18px;
   border-radius: 10px;
   background: linear-gradient(15deg, var(--primary) 0%, var(--primary-dim) 100%);
@@ -461,6 +433,15 @@ watch(
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s ease;
+}
+
+.modal-close-btn.cancel-btn {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.modal-close-btn.cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.16);
 }
 
 .modal-close-btn:hover {

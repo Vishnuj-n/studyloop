@@ -9,6 +9,9 @@ import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
 import PrivacyNoticeModal from './components/PrivacyNoticeModal.vue'
 import FloatingPet from './components/FloatingPet.vue'
+import ExtensionSetupToast from './components/ExtensionSetupToast.vue'
+import ExtensionSetupModal from './components/ExtensionSetupModal.vue'
+import { useExtensions } from './composables/useExtensions'
 import {
   getUserSettings,
   updateUserSettings,
@@ -24,6 +27,7 @@ import { initClerk } from './services/clerkAuth'
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
 const { showNotice, showError } = useToast()
+const { setupModalState, closeSetupModal, markSetupCompleted, setExtensionEnabled } = useExtensions()
 
 const route = useRoute()
 
@@ -531,6 +535,16 @@ onUnmounted(() => {
 
       <!-- Global Toaster -->
       <AppToast />
+
+      <!-- Floating Extension Setup Progress Toast -->
+      <ExtensionSetupToast />
+
+      <!-- Global Extension Setup Modal -->
+      <ExtensionSetupModal
+        :is-open="setupModalState.isOpen"
+        :extension="setupModalState.extension"
+        @close="closeSetupModal"
+      />
 
       <!-- Floating Study Companion -->
       <FloatingPet />
