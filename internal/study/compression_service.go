@@ -90,8 +90,9 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	var uncompressedChunks []models.Chunk
 	totalTokens := 0
 	for _, c := range chunks {
-		totalTokens += len(strings.Fields(c.Text))
-		if strings.TrimSpace(c.CompressedText) == "" && len(strings.Fields(c.Text)) >= 25 {
+		words := len(strings.Fields(c.Text))
+		totalTokens += int(float64(words) * 1.33)
+		if strings.TrimSpace(c.CompressedText) == "" && words >= 25 {
 			uncompressedChunks = append(uncompressedChunks, c)
 		}
 	}

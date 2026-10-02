@@ -274,3 +274,41 @@ func TestFrontMatterFilteringInQuizContext(t *testing.T) {
 		}
 	}
 }
+
+func TestCompressedTextSelection(t *testing.T) {
+	chunks := []models.Chunk{
+		{ID: "c1", Text: "This is the original full length uncompressed text for chunk one.", CompressedText: "Original text chunk one compressed."},
+		{ID: "c2", Text: "This is the original text for chunk two with no compression yet.", CompressedText: ""},
+	}
+
+	chunkIDs := make([]string, 0, len(chunks))
+	chunkTextByID := make(map[string]string, len(chunks))
+	for _, chunk := range chunks {
+		chunkIDs = append(chunkIDs, chunk.ID)
+		text := chunk.CompressedText
+		if text == "" {
+			text = chunk.Text
+		}
+		chunkTextByID[chunk.ID] = text
+	}
+
+	if chunkTextByID["c1"] != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text for c1, got %q", chunkTextByID["c1"])
+	}
+	if chunkTextByID["c2"] != "This is the original text for chunk two with no compression yet." {
+		t.Errorf("expected fallback uncompressed text for c2, got %q", chunkTextByID["c2"])
+	}
+
+	res, err := buildQuizContext(chunkIDs, chunkTextByID, 1000)
+	if err != nil {
+		t.Fatalf("buildQuizContext failed: %v", err)
+	}
+
+	if len(res.contextParts) != 2 {
+		t.Fatalf("expected 2 context parts, got %d", len(res.contextParts))
+	}
+	if res.contextParts[0] != "Original text chunk one compressed." {
+		t.Errorf("expected compressed text in contextParts[0], got %q", res.contextParts[0])
+	}
+}
+

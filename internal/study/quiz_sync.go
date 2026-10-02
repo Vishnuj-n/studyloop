@@ -360,6 +360,9 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 		return models.QuizTaskPayload{}, err
 	}
 
+	utils.Infof("[QUIZ_PIPELINE] built context parts=%d total_words=%d tokens=%d available_budget=%d topic=%s",
+		len(ctxRes.contextParts), ctxRes.totalWordCount, ctxRes.currentTokens, availableBudget, topicID)
+
 	if ctxRes.truncatedCount > 0 {
 		utils.Warnf("[QUIZ_PIPELINE] chunk_trimming total_chunks=%d included=%d truncated=%d budget_used=%d available=%d",
 			len(normalizedChunkIDs), len(ctxRes.contextParts), ctxRes.truncatedCount, ctxRes.currentTokens, availableBudget)

@@ -231,7 +231,11 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		chunkTextByID := make(map[string]string, len(chunks))
 		for _, chunk := range chunks {
 			chunkIDs = append(chunkIDs, chunk.ID)
-			chunkTextByID[chunk.ID] = chunk.Text
+			text := strings.TrimSpace(chunk.CompressedText)
+			if text == "" {
+				text = strings.TrimSpace(chunk.Text)
+			}
+			chunkTextByID[chunk.ID] = text
 		}
 
 		generatedQuiz, err := s.GenerateQuizSync(task.TopicID, chunkIDs, chunkTextByID)
