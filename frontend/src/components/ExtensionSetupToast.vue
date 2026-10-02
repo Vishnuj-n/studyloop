@@ -126,7 +126,7 @@ function onPointerMove(e) {
   position.value = { x: newX, y: newY }
 }
 
-function onPointerUp(e) {
+function onPointerUp() {
   if (!isDragging.value) return
   isDragging.value = false
   window.removeEventListener('pointermove', onPointerMove)

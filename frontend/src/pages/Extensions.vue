@@ -317,7 +317,6 @@ const {
   isEnabled: isExtensionEnabled,
   setExtensionEnabled,
   hasCompletedSetup,
-  markSetupCompleted,
   activeSetup,
   startSetup,
   openSetupModal,
@@ -400,13 +399,6 @@ function triggerSetup(ext) {
   openSetupModal(ext)
   if (activeSetup.value.extensionId !== ext.id || activeSetup.value.status === 'idle') {
     startSetup(ext)
-  }
-}
-
-function handleSetupSuccess(ext) {
-  if (ext && ext.id) {
-    markSetupCompleted(ext.id, true)
-    setExtensionEnabled(ext.id, true)
   }
 }
 

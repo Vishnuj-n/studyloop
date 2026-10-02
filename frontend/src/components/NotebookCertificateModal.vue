@@ -54,7 +54,7 @@
 
         <!-- Certificate Canvas Preview Frame -->
         <div class="cert-preview-frame">
-          <div class="cert-document" ref="certDocumentRef">
+          <div ref="certDocumentRef" class="cert-document">
             <div class="cert-inner-border">
               <div class="cert-watermark">STUDYLOOP</div>
 

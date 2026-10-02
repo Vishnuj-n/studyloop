@@ -95,7 +95,7 @@ export const setupModalState = ref({
 let setupEventsInitialized = false
 function initSetupEventListener() {
   if (setupEventsInitialized) return
-  if (typeof EventsOn === 'function') {
+  if (typeof window !== 'undefined' && window.runtime && typeof EventsOn === 'function') {
     EventsOn('extension:setup:progress', (data) => {
       if (!data || !activeSetup.value.extensionId || data.id !== activeSetup.value.extensionId) return
       if (Array.isArray(data.logs) && data.logs.length > 0) {
@@ -131,7 +131,9 @@ async function refreshExtensionConfig() {
     if (raw && typeof raw === 'string' && raw.trim() !== '') {
       try {
         parsed = JSON.parse(raw)
-      } catch {}
+      } catch (_) {
+        // Ignore JSON parse error
+      }
     }
 
     let userMode = null
@@ -144,7 +146,9 @@ async function refreshExtensionConfig() {
           userRate = u.prompt_compression_rate
         }
       }
-    } catch {}
+    } catch (_) {
+      // Ignore user settings fetch error
+    }
 
     extensionConfig.value = {
       audio_overview: { ...DEFAULT_EXTENSION_CONFIG.audio_overview, ...(parsed.audio_overview || {}) },

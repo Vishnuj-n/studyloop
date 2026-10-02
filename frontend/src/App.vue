@@ -27,7 +27,7 @@ import { initClerk } from './services/clerkAuth'
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
 const { showNotice, showError } = useToast()
-const { setupModalState, closeSetupModal, markSetupCompleted, setExtensionEnabled } = useExtensions()
+const { setupModalState, closeSetupModal } = useExtensions()
 
 const route = useRoute()
 
