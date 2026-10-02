@@ -486,7 +486,6 @@ func (r *Repository) CompleteReviewSession(taskID string) error {
 		}); err != nil {
 			return err
 		}
-		utils.LogReviewSession(taskID, "", "0", "session_completed")
 		return nil
 	})
 }

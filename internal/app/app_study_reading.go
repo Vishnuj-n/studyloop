@@ -27,7 +27,6 @@ func (a *App) activateReadingSessionTask(taskID string) map[string]interface{} {
 			utils.QueueLogger.Info("queue task activation failed", "taskID", taskID, "err", err)
 			return map[string]interface{}{"error": "failed to activate task: " + err.Error()}
 		}
-		utils.QueueLogger.Info("queue task activated", "taskID", taskID)
 		return nil
 	case models.StudyTaskStatusActive:
 		utils.QueueLogger.Debug("idempotent resume: task already active", "taskID", taskID, "status", qTask.Status, "type", qTask.TaskType, "notebookID", qTask.NotebookID, "topicID", qTask.TopicID)

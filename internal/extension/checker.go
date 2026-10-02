@@ -97,7 +97,7 @@ func RunSmokeTest(ctx context.Context, ext *Extension, pythonPath string) error 
 	testCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(testCtx, pythonPath, ext.EntrypointPath(), "--test")
+	cmd := exec.CommandContext(testCtx, pythonPath, ext.Entrypoint(), "--test")
 	cmd.Dir = ext.Dir
 	AttachAuthEnv(cmd)
 	hideConsoleWindow(cmd)
