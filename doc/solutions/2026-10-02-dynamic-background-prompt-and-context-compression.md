@@ -27,7 +27,7 @@ Compression is controlled dynamically via `user_settings.prompt_compression_mode
 ┌──────────────────────────────▼──────────────────────────────┐
 │ 2. Python Sidecar (`extensions/prompt_compressor`)          │
 │    - Uses llmlingua-2-bert-base-multilingual-cased          │
-│    - Restricted to torch.set_num_threads(2) for CPU safety │
+│    - Standard single-process CPU execution                  │
 │    - Registered in internal/extension/tiers.go ("free")    │
 └──────────────────────────────┬──────────────────────────────┘
                                │
@@ -41,7 +41,7 @@ Compression is controlled dynamically via `user_settings.prompt_compression_mode
 │ 4. Downstream Integration & UI                              │
 │    - COALESCE(compressed_text, chunk_text) in prompt builds │
 │    - UI token saving indicator / badge in Reader drawer     │
-└─────────────────────────────────────────────────────────────┘
+└──────────────────────────────┘
 ```
 
 ---
@@ -57,11 +57,9 @@ Empirical performance measured via `scripts/benchmark_prompt_compression.py`:
 
 ---
 
-## Multi-Threaded Concurrency & CPU Safety
+## Process & Pipeline Invariants
 
-When PDF Extraction, Embedding Generation, and Prompt Compression execute concurrently:
-
-1. **CPU Core Protection (`torch.set_num_threads(2)`)**: PyTorch in `compress.py` is bounded to 2 threads. This prevents PyTorch from thrashing all CPU cores while Go worker goroutines process PDF pages and ONNX embeddings.
+1. **Single-Process Execution**: The Python sidecar (`compress.py`) runs as a standard single-process helper via Go's stream runner (`runner.RunStreamWithInput`), matching all other Studyloop extensions without complex thread manipulation.
 2. **Vector Index Precision**: Embeddings are generated 100% from raw `chunk_text`, keeping vector search rankings and retrieval accuracy completely untouched.
 3. **SQLite WAL Concurrency**: SQLite operates in WAL mode with a 5000ms busy handler, gracefully serializing background single-row `UPDATE` operations without UI lockups.
 

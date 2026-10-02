@@ -67,10 +67,10 @@
                 <h3 class="ext-name">{{ ext.name }}</h3>
                 <span class="tier-tag free">FREE</span>
                 <span v-if="isExtensionSettingUp(ext.id)" class="setup-badge running">
-                  ⏳ Step {{ getSetupStep(ext.id) }}/3
+                  <BaseIcon name="loader" size="12" class="spin-icon" /> Step {{ getSetupStep(ext.id) }}/3
                 </span>
                 <span v-else-if="isExtensionSetupError(ext.id)" class="setup-badge error">
-                  ⚠ Failed
+                  <BaseIcon name="alert-triangle" size="12" /> Failed
                 </span>
               </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Reader' }}</span>
@@ -197,10 +197,10 @@
                 <h3 class="ext-name">{{ ext.name }}</h3>
                 <span class="tier-tag pro">EARLY ACCESS</span>
                 <span v-if="isExtensionSettingUp(ext.id)" class="setup-badge running">
-                  ⏳ Step {{ getSetupStep(ext.id) }}/3
+                  <BaseIcon name="loader" size="12" class="spin-icon" /> Step {{ getSetupStep(ext.id) }}/3
                 </span>
                 <span v-else-if="isExtensionSetupError(ext.id)" class="setup-badge error">
-                  ⚠ Failed
+                  <BaseIcon name="alert-triangle" size="12" /> Failed
                 </span>
               </div>
               <span class="version-tag">v{{ ext.version }} &bull; {{ ext.category || 'Advanced' }}</span>
@@ -955,7 +955,7 @@ onMounted(async () => {
 .setup-badge.running {
   background: rgba(59, 130, 246, 0.12);
   color: var(--primary, #3b82f6);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  border: 1px solid var(--outline-variant);
   animation: pulse 2s infinite ease-in-out;
 }
 
@@ -967,13 +967,13 @@ onMounted(async () => {
 .setup-badge.error {
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid var(--outline-variant);
 }
 
 .setup-status-action {
   background: rgba(59, 130, 246, 0.1);
   color: var(--primary, #3b82f6);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid var(--outline-variant);
 }
 
 .setup-status-action:hover {

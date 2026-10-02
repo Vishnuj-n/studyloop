@@ -1397,7 +1397,7 @@ button:disabled {
   border-radius: 999px;
   background: rgba(184, 187, 38, 0.15);
   color: var(--color-success, #b8bb26);
-  border: 1px solid rgba(184, 187, 38, 0.3);
+  border: 1px solid var(--outline-variant);
   cursor: help;
   user-select: none;
 }

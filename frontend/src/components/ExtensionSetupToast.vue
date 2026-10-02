@@ -224,7 +224,7 @@ watch(
 
 .ext-setup-toast.is-dragging {
   cursor: grabbing;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
   transform: scale(1.02);
 }
 
@@ -265,7 +265,7 @@ watch(
 .toast-spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid var(--surface-container);
+  border: 2px solid var(--outline-variant);
   border-top-color: var(--primary, #3b82f6);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
