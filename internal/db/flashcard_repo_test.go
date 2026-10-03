@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"ai-tutor/internal/models"
 
@@ -494,6 +495,12 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	topA := "top-deck-a"
 	topB := "top-deck-b"
 
+	if err := testRepo.CreateProfile(models.StudyProfile{ID: profA, Name: "Profile A", DeadlineAt: time.Now().Unix()}); err != nil {
+		t.Fatalf("CreateProfile A failed: %v", err)
+	}
+	if err := testRepo.CreateProfile(models.StudyProfile{ID: profB, Name: "Profile B", DeadlineAt: time.Now().Unix()}); err != nil {
+		t.Fatalf("CreateProfile B failed: %v", err)
+	}
 	if err := testRepo.EnsureTopic(topA, "Topic A"); err != nil {
 		t.Fatalf("EnsureTopic A failed: %v", err)
 	}
@@ -503,12 +510,14 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	if err := testRepo.CreateNotebook(nbA, "Notebook A", "/tmp/a.pdf", "pdf", topA, "", 10, profA); err != nil {
 		t.Fatalf("CreateNotebook A failed: %v", err)
 	}
+	_ = testRepo.EnsureNotebookTopic(nbA, topA)
 	if err := testRepo.CreateNotebook(nbB, "Notebook B", "/tmp/b.pdf", "pdf", topB, "", 10, profB); err != nil {
 		t.Fatalf("CreateNotebook B failed: %v", err)
 	}
+	_ = testRepo.EnsureNotebookTopic(nbB, topB)
 
-	_ = testRepo.CreateFlashcards(topA, []models.Flashcard{{ID: "card-pa1", TopicID: topA, Prompt: "PA1", Answer: "A1"}}, nil)
-	_ = testRepo.CreateFlashcards(topB, []models.Flashcard{{ID: "card-pb1", TopicID: topB, Prompt: "PB1", Answer: "B1"}}, nil)
+	_ = testRepo.CreateFlashcards(topA, []models.Flashcard{{ID: "card-pa1", TopicID: topA, Prompt: "PA1", Answer: "A1", DueAt: 100}}, map[string]models.FlashcardState{"card-pa1": {StateCode: 1}})
+	_ = testRepo.CreateFlashcards(topB, []models.Flashcard{{ID: "card-pb1", TopicID: topB, Prompt: "PB1", Answer: "B1", DueAt: 100}}, map[string]models.FlashcardState{"card-pb1": {StateCode: 1}})
 
 	overviewA, err := testRepo.GetAllFlashcardsDeckOverview(profA)
 	if err != nil {

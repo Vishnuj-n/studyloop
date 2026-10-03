@@ -676,6 +676,23 @@ type UserSettings struct {
 	LogLevel                string  `json:"log_level"`
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
+	AutoGenerateStudyNotes  bool    `json:"auto_generate_study_notes"`
+}
+
+// TopicStudyNote represents a structured study summary note for one reading session of a topic.
+// StartPage and EndPage identify the session scope. (0, 0) means a whole-chapter / on-demand note.
+type TopicStudyNote struct {
+	ID             string `json:"id"`
+	TopicID        string `json:"topic_id"`
+	TopicTitle     string `json:"topic_title,omitempty"`
+	NotebookID     string `json:"notebook_id"`
+	NotebookTitle  string `json:"notebook_title,omitempty"`
+	StartPage      int    `json:"start_page"`
+	EndPage        int    `json:"end_page"`
+	Content        string `json:"content"`
+	LastReviewedAt int64  `json:"last_reviewed_at"`
+	CreatedAt      string `json:"created_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
 }
 
 type AnalyticsEventSync struct {
