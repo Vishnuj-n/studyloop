@@ -84,13 +84,15 @@ const { toast, hideToast } = useToast()
 
 .app-toast-card {
   position: relative;
-  max-width: 380px;
+  max-width: 400px;
   width: calc(100vw - 48px);
-  padding: 12px 14px;
-  background: var(--surface-container-low, #1e1e24);
+  padding: 13px 15px;
+  background: var(--surface-container, #1e1e24);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.45), 0 0 1px 1px rgba(255, 255, 255, 0.08);
   color: var(--on-surface, #e2e8f0);
   display: flex;
   align-items: flex-start;
@@ -100,13 +102,13 @@ const { toast, hideToast } = useToast()
 }
 
 .app-toast-card.is-notice {
-  background: linear-gradient(135deg, var(--surface-container-low) 0%, rgba(16, 185, 129, 0.08) 100%);
-  border-color: rgba(16, 185, 129, 0.35);
+  background: color-mix(in srgb, #10b981 12%, var(--surface-container, #1e1e24));
+  border-color: rgba(16, 185, 129, 0.5);
 }
 
 .app-toast-card.is-error {
-  background: linear-gradient(135deg, var(--surface-container-low) 0%, rgba(239, 68, 68, 0.08) 100%);
-  border-color: rgba(239, 68, 68, 0.35);
+  background: color-mix(in srgb, #ef4444 12%, var(--surface-container, #1e1e24));
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .app-toast-card:hover {
@@ -197,7 +199,7 @@ const { toast, hideToast } = useToast()
   margin: 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--muted-text, #94a3b8);
+  color: var(--on-surface-variant, var(--on-surface, #e2e8f0));
   word-break: break-word;
 }
 

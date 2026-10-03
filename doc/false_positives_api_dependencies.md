@@ -44,15 +44,35 @@ These functions were falsely marked as unreachable, but are **actively called in
 | `Extension Setup Helpers` (`CheckReadiness`, `SetupExtensionEnv`, `GetEffectiveTier`) | `internal/extension/` | `App.CheckExtensionReadiness`, `App.SetupExtension` | **Active** |
 | `Keyring Store Helpers` (`SaveAPIKey`, `DeleteAPIKey`, `MarkLLMKeyStored`) | `internal/llm/keyring.go`, `internal/db/store.go` | `App.SaveLLMAPIKey`, `App.DeleteLLMAPIKey` | **Active** |
 
+| `BuildTopicGroupsFromChapters` | `internal/notebook/ingestion.go` | `App.UploadNotebook`, `App.ConfirmNotebookSyllabus` | **Active** |
+| `CompressTopicChunks` / `CompressTopicChunksAsync` | `internal/study/compression_service.go` | `App.GetTopicCompressionStats`, `App.GetTopicSectionsContent` | **Active** |
+| `DownloadYouTubeVideo` / `IngestYouTubeVideo` / `GetYouTubeSegmentTimestamps` | `internal/notebook/youtube.go` | `App.UploadYouTubeNotebook` | **Active** |
+| `ExtractSyllabusChaptersFromMarkdown` / `SplitMarkdownIntoChunks` | `internal/notebook/markdown_chunker.go` | `App.UploadNotebook`, `DraftNotebookSyllabus` | **Active** |
+| `InstallZip` / `Uninstall` | `internal/extension/installer.go` | `ExtensionManager` / `App.SetupExtension` | **Active** |
+| `RunSmokeTest` | `internal/extension/checker.go` | `CheckReadiness` / `SetupExtensionEnv` | **Active** |
+| `bookmarkNodesToDraft` / `parseBookmarkNode` / `walkBookmarkNode` / `findPDFCPUExecutable` | `internal/notebook/pdfcpu.go` | `ExtractFullPDFCPUBookmarkNodes`, `runPDFCPUBookmarksExport` | **Active** |
+| `splitDeepPDFMarkdown` / `stripMarkdownHeadings` | `internal/notebook/deep_pdf.go` | `IngestDeepPDFWithProgress` | **Active** |
+| `appendFailedQuestionsSection` / `buildSocraticRemedialPrompt` / `checkAndInsertMilestoneExam` / `insertMilestoneForAttempts` / `resolveRetryTopicAndBounds` | `internal/app/app_study_cards.go` | `App.CompleteMilestoneExam`, `App.CompleteSocraticRescue`, `App.RetryFlashcardGeneration` | **Active** |
+| `clientEndOfDayUnix` / `mapTaskError` / `queueTaskToScheduledTask` | `internal/app/app_study.go` | `App.GetTodayPlan`, `App.ActivateTask` | **Active** |
+| `computeSessionSignature` / `getMachineID` / `getNormalizedMachineID` / `getSessionFilePath` / `resolveClerkPublishableKey` | `internal/app/app_auth.go` | `App.LoginStudent`, `App.RestoreSession`, `App.ClearSession` | **Active** |
+| `envHasLLMAPIKey` / `normalizeLLMTierForApp` / `sameLLMSettingsForUI` | `internal/app/app_settings.go` | `App.GetLLMSettings`, `App.UpdateLLMSettings` | **Active** |
+| `copyPomoFile` / `scanMP3s` / `shuffleStrings` / `linearToLog` / `playFile` / `playChimeAsync` / `emitState` | `internal/app/app_pomodoro.go`, `internal/pomodoro/services/audio/service.go` | `App.Pomodoro*` endpoints and background audio player loop | **Active** |
+
 ---
 
-## 3. Truly Unused / Pending Features & Cleaned Stubs
+## 3. Pending Features, Architectural Gates & Cleaned Functions
 
-1. **Pomodoro Subsystem (`App.Pomodoro*`)**:
-   - Cleaned up 6 empty stub methods from backend and frontend: `PomodoroGetStats`, `PomodoroRecordSessionComplete`, `PomodoroCheckResumeSession`, `PomodoroDeleteProfile`, `PomodoroGetSettings`, `PomodoroSaveSettings`.
+1. **Frontend Bindings (`appApi.js`) and Extension Readiness**:
+   - `checkExtensionReadiness` / `App.CheckExtensionReadiness`: Evaluated for redundancy against `SetupExtension`. While `SetupExtension` provisions virtual environments with `uv` and runs self-tests, `CheckExtensionReadiness` is a read-only fast pre-flight probe (`CheckReadiness` -> `RunSmokeTest --test`) used to verify that an existing Python virtual environment and its dependencies are intact and executable without reinstalling or mutating packages.
+2. **Removed Developer Bypass Helpers**:
+   - `DevUnlockNotebookCertificate` / `devUnlockNotebookCertificate`: Removed from `Repository` (`internal/db/notebook_certificate.go`), `App` (`internal/app/notebook_endpoints.go`), and `frontend/src/services/appApi.js`.
+3. **Pomodoro Subsystem (`App.Pomodoro*`)**:
+   - Cleaned up 6 empty stub methods previously: `PomodoroGetStats`, `PomodoroRecordSessionComplete`, `PomodoroCheckResumeSession`, `PomodoroDeleteProfile`, `PomodoroGetSettings`, `PomodoroSaveSettings`.
    - The functional Timer (`Start`, `Pause`, `Resume`, `Stop`, `GetTimerState`), Audio Engine (`PlayLooping`, `PlayShuffleFolder`, `StopAudio`, `SetVolume`, `PlayChime`, `PickMusicFile`, `PickMusicFolder`), and Settings/Profile Persistence (`LoadProfiles`, `SaveProfile`, `GetProfileByID`) remain intact and active.
-2. **Internal Authorization & Session Endpoints**:
+4. **Internal Authorization & Session Endpoints**:
    - `App.IsProUser` is actively used as an internal backend gate for pro extensions and lo-fi folder shuffling.
-   - `App.GetUserSession` and `App.SetSession` are legacy/test-only helpers.
-3. **Test Fixtures**:
+   - `App.GetUserSession` and `App.SetSession` are legacy/test helpers.
+5. **Test Fixtures**:
    - `SeedDemoDataForTests` in `internal/db/testhelper.go`.
+
+

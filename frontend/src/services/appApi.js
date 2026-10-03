@@ -564,15 +564,6 @@ export function getNotebookCertificateStats(notebookID) {
   }
 }
 
-export function devUnlockNotebookCertificate(notebookID) {
-  try {
-    return appBridge().DevUnlockNotebookCertificate(notebookID)
-  } catch (err) {
-    console.error('Failed dev-unlocking notebook certificate:', err)
-    throw err
-  }
-}
-
 
 
 

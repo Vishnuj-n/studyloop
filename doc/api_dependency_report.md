@@ -32,7 +32,6 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `deleteLLMAPIKey` | `DeleteLLMAPIKey` | 1 | Active |
 | `deleteNotebook` | `DeleteNotebook` | 1 | Active |
 | `deleteProfile` | `DeleteProfile` | 1 | Active |
-| `devUnlockNotebookCertificate` | `DevUnlockNotebookCertificate` | 0 | Unused |
 | `downloadAndApplyUpdate` | `DownloadAndApplyUpdate` | 2 | Active |
 | `draftNotebookSyllabus` | `DraftNotebookSyllabus` | 1 | Active |
 | `generateComprehensiveExam` | `GenerateVivaExam` | 1 | Active |
@@ -147,7 +146,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `DeleteLLMAPIKey` | Yes |
 | `DeleteNotebook` | Yes |
 | `DeleteProfile` | Yes |
-| `DevUnlockNotebookCertificate` | Yes |
 | `DownloadAndApplyUpdate` | Yes |
 | `DraftNotebookSyllabus` | Yes |
 | `GenerateComprehensiveExam` | Yes |
