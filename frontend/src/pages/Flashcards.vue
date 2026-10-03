@@ -1,14 +1,5 @@
 <template>
   <div class="flashcards-page-root">
-    <!-- Toast notification -->
-    <Teleport to="body">
-      <Transition name="toast">
-        <div v-if="toast.show" class="toast-notification" :class="`toast-${toast.type}`">
-          {{ toast.message }}
-        </div>
-      </Transition>
-    </Teleport>
-
     <!-- Deck Manager Modal -->
     <FlashcardDeckManagerModal
       :show="showDeckManager"
@@ -326,7 +317,9 @@ import ErrorMessage from '../components/ErrorMessage.vue'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import FlashcardDeckManagerModal from '../components/FlashcardDeckManagerModal.vue'
 import { playCardRatingTick } from '../utils/audioJuice'
+import { useToast } from '../composables/useToast'
 
+const { showNotice, showError } = useToast()
 const route = useRoute()
 const router = useRouter()
 const showDeckManager = ref(false)
@@ -346,7 +339,6 @@ const anonymousUserID = ref('')
 const reviewTaskID = ref('')
 const sessionRemaining = ref(0)
 const queueMode = computed(() => !!reviewTaskID.value)
-const toast = ref({ show: false, message: '', type: 'info' })
 const showInfoTooltip = ref(false)
 
 const ratings = [
@@ -499,7 +491,7 @@ async function rate(ratingKey) {
       const res = await recordCardReview(reviewTaskID.value, targetCardID, validRating.value)
       if (res?.error) {
         error.value = `Failed to save review: ${res.error}`
-        showToast(res.error, 'error')
+        showError(res.error)
         return
       }
 
@@ -526,13 +518,6 @@ function reset() {
   sessionRemaining.value = 0
 }
 
-function showToast(message, type = 'info') {
-  toast.value = { show: true, message, type }
-  setTimeout(() => {
-    toast.value.show = false
-  }, 2000)
-}
-
 async function suspendCard() {
   const card = currentCard.value
   if (!card || !queueMode.value || isSubmittingReview.value) return
@@ -550,7 +535,7 @@ async function suspendCard() {
       error.value = `Failed to suspend card: ${res.error}`
       return
     }
-    showToast('Card Suspended', 'success')
+    showNotice('Card Suspended')
     await loadQueueSession(reviewTaskID.value)
   } catch (e) {
     error.value = `Failed to suspend card: ${e?.message ?? 'Unknown error'}`
@@ -611,7 +596,7 @@ async function loadQueueSession(taskID, notebookID = '') {
     const activateRes = await activateTask(taskID)
     if (activateRes?.error) {
       if (activateRes.error === 'ErrTaskCompleted') {
-        showToast('This review task is already completed.', 'info')
+        showNotice('This review task is already completed.')
         router.push('/dashboard')
         return
       }
@@ -1098,38 +1083,7 @@ async function loadQueueSession(taskID, notebookID = '') {
   color: var(--on-surface);
 }
 
-/* Toasts & Tooltips */
-.toast-notification {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: white;
-  z-index: 9999;
-  pointer-events: none;
-}
-.toast-success {
-  background: #16a34a;
-}
-.toast-error {
-  background: #dc2626;
-}
-.toast-info {
-  background: var(--primary);
-}
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s ease;
-}
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(20px);
-}
+/* Tooltips */
 
 .info-trigger {
   position: absolute;
