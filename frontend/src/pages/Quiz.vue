@@ -604,6 +604,8 @@ async function generateManualQuiz() {
   }
 }
 
+const scrollToTop = () => document.querySelector('.content-shell')?.scrollTo({ top: 0, behavior: 'smooth' })
+
 async function submitQuiz() {
   if (!allAnswered.value) {
     return
@@ -633,6 +635,7 @@ async function submitQuiz() {
             : 'Review the missed concepts and retry the material.',
       }
       submitted.value = true
+      scrollToTop()
     } catch (err) {
       error.value = err?.message || 'Failed to grade manual quiz.'
     } finally {
@@ -658,6 +661,7 @@ async function submitQuiz() {
       return
     }
     submitted.value = true
+    scrollToTop()
 
     if (result.value?.passed) {
       playCorrectChime()
