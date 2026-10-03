@@ -238,6 +238,12 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	}
 
 	utils.Infof("[COMPRESSION] successfully compressed and persisted %d chunks for topic %s", len(output.Results), topicID)
+
+	// If auto_generate_study_notes is enabled in user_settings, trigger async study note generation
+	if userSettings.AutoGenerateStudyNotes {
+		s.GenerateTopicStudyNoteAsync(ctx, topicID, "", 0, 0)
+	}
+
 	return nil
 }
 

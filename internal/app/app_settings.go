@@ -84,6 +84,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"tutor_style":                s.TutorStyle,
 		"llm_prompt_logging":         s.LLMPromptLogging,
 		"log_level":                  s.LogLevel,
+		"auto_generate_study_notes":  s.AutoGenerateStudyNotes,
 	}
 }
 

@@ -805,5 +805,97 @@ func (a *App) ClaimAchievement(achievementID string) map[string]interface{} {
 	}
 }
 
+// GenerateTopicStudyNote generates or regenerates a structured study note for a topic.
+func (a *App) GenerateTopicStudyNote(topicID, notebookID string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	note, err := a.studyService.GenerateTopicStudyNote(topicID, notebookID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"note":    note,
+	}
+}
+
+// GenerateTopicStudyNoteForRange creates or updates a study note for a topic within a specific page range.
+func (a *App) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPage, endPage int) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	note, err := a.studyService.GenerateTopicStudyNoteForRange(topicID, notebookID, startPage, endPage)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"note":    note,
+	}
+}
+
+// GetTopicStudyNote retrieves the study note for a specific topic ID.
+func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	note, err := a.studyService.GetTopicStudyNote(topicID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"note":    note,
+	}
+}
+
+// UpdateTopicStudyNote updates the markdown content of a topic study note.
+func (a *App) UpdateTopicStudyNote(topicID, content string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	if err := a.studyService.UpdateTopicStudyNote(topicID, content); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	note, _ := a.studyService.GetTopicStudyNote(topicID)
+	return map[string]interface{}{
+		"success": true,
+		"note":    note,
+	}
+}
+
+// GetNotesByNotebook retrieves all study notes for topics in a notebook.
+func (a *App) GetNotesByNotebook(notebookID string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	notes, err := a.studyService.GetNotesByNotebook(notebookID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if notes == nil {
+		notes = []models.TopicStudyNote{}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"notes":   notes,
+	}
+}
+
+// MarkTopicReviewed marks a study note as reviewed.
+func (a *App) MarkTopicReviewed(topicID string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	if err := a.studyService.MarkTopicReviewed(topicID); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+	}
+}
+
+
 
 

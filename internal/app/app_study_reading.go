@@ -303,6 +303,17 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		return fail(err.Error())
 	}
 
+	// 6.5. Trigger async session study note generation for this reading range if enabled
+	if task.TopicID != "" && a.studyService != nil {
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
+			reqCtx := a.ctx
+			if reqCtx == nil {
+				reqCtx = context.Background()
+			}
+			a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+		}
+	}
+
 	resp := map[string]interface{}{
 		"ok":           true,
 		"quiz_task_id": transitionRes.NextTaskID,
