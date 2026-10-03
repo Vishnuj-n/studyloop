@@ -6,7 +6,7 @@ import argparse
 from path_utils import validate_path
 
 # Path definitions
-DEFAULT_API_JS = "frontend/src/services/appApi.js"
+DEFAULT_SERVICES_DIR = "frontend/src/services"
 DEFAULT_FRONTEND_DIR = "frontend/src"
 DEFAULT_GO_DIR = "internal"
 
@@ -25,22 +25,20 @@ GO_METHOD = re.compile(r"func\s*\(\s*\w+\s+\*?([a-zA-Z0-9_]+)\s*\)\s*([a-zA-Z0-9
 GO_FUNC = re.compile(r"func\s+([a-zA-Z0-9_]+)\s*\(")
 
 
-def parse_app_api(filepath):
+def parse_service_file(filepath):
     """
-    Parses appApi.js and returns a mapping:
-    js_func_name -> wails_backend_method_name
+    Parses a JS service file and returns a mapping:
+    js_func_name -> wails_backend_method_name (or None)
     """
     exports = {}
     current_export = None
     
     if not os.path.exists(filepath):
-        print(f"Error: API file not found at {filepath}", file=sys.stderr)
         return exports
 
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
         
-    # We split by lines to process block scopes simply, or use a regex-based parser
     lines = content.splitlines()
     for line in lines:
         exp_match = JS_EXPORT_FUNC.search(line)
@@ -56,17 +54,44 @@ def parse_app_api(filepath):
                 
     return exports
 
-def find_js_usages(frontend_dir, api_js_path, js_functions):
+def parse_all_api_files(path):
     """
-    Scans the frontend directory to see which exported JS functions are actually called.
+    Parses either a single API file or all JS files in a services directory.
+    Returns:
+      exports: js_func_name -> wails_backend_method_name
+      api_file_paths: list of absolute paths parsed
+    """
+    exports = {}
+    api_file_paths = []
+    
+    if os.path.isfile(path):
+        api_file_paths.append(os.path.abspath(path))
+        exports.update(parse_service_file(path))
+    elif os.path.isdir(path):
+        for root, _, files in os.walk(path):
+            for file in sorted(files):
+                if file.endswith(".js") and not EXCLUDE_FRONTEND_TEST.search(file):
+                    full_p = os.path.join(root, file)
+                    api_file_paths.append(os.path.abspath(full_p))
+                    exports.update(parse_service_file(full_p))
+    else:
+        print(f"Error: API path not found at {path}", file=sys.stderr)
+        
+    return exports, api_file_paths
+
+def find_js_usages(frontend_dir, api_file_paths, js_functions):
+    """
+    Scans the frontend directory to see which exported JS functions are actually called
+    outside of the API service definition files themselves.
     """
     usages = {func: 0 for func in js_functions}
+    api_paths_set = {os.path.abspath(p) for p in api_file_paths}
     
     for root, _, files in os.walk(frontend_dir):
         for file in files:
             filepath = os.path.join(root, file)
-            # Skip the api file itself and tests
-            if os.path.abspath(filepath) == os.path.abspath(api_js_path):
+            # Skip the api definition files and tests
+            if os.path.abspath(filepath) in api_paths_set:
                 continue
             if EXCLUDE_FRONTEND_TEST.search(file):
                 continue
@@ -216,7 +241,7 @@ def build_go_call_graph(go_dir, all_go_funcs, project_root):
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze API and backend call graphs to find redundant code.")
-    parser.add_argument("--api", default=DEFAULT_API_JS, help="Path to appApi.js")
+    parser.add_argument("--api", default=DEFAULT_SERVICES_DIR, help="Path to frontend services directory or API file")
     parser.add_argument("--frontend", default=DEFAULT_FRONTEND_DIR, help="Path to frontend source directory")
     parser.add_argument("--go", default=DEFAULT_GO_DIR, help="Path to Go internal directory")
     parser.add_argument("--output", help="Output path for the report (Markdown)")
@@ -226,17 +251,17 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     
-    api_js_path = validate_path(os.path.join(project_root, args.api), project_root)
+    api_path = validate_path(os.path.join(project_root, args.api), project_root)
     frontend_dir = validate_path(os.path.join(project_root, args.frontend), project_root)
     go_dir = validate_path(os.path.join(project_root, args.go), project_root)
     if args.output:
         validate_path(os.path.join(project_root, args.output), project_root)
     
-    print("Step 1: Parsing appApi.js...")
-    api_mappings = parse_app_api(api_js_path)
+    print("Step 1: Parsing frontend API services...")
+    api_mappings, api_file_paths = parse_all_api_files(api_path)
     
     print("Step 2: Checking JS usages in frontend...")
-    js_usages = find_js_usages(frontend_dir, api_js_path, api_mappings.keys())
+    js_usages = find_js_usages(frontend_dir, api_file_paths, api_mappings.keys())
     
     print("Step 3: Parsing Go definitions...")
     app_methods, other_go_funcs = parse_go_definitions(go_dir, project_root)
@@ -307,9 +332,9 @@ def main():
     lines.append("# API & Function Dependency Report")
     lines.append("This report lists unused API endpoints, dead Go backend code, and reachability stats.\n")
     
-    # Section 1: Frontend appApi.js usage
-    lines.append("## 1. Frontend API (`appApi.js`) Usages")
-    lines.append("Lists functions defined in `appApi.js` and their usage count in the frontend.")
+    # Section 1: Frontend API usage
+    lines.append("## 1. Frontend API (`services/*.js`) Usages")
+    lines.append("Lists functions defined in frontend service bridge files and their usage count in the frontend.")
     lines.append("| JS Function | Calls Wails Method | Usage Count | Status |")
     lines.append("| --- | --- | --- | --- |")
     
@@ -319,13 +344,14 @@ def main():
         status = "Active" if count > 0 else "Unused"
         if count == 0:
             unused_js.append(js_f)
-        lines.append(f"| `{js_f}` | `{wails_m}` | {count} | {status} |")
+        wails_display = f"`{wails_m}`" if wails_m else "-"
+        lines.append(f"| `{js_f}` | {wails_display} | {count} | {status} |")
     lines.append("")
     
     # Section 2: Wails Go App Methods (Exported Only)
     lines.append("<!-- DO NOT EDIT: Auto-generated from Go App struct inspection -->")
     lines.append("## 2. Go Wails `App` API Endpoints")
-    lines.append("Lists exported API endpoints defined on `App` in the backend and whether they are invoked by `appApi.js` (excluding standard Wails lifecycle methods).")
+    lines.append("Lists exported API endpoints defined on `App` in the backend and whether they are invoked by frontend services (excluding standard Wails lifecycle methods).")
     lines.append("| Wails Method | Reachable from Frontend or main.go |")
     lines.append("| --- | --- |")
     

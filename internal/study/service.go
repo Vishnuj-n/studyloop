@@ -25,6 +25,7 @@ type Config struct {
 	FastLLMProvider  LLMProvider
 	HeavyLLMProvider LLMProvider
 	RetrievalEngine  *retrieval.Engine
+	NotesDir         string
 }
 
 // StudyService owns all study-mode generation and scoring logic.
@@ -33,6 +34,7 @@ type StudyService struct {
 	fastLLMProvider      LLMProvider
 	heavyLLMProvider     LLMProvider
 	retrievalEngine      *retrieval.Engine
+	notesDir             string
 	audioCacheMu         sync.RWMutex
 	audioScriptCache     map[string][]string
 	rateLimitMu          sync.RWMutex
@@ -51,6 +53,7 @@ func NewStudyService(cfg Config) *StudyService {
 		fastLLMProvider:  cfg.FastLLMProvider,
 		heavyLLMProvider: cfg.HeavyLLMProvider,
 		retrievalEngine:  cfg.RetrievalEngine,
+		notesDir:         cfg.NotesDir,
 		audioScriptCache: make(map[string][]string),
 		inFlightCompress: make(map[string]bool),
 	}

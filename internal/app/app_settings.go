@@ -415,11 +415,13 @@ func (a *App) reloadLLMProviders() error {
 	a.fastLLMProvider = fastProvider
 	a.heavyLLMProvider = heavyProvider
 	engine := a.retrievalEngine
+	notesDir, _ := appRuntime.ResolveNotesDir()
 	a.studyService = study.NewStudyService(study.Config{
 		Repo:             repo,
 		FastLLMProvider:  fastProvider,
 		HeavyLLMProvider: heavyProvider,
 		RetrievalEngine:  engine,
+		NotesDir:         notesDir,
 	})
 	a.aiMutex.Unlock()
 	return nil

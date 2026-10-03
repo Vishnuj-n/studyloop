@@ -33,11 +33,37 @@ Structure:
 - **Operational Takeaway**: 1 concluding rule of thumb, heuristic, or high-yield synthesis.
 `
 
+// NotesBaseDir returns the base directory where markdown notes are stored on disk for this service instance.
+func (s *StudyService) NotesBaseDir() string {
+	if s != nil && strings.TrimSpace(s.notesDir) != "" {
+		return s.notesDir
+	}
+	return NotesBaseDir()
+}
+
 // NotesBaseDir returns the base directory where markdown notes are stored on disk.
 func NotesBaseDir() string {
 	if custom := strings.TrimSpace(os.Getenv("STUDYLOOP_NOTES_DIR")); custom != "" {
 		return custom
 	}
+	// Dev: keep data in the repository for convenience.
+	if os.Getenv("APP_ENV") == "dev" {
+		projectRoot, err := os.Getwd()
+		if err == nil && projectRoot != "" {
+			return filepath.Join(projectRoot, "dev_data", "notes")
+		}
+		return filepath.Join("dev_data", "notes")
+	}
+
+	// Prod/default: use a stable per-user directory matching app data location.
+	if cfgDir, err := os.UserConfigDir(); err == nil && cfgDir != "" {
+		return filepath.Join(cfgDir, "Studyloop", "notes")
+	} else if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		return filepath.Join(cacheDir, "Studyloop", "notes")
+	} else if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+		return filepath.Join(homeDir, ".Studyloop", "notes")
+	}
+
 	return filepath.Join("dev_data", "notes")
 }
 
@@ -185,7 +211,7 @@ func (s *StudyService) GetTopicNoteFolder(topicID, notebookID string) (folderPat
 	_, nbTitle, _, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
 	cleanNb := SanitizePathSegment(nbTitle)
 	cleanTopic := SanitizePathSegment(tTitle)
-	folderPath = filepath.Join(NotesBaseDir(), cleanNb, cleanTopic)
+	folderPath = filepath.Join(s.NotesBaseDir(), cleanNb, cleanTopic)
 	assetsPath = filepath.Join(folderPath, "assets")
 	return folderPath, assetsPath
 }
@@ -608,7 +634,7 @@ func (s *StudyService) UpdateTopicStudyNote(topicID string, startPage, endPage i
 // GetNotesByNotebook scans markdown files on disk for all topics in a notebook (or all notebooks).
 func (s *StudyService) GetNotesByNotebook(notebookID string) ([]models.TopicStudyNote, error) {
 	notebookID = strings.TrimSpace(notebookID)
-	baseDir := NotesBaseDir()
+	baseDir := s.NotesBaseDir()
 
 	var searchDir string
 	if notebookID != "" && s.repo != nil {
@@ -709,7 +735,7 @@ func (s *StudyService) MarkTopicReviewed(topicID string, startPage, endPage int)
 
 // OpenNotesFolder opens the local directory containing markdown study notes in the OS file explorer.
 func (s *StudyService) OpenNotesFolder(notebookID, topicID string) (string, error) {
-	folderPath := NotesBaseDir()
+	folderPath := s.NotesBaseDir()
 	nbID, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
 	_ = nbID
 	_ = tID

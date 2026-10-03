@@ -1,35 +1,27 @@
 <template>
   <div class="notes-page">
-    <div class="notes-layout">
-      <!-- Left Sidebar: Topic / Notebook Navigator -->
-      <aside class="notes-sidebar">
+    <div class="notes-layout" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+      <!-- Left Sidebar: Collapsible Book & Chapter Tree Navigator -->
+      <aside v-show="!isSidebarCollapsed" class="notes-sidebar">
         <div class="notes-sidebar-header">
           <div class="sidebar-title-row">
-            <h2 class="sidebar-title">Study Notes</h2>
-            <span class="notes-count-badge">{{ totalNotesCount }} Notes</span>
+            <div class="title-with-badge">
+              <h2 class="sidebar-title">Study Notes</h2>
+              <span class="notes-count-badge" :title="`${totalNotesCount} notes generated across all textbooks`">
+                {{ totalNotesCount }} Notes
+              </span>
+            </div>
+            <button
+              type="button"
+              class="sidebar-toggle-btn"
+              title="Collapse sidebar (Zen reading mode)"
+              aria-label="Collapse sidebar"
+              @click="isSidebarCollapsed = true"
+            >
+              <BaseIcon name="chevron-left" size="14" />
+            </button>
           </div>
           <p class="sidebar-subtitle">Knowledge base & topic summaries</p>
-
-          <!-- Notebook Selector -->
-          <div class="notebook-filter-group">
-            <label class="filter-label" for="notes-notebook-select">Notebook</label>
-            <select
-              id="notes-notebook-select"
-              v-model="selectedNotebookID"
-              class="notes-select"
-              :disabled="loading"
-              @change="onNotebookChange"
-            >
-              <option value="">All Notebooks</option>
-              <option
-                v-for="nb in notebooks"
-                :key="nb.id"
-                :value="nb.id"
-              >
-                {{ nb.title }}
-              </option>
-            </select>
-          </div>
 
           <!-- Search Box -->
           <div class="shared-search-wrapper">
@@ -37,7 +29,7 @@
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Search topics or notes..."
+              placeholder="Search books, chapters, or notes..."
             />
             <button
               v-if="searchQuery"
@@ -51,49 +43,87 @@
           </div>
         </div>
 
-        <!-- Topic List -->
+        <!-- Book & Chapter Tree List -->
         <div class="topics-list-container">
           <div v-if="loading" class="loading-topics">
-            <span>Loading notes...</span>
+            <div class="spinner-sm"></div>
+            <span>Loading notes library...</span>
           </div>
 
-          <div v-else-if="filteredTopics.length === 0" class="empty-topics">
-            <p v-if="searchQuery">No topics match "{{ searchQuery }}"</p>
-            <p v-else>No topics found for this notebook.</p>
+          <div v-else-if="treeNotebooks.length === 0" class="empty-topics">
+            <p v-if="searchQuery">No books or chapters match "{{ searchQuery }}"</p>
+            <p v-else>No textbooks uploaded yet. Upload textbooks in the Library to start generating notes.</p>
           </div>
 
-          <div v-else class="topics-scroll-list">
-            <button
-              v-for="item in filteredTopics"
-              :key="item.topic_id"
-              type="button"
-              class="topic-list-item"
-              :class="{ active: selectedTopicID === item.topic_id }"
-              @click="selectTopic(item)"
+          <div v-else class="book-tree-list">
+            <div
+              v-for="nb in treeNotebooks"
+              :key="nb.notebook_id"
+              class="book-tree-node"
             >
-              <div class="topic-item-header">
-                <span class="topic-item-title">{{ item.title }}</span>
+              <!-- Book / Notebook Header Item -->
+              <div
+                class="book-node-header"
+                :class="{ expanded: isNotebookExpanded(nb.notebook_id) }"
+                @click="toggleNotebook(nb.notebook_id)"
+              >
+                <button
+                  type="button"
+                  class="chevron-btn"
+                  aria-label="Toggle book expansion"
+                  @click.stop="toggleNotebook(nb.notebook_id)"
+                >
+                  <BaseIcon
+                    :name="isNotebookExpanded(nb.notebook_id) ? 'chevron-down' : 'chevron-right'"
+                    size="13"
+                  />
+                </button>
+                <BaseIcon name="book" size="14" class="book-node-icon" />
+                <span class="book-node-title" :title="nb.title">{{ nb.title }}</span>
                 <span
-                  v-if="hasNote(item.topic_id)"
-                  class="status-dot dot-has-note"
-                  title="Study Note Available"
-                ></span>
-                <span
-                  v-else
-                  class="status-dot dot-missing-note"
-                  title="No Study Note Yet"
-                ></span>
-              </div>
-              <div class="topic-item-meta">
-                <span v-if="item.notebook_title" class="topic-nb-tag">{{ item.notebook_title }}</span>
-                <span v-if="item.last_reviewed_text" class="topic-reviewed-tag">
-                  Reviewed {{ item.last_reviewed_text }}
-                </span>
-                <span v-else-if="hasNote(item.topic_id)" class="topic-not-reviewed-tag">
-                  Not reviewed
+                  class="book-progress-pill"
+                  :class="{ 'all-ready': nb.notesCount > 0 && nb.notesCount === nb.totalTopics }"
+                  :title="`${nb.notesCount} of ${nb.totalTopics} chapters have study notes`"
+                >
+                  {{ nb.notesCount }}/{{ nb.totalTopics }}
                 </span>
               </div>
-            </button>
+
+              <!-- Chapter Children List -->
+              <div
+                v-if="isNotebookExpanded(nb.notebook_id)"
+                class="chapter-sublist"
+              >
+                <button
+                  v-for="topic in nb.topics"
+                  :key="topic.topic_id"
+                  type="button"
+                  class="chapter-tree-item"
+                  :class="{ active: selectedTopicID === topic.topic_id }"
+                  @click="selectTopic(topic)"
+                >
+                  <div class="chapter-item-header">
+                    <span
+                      class="status-dot"
+                      :class="topic.has_note ? 'dot-has-note' : 'dot-missing-note'"
+                      :title="topic.has_note ? 'Study Note Ready' : 'No Study Note Yet'"
+                    ></span>
+                    <span class="chapter-item-title" :title="topic.title">{{ topic.title }}</span>
+                  </div>
+                  <div class="chapter-item-meta">
+                    <span v-if="topic.start_page && topic.end_page" class="chapter-page-tag">
+                      p. {{ topic.start_page }}–{{ topic.end_page }}
+                    </span>
+                    <span v-if="topic.last_reviewed_text" class="chapter-reviewed-tag">
+                      Reviewed {{ topic.last_reviewed_text }}
+                    </span>
+                    <span v-else-if="topic.has_note" class="chapter-ready-tag">
+                      Note ready
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -102,9 +132,18 @@
       <main class="notes-content-pane">
         <template v-if="!selectedTopicID">
           <div class="notes-empty-selection">
+            <button
+              v-if="isSidebarCollapsed"
+              type="button"
+              class="restore-sidebar-btn"
+              @click="isSidebarCollapsed = false"
+            >
+              <BaseIcon name="layers" size="14" />
+              <span>Show Book Chapters</span>
+            </button>
             <BaseIcon name="book" size="48" class="empty-icon" />
             <h3>Select a Chapter</h3>
-            <p>Choose a chapter from the sidebar to view, edit, or generate per-session study notes.</p>
+            <p>Choose a chapter from your textbooks to view, edit, or generate per-session study notes.</p>
           </div>
         </template>
 
@@ -113,8 +152,21 @@
           <header class="note-view-header">
             <div class="note-title-group">
               <div class="note-meta-badges">
-                <span v-if="activeTopic?.notebook_title" class="chip-tag">
-                  {{ activeTopic.notebook_title }}
+                <!-- Sidebar Expand Button when Collapsed -->
+                <button
+                  v-if="isSidebarCollapsed"
+                  type="button"
+                  class="restore-sidebar-pill-btn"
+                  title="Expand sidebar"
+                  @click="isSidebarCollapsed = false"
+                >
+                  <BaseIcon name="sidebar" size="13" />
+                  <span>Chapters</span>
+                </button>
+
+                <span v-if="activeTopic?.notebook_title" class="chip-tag book-chip">
+                  <BaseIcon name="book" size="12" />
+                  <span>{{ activeTopic.notebook_title }}</span>
                 </span>
                 <span class="chip-tag info">
                   <BaseIcon name="layers" size="12" />
@@ -149,7 +201,7 @@
           <div class="notes-obsidian-tip">
             <BaseIcon name="info" size="14" class="tip-icon" />
             <span>
-              <strong>Obsidian & Logseq Compatible:</strong> Notes are synced to <code>dev_data/notes/</code>. Use <em>Open Folder</em> to add images (<code>![alt](./assets/pic.png)</code>) or edit notes in external markdown tools.
+              <strong>Obsidian & Logseq Compatible:</strong> Notes are synced to local markdown files. Use <em>Open Folder</em> to add images (<code>![alt](./assets/pic.png)</code>) or edit notes in external markdown tools.
             </span>
           </div>
 
@@ -408,6 +460,8 @@ const notebookTree = ref([])
 const selectedNotebookID = ref('')
 const selectedTopicID = ref('')
 const searchQuery = ref('')
+const expandedNotebooks = ref(new Set())
+const isSidebarCollapsed = ref(false)
 
 const notesMap = ref({}) // topicID -> TopicStudyNote
 const sessionSlots = ref([])
@@ -421,6 +475,19 @@ const markingSlotKey = ref(null)
 
 function getSlotKey(slot) {
   return `${slot.start_page}_${slot.end_page}`
+}
+
+function toggleNotebook(notebookID) {
+  if (expandedNotebooks.value.has(notebookID)) {
+    expandedNotebooks.value.delete(notebookID)
+  } else {
+    expandedNotebooks.value.add(notebookID)
+  }
+}
+
+function isNotebookExpanded(notebookID) {
+  if (searchQuery.value.trim().length > 0) return true
+  return expandedNotebooks.value.has(notebookID)
 }
 
 // Flat topic list with notebook title & note status
@@ -454,25 +521,69 @@ const allTopics = computed(() => {
   return list
 })
 
-const filteredTopics = computed(() => {
-  let list = allTopics.value
+// Grouped Tree for Sidebar: Books with nested chapters and progress counts
+const treeNotebooks = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim()
+  const result = []
 
-  if (selectedNotebookID.value) {
-    list = list.filter((t) => t.notebook_id === selectedNotebookID.value)
+  for (const nb of notebookTree.value) {
+    const nbTitle = nb.title || 'Untitled Notebook'
+    const nbID = nb.notebook_id || nb.id
+    const rawTopics = Array.isArray(nb.topics) ? nb.topics : []
+
+    let totalChaptersWithNotes = 0
+    const processedTopics = []
+
+    for (const t of rawTopics) {
+      const tid = t.topic_id || t.id
+      const note = notesMap.value[tid]
+      const hasNoteVal = Boolean(note && note.content && note.content.trim().length > 0)
+      if (hasNoteVal) {
+        totalChaptersWithNotes++
+      }
+
+      let reviewedText = ''
+      if (note && note.last_reviewed_at > 0) {
+        reviewedText = formatTimeAgo(note.last_reviewed_at)
+      }
+
+      const topicObj = {
+        topic_id: tid,
+        title: t.title || tid,
+        notebook_id: nbID,
+        notebook_title: nbTitle,
+        start_page: t.start_page || 0,
+        end_page: t.end_page || 0,
+        last_reviewed_at: note?.last_reviewed_at || 0,
+        last_reviewed_text: reviewedText,
+        has_note: hasNoteVal,
+      }
+
+      if (query) {
+        const titleMatch = topicObj.title.toLowerCase().includes(query)
+        const nbMatch = nbTitle.toLowerCase().includes(query)
+        const noteContent = note?.content || ''
+        const contentMatch = noteContent.toLowerCase().includes(query)
+        if (titleMatch || nbMatch || contentMatch) {
+          processedTopics.push(topicObj)
+        }
+      } else {
+        processedTopics.push(topicObj)
+      }
+    }
+
+    if (!query || processedTopics.length > 0 || nbTitle.toLowerCase().includes(query)) {
+      result.push({
+        notebook_id: nbID,
+        title: nbTitle,
+        totalTopics: rawTopics.length,
+        notesCount: totalChaptersWithNotes,
+        topics: processedTopics,
+      })
+    }
   }
 
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase().trim()
-    list = list.filter((t) => {
-      const titleMatch = t.title.toLowerCase().includes(q)
-      const nbMatch = t.notebook_title.toLowerCase().includes(q)
-      const noteContent = notesMap.value[t.topic_id]?.content || ''
-      const contentMatch = noteContent.toLowerCase().includes(q)
-      return titleMatch || nbMatch || contentMatch
-    })
-  }
-
-  return list
+  return result
 })
 
 const totalNotesCount = computed(() => {
@@ -487,11 +598,6 @@ const activeTopic = computed(() => {
     notebook_id: selectedNotebookID.value,
   }
 })
-
-function hasNote(topicID) {
-  const note = notesMap.value[topicID]
-  return Boolean(note && note.content && note.content.trim().length > 0)
-}
 
 function formatTimeAgo(unixSec) {
   if (!unixSec || unixSec <= 0) return 'Never'
@@ -522,6 +628,14 @@ async function loadInitialData() {
     notebooks.value = Array.isArray(nbList) ? nbList : []
     notebookTree.value = Array.isArray(tree) ? tree : []
 
+    // Expand all notebooks by default for quick scanning
+    const defaultExpanded = new Set()
+    for (const nb of notebookTree.value) {
+      const nid = nb.notebook_id || nb.id
+      if (nid) defaultExpanded.add(nid)
+    }
+    expandedNotebooks.value = defaultExpanded
+
     const nMap = {}
     if (notesRes && Array.isArray(notesRes.notes)) {
       for (const n of notesRes.notes) {
@@ -537,6 +651,7 @@ async function loadInitialData() {
     const queryNotebook = route.query.notebookId || route.query.notebook_id
     if (queryNotebook) {
       selectedNotebookID.value = queryNotebook
+      expandedNotebooks.value.add(queryNotebook)
     }
     if (queryTopic) {
       const found = allTopics.value.find((t) => t.topic_id === queryTopic)
@@ -557,18 +672,13 @@ async function loadInitialData() {
   }
 }
 
-async function onNotebookChange() {
-  if (selectedTopicID.value) {
-    const exists = filteredTopics.value.some((t) => t.topic_id === selectedTopicID.value)
-    if (!exists && filteredTopics.value.length > 0) {
-      selectTopic(filteredTopics.value[0])
-    }
-  }
-}
-
 async function selectTopic(topic) {
   if (!topic || !topic.topic_id) return
   selectedTopicID.value = topic.topic_id
+  if (topic.notebook_id) {
+    selectedNotebookID.value = topic.notebook_id
+    expandedNotebooks.value.add(topic.notebook_id)
+  }
   cancelEditSlot()
   errorMsg.value = ''
   successMsg.value = ''
@@ -782,25 +892,27 @@ onMounted(() => {
   flex: 1;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 /* Left Sidebar */
 .notes-sidebar {
-  width: 320px;
+  width: 330px;
   min-width: 300px;
-  max-width: 360px;
+  max-width: 380px;
   background: var(--surface-container-low);
   border-right: 1px solid var(--outline-variant);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.2s ease, opacity 0.2s ease;
 }
 
 .notes-sidebar-header {
-  padding: 20px 16px 12px;
+  padding: 16px 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   border-bottom: 1px solid var(--outline-variant);
   background: var(--surface-container-low);
 }
@@ -811,9 +923,15 @@ onMounted(() => {
   justify-content: space-between;
 }
 
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sidebar-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -821,53 +939,43 @@ onMounted(() => {
 .notes-count-badge {
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--primary) 15%, transparent);
   color: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
+.sidebar-toggle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted-text);
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border-color: var(--outline-variant);
+}
+
 .sidebar-subtitle {
-  margin: -6px 0 0;
+  margin: -4px 0 2px;
   font-size: 12px;
   color: var(--muted-text);
 }
 
-.notebook-filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.filter-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted-text);
-}
-
-.notes-select {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  border-radius: 8px;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container);
-  color: var(--on-surface);
-  outline: none;
-}
-
-.notes-select:focus {
-  border-color: var(--primary);
-}
-
-/* Topics list */
+/* Tree list container */
 .topics-list-container {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 10px 8px;
 }
 
 .loading-topics,
@@ -876,20 +984,110 @@ onMounted(() => {
   text-align: center;
   font-size: 13px;
   color: var(--muted-text);
-}
-
-.topics-scroll-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 
-.topic-list-item {
+.spinner-sm {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--outline-variant);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.book-tree-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 8px;
+}
+
+.book-tree-node {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Book Node Header */
+.book-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
   border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  background: color-mix(in srgb, var(--surface-container) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 50%, transparent);
+  transition: all 0.15s ease;
+}
+
+.book-node-header:hover {
+  background: var(--surface-container);
+  border-color: var(--outline-variant);
+}
+
+.chevron-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.book-node-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.book-node-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.book-progress-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-container-high);
+  color: var(--muted-text);
+  border: 1px solid var(--outline-variant);
+}
+
+.book-progress-pill.all-ready {
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  color: #10b981;
+  border-color: color-mix(in srgb, #10b981 30%, transparent);
+}
+
+/* Chapter Sublist */
+.chapter-sublist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-left: 14px;
+  border-left: 2px solid color-mix(in srgb, var(--outline-variant) 40%, transparent);
+  margin-left: 12px;
+}
+
+.chapter-tree-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
+  border-radius: 6px;
   background: transparent;
   border: 1px solid transparent;
   text-align: left;
@@ -898,55 +1096,77 @@ onMounted(() => {
   width: 100%;
 }
 
-.topic-list-item:hover {
+.chapter-tree-item:hover {
   background: var(--surface-container);
   border-color: var(--outline-variant);
 }
 
-.topic-list-item.active {
+.chapter-tree-item.active {
   background: var(--surface-container-high);
   border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.topic-item-header {
+.chapter-item-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
 }
 
-.topic-item-title {
-  font-size: 13px;
-  font-weight: 600;
+.chapter-item-title {
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--on-surface);
-  line-height: 1.3;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.topic-item-meta {
+.chapter-tree-item.active .chapter-item-title {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.chapter-item-meta {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
+  padding-left: 14px;
 }
 
-.topic-nb-tag {
+.chapter-page-tag {
   color: var(--muted-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 130px;
+  font-size: 10.5px;
 }
 
-.topic-reviewed-tag {
+.chapter-reviewed-tag {
   color: #10b981;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 10.5px;
 }
 
-.topic-not-reviewed-tag {
+.chapter-ready-tag {
   color: var(--muted-text);
+  font-size: 10.5px;
+}
+
+/* Status dots */
+.status-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-has-note {
+  background: #10b981;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
+}
+
+.dot-missing-note {
+  background: var(--outline-variant);
 }
 
 /* Right Content Pane */
@@ -988,9 +1208,30 @@ onMounted(() => {
   line-height: 1.5;
 }
 
+.restore-sidebar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: all 0.15s ease;
+}
+
+.restore-sidebar-btn:hover {
+  background: var(--surface-container-high);
+  border-color: var(--primary);
+}
+
 /* Topic Header */
 .note-view-header {
-  padding: 24px 32px 16px;
+  padding: 20px 32px 16px;
   border-bottom: 1px solid var(--outline-variant);
   display: flex;
   align-items: flex-start;
@@ -1001,60 +1242,89 @@ onMounted(() => {
 .note-title-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   max-width: 800px;
 }
 
 .note-meta-badges {
   display: flex;
   align-items: center;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
+}
+
+.restore-sidebar-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.restore-sidebar-pill-btn:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.chip-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+  border: 1px solid var(--outline-variant);
+}
+
+.chip-tag.book-chip {
+  background: color-mix(in srgb, var(--surface-container-high) 80%, transparent);
+  color: var(--on-surface);
+}
+
+.chip-tag.info {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .note-topic-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  margin: 0;
   color: var(--on-surface);
+  line-height: 1.25;
 }
 
 .note-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.open-folder-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-/* Obsidian / Logseq Tip */
+/* Interop tip banner */
 .notes-obsidian-tip {
-  margin: 14px 32px 0;
-  padding: 10px 16px;
+  margin: 16px 32px 0;
+  padding: 10px 14px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface-container));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  font-size: 12px;
-  line-height: 1.4;
   color: var(--on-surface-variant);
+  font-size: 12.5px;
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.notes-obsidian-tip code {
-  font-family: monospace;
-  background: var(--surface-container-high);
-  padding: 2px 5px;
-  border-radius: 4px;
-  font-size: 11px;
+  line-height: 1.4;
 }
 
 .tip-icon {
@@ -1062,61 +1332,75 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* Banners */
-.note-banner {
-  margin: 12px 32px 0;
+.notes-obsidian-tip code {
+  background: var(--surface-container-high);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11.5px;
 }
 
-/* Session Cards PPT-Style Feed */
+/* Banner notifications */
+.note-banner {
+  margin: 12px 32px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.error-banner {
+  background: color-mix(in srgb, #ef4444 15%, var(--surface));
+  color: #f87171;
+  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+}
+
+.success-banner {
+  background: color-mix(in srgb, #10b981 15%, var(--surface));
+  color: #34d399;
+  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+}
+
+/* Session Cards Feed */
 .session-cards-feed {
-  padding: 24px 32px 48px;
+  padding: 20px 32px 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 860px;
+  max-width: 960px;
 }
 
-.slots-loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40px;
-  color: var(--muted-text);
-  gap: 12px;
-}
-
-/* Individual Session Card (Presentation / Deck Style) */
 .session-note-card {
   background: var(--surface-container-low);
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .session-note-card:hover {
-  border-color: color-mix(in srgb, var(--primary) 35%, var(--outline-variant));
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--outline-variant));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Card Header */
 .session-card-header {
-  padding: 14px 20px;
+  padding: 12px 18px;
   background: var(--surface-container);
   border-bottom: 1px solid var(--outline-variant);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .session-card-badge-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .session-index-pill {
@@ -1126,8 +1410,15 @@ onMounted(() => {
   letter-spacing: 0.04em;
   padding: 3px 8px;
   border-radius: 6px;
-  background: var(--surface-container-highest);
+  background: var(--surface-container-high);
   color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+}
+
+.session-index-pill.new-badge {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .session-range-pill {
@@ -1136,11 +1427,7 @@ onMounted(() => {
   gap: 5px;
   font-size: 12px;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  color: var(--muted-text);
 }
 
 .session-review-pill {
@@ -1148,24 +1435,24 @@ onMounted(() => {
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   color: #10b981;
 }
 
 .session-card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .icon-btn-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 8px;
   background: var(--surface-container-high);
   color: var(--on-surface);
   border: 1px solid var(--outline-variant);
@@ -1175,13 +1462,13 @@ onMounted(() => {
 
 .icon-btn-pill:hover:not(:disabled) {
   background: var(--surface-container-highest);
-  border-color: var(--outline);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 .icon-btn-pill.highlight {
   background: color-mix(in srgb, var(--primary) 15%, transparent);
   color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .icon-btn-pill.highlight:hover:not(:disabled) {
@@ -1191,80 +1478,78 @@ onMounted(() => {
 .icon-btn-pill.success {
   background: color-mix(in srgb, #10b981 12%, transparent);
   color: #10b981;
-  border-color: color-mix(in srgb, #10b981 30%, transparent);
+  border-color: color-mix(in srgb, #10b981 25%, transparent);
 }
 
-.icon-btn-pill:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.icon-btn-pill.success:hover:not(:disabled) {
+  background: color-mix(in srgb, #10b981 20%, transparent);
 }
 
 /* Card Body */
 .session-card-body {
-  padding: 20px 24px;
+  padding: 18px 20px;
 }
 
 .slot-markdown-content {
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.slot-markdown-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid var(--outline-variant);
-  margin: 12px 0;
-  display: block;
-}
-
-.slot-markdown-content :deep(video) {
-  max-width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--outline-variant);
-  margin: 12px 0;
-}
-
-.generating-slot-state {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  color: var(--muted-text);
-  font-size: 13px;
+  line-height: 1.6;
+  font-size: 13.5px;
+  color: var(--on-surface);
 }
 
 .slot-editor-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  width: 100%;
 }
 
 .slot-textarea {
   width: 100%;
-  font-size: 14px;
-  line-height: 1.5;
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  font-family: inherit;
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.slot-textarea:focus {
+  border-color: var(--primary);
+}
+
+.page-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.page-input {
+  width: 60px;
+  padding: 3px 6px;
+  border-radius: 6px;
   border: 1px solid var(--outline-variant);
   background: var(--surface-container);
   color: var(--on-surface);
-  resize: vertical;
+  font-size: 12px;
+  outline: none;
 }
 
 .slot-empty-state {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
 }
 
 .empty-hint {
-  margin: 0;
   font-size: 13px;
   color: var(--muted-text);
+  margin: 0;
 }
 
 .slot-empty-buttons {
@@ -1273,53 +1558,155 @@ onMounted(() => {
   gap: 8px;
 }
 
-.add-note-btn {
-  display: inline-flex;
+.slots-loading-state,
+.generating-slot-state {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.add-note-new-card {
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--outline-variant));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-}
-
-.new-badge {
-  background: color-mix(in srgb, var(--primary) 20%, transparent);
-  color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
-}
-
-.page-range-inputs {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 12px;
   color: var(--muted-text);
-  margin-left: 6px;
+  font-size: 13px;
 }
 
-.page-input {
-  width: 58px;
-  padding: 3px 6px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--outline-variant);
+.empty-box-card {
+  padding: 36px 20px;
+  border: 1px dashed var(--outline-variant);
+  border-radius: 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-box-icon {
+  color: var(--outline-variant);
+  margin-bottom: 12px;
+}
+
+.empty-box-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.empty-box-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-text);
+}
+
+/* Spinner */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--outline-variant);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Buttons */
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary, #ffffff);
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   background: var(--surface-container);
   color: var(--on-surface);
-  text-align: center;
-  outline: none;
+  border: 1px solid var(--outline-variant);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.page-input:focus {
-  border-color: var(--primary);
+.secondary-btn:hover:not(:disabled) {
+  background: var(--surface-container-high);
+}
+
+.secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-sm {
-  padding: 5px 12px;
+  padding: 5px 10px;
   font-size: 12px;
+}
+
+/* Shared Search Input */
+.shared-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.shared-search-wrapper input {
+  width: 100%;
+  padding: 7px 28px 7px 28px;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  font-size: 12.5px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.shared-search-wrapper input:focus {
+  border-color: var(--primary);
+}
+
+.shared-search-wrapper .search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--muted-text);
+  pointer-events: none;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
 }
 </style>

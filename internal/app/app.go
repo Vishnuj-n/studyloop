@@ -806,12 +806,14 @@ func (a *App) reloadRetrievalEngine() error {
 		}
 	}
 
+	notesDir, _ := runtime.ResolveNotesDir()
 	// Recreate study service to bind the new engine; update both under lock.
 	newSvc := study.NewStudyService(study.Config{
 		Repo:             repo,
 		FastLLMProvider:  a.fastLLMProvider,
 		HeavyLLMProvider: a.heavyLLMProvider,
 		RetrievalEngine:  engine,
+		NotesDir:         notesDir,
 	})
 	a.aiMutex.Lock()
 	a.retrievalEngine = engine
