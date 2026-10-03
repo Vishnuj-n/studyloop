@@ -4,10 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 )
 
 // alterStatements defines all column additions needed to migrate existing databases forward.
@@ -128,148 +125,12 @@ func RunMigrations(tx *sql.Tx) error {
 		}
 	}
 
-	// 3. Purge legacy topic_study_notes SQLite table and export any existing notes to dev_data/notes
-	if err := purgeAndExportLegacyStudyNotes(tx); err != nil {
-		return err
-	}
-
-	// 4. Seed default rows and backfill settings
+	// 3. Seed default rows and backfill settings
 	if err := seedDefaults(tx); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// purgeAndExportLegacyStudyNotes exports any legacy topic_study_notes SQLite rows
-// to clean Markdown files with YAML frontmatter in dev_data/notes/, then drops the table.
-func purgeAndExportLegacyStudyNotes(tx *sql.Tx) error {
-	var count int
-	err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='topic_study_notes'`).Scan(&count)
-	if err != nil || count == 0 {
-		return nil
-	}
-
-	// Check if content column exists
-	var hasContent bool
-	rows, err := tx.Query(`PRAGMA table_info(topic_study_notes)`)
-	if err == nil {
-		for rows.Next() {
-			var cid int
-			var name, ctype string
-			var notnull, pk int
-			var dfltValue interface{}
-			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err == nil {
-				if strings.ToLower(name) == "content" {
-					hasContent = true
-				}
-			}
-		}
-		_ = rows.Close()
-	}
-
-	if hasContent {
-		qRows, qErr := tx.Query(`
-			SELECT n.id, n.topic_id, COALESCE(t.title, ''), n.notebook_id, COALESCE(nb.title, ''),
-			       COALESCE(n.start_page, 0), COALESCE(n.end_page, 0), COALESCE(n.content, ''),
-			       COALESCE(n.last_reviewed_at, 0)
-			FROM topic_study_notes n
-			LEFT JOIN topics t ON t.id = n.topic_id
-			LEFT JOIN notebooks nb ON nb.id = n.notebook_id
-		`)
-		if qErr == nil {
-			defer func() { _ = qRows.Close() }()
-			for qRows.Next() {
-				var id, topicID, topicTitle, notebookID, notebookTitle, content string
-				var startPage, endPage int
-				var lastReviewedAt int64
-				if scanErr := qRows.Scan(&id, &topicID, &topicTitle, &notebookID, &notebookTitle, &startPage, &endPage, &content, &lastReviewedAt); scanErr == nil {
-					if strings.TrimSpace(content) != "" {
-						exportNoteToDisk(id, notebookID, notebookTitle, topicID, topicTitle, startPage, endPage, content, lastReviewedAt)
-					}
-				}
-			}
-		}
-	}
-
-	// Drop indices and table
-	_, _ = tx.Exec(`DROP INDEX IF EXISTS idx_topic_study_notes_topic`)
-	_, _ = tx.Exec(`DROP INDEX IF EXISTS idx_topic_study_notes_topic_range`)
-	_, _ = tx.Exec(`DROP INDEX IF EXISTS idx_topic_study_notes_notebook`)
-	if _, err := tx.Exec(`DROP TABLE IF EXISTS topic_study_notes`); err != nil {
-		return fmt.Errorf("failed to drop legacy topic_study_notes table: %w", err)
-	}
-	return nil
-}
-
-func sanitizeSegment(name string) string {
-	invalid := []string{"\\", "/", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
-	result := name
-	for _, char := range invalid {
-		result = strings.ReplaceAll(result, char, "_")
-	}
-	result = strings.TrimSpace(result)
-	result = strings.Trim(result, ".")
-	if result == "" {
-		return "Untitled"
-	}
-	return result
-}
-
-func exportNoteToDisk(id, nbID, nbTitle, topicID, topicTitle string, startPage, endPage int, content string, lastReviewedAt int64) {
-	if nbTitle == "" {
-		nbTitle = "General"
-	}
-	if topicTitle == "" {
-		topicTitle = topicID
-	}
-	cleanNb := sanitizeSegment(nbTitle)
-	cleanTopic := sanitizeSegment(topicTitle)
-
-	notesBase := filepath.Join("dev_data", "notes")
-	folder := filepath.Join(notesBase, cleanNb, cleanTopic)
-	assetsFolder := filepath.Join(folder, "assets")
-
-	_ = os.MkdirAll(folder, 0755)
-	_ = os.MkdirAll(assetsFolder, 0755)
-
-	var fileName string
-	if startPage == 0 && endPage == 0 {
-		fileName = "chapter_summary.md"
-	} else {
-		fileName = fmt.Sprintf("pages_%d_%d.md", startPage, endPage)
-	}
-
-	filePath := filepath.Join(folder, fileName)
-	if _, err := os.Stat(filePath); err == nil {
-		// File already exists on disk, don't overwrite
-		return
-	}
-
-	nowStr := time.Now().UTC().Format(time.RFC3339)
-	var sb strings.Builder
-	sb.WriteString("---\n")
-	if id != "" {
-		fmt.Fprintf(&sb, "id: %q\n", id)
-	}
-	if nbID != "" {
-		fmt.Fprintf(&sb, "notebook_id: %q\n", nbID)
-	}
-	fmt.Fprintf(&sb, "notebook_title: %q\n", nbTitle)
-	if topicID != "" {
-		fmt.Fprintf(&sb, "topic_id: %q\n", topicID)
-	}
-	fmt.Fprintf(&sb, "topic_title: %q\n", topicTitle)
-	fmt.Fprintf(&sb, "start_page: %d\n", startPage)
-	fmt.Fprintf(&sb, "end_page: %d\n", endPage)
-	fmt.Fprintf(&sb, "last_reviewed_at: %d\n", lastReviewedAt)
-	fmt.Fprintf(&sb, "created_at: %q\n", nowStr)
-	fmt.Fprintf(&sb, "updated_at: %q\n", nowStr)
-	sb.WriteString("---\n\n")
-	sb.WriteString(strings.TrimSpace(content))
-	sb.WriteString("\n")
-
-	_ = os.WriteFile(filePath, []byte(sb.String()), 0644)
 }
 
 func dedupeNotebookChunks(tx *sql.Tx) error {

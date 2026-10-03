@@ -53,6 +53,7 @@ func (r *Repository) GetTopic(topicID string) (*models.TopicSummary, error) {
 	if err != nil {
 		return nil, err
 	}
+	t.Title = utils.CleanTopicTitle(t.Title)
 	return &t, nil
 }
 

@@ -23,13 +23,14 @@ Generate a structured, concise study note designed for rapid conceptual review a
 Requirements:
 - Length & Density: Scale length dynamically to match the density of the source material. Be as concise as possible while ensuring zero loss of core concepts. No padding, filler, or fluff.
 - Tone: Rigorous, clear, conceptual, direct.
-- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta explanations, or conversational text.
+- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
 - Formatting: Clean markdown with bold technical terms and structured bullet points.
-- Structure:
-  - **Core Concept & Motivation**: 1–2 sentences defining the central idea and why it matters.
-  - **Key Mechanisms & Principles**: High-yield bullet points breaking down essential mechanics, relationships, and distinctions. Include relevant formulas, notation, or algorithmic steps if present.
-  - **Critical Nuances / Edge Cases**: Key trade-offs, boundary conditions, or common pitfalls (if applicable to the content).
-  - **Operational Takeaway**: 1 concluding rule of thumb, heuristic, or high-yield synthesis.
+
+Structure:
+- **Core Concept & Motivation**: 1–2 sentences defining the central idea and why it matters.
+- **Key Mechanisms & Principles**: High-yield bullet points breaking down essential mechanics, relationships, and distinctions. Include relevant formulas, notation, or algorithmic steps if present.
+- **Critical Nuances / Edge Cases**: Key trade-offs, boundary conditions, or common pitfalls (if applicable to the content).
+- **Operational Takeaway**: 1 concluding rule of thumb, heuristic, or high-yield synthesis.
 `
 
 // NotesBaseDir returns the base directory where markdown notes are stored on disk.
@@ -86,7 +87,7 @@ func ParseMarkdownNote(raw string, fallback models.TopicStudyNote) models.TopicS
 				case "topic_id":
 					note.TopicID = val
 				case "topic_title":
-					note.TopicTitle = val
+					note.TopicTitle = utils.CleanTopicTitle(val)
 				case "notebook_id":
 					note.NotebookID = val
 				case "notebook_title":
@@ -134,7 +135,7 @@ func FormatMarkdownNote(note models.TopicStudyNote) string {
 		fmt.Fprintf(&sb, "topic_id: %q\n", note.TopicID)
 	}
 	if note.TopicTitle != "" {
-		fmt.Fprintf(&sb, "topic_title: %q\n", note.TopicTitle)
+		fmt.Fprintf(&sb, "topic_title: %q\n", utils.CleanTopicTitle(note.TopicTitle))
 	}
 	fmt.Fprintf(&sb, "start_page: %d\n", note.StartPage)
 	fmt.Fprintf(&sb, "end_page: %d\n", note.EndPage)
@@ -156,12 +157,12 @@ func FormatMarkdownNote(note models.TopicStudyNote) string {
 func (s *StudyService) resolveNotebookAndTopicTitles(topicID, notebookID string) (nbID, nbTitle, tID, tTitle string) {
 	tID = strings.TrimSpace(topicID)
 	nbID = strings.TrimSpace(notebookID)
-	tTitle = tID
+	tTitle = utils.CleanTopicTitle(tID)
 	nbTitle = "General"
 
 	if tID != "" && s.repo != nil {
 		if t, err := s.repo.GetTopic(tID); err == nil && t != nil && t.Title != "" {
-			tTitle = t.Title
+			tTitle = utils.CleanTopicTitle(t.Title)
 		}
 		if nbID == "" {
 			if nid, err := s.repo.GetNotebookIDForTopic(tID); err == nil && nid != "" {
@@ -441,6 +442,8 @@ func (s *StudyService) GetTopicStudyNoteForRange(topicID string, startPage, endP
 	}
 	if note.TopicTitle == "" {
 		note.TopicTitle = tTitle
+	} else {
+		note.TopicTitle = utils.CleanTopicTitle(note.TopicTitle)
 	}
 	if note.NotebookID == "" {
 		note.NotebookID = nbID
@@ -508,6 +511,8 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 			}
 			if note.TopicTitle == "" {
 				note.TopicTitle = tTitle
+			} else {
+				note.TopicTitle = utils.CleanTopicTitle(note.TopicTitle)
 			}
 			if note.NotebookID == "" {
 				note.NotebookID = nbID
@@ -644,6 +649,9 @@ func (s *StudyService) GetNotesByNotebook(notebookID string) ([]models.TopicStud
 		}
 		note := ParseMarkdownNote(string(data), fallback)
 		note.FilePath = path
+		if note.TopicTitle != "" {
+			note.TopicTitle = utils.CleanTopicTitle(note.TopicTitle)
+		}
 		if strings.TrimSpace(note.Content) != "" {
 			notes = append(notes, note)
 		}
