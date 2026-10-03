@@ -1,47 +1,58 @@
 ## ✨ Features
 
-- **Mastery Certificates**  
-  - Earn a downloadable certificate when you complete a notebook (100% progress).  
-  - View the certificate in a new modal, with customizable recipient name and a polished design that respects your chosen theme.  
-  - Developers can instantly unlock certificates from the Settings → Developer panel for testing.
+- **Flashcards**
+  - Added a **Copy** button to quickly duplicate flashcard content.  
+  - Improved accessibility for screen‑reader users.
 
-- **Export & Copy Certificates**  
-  - Export certificates as images or copy them directly to the clipboard with a single click.  
-  - Visual feedback lets you know when the copy succeeds or if an error occurs.
+- **Dynamic Prompt Compression**
+  - Background compression service (LLMLingua‑2) automatically trims oversized document chunks, reducing token usage and speeding up AI responses.  
+  - New settings let you control compression mode and target token retention.  
+  - UI now shows compression statistics and token‑saving badges in the Reader view.
 
-- **Viva Exam Generation**  
-  - After finishing a quiz, you can now generate a written “viva” exam that re‑uses the same questions and concepts, providing a seamless follow‑up assessment.
+- **Extension Setup Experience**
+  - Real‑time **ExtensionSetupToast** and **ExtensionSetupModal** give clear feedback while extensions install.  
+  - Progress badges and status indicators keep you informed of each installation step.
 
-- **Inline Flashcard Editing**  
-  - Edit flashcard questions and answers directly inside the deck manager modal. Changes are saved instantly, making it easy to keep your study material up‑to‑date.
+- **Toast System Revamp**
+  - Legacy toast notifications replaced with a modern **useToast** composable.  
+  - Updated styling includes a subtle backdrop filter for better readability.
 
-- **Predicted Review Intervals**  
-  - While reviewing flashcards, each rating button now shows the estimated next review time (e.g., “1 d”, “3 mo”), helping you understand the impact of your rating choices.
+- **Smooth Quiz Interaction**
+  - After submitting a quiz or scoring an answer, the page now smoothly scrolls to the top, keeping the flow natural.
+
+- **Authentication Enhancements**
+  - More reliable session handling and synchronization across the app, reducing unexpected log‑outs.  
+  - Improved session verification and observability for a smoother login experience.
+
+- **Compression Badge Component**
+  - A new UI badge lets you toggle detailed information about active compression settings.
 
 ## 🚀 Improvements
 
-- **Flashcard UI Refresh**  
-  - Updated layout and styling for a cleaner, more readable flashcard experience.  
-  - Added a top bar with file‑type indicators and quick‑action buttons on notebook cards.
+- **Search Performance**
+  - Lexical search now caches TF vectors and reduces lock contention, delivering faster results.
 
-- **Certificate UI & Accessibility**  
-  - Refactored colors to use theme tokens and improved contrast for better accessibility.  
-  - Added error handling and alerts for clipboard copy failures.  
-  - Simplified navigation between quiz and assessment pages, preserving the `flashcardsPending` flag only when needed.
+- **UI Consistency**
+  - Refreshed styling for setup badges, buttons, and toast components for a cleaner look across the app.
 
-- **Consistent Styling**  
-  - Unified border styles using the `outline-variant` token across the app.  
-  - Introduced a design‑rule check to prevent low‑contrast pastel text.
+- **Environment Configuration**
+  - Build script now respects the `ClerkPublishableKey` environment variable, simplifying deployments.
 
-- **Developer Experience**  
-  - Replaced native confirmation dialogs with a custom dialog component for a consistent look and feel.
+- **Logging**
+  - Dynamic log‑level configuration and persistence make troubleshooting easier without affecting the UI.
+
+- **Study Queue Queries**
+  - Refactored queries improve readability and maintainability, indirectly enhancing reliability.
 
 ## 🐛 Bug Fixes & Issue Resolutions
 
-- Fixed clipboard copy errors on the certificate modal, now showing a clear alert and auto‑reset timer when copying fails.  
-- Resolved navigation glitches that could cause redundant flashcard generation when moving from quizzes to written assessments.  
-- Corrected quiz task ID handling to ensure proper redirection to the examiner view.  
-
----
+- Fixed a crash when the notebook drafting toast was shown in an unexpected syllabus state.  
+- Resolved a panic that could occur during quiz transaction rollbacks.  
+- Ensured proper closure of resources in various backend functions, preventing leaks.  
+- Added error handling for attempts to delete files outside the designated upload directory.  
+- Corrected the privacy policy URL in Settings.  
+- Improved log‑level restoration to avoid hidden errors.  
+- Prevented session rollback panics and enhanced error handling in logging.  
+- Updated markdown rendering to normalize LaTeX delimiters for better KaTeX compatibility.  
 
 *Thanks for using Studyloop!*
