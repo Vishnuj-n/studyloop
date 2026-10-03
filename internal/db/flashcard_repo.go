@@ -708,8 +708,8 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 	var args []interface{}
 	profileID = strings.TrimSpace(profileID)
 	if profileID != "" {
-		query += ` WHERE (n.profile_id = ? OR (ntl.notebook_id IS NULL AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = ''))) `
-		args = append(args, profileID, profileID)
+		query += ` WHERE n.profile_id = ? `
+		args = append(args, profileID)
 	}
 	query += ` ORDER BY notebook_title ASC, topic_title ASC, c.due_at ASC, c.created_at ASC `
 

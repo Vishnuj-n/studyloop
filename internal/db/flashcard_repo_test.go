@@ -485,5 +485,51 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	if c1Updated == nil || c1Updated.Prompt != "Updated Question?" || c1Updated.Answer != "Updated Answer." {
 		t.Fatalf("expected updated prompt and answer, got prompt=%q, answer=%q", c1Updated.Prompt, c1Updated.Answer)
 	}
+
+	// 6. Test Profile Scoping
+	profA := "prof-deck-a"
+	profB := "prof-deck-b"
+	nbA := "nb-deck-a"
+	nbB := "nb-deck-b"
+	topA := "top-deck-a"
+	topB := "top-deck-b"
+
+	if err := testRepo.EnsureTopic(topA, "Topic A"); err != nil {
+		t.Fatalf("EnsureTopic A failed: %v", err)
+	}
+	if err := testRepo.EnsureTopic(topB, "Topic B"); err != nil {
+		t.Fatalf("EnsureTopic B failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(nbA, "Notebook A", "/tmp/a.pdf", "pdf", topA, "", 10, profA); err != nil {
+		t.Fatalf("CreateNotebook A failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(nbB, "Notebook B", "/tmp/b.pdf", "pdf", topB, "", 10, profB); err != nil {
+		t.Fatalf("CreateNotebook B failed: %v", err)
+	}
+
+	_ = testRepo.CreateFlashcards(topA, []models.Flashcard{{ID: "card-pa1", TopicID: topA, Prompt: "PA1", Answer: "A1"}}, nil)
+	_ = testRepo.CreateFlashcards(topB, []models.Flashcard{{ID: "card-pb1", TopicID: topB, Prompt: "PB1", Answer: "B1"}}, nil)
+
+	overviewA, err := testRepo.GetAllFlashcardsDeckOverview(profA)
+	if err != nil {
+		t.Fatalf("GetAllFlashcardsDeckOverview profA failed: %v", err)
+	}
+	if overviewA.Metrics.TotalCards != 1 {
+		t.Errorf("expected exactly 1 card for profA, got %d", overviewA.Metrics.TotalCards)
+	}
+	if len(overviewA.Notebooks) != 1 || overviewA.Notebooks[0].NotebookID != nbA {
+		t.Errorf("expected only notebook A in profA overview, got %+v", overviewA.Notebooks)
+	}
+
+	overviewB, err := testRepo.GetAllFlashcardsDeckOverview(profB)
+	if err != nil {
+		t.Fatalf("GetAllFlashcardsDeckOverview profB failed: %v", err)
+	}
+	if overviewB.Metrics.TotalCards != 1 {
+		t.Errorf("expected exactly 1 card for profB, got %d", overviewB.Metrics.TotalCards)
+	}
+	if len(overviewB.Notebooks) != 1 || overviewB.Notebooks[0].NotebookID != nbB {
+		t.Errorf("expected only notebook B in profB overview, got %+v", overviewB.Notebooks)
+	}
 }
 
