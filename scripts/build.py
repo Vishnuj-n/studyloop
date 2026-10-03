@@ -40,6 +40,7 @@ PRODUCTION_SYNC_URL = os.environ.get("CLOUD_SYNC_URL", _ENV.get("CLOUD_SYNC_URL"
 PRODUCTION_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", _ENV.get("SUPABASE_ANON_KEY", ""))
 PRODUCTION_RESEARCH_URL = os.environ.get("RESEARCH_ANALYTICS_URL", _ENV.get("RESEARCH_ANALYTICS_URL", ""))
 PRODUCTION_RESEARCH_ANON_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY_LOG", os.environ.get("RESEARCH_ANALYTICS_ANON_KEY", _ENV.get("SUPABASE_PUBLISHABLE_KEY_LOG", _ENV.get("RESEARCH_ANALYTICS_ANON_KEY", ""))))
+CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY", os.environ.get("VITE_CLERK_PUBLISHABLE_KEY", _ENV.get("CLERK_PUBLISHABLE_KEY", _ENV.get("VITE_CLERK_PUBLISHABLE_KEY", ""))))
 
 # Extension Authorization Key (Injected into Go binary and PyArmor-obfuscated Python extensions)
 EXTENSION_SECRET_KEY = os.environ.get("EXTENSION_SECRET_KEY", "").strip()
@@ -81,6 +82,7 @@ def main():
         f"-X ai-tutor/internal/study.DefaultProductionAnonKey={PRODUCTION_ANON_KEY} "
         f"-X ai-tutor/internal/study.DefaultResearchAnalyticsURL={PRODUCTION_RESEARCH_URL} "
         f"-X ai-tutor/internal/study.DefaultResearchAnalyticsAnonKey={PRODUCTION_RESEARCH_ANON_KEY} "
+        f"-X ai-tutor/internal/app.ClerkPublishableKey={CLERK_PUBLISHABLE_KEY} "
         f"-X ai-tutor/internal/extension.ExtensionAuthKey={EXTENSION_SECRET_KEY}"
     )
 

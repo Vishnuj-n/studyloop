@@ -175,3 +175,22 @@ func TestAuthConfirm_StateNonceEnforcement(t *testing.T) {
 	}
 	activeAuthServer.mu.Unlock()
 }
+
+func TestResolveClerkPublishableKey(t *testing.T) {
+	// Case 1: Value set via ldflags
+	origFlag := ClerkPublishableKey
+	defer func() { ClerkPublishableKey = origFlag }()
+
+	ClerkPublishableKey = "pk_live_test_ldflags"
+	if k := resolveClerkPublishableKey(); k != "pk_live_test_ldflags" {
+		t.Fatalf("expected pk_live_test_ldflags from ldflags, got %q", k)
+	}
+
+	// Case 2: Value set via environment variable
+	ClerkPublishableKey = ""
+	t.Setenv("VITE_CLERK_PUBLISHABLE_KEY", "pk_test_env_vite")
+	if k := resolveClerkPublishableKey(); k != "pk_test_env_vite" {
+		t.Fatalf("expected pk_test_env_vite from env, got %q", k)
+	}
+}
+

@@ -130,28 +130,6 @@
 
     <div class="toast-stack">
       <transition name="toast-fade">
-        <div v-if="showFallbackToast" class="fallback-toast">
-          <div class="fallback-toast-inner">
-            <BaseIcon name="sparkles" size="18" />
-            <div>
-              <span class="fallback-toast-title">Notice</span>
-              <p>{{ fallbackToastMessage }}</p>
-            </div>
-          </div>
-        </div>
-      </transition>
-      <transition name="toast-fade">
-        <div v-if="showActionToast" class="action-toast">
-          <div class="action-toast-inner">
-            <BaseIcon name="zap" size="18" />
-            <div>
-              <span class="fallback-toast-title">Notice</span>
-              <p>{{ actionToastMessage }}</p>
-            </div>
-          </div>
-        </div>
-      </transition>
-      <transition name="toast-fade">
         <div v-if="isDraftingSyllabus" class="drafting-toast">
           <div class="drafting-toast-inner">
             <div class="spinner"></div>
@@ -195,10 +173,11 @@ import NotebookUpload from '../components/NotebookUpload.vue'
 import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import NotebookCertificateModal from '../components/NotebookCertificateModal.vue'
-import BaseIcon from '../components/BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
+import { useToast } from '../composables/useToast'
 
 const { confirm: confirmDialog, alert: alertDialog } = useDialog()
+const { showNotice, showError } = useToast()
 const { isPro } = useClerkAuth()
 const route = useRoute()
 
@@ -228,12 +207,6 @@ const draftFallbackUsed = ref(false)
 const originalDraftChapters = ref([])
 const draftError = ref('')
 const isConfirmingDraft = ref(false)
-const showFallbackToast = ref(false)
-const fallbackToastMessage = ref('')
-const showActionToast = ref(false)
-const actionToastMessage = ref('')
-const fallbackToastTimer = ref(null)
-const actionToastTimer = ref(null)
 const isDraftingSyllabus = ref(false)
 const draftingNotebookTitle = ref('')
 const isAICleaning = ref(false)
@@ -295,13 +268,13 @@ async function setStudyStatus(notebookID, status) {
   try {
     const res = await updateNotebookStudyStatus(notebookID, status)
     if (res?.error) {
-      showToast(`Failed to update study status: ${res.error}`)
+      showError(`Failed to update study status: ${res.error}`)
       return
     }
     await loadNotebooks()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    showToast(`Failed to update study status: ${msg}`)
+    showError(`Failed to update study status: ${msg}`)
     uploadError.value = `Failed to update study status: ${msg}`
   }
 }
@@ -346,23 +319,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   EventsOff('ingestion-progress')
-  clearFallbackToastTimer()
-  clearActionToastTimer()
 })
-
-function clearFallbackToastTimer() {
-  if (fallbackToastTimer.value) {
-    clearTimeout(fallbackToastTimer.value)
-    fallbackToastTimer.value = null
-  }
-}
-
-function clearActionToastTimer() {
-  if (actionToastTimer.value) {
-    clearTimeout(actionToastTimer.value)
-    actionToastTimer.value = null
-  }
-}
 
 const extractionProgressMap = ref({})
 
@@ -402,9 +359,9 @@ function handleIngestionProgress(payload) {
   const terminalStates = new Set(['failed', 'chunked', 'indexed', 'draft_ready'])
   if (typeof payload.status === 'string' && terminalStates.has(payload.status)) {
     if (payload.status === 'draft_ready') {
-      showToast('Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
+      showNotice('Deep Structured extraction complete! Click the book card or banner to review your chapter syllabus.')
     } else if (payload.status === 'failed') {
-      showToast(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
+      showError(`Extraction error: ${payload.message || 'Deep extraction failed'}`)
     }
     // Clear stale progress so the spinner doesn't linger on the card
     if (payload.notebook_id) {
@@ -496,7 +453,7 @@ async function handleAnkiUpload({ filePath, targetNotebookID, preserveHistory })
     }
     uploadProgress.value = 100
     await Promise.all([loadNotebooks(), loadTopics()])
-    showToast(`Imported ${res.cards_count || 0} flashcards from Anki`)
+    showNotice(`Imported ${res.cards_count || 0} flashcards from Anki`)
   } catch (err) {
     uploadError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -520,7 +477,7 @@ async function handleDeepStructuredUpload() {
     }
     if (result?.duplicate) {
       await loadNotebooks()
-      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      showNotice(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
       await alertDialog({
         title: 'Document Already Exists',
         message: `This textbook is already in your library as '${result?.file_name || 'book'}'.`,
@@ -554,15 +511,11 @@ async function handleUpgradeToDeepPDF(notebookID) {
     }
 
     await loadNotebooks()
-    actionToastMessage.value = `Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`
-    showActionToast.value = true
-    setTimeout(() => {
-      showActionToast.value = false
-    }, 5000)
+    showNotice(`Deep extraction started for '${bookTitle}'. Please keep StudyLoop open — you'll get an alert when the chapter draft is ready.`)
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     uploadError.value = `Upgrade failed: ${msg}`
-    showToast(`Upgrade failed: ${msg}`)
+    showError(`Upgrade failed: ${msg}`)
   }
 }
 
@@ -604,7 +557,7 @@ async function uploadFile(file) {
 
     if (result?.duplicate) {
       uploadProgress.value = 100
-      showToast(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
+      showNotice(`Document already uploaded as "${result?.file_name || 'this textbook'}"`)
       successMessage.value = `Found existing notebook: ${result?.file_name || ''}`
       if (result?.id) {
         await openSyllabusDraft(result.id, result?.file_name || '')
@@ -692,13 +645,7 @@ async function openSyllabusDraft(notebookID, notebookTitle = '') {
 
     draftFallbackUsed.value = Boolean(draft?.fallback_used)
     if (draft?.fallback_used) {
-      fallbackToastMessage.value = 'No embedded bookmarks found in PDF. Created default chapter draft.'
-      showFallbackToast.value = true
-      clearFallbackToastTimer()
-      fallbackToastTimer.value = setTimeout(() => {
-        showFallbackToast.value = false
-        fallbackToastTimer.value = null
-      }, 5000)
+      showNotice('No embedded bookmarks found in PDF. Created default chapter draft.')
     }
 
     originalDraftTitle.value = draftNotebookTitle.value
@@ -759,9 +706,9 @@ async function aiCleanupChapters() {
     // on the next Confirm click, silently skipping re-ingestion entirely.
 
     if (result?.fallback_used) {
-      showToast('AI unavailable — using bookmark chapters')
+      showNotice('AI unavailable — using bookmark chapters')
     } else {
-      showToast('AI cleaned up chapter list')
+      showNotice('AI cleaned up chapter list')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -783,16 +730,6 @@ function chaptersEqual(a, b) {
       chapter.end_page === other.end_page
     )
   })
-}
-
-function showToast(message) {
-  actionToastMessage.value = message
-  showActionToast.value = true
-  clearActionToastTimer()
-  actionToastTimer.value = setTimeout(() => {
-    showActionToast.value = false
-    actionToastTimer.value = null
-  }, 5000)
 }
 
 async function handleConfirmSyllabus({ title, priority, chapters }) {
@@ -876,20 +813,20 @@ async function confirmSyllabusDraft() {
       await loadNotebooks()
       closeSyllabusModal()
       if (ragEnabled.value) {
-        showToast('Notebook ready! Semantic indexing running in background...')
+        showNotice('Notebook ready! Semantic indexing running in background...')
       } else {
-        showToast('Notebook ready!')
+        showNotice('Notebook ready!')
       }
     } else {
       // Chapters didn't change, just update notebook title/priority if needed
       await loadNotebooks()
       closeSyllabusModal()
-      showToast('Notebook metadata updated')
+      showNotice('Notebook metadata updated')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     draftError.value = `Failed to confirm syllabus: ${message}`
-    showToast(`Failed to confirm syllabus: ${message}`)
+    showError(`Failed to confirm syllabus: ${message}`)
   } finally {
     isConfirmingDraft.value = false
   }
@@ -1015,43 +952,8 @@ async function updatePriority(notebookId, priority) {
   pointer-events: auto;
 }
 
-.action-toast,
-.fallback-toast,
 .drafting-toast {
   position: relative;
-}
-
-.action-toast-inner {
-  max-width: 320px;
-  padding: 14px 16px;
-  background: #1f8b4c;
-  color: #fff;
-  border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--outline-variant);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.fallback-toast-inner {
-  max-width: 340px;
-  padding: 14px 16px;
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--outline-variant);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.fallback-toast-inner p {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--muted-text);
-  line-height: 1.4;
 }
 
 .drafting-toast-inner {
@@ -1079,12 +981,6 @@ async function updatePriority(notebookId, priority) {
   margin: 0;
   font-size: 13px;
   color: var(--muted-text);
-}
-
-.fallback-toast-title {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 4px;
 }
 
 .toast-fade-enter-active,

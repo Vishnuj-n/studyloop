@@ -3,6 +3,7 @@ package notebook
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -228,6 +229,9 @@ func (s *Service) GetFilePath(notebookID string) (string, error) {
 	return path, nil
 }
 
+// ErrFileOutsideUploadDir indicates the target file is outside the sandbox and must not be deleted.
+var ErrFileOutsideUploadDir = errors.New("invalid file path: outside upload directory")
+
 // DeleteFile removes a notebook file from disk
 func (s *Service) DeleteFile(filePath string) error {
 	// Ensure path is within upload directory (security check)
@@ -242,7 +246,7 @@ func (s *Service) DeleteFile(filePath string) error {
 	}
 
 	if !strings.HasPrefix(absPath, absUploadDir) {
-		return fmt.Errorf("invalid file path: outside upload directory")
+		return ErrFileOutsideUploadDir
 	}
 
 	return os.Remove(absPath)

@@ -6,14 +6,14 @@ const user = ref(null)
 const isPro = ref(false)
 const authError = ref('')
 const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
-const lastVerifiedAt = ref(Date.now())
+const lastVerifiedAt = ref(0)
 
 function saveLocalSession(u, proStatus, verifiedTime) {
   if (u) {
     localStorage.setItem('studyloop_user_session', JSON.stringify({
       user: u,
       isPro: !!proStatus,
-      lastVerifiedAt: verifiedTime || Date.now(),
+      lastVerifiedAt: verifiedTime || 0,
     }))
   } else {
     localStorage.removeItem('studyloop_user_session')
@@ -34,13 +34,14 @@ async function waitForBridge(timeoutMs = 3000) {
 let inFlightSync = null
 let lastSyncSuccessTime = 0
 const SYNC_THROTTLE_MS = 15000
+let hasInitialSyncRan = false
 
 async function syncWithBackend(force = false) {
-  if (!force && lastSyncSuccessTime > 0 && Date.now() - lastSyncSuccessTime < SYNC_THROTTLE_MS) {
-    return
-  }
   if (inFlightSync) {
     return inFlightSync
+  }
+  if (!force && lastSyncSuccessTime > 0 && Date.now() - lastSyncSuccessTime < SYNC_THROTTLE_MS) {
+    return
   }
 
   inFlightSync = (async () => {
@@ -50,17 +51,17 @@ async function syncWithBackend(force = false) {
         return
       }
 
-      // First call backend restoreSession to validate / hydrate session from disk
+      // 1. First hydrate/verify session from backend signed session storage
       const verifiedPro = await restoreSession(
         user.value?.id || '',
         user.value?.email || '',
         isPro.value,
-        Math.floor((lastVerifiedAt.value || Date.now()) / 1000)
+        Math.floor((lastVerifiedAt.value || 0) / 1000)
       )
 
-      // Retrieve active session details from Go backend (persisted session.json)
+      // 2. Retrieve active session state
       const backendSession = await getUserSession()
-      if (backendSession && backendSession.email && backendSession.userId) {
+      if (backendSession && backendSession.userId && backendSession.email) {
         if (!user.value) {
           user.value = {
             id: backendSession.userId,
@@ -71,7 +72,7 @@ async function syncWithBackend(force = false) {
         if (backendSession.verifiedAt) {
           lastVerifiedAt.value = backendSession.verifiedAt * 1000
         }
-        isPro.value = !!backendSession.isPro
+        isPro.value = Boolean(backendSession.isPro)
         saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
       } else if (typeof verifiedPro === 'boolean') {
         if (isPro.value !== verifiedPro) {
@@ -84,6 +85,7 @@ async function syncWithBackend(force = false) {
         }
       }
       lastSyncSuccessTime = Date.now()
+      hasInitialSyncRan = true
     } catch (err) {
       console.warn('[AUTH] Could not sync session with backend:', err)
     } finally {
@@ -97,7 +99,7 @@ async function syncWithBackend(force = false) {
 export async function initClerk() {
   console.log('[AUTH] initClerk() called. isSignedIn:', !!user.value, 'isPro:', isPro.value)
   isLoaded.value = true
-  await syncWithBackend()
+  await syncWithBackend(true)
   return null
 }
 
@@ -118,7 +120,7 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
       authError.value = ''
       saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
       console.log('[AUTH] Updated localStorage and memory with Pro status:', isPro.value)
-      syncWithBackend()
+      syncWithBackend(true)
     }
   })
 }
@@ -140,7 +142,7 @@ try {
       } else {
         isPro.value = !!parsed.isPro
       }
-      lastVerifiedAt.value = savedTime || Date.now()
+      lastVerifiedAt.value = savedTime || 0
       console.log('[AUTH] Restored session from localStorage: isSignedIn =', !!parsed.user, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
     }
   } else {
@@ -151,8 +153,10 @@ try {
 }
 
 export function useClerkAuth() {
-  // Ensure backend is in sync whenever composable is accessed
-  syncWithBackend()
+  // Only trigger background sync if initial sync hasn't run yet
+  if (!hasInitialSyncRan) {
+    syncWithBackend()
+  }
 
   return {
     isLoaded: computed(() => isLoaded.value),
@@ -184,13 +188,15 @@ export function useClerkAuth() {
         return { success: false, error: errMsg }
       }
     },
-    signOut: () => {
+    signOut: async () => {
       console.log('[CLERK_AUTH] signOut() triggered')
       user.value = null
       isPro.value = false
+      lastVerifiedAt.value = 0
+      hasInitialSyncRan = false
       authError.value = ''
       localStorage.removeItem('studyloop_user_session')
-      clearSession()
+      await clearSession()
     },
     openBilling: () => {
       // ponytail: direct to pricing section for early access / pro support

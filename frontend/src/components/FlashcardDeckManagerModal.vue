@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition name="deck-modal-fade">
       <div v-if="show" class="deck-modal-overlay" @click.self="close">
-        <div class="deck-modal-container" role="dialog" aria-modal="true">
+        <div class="deck-modal-container" role="dialog" aria-modal="true" aria-labelledby="fc-deck-manager-title">
           <!-- Modal Header -->
           <div class="deck-modal-header">
             <div class="header-titles">
@@ -10,19 +10,37 @@
                 <BaseIcon name="layers" size="13" />
                 <span>Retention Console</span>
               </div>
-              <h2 class="header-title">Flashcard Library & FSRS Metrics</h2>
+              <h2 id="fc-deck-manager-title" class="header-title">Flashcard Library & FSRS Metrics</h2>
             </div>
             <div class="header-actions">
               <button
                 type="button"
+                class="copy-all-btn"
+                aria-label="Copy all filtered flashcards as Markdown"
+                :title="copiedAll ? 'Copied to Clipboard!' : 'Copy all filtered flashcards as Markdown'"
+                :disabled="loading || filteredNotebooks.length === 0"
+                @click="copyAllFlashcards"
+              >
+                <BaseIcon :name="copiedAll ? 'check' : 'copy'" size="13" />
+                <span>{{ copiedAll ? 'Copied!' : 'Copy All Cards' }}</span>
+              </button>
+              <button
+                type="button"
                 class="icon-action-btn"
+                aria-label="Refresh decks and metrics"
                 title="Refresh decks and metrics"
                 :disabled="loading"
                 @click="loadOverview"
               >
                 <BaseIcon name="refresh" size="15" :class="{ 'spin-anim': loading }" />
               </button>
-              <button type="button" class="modal-close-btn" title="Close" @click="close">
+              <button
+                type="button"
+                class="modal-close-btn"
+                aria-label="Close retention modal"
+                title="Close"
+                @click="close"
+              >
                 <BaseIcon name="x" size="16" />
               </button>
             </div>
@@ -96,6 +114,7 @@
                 <input
                   v-model="searchQuery"
                   type="text"
+                  aria-label="Search flashcard questions or answers"
                   placeholder="Search questions or answers..."
                   class="search-input"
                 />
@@ -194,8 +213,18 @@
                   </div>
 
                   <!-- Bulk Notebook Actions -->
-                  <div v-if="nb.notebook_id" class="deck-header-actions" @click.stop>
+                  <div class="deck-header-actions" @click.stop>
                     <button
+                      type="button"
+                      class="action-toggle-btn copy-cards-btn"
+                      :title="copiedNotebookId === (nb.notebook_id || 'standalone') ? 'Copied to Clipboard!' : 'Copy this deck as Markdown'"
+                      @click="copyNotebookFlashcards(nb)"
+                    >
+                      <BaseIcon :name="copiedNotebookId === (nb.notebook_id || 'standalone') ? 'check' : 'copy'" size="12" />
+                      <span>{{ copiedNotebookId === (nb.notebook_id || 'standalone') ? 'Copied!' : 'Copy Cards' }}</span>
+                    </button>
+                    <button
+                      v-if="nb.notebook_id"
                       type="button"
                       :class="['action-toggle-btn', nb.is_all_suspended ? 'resume-mode' : 'pause-mode']"
                       :disabled="pendingNotebookIds.has(nb.notebook_id)"
@@ -422,6 +451,7 @@ import {
   deleteFlashcard,
   updateFlashcardContent,
 } from '../services/appApi.js'
+import { copyTextToClipboard } from '../utils/clipboard'
 import { useDialog } from '../composables/useDialog'
 import { useToast } from '../composables/useToast'
 
@@ -448,6 +478,9 @@ const searchQuery = ref('')
 const statusFilter = ref('all') // 'all' | 'due' | 'active' | 'suspended'
 const expandedNotebooks = ref(new Set())
 const expandedCardIds = ref(new Set())
+const copiedNotebookId = ref(null)
+const copiedAll = ref(false)
+let copyResetTimer = null
 
 // Inline Edit State
 const editingCardId = ref(null)
@@ -522,6 +555,14 @@ function close() {
 }
 
 // Format ugly raw topic slugs like NB-F353DC91-C33B-4CBD-ADD4-5B3C0C3E9E52-CH-04-ENCODING-AND-EVOLUTI
+function formatWord(w) {
+  const upper = w.toUpperCase()
+  // Keep common study acronyms or uppercase terms intact
+  const acronyms = new Set(['DNA', 'RNA', 'API', 'CPU', 'GPU', 'RAM', 'HTTP', 'HTTPS', 'SQL', 'CSS', 'HTML', 'FSRS', 'AI', 'ML', 'REST'])
+  if (acronyms.has(upper)) return upper
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+}
+
 function formatTopicTitle(rawTitle) {
   if (!rawTitle) return 'General'
   let cleaned = rawTitle.replace(/^NB-[A-F0-9-]+-?/i, '')
@@ -531,7 +572,7 @@ function formatTopicTitle(rawTitle) {
     const rest = chMatch[2]
       .split(/[-_]+/)
       .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .map(formatWord)
       .join(' ')
     return `Chapter ${chNum}: ${rest}`
   }
@@ -539,7 +580,7 @@ function formatTopicTitle(rawTitle) {
     return cleaned
       .split(/[-_]+/)
       .filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .map(formatWord)
       .join(' ')
   }
   return cleaned
@@ -602,6 +643,85 @@ function formatInterval(stability) {
   if (stability < 1) return `${Math.round(stability * 24)}h`
   if (stability < 30) return `${Math.round(stability)}d`
   return `${(stability / 30).toFixed(1)}mo`
+}
+
+function buildNotebookMarkdown(notebook) {
+  const nbTitle = notebook.notebook_title || 'Standalone Flashcards'
+  const lines = [`# ${nbTitle} — Flashcards`, '']
+  const topics = notebook.filteredTopics || notebook.topics || []
+
+  for (const topic of topics) {
+    if (!topic.cards || topic.cards.length === 0) continue
+    const topicTitle = formatTopicTitle(topic.topic_title)
+    lines.push(`## Topic: ${topicTitle}`)
+    lines.push('')
+    for (const card of topic.cards) {
+      lines.push(`- **Q:** ${card.prompt}`)
+      lines.push(`  **A:** ${card.answer}`)
+      lines.push('')
+    }
+  }
+  return lines.join('\n')
+}
+
+async function copyNotebookFlashcards(notebook) {
+  if (!notebook) return
+  const key = notebook.notebook_id || 'standalone'
+  const markdown = buildNotebookMarkdown(notebook)
+  if (!markdown.trim()) {
+    showError('No flashcards available to copy in this deck.')
+    return
+  }
+  const ok = await copyTextToClipboard(markdown)
+  if (ok) {
+    copiedNotebookId.value = key
+    showNotice(`Copied cards for "${notebook.notebook_title || 'Standalone'}"`)
+    if (copyResetTimer) clearTimeout(copyResetTimer)
+    copyResetTimer = setTimeout(() => {
+      if (copiedNotebookId.value === key) {
+        copiedNotebookId.value = null
+      }
+    }, 2000)
+  } else {
+    showError('Failed to copy flashcards to clipboard.')
+  }
+}
+
+async function copyAllFlashcards() {
+  const activeNotebooks = filteredNotebooks.value
+  if (!activeNotebooks || activeNotebooks.length === 0) {
+    showError('No flashcards matching current filters to copy.')
+    return
+  }
+
+  const sections = []
+  let totalCardsCount = 0
+
+  for (const nb of activeNotebooks) {
+    const md = buildNotebookMarkdown(nb)
+    if (md.trim()) {
+      sections.push(md)
+      totalCardsCount += nb.visibleCardCount || 0
+    }
+  }
+
+  if (sections.length === 0) {
+    showError('No flashcards found to copy.')
+    return
+  }
+
+  const fullMarkdown = sections.join('\n\n---\n\n')
+  const ok = await copyTextToClipboard(fullMarkdown)
+  if (ok) {
+    copiedAll.value = true
+    showNotice(`Copied ${totalCardsCount} flashcards to clipboard`)
+    if (copyResetTimer) clearTimeout(copyResetTimer)
+    copyResetTimer = setTimeout(() => {
+      copiedAll.value = false
+    }, 2000)
+  } else {
+    showError('Failed to copy all flashcards to clipboard.')
+  }
 }
 
 // Notebook accordion controls
@@ -668,11 +788,15 @@ const filteredNotebooks = computed(() => {
             if (filter === 'suspended' && !c.suspended) return false
 
             if (query) {
+              const p = (c.prompt || '').toLowerCase()
+              const a = (c.answer || '').toLowerCase()
+              const nbT = (c.notebook_title || '').toLowerCase()
+              const topT = (c.topic_title || '').toLowerCase()
               const textMatch =
-                c.prompt.toLowerCase().includes(query) ||
-                c.answer.toLowerCase().includes(query) ||
-                (c.notebook_title && c.notebook_title.toLowerCase().includes(query)) ||
-                (c.topic_title && c.topic_title.toLowerCase().includes(query))
+                p.includes(query) ||
+                a.includes(query) ||
+                nbT.includes(query) ||
+                topT.includes(query)
               if (!textMatch) return false
             }
 
@@ -706,6 +830,8 @@ const totalFilteredCards = computed(() => {
   return filteredNotebooks.value.reduce((acc, nb) => acc + nb.visibleCardCount, 0)
 })
 
+const hasAutoExpanded = ref(false)
+
 async function loadOverview() {
   if (loading.value) return
   loading.value = true
@@ -718,13 +844,14 @@ async function loadOverview() {
     if (res && res.metrics) {
       metrics.value = res.metrics
       notebooks.value = res.notebooks || []
-      // Auto-expand first 2 notebooks on initial load
-      if (expandedNotebooks.value.size === 0 && notebooks.value.length > 0) {
+      // Auto-expand first 2 notebooks on first load only
+      if (!hasAutoExpanded.value && notebooks.value.length > 0) {
         const initialSet = new Set()
         notebooks.value.slice(0, 2).forEach((nb) => {
           initialSet.add(nb.notebook_id || 'standalone')
         })
         expandedNotebooks.value = initialSet
+        hasAutoExpanded.value = true
       }
     }
   } catch (err) {
@@ -816,7 +943,9 @@ async function confirmDeleteCard(card) {
     }
     if (res && res.ok) {
       showNotice('Flashcard deleted')
-      expandedCardIds.value.delete(card.id)
+      const nextExpanded = new Set(expandedCardIds.value)
+      nextExpanded.delete(card.id)
+      expandedCardIds.value = nextExpanded
       await loadOverview()
       emit('updated')
     }
@@ -842,6 +971,10 @@ watch(
 function handleGlobalKeydown(e) {
   if (!props.show) return
   if (e.key === 'Escape') {
+    if (editingCardId.value !== null) {
+      cancelEditingCard()
+      return
+    }
     close()
   }
 }
@@ -947,6 +1080,44 @@ onUnmounted(() => {
 .icon-action-btn:active,
 .modal-close-btn:active {
   transform: scale(0.95);
+}
+
+.copy-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  transition: all 0.15s ease;
+}
+
+.copy-all-btn:hover:not(:disabled) {
+  background: var(--surface-container);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.copy-all-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.copy-cards-btn {
+  background: transparent;
+  color: var(--on-surface);
+}
+
+.copy-cards-btn:hover {
+  background: var(--surface-container-highest);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .spin-anim {
@@ -1302,8 +1473,15 @@ onUnmounted(() => {
   border: 1px solid var(--outline-variant);
 }
 
-.action-toggle-btn {
+.deck-header-actions {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-toggle-btn {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 4px 9px;

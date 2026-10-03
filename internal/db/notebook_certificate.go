@@ -158,41 +158,4 @@ func (r *Repository) GetNotebookCertificateStats(notebookID string) (*NotebookCe
 	return targetNb, nil
 }
 
-// DevUnlockNotebookCertificate is a developer bypass that completes remaining reading tasks & topic cursors for a notebook so the user can immediately test 100% completion & certificates.
-func (r *Repository) DevUnlockNotebookCertificate(notebookID string) (*NotebookCertificateStats, error) {
-	notebookID = strings.TrimSpace(notebookID)
-	if notebookID == "" {
-		return nil, fmt.Errorf("notebook id is required")
-	}
-
-	err := r.withTx(func(tx *sql.Tx) error {
-		// 1. Advance all topics linked to this notebook to their end_page and mark 'completed'
-		_, err := tx.Exec(`
-			UPDATE topics
-			SET current_page_cursor = end_page, status = 'completed', updated_at = CURRENT_TIMESTAMP
-			WHERE id IN (
-				SELECT topic_id FROM notebook_topics WHERE notebook_id = ?
-				UNION
-				SELECT topic_id FROM notebooks WHERE id = ? AND topic_id IS NOT NULL AND topic_id != ''
-			)
-		`, notebookID, notebookID)
-		if err != nil {
-			return err
-		}
-
-		// 2. Mark any pending/active tasks for this notebook as COMPLETED
-		_, err = tx.Exec(`
-			UPDATE study_queue
-			SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP
-			WHERE notebook_id = ? AND status IN ('PENDING', 'ACTIVE')
-		`, notebookID)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return r.GetNotebookCertificateStats(notebookID)
-}
-
 

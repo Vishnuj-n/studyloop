@@ -11,13 +11,15 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | --- | --- | --- | --- |
 | `activateTask` | `ActivateTask` | 4 | Active |
 | `aiCleanupNotebookSyllabus` | `AICleanupNotebookSyllabus` | 1 | Active |
+| `analyzeQuizFailure` | `AnalyzeQuizFailure` | 1 | Active |
 | `askReaderAI` | `AskReaderAI` | 1 | Active |
 | `askSocratic` | `AskSocratic` | 1 | Active |
 | `assignNotebookToProfile` | `AssignNotebookToProfile` | 1 | Active |
 | `buyStreakFreeze` | `BuyStreakFreeze` | 1 | Active |
 | `cancelExtensionSetup` | `CancelExtensionSetup` | 1 | Active |
-| `checkExtensionReadiness` | `CheckExtensionReadiness` | 1 | Active |
+| `checkExtensionReadiness` | `CheckExtensionReadiness` | 0 | Unused |
 | `checkForUpdates` | `CheckForUpdates` | 2 | Active |
+| `claimAchievement` | `ClaimAchievement` | 1 | Active |
 | `claimLootBox` | `ClaimLootBox` | 1 | Active |
 | `clearSession` | `ClearSession` | 1 | Active |
 | `completeMilestoneExam` | `CompleteMilestoneExam` | 1 | Active |
@@ -26,12 +28,14 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `completeSocraticRescue` | `CompleteSocraticRescue` | 2 | Active |
 | `confirmNotebookSyllabus` | `ConfirmNotebookSyllabus` | 1 | Active |
 | `createProfile` | `CreateProfile` | 2 | Active |
+| `deleteFlashcard` | `DeleteFlashcard` | 1 | Active |
 | `deleteLLMAPIKey` | `DeleteLLMAPIKey` | 1 | Active |
 | `deleteNotebook` | `DeleteNotebook` | 1 | Active |
 | `deleteProfile` | `DeleteProfile` | 1 | Active |
+| `downloadAndApplyUpdate` | `DownloadAndApplyUpdate` | 2 | Active |
 | `draftNotebookSyllabus` | `DraftNotebookSyllabus` | 1 | Active |
-| `generateComprehensiveExam` | `GenerateComprehensiveExam` | 1 | Active |
-| `generateFlashcardsForQuizTask` | `GenerateFlashcardsForQuizTask` | 1 | Active |
+| `generateComprehensiveExam` | `GenerateVivaExam` | 1 | Active |
+| `generateFlashcardsForQuizTask` | `GenerateFlashcardsForQuizTask` | 3 | Active |
 | `generateManualFlashcards` | `GenerateManualFlashcards` | 1 | Active |
 | `generateQuizForPageRange` | `GenerateQuizForPageRange` | 1 | Active |
 | `getAppEnv` | `GetAppEnv` | 1 | Active |
@@ -40,60 +44,76 @@ Lists functions defined in `appApi.js` and their usage count in the frontend.
 | `getDashboardOverview` | `GetDashboardOverview` | 1 | Active |
 | `getExtensionConfig` | `GetExtensionConfig` | 1 | Active |
 | `getFlashcardDueTimeline` | `GetFlashcardDueTimeline` | 1 | Active |
-| `getGamificationState` | `GetGamificationState` | 3 | Active |
-| `getGamificationStore` | `GetGamificationStore` | 1 | Active |
+| `getFlashcardsDeckOverview` | `GetFlashcardsDeckOverview` | 1 | Active |
+| `getGamificationState` | `GetGamificationState` | 4 | Active |
+| `getGamificationStore` | `GetGamificationStore` | 2 | Active |
+| `getLLMPromptLogging` | `GetLLMPromptLogging` | 1 | Active |
 | `getLLMProviderPreset` | `GetLLMProviderPreset` | 2 | Active |
 | `getLLMSettings` | `GetLLMSettings` | 1 | Active |
+| `getLogLevel` | `GetLogLevel` | 1 | Active |
+| `getNotebookCertificateStats` | `GetNotebookCertificateStats` | 1 | Active |
 | `getNotebookTopicTree` | `GetNotebookTopicTree` | 2 | Active |
 | `getNotebooks` | `GetNotebooks` | 5 | Active |
 | `getProfileDailyPace` | `GetProfileDailyPace` | 1 | Active |
 | `getProfiles` | `GetProfiles` | 1 | Active |
 | `getReaderTopicBundle` | `GetReaderTopicBundle` | 1 | Active |
+| `getReadingTaskHistory` | `GetReadingTaskHistory` | 1 | Active |
+| `getReleaseNotes` | `GetReleaseNotes` | 2 | Active |
 | `getReviewSession` | `GetReviewSession` | 1 | Active |
 | `getTask` | `GetTask` | 1 | Active |
 | `getTaskContext` | `GetTaskContext` | 2 | Active |
 | `getTodayPlan` | `GetTodayPlan` | 1 | Active |
+| `getTopicCompressionStats` | `GetTopicCompressionStats` | 1 | Active |
 | `getTopicSectionsContent` | `GetTopicSectionsContent` | 3 | Active |
-| `getUserSettings` | `GetUserSettings` | 10 | Active |
+| `getUserSession` | `GetUserSession` | 1 | Active |
+| `getUserSettings` | `GetUserSettings` | 11 | Active |
 | `importAnkiDeck` | `ImportAnkiDeck` | 1 | Active |
 | `initializeRAG` | `InitializeRAG` | 2 | Active |
 | `initializeReadingSession` | `InitializeReadingSession` | 1 | Active |
 | `isOnboarded` | `IsOnboarded` | 1 | Active |
 | `listExtensions` | `ListExtensions` | 2 | Active |
-| `logFrontendEvent` | `LogFrontendEvent` | 4 | Active |
+| `logFrontendEvent` | `LogFrontendEvent` | 5 | Active |
 | `loginStudent` | `LoginStudent` | 1 | Active |
 | `logoutStudent` | `LogoutStudent` | 1 | Active |
+| `openDataDirectory` | `OpenDataDirectory` | 1 | Active |
 | `openRepoURL` | `OpenRepoURL` | 2 | Active |
-| `openURLInBrowser` | `OpenURLInBrowser` | 5 | Active |
+| `openURLInBrowser` | `OpenURLInBrowser` | 8 | Active |
 | `recordCardReview` | `RecordCardReview` | 1 | Active |
 | `restoreSession` | `RestoreSession` | 1 | Active |
 | `retryFlashcardGeneration` | `RetryFlashcardGeneration` | 2 | Active |
+| `revertReadingTaskSession` | `RevertReadingTaskSession` | 1 | Active |
 | `runExtension` | `RunExtension` | 1 | Active |
 | `saveExtensionConfig` | `SaveExtensionConfig` | 1 | Active |
 | `saveLLMAPIKey` | `SaveLLMAPIKey` | 2 | Active |
 | `scoreShortAnswer` | `ScoreShortAnswer` | 1 | Active |
 | `selectAndUploadDeepStructuredPDF` | `SelectAndUploadDeepStructuredPDF` | 1 | Active |
 | `selectAnkiFile` | `SelectAnkiFile` | 1 | Active |
+| `setActiveProfileID` | `SetActiveProfileID` | 1 | Active |
+| `setLLMPromptLogging` | `SetLLMPromptLogging` | 1 | Active |
+| `setLogLevel` | `SetLogLevel` | 1 | Active |
 | `setupExtension` | `SetupExtension` | 1 | Active |
 | `signUpStudent` | `SignUpStudent` | 1 | Active |
 | `simplifyReadingContent` | `SimplifyReadingContent` | 1 | Active |
 | `skipReadingTask` | `SkipReadingTask` | 1 | Active |
 | `startBrowserAuth` | `StartBrowserAuth` | 1 | Active |
-| `startTopicAudioOverview` | `StartTopicAudioOverview` | 1 | Active |
+| `startTopicAudioOverview` | `StartTopicAudioOverview` | 2 | Active |
 | `stopTopicAudioOverview` | `StopTopicAudioOverview` | 1 | Active |
 | `submitQuizAttempt` | `SubmitQuizAttempt` | 1 | Active |
 | `suspendFlashcard` | `SuspendFlashcard` | 1 | Active |
 | `testLLMConnection` | `TestLLMConnection` | 2 | Active |
 | `testLLMLimits` | `TestLLMLimits` | 1 | Active |
+| `toggleCardSuspension` | `ToggleCardSuspension` | 1 | Active |
+| `toggleNotebookCardsSuspension` | `ToggleNotebookCardsSuspension` | 1 | Active |
 | `trackAnalyticsEvent` | `TrackAnalyticsEvent` | 2 | Active |
 | `triggerCloudSync` | `TriggerCloudSync` | 2 | Active |
 | `unlockCosmeticItem` | `UnlockCosmeticItem` | 1 | Active |
+| `updateFlashcardContent` | `UpdateFlashcardContent` | 1 | Active |
 | `updateLLMSettings` | `UpdateLLMSettings` | 2 | Active |
 | `updateNotebookPriority` | `UpdateNotebookPriority` | 1 | Active |
 | `updateNotebookStudyStatus` | `UpdateNotebookStudyStatus` | 1 | Active |
 | `updateNotebookTitle` | `UpdateNotebookTitle` | 1 | Active |
 | `updateProfile` | `UpdateProfile` | 1 | Active |
-| `updateUserSettings` | `UpdateUserSettings` | 5 | Active |
+| `updateUserSettings` | `UpdateUserSettings` | 6 | Active |
 | `upgradeNotebookToDeepPDF` | `UpgradeNotebookToDeepPDF` | 1 | Active |
 | `uploadNotebook` | `UploadNotebook` | 1 | Active |
 | `uploadYouTubeNotebook` | `UploadYouTubeNotebook` | 1 | Active |
@@ -105,13 +125,15 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | --- | --- |
 | `AICleanupNotebookSyllabus` | Yes |
 | `ActivateTask` | Yes |
+| `AnalyzeQuizFailure` | Yes |
 | `AskReaderAI` | Yes |
 | `AskSocratic` | Yes |
 | `AssignNotebookToProfile` | Yes |
 | `BuyStreakFreeze` | Yes |
 | `CancelExtensionSetup` | Yes |
-| `CheckExtensionReadiness` | Yes |
+| `CheckExtensionReadiness` | No (Unused API) |
 | `CheckForUpdates` | Yes |
+| `ClaimAchievement` | Yes |
 | `ClaimLootBox` | Yes |
 | `ClearSession` | Yes |
 | `CompleteMilestoneExam` | Yes |
@@ -120,14 +142,17 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `CompleteSocraticRescue` | Yes |
 | `ConfirmNotebookSyllabus` | Yes |
 | `CreateProfile` | Yes |
+| `DeleteFlashcard` | Yes |
 | `DeleteLLMAPIKey` | Yes |
 | `DeleteNotebook` | Yes |
 | `DeleteProfile` | Yes |
+| `DownloadAndApplyUpdate` | Yes |
 | `DraftNotebookSyllabus` | Yes |
 | `GenerateComprehensiveExam` | Yes |
 | `GenerateFlashcardsForQuizTask` | Yes |
 | `GenerateManualFlashcards` | Yes |
 | `GenerateQuizForPageRange` | Yes |
+| `GenerateVivaExam` | Yes |
 | `GetAppEnv` | Yes |
 | `GetAvailableTopics` | Yes |
 | `GetCloudConfig` | Yes |
@@ -135,21 +160,29 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `GetDashboardOverview` | Yes |
 | `GetExtensionConfig` | Yes |
 | `GetFlashcardDueTimeline` | Yes |
+| `GetFlashcardsDeckOverview` | Yes |
 | `GetGamificationState` | Yes |
 | `GetGamificationStore` | Yes |
+| `GetLLMPromptLogging` | Yes |
 | `GetLLMProviderPreset` | Yes |
 | `GetLLMSettings` | Yes |
+| `GetLogLevel` | Yes |
+| `GetNotebookCertificateStats` | Yes |
 | `GetNotebookTopicTree` | Yes |
 | `GetNotebookUploadDir` | Yes |
 | `GetNotebooks` | Yes |
 | `GetProfileDailyPace` | Yes |
 | `GetProfiles` | Yes |
 | `GetReaderTopicBundle` | Yes |
+| `GetReadingTaskHistory` | Yes |
+| `GetReleaseNotes` | Yes |
 | `GetReviewSession` | Yes |
 | `GetTask` | Yes |
 | `GetTaskContext` | Yes |
 | `GetTodayPlan` | Yes |
+| `GetTopicCompressionStats` | Yes |
 | `GetTopicSectionsContent` | Yes |
+| `GetUserSession` | Yes |
 | `GetUserSettings` | Yes |
 | `ImportAnkiDeck` | Yes |
 | `InitializeRAG` | Yes |
@@ -160,6 +193,7 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `LogFrontendEvent` | Yes |
 | `LoginStudent` | Yes |
 | `LogoutStudent` | Yes |
+| `OpenDataDirectory` | Yes |
 | `OpenRepoURL` | Yes |
 | `OpenURLInBrowser` | Yes |
 | `PomodoroGetAudioState` | No (Unused API) |
@@ -179,14 +213,19 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `PomodoroStopAudio` | No (Unused API) |
 | `PomodoroStopTimer` | No (Unused API) |
 | `RecordCardReview` | Yes |
+| `RestoreDatabaseFromBackup` | No (Unused API) |
 | `RestoreSession` | Yes |
 | `RetryFlashcardGeneration` | Yes |
+| `RevertReadingTaskSession` | Yes |
 | `RunExtension` | Yes |
 | `SaveExtensionConfig` | Yes |
 | `SaveLLMAPIKey` | Yes |
 | `ScoreShortAnswer` | Yes |
 | `SelectAndUploadDeepStructuredPDF` | Yes |
 | `SelectAnkiFile` | Yes |
+| `SetActiveProfileID` | Yes |
+| `SetLLMPromptLogging` | Yes |
+| `SetLogLevel` | Yes |
 | `SetupExtension` | Yes |
 | `SignUpStudent` | Yes |
 | `SimplifyReadingContent` | Yes |
@@ -198,14 +237,18 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `SuspendFlashcard` | Yes |
 | `TestLLMConnection` | Yes |
 | `TestLLMLimits` | Yes |
+| `ToggleCardSuspension` | Yes |
+| `ToggleNotebookCardsSuspension` | Yes |
 | `TrackAnalyticsEvent` | Yes |
 | `TriggerCloudSync` | Yes |
 | `UnlockCosmeticItem` | Yes |
+| `UpdateFlashcardContent` | Yes |
 | `UpdateLLMSettings` | Yes |
 | `UpdateNotebookPriority` | Yes |
 | `UpdateNotebookStudyStatus` | Yes |
 | `UpdateNotebookTitle` | Yes |
 | `UpdateProfile` | Yes |
+| `UpdateProfileFull` | No (Unused API) |
 | `UpdateUserSettings` | Yes |
 | `UpgradeNotebookToDeepPDF` | Yes |
 | `UploadNotebook` | Yes |
@@ -217,98 +260,108 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | Function/Method | File | Receiver | Type |
 | --- | --- | --- | --- |
 | `BuildTopicGroupsFromChapters` | `internal\notebook\ingestion.go:14` | None | `function` |
-| `CheckReadiness` | `internal\extension\checker.go:32` | None | `function` |
-| `CreateReviewSession` | `internal\db\review_session_repo.go:172` | `Repository` | `method` |
+| `CheckReadiness` | `internal\extension\checker.go:33` | None | `function` |
+| `CompressTopicChunks` | `internal\study\compression_service.go:85` | `StudyService` | `method` |
+| `CompressTopicChunksAsync` | `internal\study\compression_service.go:43` | `StudyService` | `method` |
+| `CreateReviewSession` | `internal\db\review_session_repo.go:173` | `Repository` | `method` |
 | `DefaultSettings` | `internal\pomodoro\domain\settings.go:15` | None | `function` |
 | `DeleteAPIKey` | `internal\llm\keyring.go:37` | None | `function` |
 | `DownloadYouTubeVideo` | `internal\notebook\youtube.go:106` | `Service` | `method` |
 | `DraftSyllabusChapters` | `internal\notebook\syllabus.go:32` | `Service` | `method` |
 | `ExtractFullPDFCPUBookmarkNodes` | `internal\notebook\pdfcpu.go:63` | None | `function` |
 | `ExtractSyllabusChaptersFromMarkdown` | `internal\notebook\markdown_chunker.go:195` | None | `function` |
-| `GetEffectiveTier` | `internal\extension\tiers.go:18` | None | `function` |
+| `GetEffectiveTier` | `internal\extension\tiers.go:19` | None | `function` |
 | `GetYouTubeSegmentTimestamps` | `internal\notebook\youtube.go:139` | `Service` | `method` |
 | `IngestDeepPDF` | `internal\notebook\deep_pdf.go:37` | `Service` | `method` |
 | `IngestDeepPDFWithProgress` | `internal\notebook\deep_pdf.go:42` | `Service` | `method` |
 | `IngestYouTubeVideo` | `internal\notebook\youtube.go:32` | `Service` | `method` |
 | `InstallZip` | `internal\extension\installer.go:45` | `Manager` | `method` |
-| `MarkLLMKeyStored` | `internal\db\store.go:621` | `Repository` | `method` |
+| `MarkLLMKeyStored` | `internal\db\settings_repo.go:433` | `Repository` | `method` |
 | `NormalizeSyllabusChapters` | `internal\notebook\syllabus.go:276` | None | `function` |
 | `ParsePDFCPUBookmarkDraftFromJSON` | `internal\notebook\pdfcpu.go:75` | None | `function` |
 | `PlayChime` | `internal\pomodoro\services\audio\service.go:168` | `Service` | `method` |
 | `PlayLooping` | `internal\pomodoro\services\audio\service.go:60` | `Service` | `method` |
 | `PlayShuffleFolder` | `internal\pomodoro\services\audio\service.go:86` | `Service` | `method` |
-| `RollTaskRewards` | `internal\study\rewards.go:12` | None | `function` |
-| `RunSmokeTest` | `internal\extension\checker.go:92` | None | `function` |
+| `RunSmokeTest` | `internal\extension\checker.go:93` | None | `function` |
 | `SaveAPIKey` | `internal\llm\keyring.go:21` | None | `function` |
 | `SeedDemoDataForTests` | `internal\db\testhelper.go:7` | `Repository` | `method` |
 | `SetChimeData` | `internal\pomodoro\services\audio\service.go:46` | `Service` | `method` |
 | `SetVolume` | `internal\pomodoro\services\audio\service.go:141` | `Service` | `method` |
-| `SetupExtensionEnv` | `internal\extension\checker.go:125` | None | `function` |
+| `SetupExtensionEnv` | `internal\extension\checker.go:146` | None | `function` |
 | `SplitMarkdownIntoChunks` | `internal\notebook\markdown_chunker.go:30` | None | `function` |
-| `TransitionTask` | `internal\study\queue_transition.go:54` | `StudyService` | `method` |
+| `TransitionTask` | `internal\study\queue_transition.go:55` | `StudyService` | `method` |
 | `Uninstall` | `internal\extension\installer.go:15` | `Manager` | `method` |
 | `activateReadingSessionTask` | `internal/app/app.go` | `App` | `AppHelper` |
-| `aggregateQueueTasks` | `internal\app\app_study.go:53` | None | `function` |
+| `aggregateQueueTasks` | `internal\app\app_study.go:55` | None | `function` |
 | `appendFailedQuestionsSection` | `internal\app\app_study_cards.go:156` | None | `function` |
-| `awardCompletionRewards` | `internal\study\queue_transition.go:298` | `StudyService` | `method` |
+| `applyRestoredSession` | `internal/app/app.go` | `App` | `AppHelper` |
+| `awardCompletionRewards` | `internal\study\queue_transition.go:327` | `StudyService` | `method` |
+| `baseCtxWithTimeout` | `internal/app/app.go` | `App` | `AppHelper` |
 | `bookmarkNodesToDraft` | `internal\notebook\pdfcpu.go:33` | None | `function` |
 | `buildInputValues` | `internal\embeddings\onnx.go:337` | `OnnxEmbedder` | `method` |
 | `buildPageSample` | `internal\notebook\syllabus.go:358` | None | `function` |
-| `buildReviewTaskForPlan` | `internal\app\app_study.go:269` | None | `function` |
+| `buildReadingSessionEnvelope` | `internal\app\app_study_reading.go:41` | None | `function` |
+| `buildReviewTaskForPlan` | `internal\app\app_study.go:302` | None | `function` |
 | `buildSocraticRemedialPrompt` | `internal\app\app_study_cards.go:91` | None | `function` |
 | `buildTokenArrays` | `internal\embeddings\onnx.go:286` | None | `function` |
 | `calculateDailyStudyMinutes` | `internal\app\app_study.go:21` | None | `function` |
-| `calculateFlashcardBudgets` | `internal\app\app_study.go:40` | None | `function` |
+| `calculateFlashcardBudgets` | `internal\app\app_study.go:42` | None | `function` |
 | `chapterIndexForPage` | `internal\notebook\ingestion.go:83` | None | `function` |
 | `checkAndInsertMilestoneExam` | `internal\app\app_study_cards.go:278` | None | `function` |
-| `computeCurrentStreak` | `internal\app\app_study.go:117` | None | `function` |
-| `computeLongestStreak` | `internal\app\app_study.go:87` | None | `function` |
+| `clientEndOfDayUnix` | `internal\app\app_study.go:169` | None | `function` |
+| `computeCurrentStreak` | `internal\app\app_study.go:119` | None | `function` |
+| `computeLongestStreak` | `internal\app\app_study.go:89` | None | `function` |
+| `computeSessionSignature` | `internal\app\app_auth.go:78` | None | `function` |
 | `copyPomoFile` | `internal\app\app_pomodoro.go:268` | None | `function` |
 | `destroyValues` | `internal\embeddings\onnx.go:536` | None | `function` |
 | `embedBatchInternal` | `internal\embeddings\onnx.go:210` | `OnnxEmbedder` | `method` |
 | `embedInternal` | `internal\embeddings\onnx.go:199` | `OnnxEmbedder` | `method` |
-| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1070` | None | `function` |
+| `emitIngestionProgress` | `internal\app\notebook_endpoints.go:1094` | None | `function` |
 | `emitState` | `internal\pomodoro\services\audio\service.go:273` | `Service` | `method` |
-| `envHasLLMAPIKey` | `internal\app\app_settings.go:388` | None | `function` |
+| `envHasLLMAPIKey` | `internal\app\app_settings.go:437` | None | `function` |
 | `extractBatchEmbedding` | `internal\embeddings\onnx.go:385` | None | `function` |
 | `extractIONames` | `internal\embeddings\onnx.go:496` | None | `function` |
+| `fetchSessionChunks` | `internal/app/app.go` | `App` | `AppHelper` |
 | `finalizeDeepStructuredPDFUpload` | `internal/app/app.go` | `App` | `AppHelper` |
 | `finalizeNotebookUpload` | `internal/app/app.go` | `App` | `AppHelper` |
 | `findPDFCPUExecutable` | `internal\notebook\pdfcpu.go:219` | None | `function` |
 | `firstInt` | `internal\notebook\pdfcpu.go:281` | None | `function` |
 | `firstN` | `internal\notebook\syllabus.go:398` | None | `function` |
 | `firstString` | `internal\notebook\pdfcpu.go:266` | None | `function` |
-| `generateLootBox` | `internal\study\rewards.go:86` | None | `function` |
-| `getAppVersion` | `internal\app\app_update.go:17` | None | `function` |
+| `getMachineID` | `internal\app\app_auth.go:60` | None | `function` |
+| `getNormalizedMachineID` | `internal\app\app_auth.go:69` | None | `function` |
 | `getNotebookAndRepo` | `internal/app/app.go` | `App` | `AppHelper` |
+| `getSessionFilePath` | `internal\app\app_auth.go:85` | None | `function` |
 | `getStreakState` | `internal/app/app.go` | `App` | `AppHelper` |
-| `getUserSession` | `internal/app/app.go` | `App` | `AppHelper` |
 | `inferMaxSeqLen` | `internal\embeddings\onnx.go:524` | None | `function` |
 | `insertMilestoneForAttempts` | `internal\app\app_study_cards.go:297` | None | `function` |
 | `isTableRow` | `internal\notebook\markdown_chunker.go:190` | None | `function` |
 | `linearToLog` | `internal\pomodoro\services\audio\service.go:266` | None | `function` |
-| `mapTaskError` | `internal\app\app_study.go:140` | None | `function` |
+| `mapTaskError` | `internal\app\app_study.go:142` | None | `function` |
 | `maxPage` | `internal\notebook\syllabus.go:390` | None | `function` |
 | `normalizeL2` | `internal\embeddings\onnx.go:477` | None | `function` |
-| `normalizeLLMTierForApp` | `internal\app\app_settings.go:378` | None | `function` |
+| `normalizeLLMTierForApp` | `internal\app\app_settings.go:427` | None | `function` |
 | `parseBookmarkNode` | `internal\notebook\pdfcpu.go:23` | None | `function` |
 | `parseMarkdownBlocks` | `internal\notebook\markdown_chunker.go:96` | None | `function` |
 | `parseSyllabusDraft` | `internal\notebook\syllabus.go:257` | None | `function` |
-| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:552` | None | `function` |
+| `persistSession` | `internal/app/app.go` | `App` | `AppHelper` |
+| `persistSyllabusDraft` | `internal\app\notebook_endpoints.go:556` | None | `function` |
 | `pickInputSource` | `internal\embeddings\onnx.go:504` | None | `function` |
 | `playChimeAsync` | `internal\pomodoro\services\audio\service.go:172` | `Service` | `method` |
 | `playFile` | `internal\pomodoro\services\audio\service.go:210` | `Service` | `method` |
-| `queueTaskToScheduledTask` | `internal\app\app_study.go:303` | None | `function` |
+| `queueTaskToScheduledTask` | `internal\app\app_study.go:339` | None | `function` |
 | `reconcileConfirmedNotebookTask` | `internal/app/app.go` | `App` | `AppHelper` |
 | `reloadLLMProviders` | `internal/app/app.go` | `App` | `AppHelper` |
-| `requireRepo` | `internal\app\app_study.go:158` | None | `function` |
+| `requireRepo` | `internal\app\app_study.go:160` | None | `function` |
+| `resolveClerkPublishableKey` | `internal\app\app_auth.go:240` | None | `function` |
 | `resolveExplicitActiveProfileID` | `internal/app/app.go` | `App` | `AppHelper` |
-| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:519` | None | `function` |
+| `resolveRetryTopicAndBounds` | `internal\app\app_study_cards.go:595` | None | `function` |
 | `resolveRuntimeLibraryPath` | `internal\embeddings\onnx.go:544` | None | `function` |
-| `rollChestTier` | `internal\study\rewards.go:61` | None | `function` |
 | `runDeepPDFExtraction` | `internal/app/app.go` | `App` | `AppHelper` |
+| `runExtensionWithInput` | `internal\study\compression_service.go:244` | None | `function` |
+| `runLLMTest` | `internal/app/app.go` | `App` | `AppHelper` |
 | `runPDFCPUBookmarksExport` | `internal\notebook\pdfcpu.go:117` | None | `function` |
-| `sameLLMSettingsForUI` | `internal\app\app_settings.go:402` | None | `function` |
+| `sameLLMSettingsForUI` | `internal\app\app_settings.go:451` | None | `function` |
 | `scanMP3s` | `internal\pomodoro\services\audio\service.go:282` | None | `function` |
 | `setSession` | `internal/app/app.go` | `App` | `AppHelper` |
 | `shuffleStrings` | `internal\pomodoro\services\audio\service.go:296` | None | `function` |
@@ -324,52 +377,52 @@ flowchart TD
     subgraph Frontend
         F_activateTask[activateTask]
         F_aiCleanupNotebookSyllabus[aiCleanupNotebookSyllabus]
+        F_analyzeQuizFailure[analyzeQuizFailure]
         F_askReaderAI[askReaderAI]
         F_askSocratic[askSocratic]
         F_assignNotebookToProfile[assignNotebookToProfile]
         F_buyStreakFreeze[buyStreakFreeze]
         F_cancelExtensionSetup[cancelExtensionSetup]
-        F_checkExtensionReadiness[checkExtensionReadiness]
         F_checkForUpdates[checkForUpdates]
+        F_claimAchievement[claimAchievement]
         F_claimLootBox[claimLootBox]
         F_clearSession[clearSession]
         F_completeMilestoneExam[completeMilestoneExam]
         F_completeReading[completeReading]
         F_completeReviewSession[completeReviewSession]
-        F_completeSocraticRescue[completeSocraticRescue]
     end
     subgraph Go_Wails_Bridge
         G_AICleanupNotebookSyllabus[App.AICleanupNotebookSyllabus]
         G_ActivateTask[App.ActivateTask]
+        G_AnalyzeQuizFailure[App.AnalyzeQuizFailure]
         G_AskReaderAI[App.AskReaderAI]
         G_AskSocratic[App.AskSocratic]
         G_AssignNotebookToProfile[App.AssignNotebookToProfile]
         G_BuyStreakFreeze[App.BuyStreakFreeze]
         G_CancelExtensionSetup[App.CancelExtensionSetup]
-        G_CheckExtensionReadiness[App.CheckExtensionReadiness]
         G_CheckForUpdates[App.CheckForUpdates]
+        G_ClaimAchievement[App.ClaimAchievement]
         G_ClaimLootBox[App.ClaimLootBox]
         G_ClearSession[App.ClearSession]
         G_CompleteMilestoneExam[App.CompleteMilestoneExam]
         G_CompleteReading[App.CompleteReading]
         G_CompleteReviewSession[App.CompleteReviewSession]
-        G_CompleteSocraticRescue[App.CompleteSocraticRescue]
     end
         F_activateTask --> G_ActivateTask
         F_aiCleanupNotebookSyllabus --> G_AICleanupNotebookSyllabus
+        F_analyzeQuizFailure --> G_AnalyzeQuizFailure
         F_askReaderAI --> G_AskReaderAI
         F_askSocratic --> G_AskSocratic
         F_assignNotebookToProfile --> G_AssignNotebookToProfile
         F_buyStreakFreeze --> G_BuyStreakFreeze
         F_cancelExtensionSetup --> G_CancelExtensionSetup
-        F_checkExtensionReadiness --> G_CheckExtensionReadiness
         F_checkForUpdates --> G_CheckForUpdates
+        F_claimAchievement --> G_ClaimAchievement
         F_claimLootBox --> G_ClaimLootBox
         F_clearSession --> G_ClearSession
         F_completeMilestoneExam --> G_CompleteMilestoneExam
         F_completeReading --> G_CompleteReading
         F_completeReviewSession --> G_CompleteReviewSession
-        F_completeSocraticRescue --> G_CompleteSocraticRescue
 ```
 
 *Note: The Mermaid flowchart is capped to the first 15 active endpoints for visual clarity.*

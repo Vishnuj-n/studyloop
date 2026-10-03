@@ -377,6 +377,8 @@ async function generate(isRetry = false) {
   }
 }
 
+const scrollToTop = () => document.querySelector('.content-shell')?.scrollTo({ top: 0, behavior: 'smooth' })
+
 async function submitAnswer() {
   if (!question.value || !userAnswer.value.trim()) return
   if (!question.value.questionId) {
@@ -397,6 +399,7 @@ async function submitAnswer() {
       score: res.score,
       feedback: res.feedback,
     }
+    scrollToTop()
   } catch (e) {
     error.value = e?.message ?? 'Scoring failed.'
   } finally {
@@ -409,9 +412,7 @@ function reset() {
   result.value = null
   userAnswer.value = ''
   error.value = ''
-  if (typeof window !== 'undefined') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  scrollToTop()
 }
 </script>
 
