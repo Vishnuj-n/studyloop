@@ -58,6 +58,7 @@ type App struct {
 	indexQueue          *retrieval.VectorIndexQueue
 	audioOverviewMu     sync.Mutex
 	audioOverviewCancel context.CancelFunc
+	audioOverviewGenID  string
 	extSetupMu          sync.Mutex
 	extSetupCancel      context.CancelFunc
 	extSetupToken       string
@@ -112,12 +113,20 @@ func initLogging() {
 }
 
 func (a *App) initIndexQueue(ctx context.Context, repo *db.Repository) {
-	if a.embedder == nil {
+	a.aiMutex.Lock()
+	emb := a.embedder
+	if emb == nil {
+		a.aiMutex.Unlock()
 		utils.Warnf("embeddings unavailable, skipping vector index queue initialization")
 		return
 	}
-	a.indexQueue = retrieval.NewVectorIndexQueue(repo, a.embedder, ctx)
+	if a.indexQueue != nil {
+		a.indexQueue.Stop()
+	}
+	a.indexQueue = retrieval.NewVectorIndexQueue(repo, emb, ctx)
 	a.indexQueue.Start()
+	q := a.indexQueue
+	a.aiMutex.Unlock()
 
 	pendingIDs, err := repo.GetPendingNotebookIDs()
 	if err != nil {
@@ -125,7 +134,7 @@ func (a *App) initIndexQueue(ctx context.Context, repo *db.Repository) {
 		return
 	}
 	for _, id := range pendingIDs {
-		a.indexQueue.Enqueue(id)
+		q.Enqueue(id)
 	}
 }
 
@@ -155,18 +164,24 @@ func (a *App) startup(ctx context.Context) {
 	a.repo = boot.Repo
 	a.repoMutex.Unlock()
 
-	a.embedder = boot.Embedder
-	a.retrievalEngine = boot.RetrievalEngine
 	a.fastLLMProvider = boot.FastLLMProvider
 	a.heavyLLMProvider = boot.HeavyLLMProvider
 	a.scheduler = boot.Scheduler
 	a.notebookService = boot.NotebookService
-	a.studyService = boot.StudyService
 	a.notebookUploadDir = boot.NotebookUploadDir
+
+	a.aiMutex.Lock()
+	a.embedder = boot.Embedder
+	a.retrievalEngine = boot.RetrievalEngine
+	a.studyService = boot.StudyService
 	a.aiReady = boot.AiReady
 	a.aiInitError = boot.AiInitError
+	a.aiMutex.Unlock()
 
 	a.initIndexQueue(ctx, boot.Repo)
+
+	// Warm up RAG assets and ONNX embedder silently in background if RAG is enabled
+	go a.warmAIBackground()
 
 	// Send minimal anonymous heartbeat ping asynchronously on launch
 	telemetry.SendHeartbeat(boot.Repo, getAppVersion())
@@ -195,9 +210,12 @@ func (a *App) shutdown() {
 		a.pomoTimer.Stop()
 	}
 	a.StopTopicAudioOverview()
+	a.aiMutex.Lock()
 	if a.indexQueue != nil {
 		a.indexQueue.Stop()
+		a.indexQueue = nil
 	}
+	a.aiMutex.Unlock()
 	utils.CloseMultiFileLogger()
 }
 
@@ -517,6 +535,7 @@ func (a *App) performAsyncRAGSetup() {
 	}
 
 	if err := a.applyVectorDBAndEmbedder(newRepo, emb); err != nil {
+		_ = emb.Close()
 		_ = newRepo.Close()
 		errMsg := fmt.Sprintf("failed to apply vector DB: %v", err)
 		a.setAIInitError(errMsg)
@@ -547,6 +566,97 @@ func (a *App) performAsyncRAGSetup() {
 	}
 
 	a.finalizeRAGSetup()
+}
+
+// warmAIBackground checks if RAG is enabled and silently warms up assets, ONNX embedder, and vector DB.
+func (a *App) warmAIBackground() {
+	ragSetupMutex.Lock()
+	if isRagSettingUp {
+		ragSetupMutex.Unlock()
+		return
+	}
+	isRagSettingUp = true
+	ragSetupMutex.Unlock()
+
+	defer func() {
+		ragSetupMutex.Lock()
+		isRagSettingUp = false
+		ragSetupMutex.Unlock()
+	}()
+
+	repo := a.getRepo()
+	if repo == nil {
+		return
+	}
+
+	ragEnabled, err := repo.GetRAGEnabled()
+	if err != nil || !ragEnabled {
+		return
+	}
+
+	am, err := runtime.NewAssetManager(a.ctx)
+	if err != nil {
+		a.setAIInitError(fmt.Sprintf("Asset manager init failed: %v", err))
+		return
+	}
+
+	if err := am.EnsureAssetsReady(); err != nil {
+		a.setAIInitError(fmt.Sprintf("RAG assets not ready: %v", err))
+		return
+	}
+
+	if _, err := am.StageDLLs(); err != nil {
+		a.setAIInitError(fmt.Sprintf("failed to stage DLLs: %v", err))
+		return
+	}
+
+	dbPath, err := runtime.ResolveDBPath()
+	if err != nil {
+		a.setAIInitError(fmt.Sprintf("failed to resolve database path: %v", err))
+		return
+	}
+
+	newRepo, err := db.Init(dbPath, am.Vec0DllPath())
+	if err != nil {
+		a.setAIInitError(fmt.Sprintf("failed to initialize vector DB: %v", err))
+		return
+	}
+	if !newRepo.IsVecExtensionLoaded() {
+		_ = newRepo.Close()
+		a.setAIInitError("sqlite-vec extension is missing or failed to load")
+		return
+	}
+
+	emb, err := a.initEmbedder(am)
+	if err != nil {
+		_ = newRepo.Close()
+		a.setAIInitError(err.Error())
+		return
+	}
+
+	if err := a.applyVectorDBAndEmbedder(newRepo, emb); err != nil {
+		_ = emb.Close()
+		_ = newRepo.Close()
+		a.setAIInitError(fmt.Sprintf("failed to apply vector DB: %v", err))
+		return
+	}
+
+	if err := a.reloadRetrievalEngine(); err != nil {
+		a.setAIInitError(fmt.Sprintf("failed to reload retrieval engine: %v", err))
+		return
+	}
+
+	a.aiMutex.Lock()
+	a.aiReady = true
+	a.aiInitError = ""
+	if a.indexQueue != nil {
+		a.indexQueue.Stop()
+	}
+	a.indexQueue = retrieval.NewVectorIndexQueue(a.getRepo(), a.embedder, a.ctx)
+	a.indexQueue.Start()
+	a.aiMutex.Unlock()
+
+	utils.Infof("[AI_WARMUP] Background RAG and ONNX embedder initialization complete.")
 }
 
 func (a *App) setAIInitError(errMsg string) {
@@ -732,20 +842,25 @@ func (a *App) StartTopicAudioOverview(topicID string, notebookID string, startPa
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
 
+	generationID := uuid.NewString()
+
 	a.audioOverviewMu.Lock()
 	if a.audioOverviewCancel != nil {
 		a.audioOverviewCancel()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a.audioOverviewCancel = cancel
+	a.audioOverviewGenID = generationID
 	a.audioOverviewMu.Unlock()
-
-	generationID := uuid.NewString()
 
 	go func() {
 		defer func() {
 			a.audioOverviewMu.Lock()
-			a.audioOverviewCancel = nil
+			// ponytail: only clear if this goroutine is still the active session
+			if a.audioOverviewGenID == generationID {
+				a.audioOverviewCancel = nil
+				a.audioOverviewGenID = ""
+			}
 			a.audioOverviewMu.Unlock()
 		}()
 
@@ -796,6 +911,7 @@ func (a *App) StopTopicAudioOverview() map[string]interface{} {
 	if a.audioOverviewCancel != nil {
 		a.audioOverviewCancel()
 		a.audioOverviewCancel = nil
+		a.audioOverviewGenID = ""
 	}
 	return map[string]interface{}{"status": "stopped"}
 }

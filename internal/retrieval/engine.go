@@ -1,43 +1,45 @@
 // Package retrieval provides a standalone, reusable semantic search engine.
 // It wraps ONNX embedding + sqlite-vec cosine search with a clean public API
-// so any consumer (currently only socratic.go) can call SemanticSearch without
-// importing the full RAG pipeline.
+// so any consumer can call SemanticSearch without importing the full RAG pipeline.
 package retrieval
 
 import (
 	"container/list"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"ai-tutor/internal/db"
 	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/models"
+	"ai-tutor/internal/utils"
 )
 
 var ErrInvalidNotebookContext = errors.New("invalid notebook context: notebook ID is required")
 
+const (
+	// defaultCandidateK is the candidate pool size for hybrid fusion.
+	defaultCandidateK = 50
+	// rrfConstantK is the standard smoothing factor (k=60) for Reciprocal Rank Fusion.
+	rrfConstantK = 60.0
+	// minLexicalScoreThreshold is the minimum score required to consider lexical search matched.
+	minLexicalScoreThreshold = 0.05
+)
+
 // SearchResult is a single ranked chunk returned by SemanticSearch.
 type SearchResult struct {
-	ChunkID         string
-	Text            string
-	TopicID         string
-	PageNum         int
-	ImportanceScore float64
-	WeaknessScore   float64
-	Score           float64
+	ChunkID         string  // Unique identifier for the chunk
+	Text            string  // Raw text content of the chunk
+	TopicID         string  // Associated topic identifier
+	PageNum         int     // Page number in source document
+	ImportanceScore float64 // Importance score from chunk metadata
+	WeaknessScore   float64 // Weakness/remedial score from user history
+	Score           float64 // Final hybrid fusion retrieval score
 }
-
-type Scope string
-
-const (
-	ScopeTopic    Scope = "topic"
-	ScopeNotebook Scope = "notebook"
-)
 
 // Engine performs semantic similarity search using ONNX embeddings + sqlite-vec
 // with a lexical TF-cosine fallback when ONNX is unavailable.
@@ -55,7 +57,7 @@ type Engine struct {
 	maxCacheSize int
 }
 
-// NewEngine creates a retrieval engine.  embedder may be nil; the engine will
+// NewEngine creates a retrieval engine. embedder may be nil; the engine will
 // fall back to lexical cosine similarity in that case.
 func NewEngine(repo *db.Repository, embedder *embeddings.OnnxEmbedder) *Engine {
 	return &Engine{
@@ -67,6 +69,36 @@ func NewEngine(repo *db.Repository, embedder *embeddings.OnnxEmbedder) *Engine {
 		maxCacheSize: 10000, // Limit cache to prevent memory leaks
 	}
 }
+
+// SetEmbedder atomically updates the engine's embedder instance.
+func (e *Engine) SetEmbedder(emb *embeddings.OnnxEmbedder) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.embedder = emb
+}
+
+// SetRepo atomically updates the engine's repository instance.
+func (e *Engine) SetRepo(repo *db.Repository) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.repo = repo
+}
+
+// GetEmbedder returns the current embedder under lock.
+func (e *Engine) GetEmbedder() *embeddings.OnnxEmbedder {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.embedder
+}
+
+// GetRepo returns the current repository snapshot under lock.
+func (e *Engine) GetRepo() *db.Repository {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.repo
+}
+
+
 
 // AddChunk pre-builds the TF vector for the lexical fallback path.
 // Call this once per chunk at startup (mirrors rag.EmbeddingStore.AddChunk).
@@ -100,7 +132,7 @@ func (e *Engine) AddChunk(chunk models.Chunk) {
 }
 
 // SemanticSearch returns the topK most relevant chunks for query inside the
-// given topic.  Pass startPage/endPage > 0 to scope the search to a page window;
+// given topic. Pass startPage/endPage > 0 to scope the search to a page window;
 // pass 0 for both to search the whole topic.
 func (e *Engine) SemanticSearch(topicID string, query string, topK int, startPage, endPage int) ([]SearchResult, error) {
 	topicID = strings.TrimSpace(topicID)
@@ -108,18 +140,23 @@ func (e *Engine) SemanticSearch(topicID string, query string, topK int, startPag
 		return nil, fmt.Errorf("topic id is required")
 	}
 
+	repo := e.GetRepo()
+	if repo == nil {
+		return nil, fmt.Errorf("repository unavailable")
+	}
+
 	loadChunks := func() ([]models.Chunk, error) {
 		if startPage > 0 && endPage > 0 {
-			return e.repo.GetChunksForTopicPageRange(topicID, startPage, endPage)
+			return repo.GetChunksForTopicPageRange(topicID, startPage, endPage)
 		}
-		return e.repo.GetChunksForTopic(topicID)
+		return repo.GetChunksForTopic(topicID)
 	}
 
 	vectorSearch := func(queryVec []float32, k int) ([]string, error) {
-		return e.repo.SearchVectorsForTopic(topicID, queryVec, k, startPage, endPage)
+		return repo.SearchVectorsForTopic(topicID, queryVec, k, startPage, endPage)
 	}
 
-	return e.searchWithScope("vector search", query, topK, loadChunks, vectorSearch)
+	return e.searchWithScope("topic vector search", query, topK, loadChunks, vectorSearch)
 }
 
 // SemanticSearchNotebook returns the topK most relevant chunks linked to one notebook.
@@ -130,13 +167,18 @@ func (e *Engine) SemanticSearchNotebook(notebookID string, topicID string, query
 	}
 	topicID = strings.TrimSpace(topicID)
 
+	repo := e.GetRepo()
+	if repo == nil {
+		return nil, fmt.Errorf("repository unavailable")
+	}
+
 	var scopedChunksCache []models.Chunk
 	var scopedChunksLoaded bool
 	getScopedChunks := func() ([]models.Chunk, error) {
 		if scopedChunksLoaded {
 			return scopedChunksCache, nil
 		}
-		chunks, err := e.repo.GetChunksForNotebook(notebookID)
+		chunks, err := repo.GetChunksForNotebook(notebookID)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +205,7 @@ func (e *Engine) SemanticSearchNotebook(notebookID string, topicID string, query
 
 	vectorSearch := func(queryVec []float32, k int) ([]string, error) {
 		if topicID == "" {
-			return e.repo.SearchVectorsForNotebook(notebookID, queryVec, k)
+			return repo.SearchVectorsForNotebook(notebookID, queryVec, k)
 		}
 
 		scopedChunks, err := getScopedChunks()
@@ -186,7 +228,7 @@ func (e *Engine) SemanticSearchNotebook(notebookID string, topicID string, query
 		}
 
 		for {
-			chunkIDs, searchErr := e.repo.SearchVectorsForNotebook(notebookID, queryVec, overfetchK)
+			chunkIDs, searchErr := repo.SearchVectorsForNotebook(notebookID, queryVec, overfetchK)
 			if searchErr != nil {
 				return nil, searchErr
 			}
@@ -258,59 +300,64 @@ func (e *Engine) searchWithScope(
 		byID[c.ID] = c
 	}
 
-	const rrfK = 60.0
 	rrfScores := make(map[string]float64)
 
-	var (
-		wg             sync.WaitGroup
-		vectorMatched  bool
-		chunkIDs       []string
-		lexicalResults []SearchResult
-		lexicalMatched bool
-	)
+	type vectorResult struct {
+		matched  bool
+		chunkIDs []string
+	}
+	vecChan := make(chan vectorResult, 1)
+	lexChan := make(chan []SearchResult, 1)
 
 	// Run vector search and lexical search concurrently
-	wg.Add(2)
-
 	go func() {
-		defer wg.Done()
-		if e.embedder != nil {
-			queryVec, embedErr := e.embedder.Embed(query)
-			if embedErr == nil {
-				cIDs, searchErr := vectorSearch(queryVec, candidateK)
-				if searchErr == nil && len(cIDs) > 0 {
-					vectorMatched = true
-					chunkIDs = cIDs
-				} else if searchErr != nil {
-					log.Printf("retrieval: %s vector search unavailable: %v", scopeName, searchErr)
-				}
-			} else {
-				log.Printf("retrieval: query embedding failed: %v", embedErr)
-			}
+		emb := e.GetEmbedder()
+		if emb == nil {
+			vecChan <- vectorResult{matched: false}
+			return
 		}
+		queryVec, embedErr := emb.Embed(query)
+		if embedErr != nil {
+			utils.Debugf("retrieval: query embedding failed: %v", embedErr)
+			vecChan <- vectorResult{matched: false}
+			return
+		}
+		cIDs, searchErr := vectorSearch(queryVec, candidateK)
+		if searchErr != nil || len(cIDs) == 0 {
+			if searchErr != nil {
+				utils.Debugf("retrieval: %s vector search unavailable: %v", scopeName, searchErr)
+			}
+			vecChan <- vectorResult{matched: false}
+			return
+		}
+		vecChan <- vectorResult{matched: true, chunkIDs: cIDs}
 	}()
 
 	go func() {
-		defer wg.Done()
-		lexicalResults = e.lexicalSearch(query, chunks, candidateK)
+		lexChan <- e.lexicalSearch(query, chunks, candidateK)
 	}()
 
-	wg.Wait()
+	vecRes := <-vecChan
+	lexicalResults := <-lexChan
+
+	vectorMatched := vecRes.matched
+	chunkIDs := vecRes.chunkIDs
+	lexicalMatched := false
 
 	// Apply reciprocal rank fusion for vector results
 	if vectorMatched {
 		for rank, cid := range chunkIDs {
 			if _, exists := byID[cid]; exists {
-				rrfScores[cid] += 1.0 / (rrfK + float64(rank+1))
+				rrfScores[cid] += 1.0 / (rrfConstantK + float64(rank+1))
 			}
 		}
 	}
 
 	// Apply reciprocal rank fusion for lexical results
 	for rank, res := range lexicalResults {
-		if res.Score > 0 {
+		if res.Score > minLexicalScoreThreshold {
 			lexicalMatched = true
-			rrfScores[res.ChunkID] += 1.0 / (rrfK + float64(rank+1))
+			rrfScores[res.ChunkID] += 1.0 / (rrfConstantK + float64(rank+1))
 		}
 	}
 
@@ -354,16 +401,29 @@ func (e *Engine) searchWithScope(
 func (e *Engine) lexicalSearch(query string, chunks []models.Chunk, k int) []SearchResult {
 	qVec := e.tfVector(query)
 	qMagnitude := vectorMagnitude(qVec)
-	var results []SearchResult
+
+	// Pre-extract cached vectors under read lock
+	cachedVectors := make(map[string]map[string]float64, len(chunks))
+	var missingChunks []models.Chunk
 
 	e.mu.RLock()
-	defer e.mu.RUnlock()
 	for _, c := range chunks {
-		// Page filtering is now handled at database level
-		cVec, ok := e.tfCache[c.ID]
-		if !ok {
-			cVec = e.tfVector(c.Text)
+		if vec, ok := e.tfCache[c.ID]; ok {
+			cachedVectors[c.ID] = vec
+		} else {
+			missingChunks = append(missingChunks, c)
 		}
+	}
+	e.mu.RUnlock()
+
+	// Compute TF vectors outside of lock for cache misses
+	for _, c := range missingChunks {
+		cachedVectors[c.ID] = e.tfVector(c.Text)
+	}
+
+	results := make([]SearchResult, 0, len(chunks))
+	for _, c := range chunks {
+		cVec := cachedVectors[c.ID]
 		score := cosineSimilarity(qVec, cVec, qMagnitude)
 		results = append(results, SearchResult{
 			ChunkID:         c.ID,
@@ -413,7 +473,7 @@ var stopWords = map[string]bool{
 func tokenize(text string) []string {
 	text = strings.ToLower(text)
 	raw := strings.FieldsFunc(text, func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < '0' || r > '9')
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
 	out := make([]string, 0, len(raw))
 	for _, w := range raw {

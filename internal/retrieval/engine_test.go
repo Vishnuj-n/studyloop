@@ -83,3 +83,20 @@ func TestHybridRRFCompounding(t *testing.T) {
 		t.Fatalf("expected 2 results, got %d", len(res))
 	}
 }
+
+func TestUnicodeTokenizer(t *testing.T) {
+	tokens := tokenize("Bonjour le monde! 学习 Go 语言 — Café & Naïve")
+	// Verify that non-ASCII unicode letters are preserved
+	tokenMap := make(map[string]bool)
+	for _, tk := range tokens {
+		tokenMap[tk] = true
+	}
+
+	expectedTokens := []string{"bonjour", "monde", "学习", "语言", "café", "naïve"}
+	for _, exp := range expectedTokens {
+		if !tokenMap[exp] {
+			t.Errorf("expected token %q to be present, but got tokens: %v", exp, tokens)
+		}
+	}
+}
+
