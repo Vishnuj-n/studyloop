@@ -128,9 +128,9 @@
       @close="closeCertificateModal"
     />
 
-    <div v-if="isDraftingSyllabus" class="toast-stack">
+    <div class="toast-stack">
       <transition name="toast-fade">
-        <div class="drafting-toast">
+        <div v-if="isDraftingSyllabus" class="drafting-toast">
           <div class="drafting-toast-inner">
             <div class="spinner"></div>
             <span class="drafting-title">Preparing chapter draft...</span>
@@ -173,7 +173,6 @@ import NotebookUpload from '../components/NotebookUpload.vue'
 import NotebookCard from '../components/NotebookCard.vue'
 import NotebookSyllabusModal from '../components/NotebookSyllabusModal.vue'
 import NotebookCertificateModal from '../components/NotebookCertificateModal.vue'
-import BaseIcon from '../components/BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
 import { useToast } from '../composables/useToast'
 

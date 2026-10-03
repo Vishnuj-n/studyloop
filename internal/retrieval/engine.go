@@ -289,8 +289,7 @@ func (e *Engine) searchWithScope(
 		return nil, fmt.Errorf("no chunks found")
 	}
 
-	// ponytail: candidate pool size for hybrid fusion (up to 50 items)
-	candidateK := 50
+	candidateK := defaultCandidateK
 	if candidateK > len(chunks) {
 		candidateK = len(chunks)
 	}
