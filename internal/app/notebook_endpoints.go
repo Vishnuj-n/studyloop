@@ -8,7 +8,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ai-tutor/internal/db"
@@ -22,6 +24,23 @@ import (
 )
 
 const ingestionEventName = "ingestion-progress"
+
+const (
+	statusUploaded   = "uploaded"
+	statusProcessing = "processing"
+	statusDraftReady = "draft_ready"
+	statusChunked    = "chunked"
+	statusFailed     = "failed"
+	statusAnalyzing  = "analyzing"
+)
+
+// ponytail: per-notebook mutex prevents double-confirm / confirm-delete races
+var notebookOpLocks sync.Map
+
+func getNotebookOpLock(id string) *sync.Mutex {
+	l, _ := notebookOpLocks.LoadOrStore(id, &sync.Mutex{})
+	return l.(*sync.Mutex)
+}
 
 type ingestionProgressPayload struct {
 	NotebookID   string `json:"notebook_id"`
@@ -173,36 +192,41 @@ func (a *App) finalizeDeepStructuredPDFUpload(uploadResult *notebook.UploadResul
 	}
 }
 
+func (a *App) handleDeepPDFFailure(repo *db.Repository, nbID, prevStatus, prevStudyStatus, msg string) {
+	fallbackStatus := statusFailed
+	if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
+		fallbackStatus = prevStatus
+	}
+	_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
+	_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
+	emitIngestionProgress(a, ingestionProgressPayload{
+		NotebookID: nbID,
+		Status:     fallbackStatus,
+		Message:    msg,
+	})
+}
+
 func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *extension.Extension, prevStatus, prevStudyStatus string) {
 	repo := a.getRepo()
 	if repo == nil {
 		return
 	}
 
-	_ = repo.UpdateNotebookStatus(nbID, "processing")
-	emitIngestionProgress(a, ingestionProgressPayload{
-		NotebookID: nbID,
-		Status:     "processing",
-		Message:    "Initializing extraction...",
-		Phase:      "extraction",
-		Percent:    0,
-	})
+	_ = repo.UpdateNotebookStatus(nbID, statusProcessing)
 
 	go func() {
+		emitIngestionProgress(a, ingestionProgressPayload{
+			NotebookID: nbID,
+			Status:     statusProcessing,
+			Message:    "Initializing extraction...",
+			Phase:      "extraction",
+			Percent:    0,
+		})
+
 		defer func() {
 			if r := recover(); r != nil {
 				utils.Errorf("[DEEP_PDF] Panic during background extraction for %s (%s): %v", fileName, nbID, r)
-				fallbackStatus := "failed"
-				if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
-					fallbackStatus = prevStatus
-				}
-				_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
-				_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
-				emitIngestionProgress(a, ingestionProgressPayload{
-					NotebookID: nbID,
-					Status:     fallbackStatus,
-					Message:    fmt.Sprintf("Extraction failed: internal panic (%v)", r),
-				})
+				a.handleDeepPDFFailure(repo, nbID, prevStatus, prevStudyStatus, fmt.Sprintf("Extraction failed: internal panic (%v)", r))
 			}
 		}()
 		// ponytail: no artificial timeout ceiling; background PDF processing runs until done
@@ -216,7 +240,7 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 			}
 			emitIngestionProgress(a, ingestionProgressPayload{
 				NotebookID: nbID,
-				Status:     "processing",
+				Status:     statusProcessing,
 				Message:    message,
 				Phase:      "extraction",
 				Processed:  processed,
@@ -228,17 +252,7 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 		doc, result, extErr := a.notebookService.IngestDeepPDFWithProgress(ctx, filePath, a.extRunner, extObj, onProgress)
 		if extErr != nil {
 			utils.Warnf("[DEEP_PDF] Extraction failed for %s (%s): %v", fileName, nbID, extErr)
-			fallbackStatus := "failed"
-			if nb, err := repo.GetNotebookByID(nbID); err == nil && nb != nil && nb.ChunkCount > 0 {
-				fallbackStatus = prevStatus
-			}
-			_ = repo.UpdateNotebookStatus(nbID, fallbackStatus)
-			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     fallbackStatus,
-				Message:    fmt.Sprintf("Extraction failed: %v", extErr),
-			})
+			a.handleDeepPDFFailure(repo, nbID, prevStatus, prevStudyStatus, fmt.Sprintf("Extraction failed: %v", extErr))
 			return
 		}
 
@@ -268,13 +282,7 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 
 		if err := persistSyllabusDraft(repo, nbID, doc.PageCount, chaptersDraft, fallbackUsed); err != nil {
 			utils.Warnf("[DEEP_PDF] Failed to persist syllabus draft for %s (%s): %v", fileName, nbID, err)
-			_ = repo.UpdateNotebookStatus(nbID, prevStatus)
-			_ = repo.UpdateNotebookStudyStatus(nbID, prevStudyStatus)
-			emitIngestionProgress(a, ingestionProgressPayload{
-				NotebookID: nbID,
-				Status:     prevStatus,
-				Message:    fmt.Sprintf("Failed to save syllabus draft: %v", err),
-			})
+			a.handleDeepPDFFailure(repo, nbID, prevStatus, prevStudyStatus, fmt.Sprintf("Failed to save syllabus draft: %v", err))
 			return
 		}
 
@@ -284,7 +292,7 @@ func (a *App) runDeepPDFExtraction(nbID, filePath, fileName string, extObj *exte
 
 		emitIngestionProgress(a, ingestionProgressPayload{
 			NotebookID: nbID,
-			Status:     "draft_ready",
+			Status:     statusDraftReady,
 			Message:    "Syllabus draft ready",
 		})
 	}()
@@ -684,12 +692,16 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 
 	// regenerate=true: full extraction + LLM (used by AI Clean Up)
 	// Stop and return error if LLM is unavailable or draft generation fails.
-	if a.heavyLLMProvider == nil {
-		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
+	a.aiMutex.Lock()
+	heavyLLM := a.heavyLLMProvider
+	a.aiMutex.Unlock()
+
+	if heavyLLM == nil {
+		_ = repo.UpdateNotebookStatus(notebookID, statusDraftReady)
 		return map[string]interface{}{"error": "heavy LLM provider is not available for AI cleanup"}
 	}
 
-	result, llmErr := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, a.heavyLLMProvider)
+	result, llmErr := a.notebookService.DraftSyllabusChapters(nb.FileType, nb.FilePath, doc, heavyLLM)
 	if llmErr != nil {
 		_ = repo.UpdateNotebookStatus(notebookID, "draft_ready")
 		return map[string]interface{}{"error": fmt.Sprintf("AI extraction failed: %v", llmErr)}
@@ -723,12 +735,15 @@ func (a *App) AICleanupNotebookSyllabus(notebookID string) map[string]interface{
 
 // ConfirmNotebookSyllabus commits notebook ingestion from user-confirmed chapter bounds.
 func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.SyllabusChapterDraft) map[string]interface{} {
+	notebookID = strings.TrimSpace(notebookID)
+	mu := getNotebookOpLock(notebookID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
 	if errResp != nil {
 		return errResp
 	}
-
-	notebookID = strings.TrimSpace(notebookID)
 
 	// Extract document only when a full re-ingest is necessary. We'll try to detect
 	// whether a metadata-only or topic-metadata-only update is sufficient.
@@ -736,9 +751,20 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if len(normalized) == 0 {
 		return map[string]interface{}{"error": "at least one valid chapter is required"}
 	}
+	sort.SliceStable(normalized, func(i, j int) bool {
+		return normalized[i].StartPage < normalized[j].StartPage
+	})
 
 	// Attempt to fetch existing topics/bounds for this notebook to decide path
 	existingTopics, etErr := repo.GetNotebookTopicsWithBounds(notebookID)
+	if len(existingTopics) > 0 {
+		sort.SliceStable(existingTopics, func(i, j int) bool {
+			if existingTopics[i].StartPage != existingTopics[j].StartPage {
+				return existingTopics[i].StartPage < existingTopics[j].StartPage
+			}
+			return existingTopics[i].TopicID < existingTopics[j].TopicID
+		})
+	}
 	existingTopicIDs := make(map[string]struct{}, len(existingTopics))
 	for _, et := range existingTopics {
 		existingTopicIDs[et.TopicID] = struct{}{}
@@ -749,7 +775,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	}
 
 	// If notebook already chunked and we have existing topic info, compare bounds/titles
-	if nb.Status == "chunked" && len(existingTopics) > 0 {
+	if nb.Status == statusChunked && len(existingTopics) > 0 {
 		boundsChanged := false
 		titlesChanged := false
 
@@ -791,7 +817,7 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 			}
 
 			if err := repo.EnsureTopicsBatch(topicItems); err != nil {
-				_ = repo.UpdateNotebookStatus(notebookID, "failed")
+				_ = repo.UpdateNotebookStatus(notebookID, statusFailed)
 				return map[string]interface{}{"error": "failed to update topics: " + err.Error()}
 			}
 
@@ -824,6 +850,9 @@ func (a *App) ConfirmNotebookSyllabus(notebookID string, chapters []models.Sylla
 	if len(normalized) == 0 {
 		return map[string]interface{}{"error": "at least one valid chapter is required"}
 	}
+	sort.SliceStable(normalized, func(i, j int) bool {
+		return normalized[i].StartPage < normalized[j].StartPage
+	})
 
 	// Collect all topics and bounds for batch processing
 	topicItems := make([]db.TopicBatchItem, 0, len(normalized))
@@ -1049,7 +1078,7 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 		}
 	}
 
-	var result []map[string]interface{}
+	result := make([]map[string]interface{}, 0, len(notebooks))
 	for _, nb := range notebooks {
 		result = append(result, map[string]interface{}{
 			"id":              nb.ID,
@@ -1148,6 +1177,10 @@ func (a *App) UpdateNotebookPriority(notebookID string, priority int) map[string
 // DeleteNotebook removes a notebook and its associated file
 func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 	notebookID = strings.TrimSpace(notebookID)
+	mu := getNotebookOpLock(notebookID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	repo, nb, errResp := a.getNotebookAndRepo(notebookID)
 	if errResp != nil {
 		return errResp
@@ -1157,8 +1190,8 @@ func (a *App) DeleteNotebook(notebookID string) map[string]interface{} {
 	// ponytail: never delete user's original external files (e.g. Downloads, Documents, Desktop)
 	if nb.FilePath != "" && a.notebookService != nil {
 		if err := a.notebookService.DeleteFile(nb.FilePath); err != nil && !os.IsNotExist(err) {
-			// If error was "outside upload directory", ignore it safely — external file must remain untouched!
-			if !strings.Contains(err.Error(), "outside upload directory") {
+			// If error was ErrFileOutsideUploadDir, ignore it safely — external file must remain untouched!
+			if !errors.Is(err, notebook.ErrFileOutsideUploadDir) && !strings.Contains(err.Error(), "outside upload directory") {
 				return map[string]interface{}{
 					"error": fmt.Sprintf("failed to delete notebook file %s: %v", nb.FilePath, err),
 				}
@@ -1220,13 +1253,15 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		}
 	}
 
-	deadlineTime := time.Unix(p.DeadlineAt, 0)
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	deadlineDate := time.Date(deadlineTime.Year(), deadlineTime.Month(), deadlineTime.Day(), 0, 0, 0, 0, now.Location())
+	deadlineTime := time.Unix(p.DeadlineAt, 0).UTC()
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	deadlineDate := time.Date(deadlineTime.Year(), deadlineTime.Month(), deadlineTime.Day(), 0, 0, 0, 0, time.UTC)
 
-	duration := deadlineDate.Sub(today)
-	daysRemaining := int(math.Round(duration.Hours() / 24))
+	daysRemaining := int(deadlineDate.Sub(today).Hours() / 24)
+	if daysRemaining < 0 {
+		daysRemaining = 0
+	}
 
 	var dailyPace int
 	if daysRemaining > 0 {
@@ -1239,11 +1274,14 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to load user settings: %v", err)}
 	}
+	if settings == nil {
+		return map[string]interface{}{"error": "user settings not found"}
+	}
 
 	var targetWords int
 	if p.TargetSessionWords != nil && *p.TargetSessionWords > 0 {
 		targetWords = *p.TargetSessionWords
-	} else if settings != nil && settings.TargetSessionWords > 0 {
+	} else if settings.TargetSessionWords > 0 {
 		targetWords = settings.TargetSessionWords
 	} else {
 		return map[string]interface{}{"error": "invalid target_session_words in user settings"}
@@ -1379,15 +1417,5 @@ func (a *App) GetNotebookCertificateStats(notebookID string) (*db.NotebookCertif
 		return nil, errors.New("database not initialized")
 	}
 	return repo.GetNotebookCertificateStats(notebookID)
-}
-
-// DevUnlockNotebookCertificate is a developer bypass that completes remaining reading tasks & topic cursors for a notebook so the user can immediately test 100% completion & certificates.
-func (a *App) DevUnlockNotebookCertificate(notebookID string) (*db.NotebookCertificateStats, error) {
-	repo := a.getRepo()
-	if repo == nil {
-		return nil, errors.New("database not initialized")
-	}
-
-	return repo.DevUnlockNotebookCertificate(notebookID)
 }
 
