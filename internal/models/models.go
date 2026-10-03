@@ -689,6 +689,7 @@ type TopicStudyNote struct {
 	NotebookTitle  string `json:"notebook_title,omitempty"`
 	StartPage      int    `json:"start_page"`
 	EndPage        int    `json:"end_page"`
+	FilePath       string `json:"file_path,omitempty"`
 	Content        string `json:"content"`
 	LastReviewedAt int64  `json:"last_reviewed_at"`
 	CreatedAt      string `json:"created_at,omitempty"`

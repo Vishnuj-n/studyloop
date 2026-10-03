@@ -591,9 +591,24 @@ export function getTopicStudyNote(topicID) {
   }
 }
 
-export function updateTopicStudyNote(topicID, content) {
+export function getTopicStudyNoteSlots(topicID) {
   try {
-    return appBridge().UpdateTopicStudyNote(topicID, content)
+    return appBridge().GetTopicStudyNoteSlots(topicID)
+  } catch (err) {
+    console.error('Failed fetching topic study note slots:', err)
+    throw err
+  }
+}
+
+export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, content = '') {
+  try {
+    // If called with (topicID, content) backward-compatibility
+    if (typeof startPage === 'string' && content === '') {
+      content = startPage
+      startPage = 0
+      endPage = 0
+    }
+    return appBridge().UpdateTopicStudyNote(topicID, Number(startPage) || 0, Number(endPage) || 0, content)
   } catch (err) {
     console.error('Failed updating topic study note:', err)
     throw err
@@ -609,14 +624,24 @@ export function getNotesByNotebook(notebookID = '') {
   }
 }
 
-export function markTopicReviewed(topicID) {
+export function markTopicReviewed(topicID, startPage = 0, endPage = 0) {
   try {
-    return appBridge().MarkTopicReviewed(topicID)
+    return appBridge().MarkTopicReviewed(topicID, Number(startPage) || 0, Number(endPage) || 0)
   } catch (err) {
     console.error('Failed marking topic reviewed:', err)
     throw err
   }
 }
+
+export function openNotesFolder(notebookID = '', topicID = '') {
+  try {
+    return appBridge().OpenNotesFolder(notebookID || '', topicID || '')
+  } catch (err) {
+    console.error('Failed opening notes folder:', err)
+    throw err
+  }
+}
+
 
 
 

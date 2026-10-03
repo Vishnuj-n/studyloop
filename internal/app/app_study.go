@@ -805,7 +805,7 @@ func (a *App) ClaimAchievement(achievementID string) map[string]interface{} {
 	}
 }
 
-// GenerateTopicStudyNote generates or regenerates a structured study note for a topic.
+// GenerateTopicStudyNote generates or regenerates the whole-chapter (0,0) study note for a topic.
 func (a *App) GenerateTopicStudyNote(topicID, notebookID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
@@ -820,7 +820,8 @@ func (a *App) GenerateTopicStudyNote(topicID, notebookID string) map[string]inte
 	}
 }
 
-// GenerateTopicStudyNoteForRange creates or updates a study note for a topic within a specific page range.
+// GenerateTopicStudyNoteForRange creates or replaces the study note for a specific reading session page range.
+// Each (topicID, startPage, endPage) is its own independent note slot — no merging.
 func (a *App) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPage, endPage int) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
@@ -835,7 +836,8 @@ func (a *App) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPa
 	}
 }
 
-// GetTopicStudyNote retrieves the study note for a specific topic ID.
+// GetTopicStudyNote retrieves the whole-chapter (0,0) study note for a topic.
+// Use GetTopicStudyNoteSlots to get all per-session notes.
 func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
@@ -850,15 +852,35 @@ func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
 	}
 }
 
-// UpdateTopicStudyNote updates the markdown content of a topic study note.
-func (a *App) UpdateTopicStudyNote(topicID, content string) map[string]interface{} {
+// GetTopicStudyNoteSlots returns all per-session notes for a topic ordered by start_page.
+// The frontend uses this to render one card per reading session.
+func (a *App) GetTopicStudyNoteSlots(topicID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
-	if err := a.studyService.UpdateTopicStudyNote(topicID, content); err != nil {
+	notes, err := a.studyService.GetTopicStudyNoteSlots(topicID)
+	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	note, _ := a.studyService.GetTopicStudyNote(topicID)
+	if notes == nil {
+		notes = []models.TopicStudyNote{}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"slots":   notes,
+	}
+}
+
+// UpdateTopicStudyNote updates the markdown content of a specific (topic, page range) note slot.
+// Use startPage=0, endPage=0 for the whole-chapter note.
+func (a *App) UpdateTopicStudyNote(topicID string, startPage, endPage int, content string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	if err := a.studyService.UpdateTopicStudyNote(topicID, startPage, endPage, content); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	note, _ := a.studyService.GetTopicStudyNoteForRange(topicID, startPage, endPage)
 	return map[string]interface{}{
 		"success": true,
 		"note":    note,
@@ -883,12 +905,13 @@ func (a *App) GetNotesByNotebook(notebookID string) map[string]interface{} {
 	}
 }
 
-// MarkTopicReviewed marks a study note as reviewed.
-func (a *App) MarkTopicReviewed(topicID string) map[string]interface{} {
+// MarkTopicReviewed marks a specific (topic, page range) note slot as reviewed.
+// Use startPage=0, endPage=0 for the whole-chapter note.
+func (a *App) MarkTopicReviewed(topicID string, startPage, endPage int) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
-	if err := a.studyService.MarkTopicReviewed(topicID); err != nil {
+	if err := a.studyService.MarkTopicReviewed(topicID, startPage, endPage); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{
@@ -896,6 +919,18 @@ func (a *App) MarkTopicReviewed(topicID string) map[string]interface{} {
 	}
 }
 
-
-
+// OpenNotesFolder opens the local directory containing markdown study notes in the OS file explorer (Windows Explorer, Finder, etc.)
+func (a *App) OpenNotesFolder(notebookID, topicID string) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	absPath, err := a.studyService.OpenNotesFolder(notebookID, topicID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error(), "path": absPath}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"path":    absPath,
+	}
+}
 

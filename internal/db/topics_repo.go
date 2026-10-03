@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
@@ -55,6 +54,20 @@ func (r *Repository) GetTopic(topicID string) (*models.TopicSummary, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// GetNotebookTitle returns the title of a notebook by its ID.
+func (r *Repository) GetNotebookTitle(notebookID string) (string, error) {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return "", nil
+	}
+	var title string
+	err := r.db.QueryRow(`SELECT COALESCE(title, '') FROM notebooks WHERE id = ?`, notebookID).Scan(&title)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return title, err
 }
 
 // GetNotebookIDForTopic resolves the parent notebook ID for a given topic ID.
@@ -688,219 +701,43 @@ func (r *Repository) IsTopicFullyReadTx(tx *sql.Tx, topicID string) (bool, error
 	return endPage > 0 && cursor >= endPage, nil
 }
 
-// UpsertTopicStudyNote inserts or updates a per-session study note.
-// The uniqueness key is (topic_id, start_page, end_page).
-// Use start_page=0, end_page=0 for a whole-chapter / on-demand note.
-func (r *Repository) UpsertTopicStudyNote(note models.TopicStudyNote) error {
-	id := strings.TrimSpace(note.ID)
-	if id == "" {
-		id = fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(note.TopicID), note.StartPage, note.EndPage)
-	}
-	topicID := strings.TrimSpace(note.TopicID)
-	if topicID == "" {
-		return fmt.Errorf("topic id is required for study note")
-	}
-	notebookID := strings.TrimSpace(note.NotebookID)
-	if notebookID == "" {
-		// Attempt to lookup notebook_id from notebook_topics if not provided
-		_ = r.db.QueryRow(`SELECT notebook_id FROM notebook_topics WHERE topic_id = ? LIMIT 1`, topicID).Scan(&notebookID)
-	}
-
-	_, err := r.db.Exec(`
-		INSERT INTO topic_study_notes (id, topic_id, notebook_id, start_page, end_page, content, last_reviewed_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(topic_id, start_page, end_page) DO UPDATE SET
-			content = excluded.content,
-			notebook_id = CASE WHEN excluded.notebook_id != '' THEN excluded.notebook_id ELSE topic_study_notes.notebook_id END,
-			updated_at = CURRENT_TIMESTAMP
-	`, id, topicID, notebookID, note.StartPage, note.EndPage, note.Content, note.LastReviewedAt)
-	return err
-}
-
-// GetTopicStudyNote retrieves the whole-chapter (start_page=0, end_page=0) note for a topic.
-// Use GetTopicStudyNoteSlots to retrieve all per-session notes.
-func (r *Repository) GetTopicStudyNote(topicID string) (*models.TopicStudyNote, error) {
-	return r.GetTopicStudyNoteForRange(topicID, 0, 0)
-}
-
-// GetTopicStudyNoteForRange retrieves the study note for a specific (topic, startPage, endPage) slot.
-// Returns nil, nil when no note exists yet for this slot.
-func (r *Repository) GetTopicStudyNoteForRange(topicID string, startPage, endPage int) (*models.TopicStudyNote, error) {
-	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
-		return nil, fmt.Errorf("topic id is required")
-	}
-
-	var note models.TopicStudyNote
-	var createdAt, updatedAt string
-	err := r.db.QueryRow(`
-		SELECT n.id, n.topic_id, COALESCE(t.title, ''), n.notebook_id, COALESCE(nb.title, ''),
-		       n.start_page, n.end_page, n.content, COALESCE(n.last_reviewed_at, 0),
-		       COALESCE(n.created_at, ''), COALESCE(n.updated_at, '')
-		FROM topic_study_notes n
-		LEFT JOIN topics t ON t.id = n.topic_id
-		LEFT JOIN notebooks nb ON nb.id = n.notebook_id
-		WHERE n.topic_id = ? AND n.start_page = ? AND n.end_page = ?
-	`, topicID, startPage, endPage).Scan(
-		&note.ID, &note.TopicID, &note.TopicTitle, &note.NotebookID, &note.NotebookTitle,
-		&note.StartPage, &note.EndPage, &note.Content, &note.LastReviewedAt, &createdAt, &updatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	note.CreatedAt = createdAt
-	note.UpdatedAt = updatedAt
-	return &note, nil
-}
-
-// GetTopicStudyNoteSlots returns all per-session notes for a topic ordered by start_page ascending.
-// Each row is one reading session note. Row with start_page=0,end_page=0 is the whole-chapter note.
-func (r *Repository) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStudyNote, error) {
+// GetCompletedReadingSessionsForTopic returns active or completed reading sessions from study_queue
+// for surfacing reading session note slots in study notes.
+func (r *Repository) GetCompletedReadingSessionsForTopic(topicID string) ([]models.StudyQueueTask, error) {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
 		return nil, fmt.Errorf("topic id is required")
 	}
 
 	rows, err := r.db.Query(`
-		SELECT n.id, n.topic_id, COALESCE(t.title, ''), n.notebook_id, COALESCE(nb.title, ''),
-		       n.start_page, n.end_page, n.content, COALESCE(n.last_reviewed_at, 0),
-		       COALESCE(n.created_at, ''), COALESCE(n.updated_at, '')
-		FROM topic_study_notes n
-		LEFT JOIN topics t ON t.id = n.topic_id
-		LEFT JOIN notebooks nb ON nb.id = n.notebook_id
-		WHERE n.topic_id = ?
-		ORDER BY n.start_page ASC, n.end_page ASC
+		SELECT sq.id, sq.topic_id, COALESCE(t.title, ''), sq.notebook_id, COALESCE(nb.title, ''),
+		       COALESCE(sq.start_page, 0), COALESCE(sq.end_page, 0)
+		FROM study_queue sq
+		LEFT JOIN topics t ON t.id = sq.topic_id
+		LEFT JOIN notebooks nb ON nb.id = sq.notebook_id
+		WHERE sq.topic_id = ? 
+		  AND sq.task_type IN ('READING', 'REREAD')
+		  AND sq.status IN ('COMPLETED', 'ACTIVE')
+		  AND COALESCE(sq.start_page, 0) > 0
+		  AND COALESCE(sq.end_page, 0) >= COALESCE(sq.start_page, 0)
+		ORDER BY sq.start_page ASC, sq.end_page ASC
 	`, topicID)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var notes []models.TopicStudyNote
+	var tasks []models.StudyQueueTask
 	for rows.Next() {
-		var note models.TopicStudyNote
-		var createdAt, updatedAt string
-		if err := rows.Scan(
-			&note.ID, &note.TopicID, &note.TopicTitle, &note.NotebookID, &note.NotebookTitle,
-			&note.StartPage, &note.EndPage, &note.Content, &note.LastReviewedAt, &createdAt, &updatedAt,
-		); err != nil {
+		var task models.StudyQueueTask
+		var topicTitle, nbTitle string
+		if err := rows.Scan(&task.ID, &task.TopicID, &topicTitle, &task.NotebookID, &nbTitle, &task.StartPage, &task.EndPage); err != nil {
 			return nil, err
 		}
-		note.CreatedAt = createdAt
-		note.UpdatedAt = updatedAt
-		notes = append(notes, note)
+		task.Title = topicTitle
+		tasks = append(tasks, task)
 	}
-	return notes, rows.Err()
+	return tasks, rows.Err()
 }
 
-// UpdateTopicStudyNoteContent updates the Markdown content for a topic study note.
-func (r *Repository) UpdateTopicStudyNoteContent(topicID, content string) error {
-	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
-		return fmt.Errorf("topic id is required")
-	}
-
-	// Check if note exists; if not, look up notebookID and insert
-	var exists bool
-	_ = r.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM topic_study_notes WHERE topic_id = ?)`, topicID).Scan(&exists)
-	if !exists {
-		var notebookID string
-		_ = r.db.QueryRow(`SELECT notebook_id FROM notebook_topics WHERE topic_id = ? LIMIT 1`, topicID).Scan(&notebookID)
-		return r.UpsertTopicStudyNote(models.TopicStudyNote{
-			TopicID:    topicID,
-			NotebookID: notebookID,
-			Content:    content,
-		})
-	}
-
-	_, err := r.db.Exec(`
-		UPDATE topic_study_notes
-		SET content = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE topic_id = ?
-	`, content, topicID)
-	return err
-}
-
-// GetNotesByNotebook returns all study notes for topics belonging to a notebook.
-func (r *Repository) GetNotesByNotebook(notebookID string) ([]models.TopicStudyNote, error) {
-	notebookID = strings.TrimSpace(notebookID)
-
-	var query string
-	var args []interface{}
-	if notebookID != "" {
-		query = `
-			SELECT n.id, n.topic_id, COALESCE(t.title, ''), n.notebook_id, COALESCE(nb.title, ''), n.content, COALESCE(n.last_reviewed_at, 0),
-			       COALESCE(n.created_at, ''), COALESCE(n.updated_at, '')
-			FROM topic_study_notes n
-			LEFT JOIN topics t ON t.id = n.topic_id
-			LEFT JOIN notebooks nb ON nb.id = n.notebook_id
-			WHERE n.notebook_id = ?
-			ORDER BY n.updated_at DESC
-		`
-		args = append(args, notebookID)
-	} else {
-		query = `
-			SELECT n.id, n.topic_id, COALESCE(t.title, ''), n.notebook_id, COALESCE(nb.title, ''), n.content, COALESCE(n.last_reviewed_at, 0),
-			       COALESCE(n.created_at, ''), COALESCE(n.updated_at, '')
-			FROM topic_study_notes n
-			LEFT JOIN topics t ON t.id = n.topic_id
-			LEFT JOIN notebooks nb ON nb.id = n.notebook_id
-			ORDER BY n.updated_at DESC
-		`
-	}
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var notes []models.TopicStudyNote
-	for rows.Next() {
-		var note models.TopicStudyNote
-		var createdAt, updatedAt string
-		if err := rows.Scan(
-			&note.ID, &note.TopicID, &note.TopicTitle, &note.NotebookID, &note.NotebookTitle,
-			&note.Content, &note.LastReviewedAt, &createdAt, &updatedAt,
-		); err != nil {
-			return nil, err
-		}
-		note.CreatedAt = createdAt
-		note.UpdatedAt = updatedAt
-		notes = append(notes, note)
-	}
-	return notes, rows.Err()
-}
-
-// MarkTopicStudyNoteReviewed sets last_reviewed_at to the current Unix timestamp.
-func (r *Repository) MarkTopicStudyNoteReviewed(topicID string) error {
-	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
-		return fmt.Errorf("topic id is required")
-	}
-
-	res, err := r.db.Exec(`
-		UPDATE topic_study_notes
-		SET last_reviewed_at = strftime('%s', 'now'), updated_at = CURRENT_TIMESTAMP
-		WHERE topic_id = ?
-	`, topicID)
-	if err != nil {
-		return err
-	}
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		// If no record exists yet, create one
-		var notebookID string
-		_ = r.db.QueryRow(`SELECT notebook_id FROM notebook_topics WHERE topic_id = ? LIMIT 1`, topicID).Scan(&notebookID)
-		return r.UpsertTopicStudyNote(models.TopicStudyNote{
-			TopicID:        topicID,
-			NotebookID:     notebookID,
-			LastReviewedAt: time.Now().Unix(),
-		})
-	}
-	return nil
-}
 

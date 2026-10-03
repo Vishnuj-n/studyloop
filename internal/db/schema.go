@@ -161,20 +161,6 @@ func InitSchema(tx *sql.Tx) error {
 			FOREIGN KEY (active_profile_id) REFERENCES study_profiles(id) ON DELETE SET NULL
 		)`,
 
-		`CREATE TABLE IF NOT EXISTS topic_study_notes (
-			id TEXT PRIMARY KEY,
-			topic_id TEXT NOT NULL,
-			notebook_id TEXT NOT NULL,
-			start_page INTEGER NOT NULL DEFAULT 0,
-			end_page INTEGER NOT NULL DEFAULT 0,
-			content TEXT NOT NULL DEFAULT '',
-			last_reviewed_at INTEGER DEFAULT 0,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
-			FOREIGN KEY (notebook_id) REFERENCES notebooks(id) ON DELETE CASCADE
-		)`,
-
 		`CREATE TABLE IF NOT EXISTS llm_settings (
 			tier TEXT PRIMARY KEY CHECK (tier IN ('fast', 'heavy')),
 			provider TEXT NOT NULL DEFAULT 'groq',
@@ -363,9 +349,6 @@ func InitSchema(tx *sql.Tx) error {
 		`CREATE INDEX IF NOT EXISTS idx_manual_flashcards_notebook_id ON manual_flashcards(notebook_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_events_synced ON analytics_events(synced)`,
 		`CREATE INDEX IF NOT EXISTS idx_pending_loot_boxes_opened ON pending_loot_boxes(opened, created_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_topic_study_notes_topic ON topic_study_notes(topic_id)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_study_notes_topic_range ON topic_study_notes(topic_id, start_page, end_page)`,
-		`CREATE INDEX IF NOT EXISTS idx_topic_study_notes_notebook ON topic_study_notes(notebook_id)`,
 	}
 
 	for _, stmt := range indexes {

@@ -4,6 +4,68 @@
  */
 
 export const icons = {
+  "plus": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<line x1=\"12\" y1=\"5\" x2=\"12\" y2=\"19\"/>",
+      "<line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"/>"
+    ]
+  },
+  "search": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"11\" cy=\"11\" r=\"8\"/>",
+      "<line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/>"
+    ]
+  },
+  "info": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<circle cx=\"12\" cy=\"12\" r=\"10\"/>",
+      "<line x1=\"12\" y1=\"16\" x2=\"12\" y2=\"12\"/>",
+      "<line x1=\"12\" y1=\"8\" x2=\"12.01\" y2=\"8\"/>"
+    ]
+  },
+  "layers": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<polygon points=\"12 2 2 7 12 12 22 7 12 2\"/>",
+      "<polyline points=\"2 17 12 22 22 17\"/>",
+      "<polyline points=\"2 12 12 17 22 12\"/>"
+    ]
+  },
+  "book-open": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z\"/>",
+      "<path d=\"M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z\"/>"
+    ]
+  },
+  "user": {
+    "viewBox": "0 0 24 24",
+    "fill": "none",
+    "stroke": "currentColor",
+    "strokeWidth": 2,
+    "paths": [
+      "<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/>",
+      "<circle cx=\"12\" cy=\"7\" r=\"4\"/>"
+    ]
+  },
   "coin": {
     "viewBox": "0 0 24 24",
     "fill": "none",

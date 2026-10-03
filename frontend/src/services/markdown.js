@@ -80,8 +80,13 @@ const SANITIZE_CONFIG = {
     'msup',
     'msubsup',
     'input',
+    'img',
+    'video',
+    'source',
+    'figure',
+    'figcaption',
   ],
-  ADD_ATTR: ['aria-hidden', 'type', 'checked', 'disabled'],
+  ADD_ATTR: ['aria-hidden', 'type', 'checked', 'disabled', 'src', 'alt', 'title', 'width', 'height', 'controls', 'poster'],
 }
 
 export function renderMarkdown(input) {

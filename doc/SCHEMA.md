@@ -11,7 +11,7 @@ Generated from + must stay synchronized with `internal/db/schema.go`. Every `CRE
 | Layer         | Tables                                                                                  |
 | ------------- | --------------------------------------------------------------------------------------- |
 | Queue         | `study_queue`, `review_task_cards`                                                      |
-| Content       | `notebooks`, `topics`, `chunks`, `notebook_topics`, `notebook_chunks`, `topic_progress`, `topic_study_notes` |
+| Content       | `notebooks`, `topics`, `chunks`, `notebook_topics`, `notebook_chunks`, `topic_progress` |
 | Assessment    | `quiz_attempts`, `reread_attempts`, `written_questions`, `written_user_answers`         |
 | Retention     | `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`                                    |
 | Configuration | `user_settings`, `llm_settings`, `study_profiles`                                       |
@@ -190,29 +190,6 @@ Topic-level learning metadata.
 | `mastery_score` | REAL DEFAULT 0 | Topic mastery score |
 | `review_enabled` | INTEGER DEFAULT 0 | Whether review enabled |
 | `status` | TEXT DEFAULT 'active' | Topic progress lifecycle state |
-
-### `topic_study_notes`
-
-Structured topic summary and study sheet for active recall and pre-exam retrieval.
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | TEXT PRIMARY KEY | Unique study note identifier |
-| `topic_id` | TEXT NOT NULL | Context topic. FK → `topics(id)` ON DELETE CASCADE |
-| `notebook_id` | TEXT NOT NULL | Parent notebook. FK → `notebooks(id)` ON DELETE CASCADE |
-| `content` | TEXT NOT NULL DEFAULT '' | Markdown study note content (100–150 word summary) |
-| `last_reviewed_at` | INTEGER DEFAULT 0 | Unix timestamp of last pre-exam retrieval or manual review |
-| `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation timestamp |
-| `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update timestamp |
-
-**Foreign keys:** `topic_id` → `topics(id)` ON DELETE CASCADE, `notebook_id` → `notebooks(id)` ON DELETE CASCADE.
-
-**Indexes**
-
-```sql
-CREATE UNIQUE INDEX idx_topic_study_notes_topic ON topic_study_notes(topic_id);
-CREATE INDEX idx_topic_study_notes_notebook ON topic_study_notes(notebook_id);
-```
 
 ## Assessment Tables
 
@@ -536,8 +513,6 @@ CREATE INDEX idx_pending_loot_boxes_opened ON pending_loot_boxes(opened, created
 | `fsrs_cards` | `source_chunk_id` | `chunks(id)` | ON DELETE SET NULL |
 | `fsrs_review_log` | `topic_id` | `topics(id)` | ON DELETE CASCADE |
 | `manual_flashcards` | `notebook_id` | `notebooks(id)` | ON DELETE CASCADE |
-| `topic_study_notes` | `topic_id` | `topics(id)` | ON DELETE CASCADE |
-| `topic_study_notes` | `notebook_id` | `notebooks(id)` | ON DELETE CASCADE |
 | `user_settings` | `active_profile_id` | `study_profiles(id)` | ON DELETE SET NULL |
 
 ### Semantic Relationships
