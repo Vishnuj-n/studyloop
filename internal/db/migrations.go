@@ -103,6 +103,10 @@ var alterStatements = []struct {
 	// gamification
 	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
 	{"user_gamification", "last_freeze_purchased_at", "ALTER TABLE user_gamification ADD COLUMN last_freeze_purchased_at INTEGER NOT NULL DEFAULT 0"},
+
+	// topic_study_notes: per-session page range columns (replaces merged-blob design)
+	{"topic_study_notes", "start_page", "ALTER TABLE topic_study_notes ADD COLUMN start_page INTEGER NOT NULL DEFAULT 0"},
+	{"topic_study_notes", "end_page", "ALTER TABLE topic_study_notes ADD COLUMN end_page INTEGER NOT NULL DEFAULT 0"},
 }
 
 // RunMigrations applies idempotent column additions, table deduping, and data backfills.
@@ -125,11 +129,46 @@ func RunMigrations(tx *sql.Tx) error {
 		}
 	}
 
-	// 3. Seed default rows and backfill settings
+	// 3. Migrate topic_study_notes from per-topic unique index to per-session unique index.
+	// Drop the old idx_topic_study_notes_topic unique index (if it was created as UNIQUE)
+	// and ensure the new composite unique index exists.
+	if err := migrateTopicStudyNotesIndex(tx); err != nil {
+		return err
+	}
+
+	// 4. Seed default rows and backfill settings
 	if err := seedDefaults(tx); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// migrateTopicStudyNotesIndex drops the old unique-on-topic_id index and creates the
+// new unique-on-(topic_id, start_page, end_page) index idempotently.
+func migrateTopicStudyNotesIndex(tx *sql.Tx) error {
+	// Check if the old UNIQUE index still exists (it may have been created as UNIQUE on topic_id alone)
+	var oldIndexType string
+	err := tx.QueryRow(`
+		SELECT COALESCE(sql, '') FROM sqlite_master
+		WHERE type = 'index' AND name = 'idx_topic_study_notes_topic'
+	`).Scan(&oldIndexType)
+	if err == nil && strings.Contains(strings.ToUpper(oldIndexType), "UNIQUE") {
+		// Drop the old unique-on-topic_id index so the new composite one can be the uniqueness constraint
+		if _, dropErr := tx.Exec(`DROP INDEX IF EXISTS idx_topic_study_notes_topic`); dropErr != nil {
+			return fmt.Errorf("failed to drop old unique index idx_topic_study_notes_topic: %w", dropErr)
+		}
+		// Recreate as a plain (non-unique) index
+		if _, createErr := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_topic_study_notes_topic ON topic_study_notes(topic_id)`); createErr != nil {
+			return fmt.Errorf("failed to recreate idx_topic_study_notes_topic as non-unique: %w", createErr)
+		}
+	}
+	// Ensure the new composite unique index exists
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_topic_study_notes_topic_range ON topic_study_notes(topic_id, start_page, end_page)`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			return fmt.Errorf("failed to create idx_topic_study_notes_topic_range: %w", err)
+		}
+	}
 	return nil
 }
 
