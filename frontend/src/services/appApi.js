@@ -564,6 +564,61 @@ export function getNotebookCertificateStats(notebookID) {
   }
 }
 
+export function generateTopicStudyNote(topicID, notebookID = '') {
+  try {
+    return appBridge().GenerateTopicStudyNote(topicID, notebookID)
+  } catch (err) {
+    console.error('Failed generating topic study note:', err)
+    throw err
+  }
+}
+
+export function generateTopicStudyNoteForRange(topicID, notebookID = '', startPage = 0, endPage = 0) {
+  try {
+    return appBridge().GenerateTopicStudyNoteForRange(topicID, notebookID, startPage, endPage)
+  } catch (err) {
+    console.error('Failed generating topic study note for range:', err)
+    throw err
+  }
+}
+
+export function getTopicStudyNote(topicID) {
+  try {
+    return appBridge().GetTopicStudyNote(topicID)
+  } catch (err) {
+    console.error('Failed fetching topic study note:', err)
+    throw err
+  }
+}
+
+export function updateTopicStudyNote(topicID, content) {
+  try {
+    return appBridge().UpdateTopicStudyNote(topicID, content)
+  } catch (err) {
+    console.error('Failed updating topic study note:', err)
+    throw err
+  }
+}
+
+export function getNotesByNotebook(notebookID = '') {
+  try {
+    return appBridge().GetNotesByNotebook(notebookID)
+  } catch (err) {
+    console.error('Failed fetching notes by notebook:', err)
+    throw err
+  }
+}
+
+export function markTopicReviewed(topicID) {
+  try {
+    return appBridge().MarkTopicReviewed(topicID)
+  } catch (err) {
+    console.error('Failed marking topic reviewed:', err)
+    throw err
+  }
+}
+
+
 
 
 

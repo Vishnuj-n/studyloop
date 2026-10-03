@@ -342,6 +342,14 @@
       title='Enable "Skip to Reading" (Escape Hatch)'
       hint="Temporarily deprioritizes review backlogs, letting you read new material first. FSRS records remain safe."
     />
+
+    <SettingsToggle
+      :model-value="settings.auto_generate_study_notes"
+      :disabled="disabled"
+      title="Auto-Generate Structured Study Notes"
+      hint="Generates a short editable summary (~150 words) in the background after chapter text compression. Notes appear in your Notes knowledge base tab."
+      @update:model-value="onToggleAutoStudyNotes"
+    />
   </article>
 </template>
 
@@ -366,6 +374,7 @@ import {
   pickPomodoroMusicFolder,
 } from '../services/pomodoroApi'
 import { useClerkAuth } from '../services/clerkAuth'
+import { useDialog } from '../composables/useDialog'
 
 const { isPro, openBilling } = useClerkAuth()
 
@@ -609,6 +618,27 @@ function openOutlookForSlot(slot) {
 function downloadICS() {
   const slots = getActiveSlots()
   downloadRoutineICS(slots)
+}
+
+const { confirm: confirmDialog } = useDialog()
+
+async function onToggleAutoStudyNotes(val) {
+  // Optimistically apply the new value (matches v-model pattern used by other toggles in this component)
+  props.settings.auto_generate_study_notes = val
+  if (val) {
+    const ok = await confirmDialog({
+      title: 'Enable Auto-Generate Study Notes?',
+      message:
+        'Generates a short editable summary after you complete a topic. This feature uses additional LLM credits. We recommend enabling it if Prompt Compression is enabled or you have configured a paid LLM API key (e.g. Azure / OpenAI).',
+      confirmText: 'Enable Study Notes',
+      cancelText: 'Cancel',
+      type: 'info',
+    })
+    if (!ok) {
+      // User cancelled — revert
+      props.settings.auto_generate_study_notes = false
+    }
+  }
 }
 </script>
 
