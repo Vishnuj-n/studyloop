@@ -54,7 +54,7 @@
 
             <div class="metric-item">
               <span class="metric-label">Target Pace</span>
-              <span class="metric-value">{{ pace?.required_daily_sessions ? `${Math.ceil(pace.required_daily_sessions)} sess/day` : '—' }}</span>
+              <span class="metric-value">{{ pace?.required_daily_sessions ? `${pace.required_daily_sessions} sess/day` : '—' }}</span>
               <span class="metric-subtext">Needed for exam deadline</span>
             </div>
 
@@ -168,15 +168,14 @@ const statusExplanation = computed(() => {
     return `At your current velocity of ${props.pace?.current_daily_sessions || 1} sessions/day, you'll comfortably finish on ${formatDate(props.pace?.projected_finish)}.`
   }
   if (s === 'ON_TRACK') {
-    return `Your reading pace matches the required ${Math.ceil(props.pace?.required_daily_sessions || 1)} sessions/day to complete on schedule.`
+    return `Your reading pace matches the required ${props.pace?.required_daily_sessions || 1} sessions/day to complete on schedule.`
   }
   if (s === 'BEHIND') {
-    const needed = Math.ceil(props.pace?.extra_sessions_needed || 1)
-    const sessText = needed === 1 ? '1 session/day' : `${needed} sessions/day`
-    if (needed >= 2) {
-      return `Add ~${sessText} (or consider spacing out your target exam date) to complete your remaining curriculum on time.`
-    }
-    return `Add ~${sessText} (or extend your daily study window) to finish before your exam.`
+    const gap = Math.abs(props.pace?.days_gap || 1)
+    const needed = (props.pace?.extra_sessions_needed !== undefined && props.pace.extra_sessions_needed > 0)
+      ? props.pace.extra_sessions_needed
+      : Math.round(((props.pace?.required_daily_sessions || 1) - (props.pace?.current_daily_sessions || 0)) * 10) / 10
+    return `You're currently projected ${gap} ${gap === 1 ? 'day' : 'days'} late. Completing ~${needed || 1} extra session over your current routine will get you back on track.`
   }
   return 'Complete 2 to 3 study sessions so StudyLoop can estimate your personalized reading velocity.'
 })
