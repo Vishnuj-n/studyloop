@@ -10,16 +10,13 @@ This solution integrates a persistent **Study Notes Knowledge Base** into Studyl
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │ 1. READING SESSION & EXTRACTION                                                             │
-│    [ Complete Reading Session: Pages X–Y ]                                                 │
-│                     │                                                                       │
-│                     ▼                                                                       │
-│    [ LLMLingua-2 Compression ] ──► Chunks compressed and stored in `chunks.compressed_text` │
-│                     │                                                                       │
-│                     ▼ (If auto_generate_study_notes == true)                                │
-│    [ Session-Scoped LLM Call ] ──► Clean, readable 100–150 word summary for Pages X–Y       │
-│                     │                                                                       │
-│                     ▼                                                                       │
-│    [ Incremental Merge ] ──► Appended under `### Pages X–Y` in `topic_study_notes`          │
+│    [ Start Reading Session: Pages X–Y ]                                                     │
+│         │                                                                                   │
+│         ├─► [ LLMLingua-2 Compression ] ──► Chunks compressed in `chunks.compressed_text`   │
+│         │                                                                                   │
+│         └─► (If auto_generate_study_notes == true & note does not exist)                     │
+│             [ Session-Scoped LLM Call ] ──► Async study note generation while user reads    │
+│                                             (avoids 429 collision with quiz at completion)  │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐

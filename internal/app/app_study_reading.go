@@ -99,6 +99,16 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 			reqCtx = context.Background()
 		}
 		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID)
+
+		// Trigger async study note generation on reading session start if enabled and not already generated.
+		// Running on reader open gives the background job ample time while the user reads, avoiding
+		// back-to-back LLM calls and 429 rate limit spikes during CompleteReading (which runs Quiz generation).
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
+			existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
+			if checkErr == nil && existingNote == nil {
+				a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+			}
+		}
 	}
 
 	currentPage := task.CurrentPage
@@ -303,16 +313,6 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		return fail(err.Error())
 	}
 
-	// 6.5. Trigger async session study note generation for this reading range if enabled
-	if task.TopicID != "" && a.studyService != nil {
-		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
-			reqCtx := a.ctx
-			if reqCtx == nil {
-				reqCtx = context.Background()
-			}
-			a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
-		}
-	}
 
 	resp := map[string]interface{}{
 		"ok":           true,
