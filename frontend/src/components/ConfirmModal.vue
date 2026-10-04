@@ -1,11 +1,17 @@
 <script setup>
-import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import { useDialog } from '../composables/useDialog'
 
 const { dialogState, handleConfirm, handleCancel } = useDialog()
 const cardRef = ref(null)
 let previousActiveElement = null
+
+const dialogIconName = computed(() => {
+  if (dialogState.type === 'danger') return 'trash'
+  if (dialogState.type === 'warning') return 'alert-triangle'
+  return 'info'
+})
 
 watch(
   () => dialogState.isOpen,
@@ -83,7 +89,7 @@ onUnmounted(() => {
           <div class="dialog-header">
             <div class="dialog-icon-wrapper" :class="dialogState.type">
               <BaseIcon
-                :name="dialogState.type === 'danger' ? 'trash' : dialogState.type === 'warning' ? 'alert-triangle' : 'info'"
+                :name="dialogIconName"
                 size="22"
               />
             </div>

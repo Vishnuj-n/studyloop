@@ -1294,11 +1294,6 @@ function handleEnterKey(event) {
   cursor: not-allowed;
 }
 
-.send-svg {
-  width: 14px;
-  height: 14px;
-}
-
 .composer-hint-row {
   display: flex;
   justify-content: flex-end;
