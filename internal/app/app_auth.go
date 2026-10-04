@@ -137,9 +137,8 @@ func (a *App) setSession(userID, email string, isPro bool) {
 	a.persistSession(userID, email, isPro, now)
 }
 
-// RestoreSession allows frontend to re-hydrate offline session on launch within grace period.
-// Untrusted frontend arguments are discarded to prevent DevTools/localStorage tampering;
-// session is verified from machine-bound signed storage on disk.
+// RestoreSession re-hydrates offline session on launch from machine-bound signed storage on disk.
+// Session validity and 10-day grace period are evaluated strictly inside Go backend.
 func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
 	filePath, err := runtime.ResolveSessionPath()
 	if err != nil {
@@ -148,12 +147,12 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 		return false
 	}
 
-	utils.Debugf("[AUTH] RestoreSession called with frontend args: user=%q, email=%q, isPro=%v, verifiedAt=%d. Target session path: %s",
+	utils.Infof("[AUTH] RestoreSession called: user=%q, email=%q, isPro=%v, verifiedAt=%d. Session path: %s",
 		userID, email, isPro, verifiedAt, filePath)
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		utils.Debugf("[AUTH] Offline session file unreadable or not found at %s: %v. Resetting active session to Free.", filePath, err)
+		utils.Warnf("[AUTH] Session file not found at %s (err=%v). Resetting active session to Free.", filePath, err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
