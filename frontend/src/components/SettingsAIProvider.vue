@@ -218,6 +218,25 @@
       </div>
     </div>
 
+    <div v-if="settings" class="form-group" style="margin-top: 16px;">
+      <label for="settings-rate-limit-strategy">Rate Limit Strategy</label>
+      <select
+        id="settings-rate-limit-strategy"
+        v-model="settings.rate_limit_strategy"
+        :disabled="disabled"
+      >
+        <option value="STANDARD">Standard (Fail &amp; Cooldown on 429)</option>
+        <option value="PACED">Paced Smoothing (Swap to Heavy if Fast used within 60s)</option>
+      </select>
+      <p class="hint">
+        {{
+          settings.rate_limit_strategy === 'PACED'
+            ? 'Automatically escalates requests to Heavy provider if Fast was called in the last 60s, avoiding free-tier TPM spikes.'
+            : 'Standard behavior: requests use Fast tier until a 429 error triggers a 45-second cooldown.'
+        }}
+      </p>
+    </div>
+
     <div class="button-row">
       <button type="button" class="sync-btn" :disabled="disabled" @click="$emit('remove-keys')">
         Remove Stored Keys
@@ -236,6 +255,7 @@ const props = defineProps({
   llmSettings: { type: Object, required: true },
   llmFastKey: { type: String, required: true },
   llmHeavyKey: { type: String, required: true },
+  settings: { type: Object, default: () => null },
   targetSessionWords: { type: Number, default: 3000 },
   disabled: { type: Boolean, default: false },
 })

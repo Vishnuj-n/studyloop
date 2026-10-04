@@ -109,6 +109,7 @@
               :llm-settings="llmSettings"
               :llm-fast-key="llmFastKey"
               :llm-heavy-key="llmHeavyKey"
+              :settings="settings"
               :target-session-words="settings.target_session_words || 3000"
               :disabled="loading || savingLLM"
               @apply-preset="applyProviderPreset"

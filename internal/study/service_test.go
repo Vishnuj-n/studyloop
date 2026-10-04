@@ -2,11 +2,13 @@ package study
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"ai-tutor/internal/db"
 	llmpkg "ai-tutor/internal/llm"
+	"ai-tutor/internal/models"
 )
 
 type dummyLLM struct {
@@ -117,3 +119,77 @@ func TestFormatLLMErrorMessages(t *testing.T) {
 		t.Errorf("Scenario D expected unchanged error 'network timeout', got %q", errD.Error())
 	}
 }
+
+func TestPacedRateLimitStrategy(t *testing.T) {
+	fast := &dummyLLM{model: "gpt-4.1-mini"}
+	heavy := &dummyLLM{model: "gemini-2.5-flash"}
+
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	repo, err := db.Init(dbPath, "")
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// Update user settings to PACED
+	err = repo.UpdateUserSettings(models.UserSettings{
+		RateLimitStrategy: models.RateLimitStrategyPaced,
+	})
+	if err != nil {
+		t.Fatalf("failed to update user settings: %v", err)
+	}
+
+	svc := NewStudyService(Config{
+		Repo:             repo,
+		FastLLMProvider:  fast,
+		HeavyLLMProvider: heavy,
+	})
+
+	// 1. Initial state: fast has not been called yet (timeSinceLastFastCall is large), should route to fast
+	provider, tier := svc.selectLLM("sample context")
+	if tier != "fast" || provider.ModelName() != "gpt-4.1-mini" {
+		t.Fatalf("expected initial routing to fast, got tier=%s model=%s", tier, provider.ModelName())
+	}
+
+	// 2. Call fast provider (simulating any feature calling GenerateAnswer)
+	_, err = svc.fastLLMProvider.GenerateAnswer("test prompt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// 3. Immediately select LLM: since fast was called <60s ago and PACED is active, should route to heavy
+	provider, tier = svc.selectLLM("sample context")
+	if tier != "heavy" || provider.ModelName() != "gemini-2.5-flash" {
+		t.Fatalf("expected routing to heavy tier under PACED strategy after recent fast call, got tier=%s model=%s", tier, provider.ModelName())
+	}
+
+	// 4. Manually advance lastFastCallTime past 60s
+	svc.rateLimitMu.Lock()
+	svc.lastFastCallTime = time.Now().Add(-65 * time.Second)
+	svc.rateLimitMu.Unlock()
+
+	// 5. Select LLM: window passed, should route back to fast
+	provider, tier = svc.selectLLM("sample context")
+	if tier != "fast" || provider.ModelName() != "gpt-4.1-mini" {
+		t.Fatalf("expected routing back to fast tier after 60s window elapsed, got tier=%s model=%s", tier, provider.ModelName())
+	}
+
+	// 6. Switch settings back to STANDARD
+	err = repo.UpdateUserSettings(models.UserSettings{
+		RateLimitStrategy: models.RateLimitStrategyStandard,
+	})
+	if err != nil {
+		t.Fatalf("failed to set standard settings: %v", err)
+	}
+
+	// Call fast again
+	_, _ = svc.fastLLMProvider.GenerateAnswer("test prompt 2")
+
+	// In STANDARD mode, recent fast call does NOT force heavy
+	provider, tier = svc.selectLLM("sample context")
+	if tier != "fast" || provider.ModelName() != "gpt-4.1-mini" {
+		t.Fatalf("expected STANDARD strategy to route to fast even when called recently, got tier=%s model=%s", tier, provider.ModelName())
+	}
+}
+

@@ -44,6 +44,11 @@ const (
 	StudyTaskStatusReserved  StudyTaskStatus = "RESERVED"
 )
 
+const (
+	RateLimitStrategyStandard = "STANDARD"
+	RateLimitStrategyPaced    = "PACED"
+)
+
 // ReviewTaskDailyID is the synthetic task ID for daily flashcard review materialization.
 const ReviewTaskDailyID = "task-review-daily"
 
@@ -679,6 +684,7 @@ type UserSettings struct {
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
 	AutoGenerateStudyNotes  bool    `json:"auto_generate_study_notes"`
+	RateLimitStrategy       string  `json:"rate_limit_strategy"`
 }
 
 // TopicStudyNote represents a structured study summary note for one reading session of a topic.

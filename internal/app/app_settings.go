@@ -85,6 +85,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"llm_prompt_logging":         s.LLMPromptLogging,
 		"log_level":                  s.LogLevel,
 		"auto_generate_study_notes":  s.AutoGenerateStudyNotes,
+		"rate_limit_strategy":        s.RateLimitStrategy,
 	}
 }
 
@@ -131,6 +132,12 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	}
 	if s.DefaultRemedialStrategy != strategyFast && s.DefaultRemedialStrategy != strategyClassic {
 		return map[string]interface{}{"error": fmt.Sprintf("default remedial strategy must be %s or %s", strategyClassic, strategyFast)}
+	}
+	if s.RateLimitStrategy == "" {
+		s.RateLimitStrategy = models.RateLimitStrategyStandard
+	}
+	if s.RateLimitStrategy != models.RateLimitStrategyStandard && s.RateLimitStrategy != models.RateLimitStrategyPaced {
+		return map[string]interface{}{"error": fmt.Sprintf("rate limit strategy must be %s or %s", models.RateLimitStrategyStandard, models.RateLimitStrategyPaced)}
 	}
 	if s.QuizQuestionCount > 0 && (s.QuizQuestionCount < minQuizQuestionCount || s.QuizQuestionCount > maxQuizQuestionCount) {
 		return map[string]interface{}{"error": fmt.Sprintf("quiz question count must be between %d and %d", minQuizQuestionCount, maxQuizQuestionCount)}

@@ -19,6 +19,19 @@ type LLMProvider interface {
 	GetLimits() llmpkg.ModelLimits
 }
 
+// pacedProvider decorates an LLMProvider to monitor invocation times.
+type pacedProvider struct {
+	LLMProvider
+	onCalled func()
+}
+
+func (p *pacedProvider) GenerateAnswer(prompt string) (string, error) {
+	if p.onCalled != nil {
+		p.onCalled()
+	}
+	return p.LLMProvider.GenerateAnswer(prompt)
+}
+
 // Config wires all dependencies into StudyService via constructor injection.
 type Config struct {
 	Repo             *db.Repository
@@ -39,6 +52,7 @@ type StudyService struct {
 	audioScriptCache     map[string][]string
 	rateLimitMu          sync.RWMutex
 	fastRateLimitedUntil time.Time
+	lastFastCallTime     time.Time
 	inFlightCompressMu   sync.Mutex
 	inFlightCompress     map[string]bool
 }
@@ -48,15 +62,47 @@ func NewStudyService(cfg Config) *StudyService {
 	if cfg.Repo == nil {
 		panic("study service: repository is required")
 	}
-	return &StudyService{
+	s := &StudyService{
 		repo:             cfg.Repo,
-		fastLLMProvider:  cfg.FastLLMProvider,
 		heavyLLMProvider: cfg.HeavyLLMProvider,
 		retrievalEngine:  cfg.RetrievalEngine,
 		notesDir:         cfg.NotesDir,
 		audioScriptCache: make(map[string][]string),
 		inFlightCompress: make(map[string]bool),
 	}
+	if cfg.FastLLMProvider != nil {
+		s.fastLLMProvider = &pacedProvider{
+			LLMProvider: cfg.FastLLMProvider,
+			onCalled:    s.markFastCalled,
+		}
+	}
+	return s
+}
+
+func (s *StudyService) markFastCalled() {
+	s.rateLimitMu.Lock()
+	defer s.rateLimitMu.Unlock()
+	s.lastFastCallTime = time.Now()
+}
+
+func (s *StudyService) timeSinceLastFastCall() time.Duration {
+	s.rateLimitMu.RLock()
+	defer s.rateLimitMu.RUnlock()
+	if s.lastFastCallTime.IsZero() {
+		return time.Hour // large duration if never called
+	}
+	return time.Since(s.lastFastCallTime)
+}
+
+func (s *StudyService) isPacingEnabled() bool {
+	if s.repo == nil {
+		return false
+	}
+	settings, err := s.repo.GetUserSettings()
+	if err != nil || settings == nil {
+		return false
+	}
+	return settings.RateLimitStrategy == "PACED"
 }
 
 // MarkFastRateLimited sets a temporary cooldown duration for the fast LLM tier.
@@ -92,12 +138,25 @@ func (s *StudyService) FormatLLMError(err error, tier string) error {
 	return err
 }
 
-// selectLLM dynamically routes to heavy provider if context exceeds fast provider input limits
-// or if fast provider is currently in rate-limit cooldown.
+// selectLLM dynamically routes to heavy provider if context exceeds fast provider input limits,
+// or if fast provider is currently in rate-limit cooldown, or if PACED smoothing strategy applies.
 func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
+	// 1. 429 Cooldown check (always applies)
 	if s.IsFastRateLimited() && s.heavyLLMProvider != nil {
 		return s.heavyLLMProvider, "heavy"
 	}
+
+	// 2. PACED strategy check (if enabled by user setting)
+	if s.isPacingEnabled() && s.heavyLLMProvider != nil {
+		if s.fastLLMProvider == nil || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName() {
+			if s.timeSinceLastFastCall() < 60*time.Second {
+				utils.Infof("[STUDY_SERVICE] Paced smoothing active: fast tier called %v ago (<60s). Escalating to heavy tier.", s.timeSinceLastFastCall().Round(time.Millisecond))
+				return s.heavyLLMProvider, "heavy"
+			}
+		}
+	}
+
+	// 3. Normal token limit & fallback logic
 	if s.fastLLMProvider != nil {
 		fastLimits := s.fastLLMProvider.GetLimits()
 		// ponytail: 15% safety buffer accounts for prompt wrapper template overhead
