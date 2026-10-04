@@ -150,9 +150,10 @@
             </button>
             <button
               class="secondary note-drawer-btn"
+              :class="{ active: !chat.chatCollapsed.value && currentSidebarTab === 'note' }"
               :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
-              title="View & Edit Chapter Study Note"
-              @click="openNoteDrawer"
+              title="View & Edit Chapter Study Note in Sidebar"
+              @click="toggleNoteTab"
             >
               <BaseIcon name="file-text" size="14" />
               <span>Note</span>
@@ -277,7 +278,7 @@
       </article>
 
       <ReaderChat
-        v-if="ragEnabled && ragQueueStudy"
+        v-model:active-tab="currentSidebarTab"
         :selected-topic-i-d="reader.selectedTopicID.value"
         :selected-topic-title="reader.topicTitle?.value || reader.selectedTopicTitle?.value || ''"
         :selected-notebook-i-d="reader.selectedNotebookID.value"
@@ -286,13 +287,11 @@
         :topic-start-page="reader.topicStartPage.value"
         :topic-end-page="reader.topicEndPage.value"
         :rag-enabled="ragEnabled"
+        :rag-queue-study="ragQueueStudy"
         :rag-settings-loaded="ragSettingsLoaded"
         :rag-settings-error="ragSettingsError"
         @retry-settings="retryGetUserSettings"
       />
-      <div v-else-if="ragEnabled && !ragQueueStudy" class="chat-disabled">
-        Chat is currently disabled in queue study mode.
-      </div>
     </div>
 
     <!-- Floating Audio Overview Bar -->
@@ -305,81 +304,6 @@
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />
-
-    <!-- In-Reader Note Drawer / Modal -->
-    <div v-if="showNoteDrawer" class="reader-note-backdrop" @click.self="closeNoteDrawer">
-      <div class="reader-note-modal">
-        <header class="reader-note-header">
-          <div class="header-titles">
-            <span class="note-modal-badge">Study Note</span>
-            <h3>{{ reader.topicTitle.value }}</h3>
-          </div>
-          <button type="button" class="close-note-btn" title="Close" @click="closeNoteDrawer">
-            <BaseIcon name="x" size="16" />
-          </button>
-        </header>
-
-        <div class="reader-note-body">
-          <div v-if="noteLoading" class="note-state-box">
-            <span>Loading note...</span>
-          </div>
-          <div v-else-if="noteGenerating" class="note-state-box">
-            <div class="generating-spinner"></div>
-            <span>Generating structured study note...</span>
-          </div>
-          <div v-else-if="noteEditing" class="note-edit-box">
-            <textarea
-              v-model="noteEditContent"
-              class="reader-note-textarea"
-              placeholder="Write chapter summary note (Markdown supported)..."
-              rows="12"
-            ></textarea>
-          </div>
-          <div v-else-if="currentNoteContent" class="note-view-box">
-            <div class="note-markdown" v-html="renderedNoteMarkdown"></div>
-          </div>
-          <div v-else class="note-empty-box">
-            <p>No study note generated for this topic yet.</p>
-          </div>
-        </div>
-
-        <footer class="reader-note-footer">
-          <template v-if="noteEditing">
-            <button class="secondary" :disabled="noteSaving" @click="noteEditing = false">Cancel</button>
-            <button class="primary" :disabled="noteSaving" @click="saveDrawerNote">
-              {{ noteSaving ? 'Saving...' : 'Save Note' }}
-            </button>
-          </template>
-          <template v-else>
-            <button
-              v-if="currentNoteContent"
-              class="secondary"
-              :disabled="noteGenerating || noteSaving"
-              @click="startDrawerEdit"
-            >
-              <BaseIcon name="edit" size="14" />
-              <span>Edit</span>
-            </button>
-            <button
-              class="primary"
-              :disabled="noteGenerating || noteSaving"
-              @click="generateDrawerNote"
-            >
-              <BaseIcon name="sparkles" size="14" />
-              <span>{{ currentNoteContent ? 'Regenerate' : 'Generate Note' }}</span>
-            </button>
-            <button
-              v-if="currentNoteContent"
-              class="secondary"
-              @click="goToNotesPage"
-            >
-              <span>Open in Knowledge Base →</span>
-            </button>
-          </template>
-        </footer>
-      </div>
-    </div>
-
   </section>
 </template>
 
@@ -395,11 +319,7 @@ import {
   getTopicSectionsContent,
   getTopicCompressionStats,
   skipReadingTask,
-  getTopicStudyNote,
-  generateTopicStudyNote,
-  updateTopicStudyNote,
 } from '../services/appApi'
-import { renderMarkdown } from '../services/markdown'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
 import { useToast } from '../composables/useToast'
@@ -418,19 +338,19 @@ const { isExtensionActive } = useExtensions()
 const { confirm } = useDialog()
 const showAudioOverview = ref(false)
 const simplifying = ref(false)
+// Sidebar Companion State
+const currentSidebarTab = ref('chat')
 
-// In-Reader Note Drawer State
-const showNoteDrawer = ref(false)
-const noteLoading = ref(false)
-const noteGenerating = ref(false)
-const noteSaving = ref(false)
-const noteEditing = ref(false)
-const noteEditContent = ref('')
-const currentNoteContent = ref('')
-
-const renderedNoteMarkdown = computed(() => {
-  return renderMarkdown(currentNoteContent.value || '')
-})
+function toggleNoteTab() {
+  if (chat.chatCollapsed.value) {
+    chat.chatCollapsed.value = false
+    currentSidebarTab.value = 'note'
+  } else if (currentSidebarTab.value === 'note') {
+    chat.chatCollapsed.value = true
+  } else {
+    currentSidebarTab.value = 'note'
+  }
+}
 
 async function openNoteDrawer() {
   const tid = reader.selectedTopicID.value
@@ -1560,134 +1480,5 @@ button:disabled {
   border-color: #c49a6c !important;
 }
 
-/* In-Reader Note Drawer / Modal Styles */
-.reader-note-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.reader-note-modal {
-  width: 100%;
-  max-width: 680px;
-  max-height: 85vh;
-  background: var(--surface-container);
-  border: 1px solid var(--outline-variant);
-  border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.reader-note-header {
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--outline-variant);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-container-low);
-}
-
-.note-modal-badge {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--primary);
-  margin-bottom: 2px;
-  display: block;
-}
-
-.reader-note-header h3 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.close-note-btn {
-  background: transparent;
-  border: none;
-  color: var(--muted-text);
-  cursor: pointer;
-  padding: 4px;
-  display: grid;
-  place-items: center;
-}
-
-.reader-note-body {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 200px;
-}
-
-.note-state-box,
-.note-empty-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 16px;
-  text-align: center;
-  color: var(--muted-text);
-}
-
-.reader-note-textarea {
-  width: 100%;
-  padding: 14px;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
-  border-radius: 8px;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  resize: vertical;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.reader-note-textarea:focus {
-  border-color: var(--primary);
-}
-
-.note-markdown {
-  line-height: 1.6;
-  font-size: 14px;
-}
-
-.note-markdown :deep(p) {
-  margin: 0.6em 0;
-}
-
-.note-markdown :deep(ul),
-.note-markdown :deep(ol) {
-  padding-left: 1.4em;
-  margin: 0.6em 0;
-}
-
-.note-markdown :deep(strong) {
-  color: var(--primary);
-}
-
-.reader-note-footer {
-  padding: 14px 24px;
-  border-top: 1px solid var(--outline-variant);
-  background: var(--surface-container-low);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
 </style>
 
