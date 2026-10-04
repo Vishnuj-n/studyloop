@@ -504,6 +504,12 @@ const allTopics = computed(() => {
         if (note && note.last_reviewed_at > 0) {
           reviewedText = formatTimeAgo(note.last_reviewed_at)
         }
+        const hasNoteVal = Boolean(note && note.content && note.content.trim().length > 0)
+        // A topic is active/reached if it has a note, is completed, or has active page reading progress
+        const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
+        if (!hasNoteVal && !hasStartedReading) {
+          continue
+        }
         list.push({
           topic_id: tid,
           title: t.title || tid,
@@ -513,7 +519,7 @@ const allTopics = computed(() => {
           end_page: t.end_page || 0,
           last_reviewed_at: note?.last_reviewed_at || 0,
           last_reviewed_text: reviewedText,
-          has_note: Boolean(note && note.content && note.content.trim().length > 0),
+          has_note: hasNoteVal,
         })
       }
     }
@@ -547,6 +553,12 @@ const treeNotebooks = computed(() => {
         reviewedText = formatTimeAgo(note.last_reviewed_at)
       }
 
+      const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
+      // Only include chapters that have existing study notes or have been reached/started
+      if (!hasNoteVal && !hasStartedReading) {
+        continue
+      }
+
       const topicObj = {
         topic_id: tid,
         title: t.title || tid,
@@ -572,7 +584,7 @@ const treeNotebooks = computed(() => {
       }
     }
 
-    if (!query || processedTopics.length > 0 || nbTitle.toLowerCase().includes(query)) {
+    if (processedTopics.length > 0) {
       result.push({
         notebook_id: nbID,
         title: nbTitle,

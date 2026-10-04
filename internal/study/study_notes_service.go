@@ -22,7 +22,7 @@ Generate a structured, concise study note designed for rapid conceptual review a
 
 Requirements:
 - Length & Density: Scale length dynamically to match the density of the source material. Be as concise as possible while ensuring zero loss of core concepts. No padding, filler, or fluff.
-- Tone: Rigorous, clear, conceptual, direct.
+- Tone: Rigorous, clear, conceptual, direct and limit it to the essential information. Avoid casual language, jokes, or personal commentary. 
 - Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
 - Formatting: Clean markdown with bold technical terms and structured bullet points.
 
