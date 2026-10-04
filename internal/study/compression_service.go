@@ -46,9 +46,6 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 		return
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
 
 	s.inFlightCompressMu.Lock()
 	if s.inFlightCompress == nil {

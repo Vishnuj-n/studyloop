@@ -1243,19 +1243,6 @@ button:disabled {
 }
 
 
-
-.chat-disabled {
-  color: var(--muted-text);
-  background: var(--surface-container-low);
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 14px;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .scroll-progress-bar {
   position: absolute;
   top: 0;
