@@ -329,6 +329,7 @@ import BaseIcon from './BaseIcon.vue'
 import {
   logFrontendEvent,
   getTopicStudyNote,
+  getTopicStudyNoteForRange,
   generateTopicStudyNote,
   updateTopicStudyNote,
 } from '../services/appApi'
@@ -421,7 +422,15 @@ async function fetchTopicNote(topicId) {
   noteLoading.value = true
   noteEditing.value = false
   try {
-    const res = await getTopicStudyNote(topicId)
+    const startPage = props.topicStartPage || 0
+    const endPage = props.topicEndPage || 0
+    let res = null
+    if (startPage > 0 && endPage >= startPage) {
+      res = await getTopicStudyNoteForRange(topicId, startPage, endPage)
+    }
+    if (!res || !res.note || !res.note.content) {
+      res = await getTopicStudyNote(topicId)
+    }
     if (res && res.note && res.note.content) {
       currentNoteContent.value = res.note.content
     } else {
@@ -459,7 +468,9 @@ async function saveNote() {
   if (!tid) return
   noteSaving.value = true
   try {
-    const res = await updateTopicStudyNote(tid, noteEditContent.value)
+    const startPage = props.topicStartPage || 0
+    const endPage = props.topicEndPage || 0
+    const res = await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
     if (res && res.note) {
       currentNoteContent.value = res.note.content
     } else {
@@ -470,7 +481,7 @@ async function saveNote() {
     setTimeout(() => {
       noteLastSaved.value = false
     }, 2500)
-    logFrontendEvent('info', 'ReaderChat', 'study_note_saved', { topicID: tid })
+    logFrontendEvent('info', 'ReaderChat', 'study_note_saved', { topicID: tid, startPage, endPage })
   } catch (err) {
     console.error('[ReaderChat Note] Failed to save note:', err)
   } finally {

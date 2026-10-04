@@ -623,21 +623,24 @@ function downloadICS() {
 const { confirm: confirmDialog } = useDialog()
 
 async function onToggleAutoStudyNotes(val) {
-  // Optimistically apply the new value (matches v-model pattern used by other toggles in this component)
-  props.settings.auto_generate_study_notes = val
-  if (val) {
-    const ok = await confirmDialog({
-      title: 'Enable Auto-Generate Study Notes?',
-      message:
-        'Generates a short editable summary after you complete a topic. This feature uses additional LLM credits. We recommend enabling it if Prompt Compression is enabled or you have configured a paid LLM API key (e.g. Azure / OpenAI).',
-      confirmText: 'Enable Study Notes',
-      cancelText: 'Cancel',
-      type: 'info',
-    })
-    if (!ok) {
-      // User cancelled — revert
-      props.settings.auto_generate_study_notes = false
-    }
+  if (!val) {
+    props.settings.auto_generate_study_notes = false
+    return
+  }
+
+  const ok = await confirmDialog({
+    title: 'Enable Auto-Generate Study Notes?',
+    message:
+      'Generates a short editable summary when a reading session opens. This feature uses additional LLM credits. We recommend enabling it if Prompt Compression is enabled or you have configured a paid LLM API key (e.g. Azure / OpenAI).',
+    confirmText: 'Enable Study Notes',
+    cancelText: 'Cancel',
+    type: 'info',
+  })
+
+  if (ok) {
+    props.settings.auto_generate_study_notes = true
+  } else {
+    props.settings.auto_generate_study_notes = false
   }
 }
 </script>

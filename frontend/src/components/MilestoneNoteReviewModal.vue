@@ -55,7 +55,18 @@
             <div v-if="noteLoading" class="note-loading-spinner">
               <span>Loading topic notes...</span>
             </div>
-            <div v-else-if="currentNoteContent" class="shared-markdown-content" v-html="renderedNote"></div>
+            <div v-else-if="contentSlots.length > 0" class="note-slots-container">
+              <div
+                v-for="(slot, sIdx) in contentSlots"
+                :key="slot.id || (slot.start_page + '-' + slot.end_page) || sIdx"
+                class="note-slot-item"
+              >
+                <div v-if="slot.start_page > 0 || slot.end_page > 0" class="slot-badge">
+                  Pages {{ slot.start_page }}–{{ slot.end_page }}
+                </div>
+                <div class="shared-markdown-content" v-html="renderMarkdown(slot.content)"></div>
+              </div>
+            </div>
             <div v-else class="no-note-prompt">
               <p>No study note has been recorded for this topic yet.</p>
               <button
@@ -108,7 +119,7 @@
 import { ref, computed, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import {
-  getTopicStudyNote,
+  getTopicStudyNoteSlots,
   generateTopicStudyNote,
   markTopicReviewed,
 } from '../services/appApi'
@@ -127,7 +138,7 @@ const userExplanation = ref('')
 const noteRevealed = ref(false)
 const noteLoading = ref(false)
 const generatingNote = ref(false)
-const currentNoteContent = ref('')
+const noteSlots = ref([])
 
 const reviewTopics = computed(() => {
   return Array.isArray(props.topics) && props.topics.length > 0
@@ -139,8 +150,8 @@ const currentTopic = computed(() => {
   return reviewTopics.value[currentIndex.value] || null
 })
 
-const renderedNote = computed(() => {
-  return renderMarkdown(currentNoteContent.value || '')
+const contentSlots = computed(() => {
+  return (noteSlots.value || []).filter((s) => s && s.content && s.content.trim())
 })
 
 watch(
@@ -149,7 +160,7 @@ watch(
     if (props.show && currentTopic.value?.topic_id) {
       userExplanation.value = ''
       noteRevealed.value = false
-      currentNoteContent.value = ''
+      noteSlots.value = []
       await fetchNote()
     }
   },
@@ -161,15 +172,15 @@ async function fetchNote() {
   if (!tid) return
   noteLoading.value = true
   try {
-    const res = await getTopicStudyNote(tid)
-    if (res && res.note && res.note.content) {
-      currentNoteContent.value = res.note.content
+    const res = await getTopicStudyNoteSlots(tid)
+    if (res && Array.isArray(res.slots)) {
+      noteSlots.value = res.slots
     } else {
-      currentNoteContent.value = ''
+      noteSlots.value = []
     }
   } catch (err) {
-    console.warn('[PRE_EXAM_NOTE] Error fetching note:', err)
-    currentNoteContent.value = ''
+    console.warn('[PRE_EXAM_NOTE] Error fetching note slots:', err)
+    noteSlots.value = []
   } finally {
     noteLoading.value = false
   }
@@ -190,7 +201,7 @@ async function generateNoteForTopic() {
   try {
     const res = await generateTopicStudyNote(tid, props.notebookId || '')
     if (res && res.note) {
-      currentNoteContent.value = res.note.content
+      await fetchNote()
     }
   } catch (err) {
     console.error('[PRE_EXAM_NOTE] Generation error:', err)
@@ -338,6 +349,33 @@ function proceedToExam() {
   max-height: 240px;
   overflow-y: auto;
   font-size: 13px;
+}
+
+.note-slots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.note-slot-item {
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 12px;
+}
+
+.note-slot-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.slot-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-bottom: 6px;
 }
 
 .note-loading-spinner,

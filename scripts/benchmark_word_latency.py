@@ -113,8 +113,10 @@ def run_benchmarks():
     print("-------------------------------------------------------------------------")
     for count in word_targets:
         chunk_size = 500
-        num_chunks = (count + chunk_size - 1) // chunk_size
-        chunks = [generate_text(chunk_size) for _ in range(num_chunks)]
+        full_doc = generate_text(count)
+        words = full_doc.split()
+        chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+        num_chunks = len(chunks)
         
         t0 = time.perf_counter()
         for ch in chunks:

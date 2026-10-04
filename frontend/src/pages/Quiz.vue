@@ -390,6 +390,7 @@ import {
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import MilestoneNoteReviewModal from '../components/MilestoneNoteReviewModal.vue'
+import { cleanTopicTitle } from '../composables/useReaderBase'
 import { playCorrectChime, playIncorrectThud } from '../utils/audioJuice'
 
 const route = useRoute()
@@ -541,11 +542,13 @@ async function loadQuizTask() {
       const topicList = []
       if (payload?.quizzes && typeof payload.quizzes === 'object') {
         for (const tid of Object.keys(payload.quizzes)) {
-          topicList.push({ topic_id: tid, title: tid })
+          const title = (task.topic_id === tid && (task.topic_title || task.title)) ? (task.topic_title || task.title) : cleanTopicTitle(tid)
+          topicList.push({ topic_id: tid, title: title || 'Chapter Review' })
         }
       }
       if (topicList.length === 0 && task.topic_id) {
-        topicList.push({ topic_id: task.topic_id, title: task.title || task.topic_id })
+        const title = task.topic_title || task.title || cleanTopicTitle(task.topic_id) || 'Chapter Review'
+        topicList.push({ topic_id: task.topic_id, title })
       }
       milestoneReviewTopics.value = topicList
       showMilestonePreReview.value = true

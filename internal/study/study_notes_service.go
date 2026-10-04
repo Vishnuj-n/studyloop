@@ -208,10 +208,25 @@ func (s *StudyService) resolveNotebookAndTopicTitles(topicID, notebookID string)
 
 // GetTopicNoteFolder returns the directory path and assets subfolder for a given topic.
 func (s *StudyService) GetTopicNoteFolder(topicID, notebookID string) (folderPath, assetsPath string) {
-	_, nbTitle, _, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
+	_, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
 	cleanNb := SanitizePathSegment(nbTitle)
 	cleanTopic := SanitizePathSegment(tTitle)
-	folderPath = filepath.Join(s.NotesBaseDir(), cleanNb, cleanTopic)
+
+	folderName := cleanTopic
+	if tID != "" {
+		folderName = fmt.Sprintf("%s_%s", cleanTopic, SanitizePathSegment(tID))
+	}
+
+	folderPath = filepath.Join(s.NotesBaseDir(), cleanNb, folderName)
+	legacyPath := filepath.Join(s.NotesBaseDir(), cleanNb, cleanTopic)
+
+	// If legacy folder exists and new suffixed folder doesn't exist, fallback to legacy
+	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
+		if _, legErr := os.Stat(legacyPath); legErr == nil {
+			folderPath = legacyPath
+		}
+	}
+
 	assetsPath = filepath.Join(folderPath, "assets")
 	return folderPath, assetsPath
 }
@@ -405,14 +420,34 @@ func (s *StudyService) GenerateTopicStudyNoteAsync(ctx context.Context, topicID,
 		return
 	}
 
+	key := fmt.Sprintf("%s:%d:%d", topicID, startPage, endPage)
+	s.inFlightNotesMu.Lock()
+	if s.inFlightNotes == nil {
+		s.inFlightNotes = make(map[string]bool)
+	}
+	if s.inFlightNotes[key] {
+		s.inFlightNotesMu.Unlock()
+		return
+	}
+	s.inFlightNotes[key] = true
+	s.inFlightNotesMu.Unlock()
+
 	go func() {
 		defer func() {
+			s.inFlightNotesMu.Lock()
+			delete(s.inFlightNotes, key)
+			s.inFlightNotesMu.Unlock()
+
 			if r := recover(); r != nil {
 				utils.Errorf("[STUDY_NOTES] panic in GenerateTopicStudyNoteAsync: %v", r)
 			}
 		}()
 
-		bgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		reqCtx := ctx
+		if reqCtx == nil {
+			reqCtx = context.Background()
+		}
+		bgCtx, cancel := context.WithTimeout(reqCtx, 2*time.Minute)
 		defer cancel()
 
 		select {
@@ -462,6 +497,9 @@ func (s *StudyService) GetTopicStudyNoteForRange(topicID string, startPage, endP
 	}
 
 	note := ParseMarkdownNote(string(data), fallback)
+	if note.TopicID != "" && tID != "" && note.TopicID != tID {
+		return nil, nil
+	}
 	note.FilePath = filePath
 	if note.TopicID == "" {
 		note.TopicID = tID
@@ -531,6 +569,9 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 			}
 
 			note := ParseMarkdownNote(string(data), fallback)
+			if note.TopicID != "" && tID != "" && note.TopicID != tID {
+				continue
+			}
 			note.FilePath = filePath
 			if note.TopicID == "" {
 				note.TopicID = tID
@@ -714,18 +755,7 @@ func (s *StudyService) MarkTopicReviewed(topicID string, startPage, endPage int)
 	}
 
 	if existing == nil {
-		nbID, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, "")
-		existing = &models.TopicStudyNote{
-			ID:            fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
-			TopicID:       tID,
-			TopicTitle:    tTitle,
-			NotebookID:    nbID,
-			NotebookTitle: nbTitle,
-			StartPage:     startPage,
-			EndPage:       endPage,
-			Content:       "",
-			CreatedAt:     time.Now().UTC().Format(time.RFC3339),
-		}
+		return nil
 	}
 
 	existing.LastReviewedAt = time.Now().Unix()

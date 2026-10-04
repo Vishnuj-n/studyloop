@@ -852,6 +852,21 @@ func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
 	}
 }
 
+// GetTopicStudyNoteForRange retrieves the study note for a specific (topic, startPage, endPage) slot.
+func (a *App) GetTopicStudyNoteForRange(topicID string, startPage, endPage int) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	note, err := a.studyService.GetTopicStudyNoteForRange(topicID, startPage, endPage)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"note":    note,
+	}
+}
+
 // GetTopicStudyNoteSlots returns all per-session notes for a topic ordered by start_page.
 // The frontend uses this to render one card per reading session.
 func (a *App) GetTopicStudyNoteSlots(topicID string) map[string]interface{} {

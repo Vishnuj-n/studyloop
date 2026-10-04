@@ -73,7 +73,11 @@ def parse_all_api_files(path):
                 if file.endswith(".js") and not EXCLUDE_FRONTEND_TEST.search(file):
                     full_p = os.path.join(root, file)
                     api_file_paths.append(os.path.abspath(full_p))
-                    exports.update(parse_service_file(full_p))
+                    service_exports = parse_service_file(full_p)
+                    collisions = set(service_exports.keys()) & set(exports.keys())
+                    if collisions:
+                        raise ValueError(f"Duplicate export(s) {sorted(list(collisions))} in service file {full_p}")
+                    exports.update(service_exports)
     else:
         print(f"Error: API path not found at {path}", file=sys.stderr)
         

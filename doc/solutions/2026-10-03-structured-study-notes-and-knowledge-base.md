@@ -49,25 +49,21 @@ This solution integrates a persistent **Study Notes Knowledge Base** into Studyl
 
 ## Key Components
 
-### 1. Database & Schema
-- **`topic_study_notes` Table**:
-  - `id` (TEXT PRIMARY KEY)
-  - `topic_id` (TEXT NOT NULL UNIQUE, FK → `topics(id)` ON DELETE CASCADE)
-  - `notebook_id` (TEXT NOT NULL, FK → `notebooks(id)` ON DELETE CASCADE)
-  - `content` (TEXT NOT NULL DEFAULT '')
-  - `last_reviewed_at` (INTEGER DEFAULT 0)
-  - `created_at`, `updated_at` (TIMESTAMP)
-  - **Indexes**: `idx_topic_study_notes_topic`, `idx_topic_study_notes_notebook`
+### 1. Storage & Settings
+- **File-Backed Notes (`NotesBaseDir()`)**:
+  - Notes are stored directly as Markdown files on disk in notebook and topic folders under `NotesBaseDir()`.
+  - Layout per topic: `chapter_summary.md` (whole chapter note) and `pages_X_Y.md` (page-range notes).
+  - YAML frontmatter in each file tracks metadata such as `topic_id`, `notebook_id`, `start_page`, `end_page`, `created_at`, `updated_at`, and `last_reviewed_at`.
 - **`user_settings.auto_generate_study_notes`**: Boolean flag persisted in SQLite singleton, migrated cleanly via `internal/db/migrations.go`.
 
 ### 2. Session-Scoped Generation Engine
 - **Prioritizes Pre-Compressed Text**: Uses `chunk.compressed_text` (from LLMLingua-2) first, fitting 2–3x more textbook content into the LLM prompt within context limits while generating crisp, human-readable notes.
-- **Section Accumulation (`mergeSectionIntoNote`)**: Scopes generation to `start_page` and `end_page`. When multiple reading sessions are completed for a chapter, each session's summary is merged into the topic note under `### Pages X–Y` headers without overwriting prior session notes or custom user edits.
-- **Whole-Chapter On-Demand Generation**: Clicking `[Generate Note]` or `[Regenerate]` from `/notes` synthesizes the entire chapter across all available chunks.
+- **Range Check & Scoped Generation**: Checks whether a note already exists for the current page range before generating. When generated, saves directly to the corresponding `pages_X_Y.md` file.
+- **Whole-Chapter On-Demand Generation**: Clicking `[Generate Note]` or `[Regenerate]` from `/notes` synthesizes the entire chapter across all available chunks and saves to `chapter_summary.md`.
 
 ### 3. User Interfaces
 - **Notes Page (`frontend/src/pages/Notes.vue`)**: Full 2-column Knowledge Base with notebook selector, live search across topics and note text, review status tags, dual Markdown view / raw editor, and AI regeneration.
-- **Reader Drawer (`frontend/src/pages/Reader.vue`)**: Slide-out drawer in the top navigation bar to quickly reference and edit study notes without losing reading position.
+- **Study Note Tab (`frontend/src/components/ReaderChat.vue`)**: Embedded Study Note tab in ReaderChat allowing students to reference, edit, and save range notes directly alongside their reading session without leaving the reader.
 - **Pre-Exam Review Modal (`frontend/src/components/MilestoneNoteReviewModal.vue`)**: Cognitive retrieval-first modal triggered before Milestone Exam questions begin in `Quiz.vue`.
 - **Settings Toggle (`frontend/src/components/SettingsStudyBudget.vue`)**: Opt-in toggle with credit/cost warning dialog.
 

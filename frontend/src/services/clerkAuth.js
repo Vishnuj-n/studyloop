@@ -67,8 +67,8 @@ async function syncWithBackend(force = false) {
         }
         isPro.value = Boolean(backendSession.isPro)
         saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
-      } else {
-        // Go backend session is missing, invalid, or expired -> reset frontend auth state
+      } else if (backendSession && typeof backendSession === 'object') {
+        // Go backend explicitly reported no session -> reset frontend auth state
         if (isPro.value || user.value) {
           console.warn('[AUTH] Go backend session invalid or missing. Resetting frontend user and isPro state to unauthenticated/free.')
           logFrontendEvent('info', 'Auth', 'backend_session_reset', { fromPro: isPro.value })
@@ -81,7 +81,7 @@ async function syncWithBackend(force = false) {
       lastSyncSuccessTime = Date.now()
       hasInitialSyncRan = true
     } catch (err) {
-      console.warn('[AUTH] Could not sync session with backend:', err)
+      console.warn('[AUTH] Bridge or transport error syncing session with backend:', err)
     } finally {
       inFlightSync = null
     }

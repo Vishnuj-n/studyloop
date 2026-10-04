@@ -173,7 +173,7 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 	isValidSig := hmac.Equal([]byte(sess.Signature), []byte(sig1)) || hmac.Equal([]byte(sess.Signature), []byte(sig2))
 	if !isValidSig {
 		utils.Warnf("[AUTH] Session signature mismatch at %s. Downgrading to free.", filePath)
-		a.applyRestoredSession(sess.UserID, sess.Email, false, 0)
+		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
 

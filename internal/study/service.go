@@ -55,6 +55,8 @@ type StudyService struct {
 	lastFastCallTime     time.Time
 	inFlightCompressMu   sync.Mutex
 	inFlightCompress     map[string]bool
+	inFlightNotesMu      sync.Mutex
+	inFlightNotes        map[string]bool
 }
 
 // NewStudyService constructs a StudyService from injected dependencies.
@@ -69,6 +71,7 @@ func NewStudyService(cfg Config) *StudyService {
 		notesDir:         cfg.NotesDir,
 		audioScriptCache: make(map[string][]string),
 		inFlightCompress: make(map[string]bool),
+		inFlightNotes:    make(map[string]bool),
 	}
 	if cfg.FastLLMProvider != nil {
 		s.fastLLMProvider = &pacedProvider{
@@ -141,16 +144,23 @@ func (s *StudyService) FormatLLMError(err error, tier string) error {
 // selectLLM dynamically routes to heavy provider if context exceeds fast provider input limits,
 // or if fast provider is currently in rate-limit cooldown, or if PACED smoothing strategy applies.
 func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
+	s.rateLimitMu.Lock()
+	defer s.rateLimitMu.Unlock()
+
 	// 1. 429 Cooldown check (always applies)
-	if s.IsFastRateLimited() && s.heavyLLMProvider != nil {
+	if time.Now().Before(s.fastRateLimitedUntil) && s.heavyLLMProvider != nil {
 		return s.heavyLLMProvider, "heavy"
 	}
 
 	// 2. PACED strategy check (if enabled by user setting)
 	if s.isPacingEnabled() && s.heavyLLMProvider != nil {
 		if s.fastLLMProvider == nil || s.heavyLLMProvider.ModelName() != s.fastLLMProvider.ModelName() {
-			if s.timeSinceLastFastCall() < 60*time.Second {
-				utils.Infof("[STUDY_SERVICE] Paced smoothing active: fast tier called %v ago (<60s). Escalating to heavy tier.", s.timeSinceLastFastCall().Round(time.Millisecond))
+			timeSince := time.Hour
+			if !s.lastFastCallTime.IsZero() {
+				timeSince = time.Since(s.lastFastCallTime)
+			}
+			if timeSince < 60*time.Second {
+				utils.Infof("[STUDY_SERVICE] Paced smoothing active: fast tier called %v ago (<60s). Escalating to heavy tier.", timeSince.Round(time.Millisecond))
 				return s.heavyLLMProvider, "heavy"
 			}
 		}
@@ -177,6 +187,7 @@ func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
 				return s.heavyLLMProvider, "heavy"
 			}
 		}
+		s.lastFastCallTime = time.Now()
 		return s.fastLLMProvider, "fast"
 	}
 	if s.heavyLLMProvider != nil {

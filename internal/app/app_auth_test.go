@@ -60,13 +60,17 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 		t.Fatalf("failed to write tampered file: %v", err)
 	}
 
-	// Restore tampered session -> must reject and set isPro = false
+	// Restore tampered session -> must reject, set isPro = false, and expose no user
 	a3 := &App{}
 	if a3.RestoreSession("attacker", "hacker@evil.com", true, time.Now().Unix()) {
 		t.Fatalf("expected RestoreSession to reject tampered file signature")
 	}
 	if a3.IsProUser() {
 		t.Fatalf("expected a3.IsProUser() to be false after tampering attempt")
+	}
+	tamperedSess := a3.GetUserSession()
+	if tamperedSess["userId"] != "" || tamperedSess["email"] != "" {
+		t.Fatalf("expected empty user session on failed restore, got %#v", tamperedSess)
 	}
 
 	// 3. Grace Period Expiration (>10 days)

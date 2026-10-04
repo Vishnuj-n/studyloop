@@ -86,7 +86,7 @@ func TestGenerateTopicStudyNote(t *testing.T) {
 	}
 
 	// Verify file was written to disk
-	expectedPath := filepath.Join(notesDir, "Machine Learning", "Backpropagation", "chapter_summary.md")
+	expectedPath := svc.GetNoteFilePath(topicID, "nb-test", 0, 0)
 	data, err := os.ReadFile(expectedPath)
 	if err != nil {
 		t.Fatalf("expected markdown file on disk at %s: %v", expectedPath, err)
@@ -99,9 +99,36 @@ func TestGenerateTopicStudyNote(t *testing.T) {
 	}
 
 	// Verify assets folder was created
-	assetsPath := filepath.Join(notesDir, "Machine Learning", "Backpropagation", "assets")
+	_, assetsPath := svc.GetTopicNoteFolder(topicID, "nb-test")
 	if stat, err := os.Stat(assetsPath); err != nil || !stat.IsDir() {
 		t.Fatalf("expected assets directory to exist at %s", assetsPath)
+	}
+}
+
+func TestMarkTopicReviewed_NoExistingNote(t *testing.T) {
+	tempDir := t.TempDir()
+	notesDir := filepath.Join(tempDir, "notes")
+	t.Setenv("STUDYLOOP_NOTES_DIR", notesDir)
+
+	dbPath := filepath.Join(tempDir, "test_study_notes_empty.db")
+	repo, err := db.Init(dbPath, "")
+	if err != nil {
+		t.Fatalf("failed to init test db: %v", err)
+	}
+	t.Cleanup(func() { _ = repo.Close() })
+
+	svc := &StudyService{repo: repo}
+	err = svc.MarkTopicReviewed("non-existent-topic", 1, 10)
+	if err != nil {
+		t.Fatalf("expected nil error on missing note, got %v", err)
+	}
+
+	note, err := svc.GetTopicStudyNoteForRange("non-existent-topic", 1, 10)
+	if err != nil {
+		t.Fatalf("unexpected error getting note: %v", err)
+	}
+	if note != nil {
+		t.Fatalf("expected no note created, got: %#v", note)
 	}
 }
 

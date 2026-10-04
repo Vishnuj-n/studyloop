@@ -403,35 +403,35 @@
   line-height: 1.6;
 }
 
-.shared-markdown-content :deep(h1),
-.shared-markdown-content :deep(h2),
-.shared-markdown-content :deep(h3) {
+.shared-markdown-content h1,
+.shared-markdown-content h2,
+.shared-markdown-content h3 {
   margin-top: 1.2em;
   margin-bottom: 0.5em;
   font-weight: 700;
   color: var(--on-surface);
 }
 
-.shared-markdown-content :deep(p) {
+.shared-markdown-content p {
   margin: 0.6em 0;
 }
 
-.shared-markdown-content :deep(ul),
-.shared-markdown-content :deep(ol) {
+.shared-markdown-content ul,
+.shared-markdown-content ol {
   padding-left: 1.4em;
   margin: 0.6em 0;
 }
 
-.shared-markdown-content :deep(li) {
+.shared-markdown-content li {
   margin: 0.3em 0;
 }
 
-.shared-markdown-content :deep(strong) {
+.shared-markdown-content strong {
   color: var(--primary);
   font-weight: 700;
 }
 
-.shared-markdown-content :deep(code) {
+.shared-markdown-content code {
   background: var(--surface-container);
   padding: 2px 6px;
   border-radius: 4px;

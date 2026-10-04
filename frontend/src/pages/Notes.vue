@@ -506,12 +506,15 @@ const allTopics = computed(() => {
     if (Array.isArray(nb.topics)) {
       for (const t of nb.topics) {
         const tid = t.topic_id || t.id
-        const note = notesMap.value[tid]
-        let reviewedText = ''
-        if (note && note.last_reviewed_at > 0) {
-          reviewedText = formatTimeAgo(note.last_reviewed_at)
+        const topicNotes = notesMap.value[tid] || []
+        const hasNoteVal = topicNotes.some((n) => n && n.content && n.content.trim().length > 0)
+        let maxReviewedAt = 0
+        for (const n of topicNotes) {
+          if (n?.last_reviewed_at && n.last_reviewed_at > maxReviewedAt) {
+            maxReviewedAt = n.last_reviewed_at
+          }
         }
-        const hasNoteVal = Boolean(note && note.content && note.content.trim().length > 0)
+        const reviewedText = maxReviewedAt > 0 ? formatTimeAgo(maxReviewedAt) : ''
         // A topic is active/reached if it has a note, is completed, or has active page reading progress
         const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
         if (!hasNoteVal && !hasStartedReading) {
@@ -524,7 +527,7 @@ const allTopics = computed(() => {
           notebook_title: nbTitle,
           start_page: t.start_page || 0,
           end_page: t.end_page || 0,
-          last_reviewed_at: note?.last_reviewed_at || 0,
+          last_reviewed_at: maxReviewedAt,
           last_reviewed_text: reviewedText,
           has_note: hasNoteVal,
         })
@@ -549,16 +552,19 @@ const treeNotebooks = computed(() => {
 
     for (const t of rawTopics) {
       const tid = t.topic_id || t.id
-      const note = notesMap.value[tid]
-      const hasNoteVal = Boolean(note && note.content && note.content.trim().length > 0)
+      const topicNotes = notesMap.value[tid] || []
+      const hasNoteVal = topicNotes.some((n) => n && n.content && n.content.trim().length > 0)
       if (hasNoteVal) {
         totalChaptersWithNotes++
       }
 
-      let reviewedText = ''
-      if (note && note.last_reviewed_at > 0) {
-        reviewedText = formatTimeAgo(note.last_reviewed_at)
+      let maxReviewedAt = 0
+      for (const n of topicNotes) {
+        if (n?.last_reviewed_at && n.last_reviewed_at > maxReviewedAt) {
+          maxReviewedAt = n.last_reviewed_at
+        }
       }
+      const reviewedText = maxReviewedAt > 0 ? formatTimeAgo(maxReviewedAt) : ''
 
       const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
       // Only include chapters that have existing study notes or have been reached/started
@@ -573,7 +579,7 @@ const treeNotebooks = computed(() => {
         notebook_title: nbTitle,
         start_page: t.start_page || 0,
         end_page: t.end_page || 0,
-        last_reviewed_at: note?.last_reviewed_at || 0,
+        last_reviewed_at: maxReviewedAt,
         last_reviewed_text: reviewedText,
         has_note: hasNoteVal,
       }
@@ -581,8 +587,7 @@ const treeNotebooks = computed(() => {
       if (query) {
         const titleMatch = topicObj.title.toLowerCase().includes(query)
         const nbMatch = nbTitle.toLowerCase().includes(query)
-        const noteContent = note?.content || ''
-        const contentMatch = noteContent.toLowerCase().includes(query)
+        const contentMatch = topicNotes.some((n) => (n?.content || '').toLowerCase().includes(query))
         if (titleMatch || nbMatch || contentMatch) {
           processedTopics.push(topicObj)
         }
@@ -606,7 +611,9 @@ const treeNotebooks = computed(() => {
 })
 
 const totalNotesCount = computed(() => {
-  return Object.values(notesMap.value).filter((n) => n && n.content && n.content.trim().length > 0).length
+  return Object.values(notesMap.value)
+    .flat()
+    .filter((n) => n && n.content && n.content.trim().length > 0).length
 })
 
 const activeTopic = computed(() => {
@@ -659,7 +666,10 @@ async function loadInitialData() {
     if (notesRes && Array.isArray(notesRes.notes)) {
       for (const n of notesRes.notes) {
         if (n.topic_id) {
-          nMap[n.topic_id] = n
+          if (!nMap[n.topic_id]) {
+            nMap[n.topic_id] = []
+          }
+          nMap[n.topic_id].push(n)
         }
       }
     }
