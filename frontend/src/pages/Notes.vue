@@ -356,7 +356,7 @@
                       @click="generateSlot(slot)"
                     >
                       <BaseIcon name="sparkles" size="14" />
-                      <span>{{ generatingSlotKey === getSlotKey(slot) ? 'Generating...' : (slot.content ? 'Regenerate' : 'Generate Note') }}</span>
+                      <span>{{ getSlotGenerateButtonText(slot) }}</span>
                     </button>
 
                     <button
@@ -475,6 +475,13 @@ const markingSlotKey = ref(null)
 
 function getSlotKey(slot) {
   return `${slot.start_page}_${slot.end_page}`
+}
+
+function getSlotGenerateButtonText(slot) {
+  if (generatingSlotKey.value === getSlotKey(slot)) {
+    return 'Generating...'
+  }
+  return slot.content ? 'Regenerate' : 'Generate Note'
 }
 
 function toggleNotebook(notebookID) {
@@ -955,12 +962,13 @@ onMounted(() => {
   border-radius: 999px;
   background: color-mix(in srgb, var(--primary) 15%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .sidebar-toggle-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
+  border-color: transparent;
   color: var(--muted-text);
   border-radius: 6px;
   padding: 4px 6px;
@@ -1032,7 +1040,7 @@ onMounted(() => {
   cursor: pointer;
   user-select: none;
   background: color-mix(in srgb, var(--surface-container) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 50%, transparent);
+  border: 1px solid var(--outline-variant);
   transition: all 0.15s ease;
 }
 
@@ -1101,7 +1109,8 @@ onMounted(() => {
   padding: 7px 10px;
   border-radius: 6px;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
+  border-color: transparent;
   text-align: left;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1273,7 +1282,7 @@ onMounted(() => {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1330,7 +1339,7 @@ onMounted(() => {
   padding: 10px 14px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--primary) 8%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--on-surface-variant);
   font-size: 12.5px;
   display: flex;
@@ -1366,14 +1375,14 @@ onMounted(() => {
 
 .error-banner {
   background: color-mix(in srgb, #ef4444 15%, var(--surface));
-  color: #f87171;
-  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  color: #dc2626;
+  border: 1px solid var(--outline-variant);
 }
 
 .success-banner {
   background: color-mix(in srgb, #10b981 15%, var(--surface));
-  color: #34d399;
-  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  color: #059669;
+  border: 1px solid var(--outline-variant);
 }
 
 /* Session Cards Feed */

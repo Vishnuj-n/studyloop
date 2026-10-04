@@ -369,7 +369,7 @@
   gap: 8px;
   background: color-mix(in srgb, #ef4444 15%, transparent);
   color: #ef4444;
-  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .banner-success,
@@ -383,7 +383,7 @@
   gap: 8px;
   background: color-mix(in srgb, #10b981 15%, transparent);
   color: #10b981;
-  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 /* Modal Fade-in Keyframe */

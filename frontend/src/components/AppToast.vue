@@ -92,7 +92,7 @@ const { toast, hideToast } = useToast()
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.45), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.12), 0 0 1px 1px rgba(255, 255, 255, 0.08);
   color: var(--on-surface, #e2e8f0);
   display: flex;
   align-items: flex-start;

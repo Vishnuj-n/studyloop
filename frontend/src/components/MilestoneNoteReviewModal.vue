@@ -234,7 +234,7 @@ function proceedToExam() {
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;

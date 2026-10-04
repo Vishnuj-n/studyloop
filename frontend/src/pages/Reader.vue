@@ -1583,7 +1583,7 @@ button:disabled {
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
