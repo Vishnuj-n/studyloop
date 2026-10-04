@@ -92,23 +92,24 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	// Trigger asynchronous background compression on topic opening (soft skip if study service is not yet initialized)
+	// Trigger sequential background processing on topic opening:
+	// Compression runs first so study note generation consumes pre-compressed chunks (~20% smaller prompt).
 	if task.TopicID != "" && a.studyService != nil {
 		reqCtx := a.ctx
 		if reqCtx == nil {
 			reqCtx = context.Background()
 		}
-		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID)
 
-		// Trigger async study note generation on reading session start if enabled and not already generated.
-		// Running on reader open gives the background job ample time while the user reads, avoiding
-		// back-to-back LLM calls and 429 rate limit spikes during CompleteReading (which runs Quiz generation).
-		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
-			existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
-			if checkErr == nil && existingNote == nil {
-				a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+		noteGenCallback := func() {
+			if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
+				existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
+				if checkErr == nil && existingNote == nil {
+					a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+				}
 			}
 		}
+
+		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID, noteGenCallback)
 	}
 
 	currentPage := task.CurrentPage

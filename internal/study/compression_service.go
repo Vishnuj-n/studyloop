@@ -38,9 +38,9 @@ type CompressionOutput struct {
 }
 
 // CompressTopicChunksAsync triggers background compression for all chunks in a topic
-// without blocking the caller. It dynamically decides whether compression is needed
-// based on user settings and model context window budgets.
-func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID string) {
+// without blocking the caller. It accepts an optional onComplete callback that is executed
+// strictly after compression finishes, guaranteeing sequential execution for dependent tasks like note generation.
+func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID string, onComplete func()) {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
 		return
@@ -72,11 +72,15 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 			}
 		}()
 
-		bgCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
 		if err := s.CompressTopicChunks(bgCtx, topicID); err != nil {
 			utils.Warnf("[COMPRESSION] CompressTopicChunks failed for topic %s: %v", topicID, err)
+		}
+
+		if onComplete != nil {
+			onComplete()
 		}
 	}()
 }
@@ -160,25 +164,6 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 
 	utils.Infof("[COMPRESSION] running background compression on %d chunks for topic %s (rate=%.2f)", len(uncompressedChunks), topicID, rate)
 
-	// Prepare payload for prompt_compressor extension
-	var chunkInputs []CompressionChunkInput
-	for _, c := range uncompressedChunks {
-		chunkInputs = append(chunkInputs, CompressionChunkInput{
-			ID:   c.ID,
-			Text: c.Text,
-		})
-	}
-
-	payload := CompressionPayload{
-		Rate:   rate,
-		Chunks: chunkInputs,
-	}
-
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal compression payload: %w", err)
-	}
-
 	extDir := extension.ResolveExtensionsDir("")
 	compressExt := &extension.Extension{
 		Manifest: extension.Manifest{ID: "prompt_compressor", Name: "Prompt & Context Compressor", Runtime: "python", Entrypoint: "compress.py"},
@@ -214,35 +199,71 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	}
 
 	runner := extension.NewRunner()
-	outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
-	if err != nil {
-		return fmt.Errorf("failed to execute prompt compressor: %w", err)
-	}
+	const batchSize = 10
+	totalProcessed := 0
 
-	var output CompressionOutput
-	if err := json.Unmarshal(outputBytes, &output); err != nil {
-		return fmt.Errorf("failed to parse compressor output: %w", err)
-	}
+	for i := 0; i < len(uncompressedChunks); i += batchSize {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	if output.Error != "" {
-		return fmt.Errorf("compressor error: %s", output.Error)
-	}
+		end := i + batchSize
+		if end > len(uncompressedChunks) {
+			end = len(uncompressedChunks)
+		}
+		batch := uncompressedChunks[i:end]
 
-	// Update SQLite chunks with compressed text
-	for _, res := range output.Results {
-		if res.Error == "" && res.CompressedText != "" {
-			if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
-				utils.Warnf("[COMPRESSION] failed to update chunk %s compressed text: %v", res.ID, err)
+		var chunkInputs []CompressionChunkInput
+		for _, c := range batch {
+			chunkInputs = append(chunkInputs, CompressionChunkInput{
+				ID:   c.ID,
+				Text: c.Text,
+			})
+		}
+
+		payload := CompressionPayload{
+			Rate:   rate,
+			Chunks: chunkInputs,
+		}
+
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			utils.Warnf("[COMPRESSION] failed to marshal batch payload for topic %s: %v", topicID, err)
+			continue
+		}
+
+		outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
+		if err != nil {
+			utils.Warnf("[COMPRESSION] failed to execute batch %d-%d for topic %s: %v", i, end, topicID, err)
+			continue
+		}
+
+		var output CompressionOutput
+		if err := json.Unmarshal(outputBytes, &output); err != nil {
+			utils.Warnf("[COMPRESSION] failed to parse batch output for topic %s: %v", topicID, err)
+			continue
+		}
+
+		if output.Error != "" {
+			utils.Warnf("[COMPRESSION] batch error for topic %s: %s", topicID, output.Error)
+			continue
+		}
+
+		// Update SQLite chunks immediately for this batch
+		for _, res := range output.Results {
+			if res.Error == "" && res.CompressedText != "" {
+				if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
+					utils.Warnf("[COMPRESSION] failed to update chunk %s compressed text: %v", res.ID, err)
+				} else {
+					totalProcessed++
+				}
 			}
 		}
 	}
 
-	utils.Infof("[COMPRESSION] successfully compressed and persisted %d chunks for topic %s", len(output.Results), topicID)
-
-	// If auto_generate_study_notes is enabled in user_settings, trigger async study note generation
-	if userSettings.AutoGenerateStudyNotes {
-		s.GenerateTopicStudyNoteAsync(ctx, topicID, "", 0, 0)
-	}
+	utils.Infof("[COMPRESSION] successfully compressed and persisted %d chunks for topic %s", totalProcessed, topicID)
 
 	return nil
 }
