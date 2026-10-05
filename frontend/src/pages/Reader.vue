@@ -604,10 +604,6 @@ function onSimplifyClick() {
   handleSimplify()
 }
 
-function onNoteClick() {
-  showMoreMenu.value = false
-  toggleNoteTab()
-}
 
 function goBackToNotes() {
   router.push({

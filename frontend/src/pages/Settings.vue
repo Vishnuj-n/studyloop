@@ -519,6 +519,16 @@ watch(
   }
 )
 
+watch(
+  () => [route.query.category, route.query.tab],
+  ([newCat, newTab]) => {
+    const target = newCat || newTab
+    if (target && categories.some((c) => c.id === target)) {
+      activeCategory.value = target
+    }
+  }
+)
+
 onMounted(async () => {
   if (route.query.category && categories.some((c) => c.id === route.query.category)) {
     activeCategory.value = route.query.category

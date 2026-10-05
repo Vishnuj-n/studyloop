@@ -122,6 +122,19 @@
     />
 
     <div v-if="!llmSettings.use_same_for_heavy" class="llm-advanced">
+      <div class="swap-row">
+        <button
+          type="button"
+          class="swap-tiers-btn"
+          :disabled="disabled"
+          title="Instantly swap Fast tier and Heavy tier configurations"
+          @click="swapFastAndHeavy"
+        >
+          <BaseIcon name="refresh-cw" size="13" />
+          <span>Swap Fast ↔ Heavy Tiers</span>
+        </button>
+      </div>
+
       <div class="form-group">
         <label for="settings-heavy-provider">Heavy Provider</label>
         <select
@@ -303,7 +316,34 @@ const hasFastTokenWarning = computed(() => {
   return words * 1.3 > maxTokens
 })
 
-defineEmits(['apply-preset', 'remove-keys', 'update:llmFastKey', 'update:llmHeavyKey'])
+const emit = defineEmits(['apply-preset', 'remove-keys', 'update:llmFastKey', 'update:llmHeavyKey'])
+
+function swapFastAndHeavy() {
+  if (props.llmSettings?.use_same_for_heavy) return
+  if (!props.llmSettings?.fast || !props.llmSettings?.heavy) return
+
+  const fastProvider = props.llmSettings.fast.provider
+  const fastBaseUrl = props.llmSettings.fast.base_url
+  const fastModel = props.llmSettings.fast.model
+  const fastMaxTokens = props.llmSettings.fast.max_input_tokens
+  const fastHasKey = props.llmSettings.fast.has_api_key
+
+  props.llmSettings.fast.provider = props.llmSettings.heavy.provider
+  props.llmSettings.fast.base_url = props.llmSettings.heavy.base_url
+  props.llmSettings.fast.model = props.llmSettings.heavy.model
+  props.llmSettings.fast.max_input_tokens = props.llmSettings.heavy.max_input_tokens
+  props.llmSettings.fast.has_api_key = props.llmSettings.heavy.has_api_key
+
+  props.llmSettings.heavy.provider = fastProvider
+  props.llmSettings.heavy.base_url = fastBaseUrl
+  props.llmSettings.heavy.model = fastModel
+  props.llmSettings.heavy.max_input_tokens = fastMaxTokens
+  props.llmSettings.heavy.has_api_key = fastHasKey
+
+  const prevFastKey = props.llmFastKey
+  emit('update:llmFastKey', props.llmHeavyKey)
+  emit('update:llmHeavyKey', prevFastKey)
+}
 
 async function openExternalLink(url) {
   try {
@@ -505,6 +545,38 @@ h2 {
   gap: 24px;
   padding-top: 8px;
   border-top: 1px solid var(--outline-variant);
+}
+
+.swap-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -8px;
+}
+
+.swap-tiers-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.swap-tiers-btn:hover:not(:disabled) {
+  background: var(--surface-container-high);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.swap-tiers-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .button-row {

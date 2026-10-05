@@ -41,6 +41,78 @@
               <BaseIcon name="x" size="12" />
             </button>
           </div>
+
+          <!-- Quick Sidebar Auto Notes & Settings Bar -->
+          <div class="sidebar-quick-toolbar">
+            <label class="auto-notes-pill-toggle" title="Automatically queue study notes when completing reading sessions">
+              <input
+                v-model="autoNotesEnabled"
+                type="checkbox"
+                @change="saveAutoNotesSetting"
+              />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">Auto Notes</span>
+            </label>
+
+            <button
+              type="button"
+              class="sidebar-settings-quick-btn"
+              :class="{ active: showNotesSettingsPopover }"
+              title="Notes Generation Settings"
+              aria-label="Notes settings"
+              @click="showNotesSettingsPopover = !showNotesSettingsPopover"
+            >
+              <BaseIcon name="settings" size="13" />
+            </button>
+          </div>
+
+          <!-- Notes Settings Popover -->
+          <div v-if="showNotesSettingsPopover" class="notes-settings-popover">
+            <div class="popover-header">
+              <span class="popover-title">Notes Settings</span>
+              <button
+                type="button"
+                class="popover-close-btn"
+                title="Close settings"
+                @click="showNotesSettingsPopover = false"
+              >
+                <BaseIcon name="x" size="12" />
+              </button>
+            </div>
+            <div class="popover-body">
+              <div class="popover-setting-row">
+                <span class="popover-label">Auto-Generate</span>
+                <input
+                  v-model="autoNotesEnabled"
+                  type="checkbox"
+                  @change="saveAutoNotesSetting"
+                />
+              </div>
+              <div class="popover-setting-row">
+                <span class="popover-label">Summary Detail</span>
+                <select
+                  v-model="noteDetailLevel"
+                  class="popover-select"
+                  @change="saveAutoNotesSetting"
+                >
+                  <option value="concise">Concise Summary</option>
+                  <option value="detailed">Comprehensive Deck</option>
+                  <option value="bullet">Key Takeaways & Formulas</option>
+                </select>
+              </div>
+              <div class="popover-setting-row">
+                <span class="popover-label">AI Model Tier</span>
+                <select
+                  v-model="noteModelTier"
+                  class="popover-select"
+                  @change="saveAutoNotesSetting"
+                >
+                  <option value="fast">Fast Model (Speed)</option>
+                  <option value="heavy">Heavy Model (Deep)</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Book & Chapter Tree List -->
@@ -519,6 +591,18 @@ const isSidebarCollapsed = ref(false)
 const notesMap = ref({}) // topicID -> TopicStudyNote
 const sessionSlots = ref([])
 const showAllSessions = ref(false)
+
+// Auto-notes & sidebar settings state
+const autoNotesEnabled = ref(localStorage.getItem('studyloop_auto_notes_enabled') === 'true')
+const noteDetailLevel = ref(localStorage.getItem('studyloop_notes_detail_level') || 'concise')
+const noteModelTier = ref(localStorage.getItem('studyloop_notes_model_tier') || 'fast')
+const showNotesSettingsPopover = ref(false)
+
+function saveAutoNotesSetting() {
+  localStorage.setItem('studyloop_auto_notes_enabled', autoNotesEnabled.value ? 'true' : 'false')
+  localStorage.setItem('studyloop_notes_detail_level', noteDetailLevel.value)
+  localStorage.setItem('studyloop_notes_model_tier', noteModelTier.value)
+}
 
 // Slot editing & action state
 const editingSlotKey = ref(null)
@@ -2094,5 +2178,167 @@ onMounted(() => {
   padding: 2px;
   display: flex;
   align-items: center;
+}
+
+/* Sidebar Quick Toolbar & Auto Notes Toggle */
+.sidebar-quick-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.auto-notes-pill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-surface-variant, var(--muted-text));
+  padding: 3px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.auto-notes-pill-toggle:hover {
+  background: var(--surface-container-high, rgba(255, 255, 255, 0.05));
+}
+
+.auto-notes-pill-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  background-color: var(--surface-container-highest, #3a3a3c);
+  border-radius: 12px;
+  transition: 0.2s ease;
+  border: 1px solid var(--outline-variant);
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 10px;
+  width: 10px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--on-surface-variant, #fff);
+  border-radius: 50%;
+  transition: 0.2s ease;
+}
+
+.auto-notes-pill-toggle input:checked + .toggle-slider {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.auto-notes-pill-toggle input:checked + .toggle-slider:before {
+  transform: translateX(12px);
+  background-color: #fff;
+}
+
+.sidebar-settings-quick-btn {
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--muted-text);
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.sidebar-settings-quick-btn:hover,
+.sidebar-settings-quick-btn.active {
+  background: var(--surface-container);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* Notes Settings Popover */
+.notes-settings-popover {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 6px;
+}
+
+.popover-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.popover-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.popover-close-btn:hover {
+  color: var(--on-surface);
+}
+
+.popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popover-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.popover-label {
+  font-size: 11.5px;
+  color: var(--muted-text);
+}
+
+.popover-select {
+  font-size: 11.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  outline: none;
+  max-width: 140px;
 }
 </style>
