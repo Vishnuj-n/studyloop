@@ -233,7 +233,7 @@
         <div class="note-meta-bar">
           <div class="note-chapter-pill" :title="displayContextTitle">
             <BaseIcon name="book" size="12" custom-class="context-pill-icon" />
-            <span class="note-chapter-title">{{ selectedTopicTitle || 'Chapter Study Note' }}</span>
+            <span class="note-chapter-title">{{ notePillTitle }}</span>
           </div>
           <span v-if="noteLastSaved" class="note-saved-status">Saved</span>
         </div>
@@ -331,6 +331,7 @@ import {
   getTopicStudyNote,
   getTopicStudyNoteForRange,
   generateTopicStudyNote,
+  generateTopicStudyNoteForRange,
   updateTopicStudyNote,
 } from '../services/appApi'
 
@@ -344,6 +345,8 @@ const props = defineProps({
   currentPage: { type: Number, required: true },
   topicStartPage: { type: Number, required: true },
   topicEndPage: { type: Number, required: true },
+  navigationMinPage: { type: Number, default: 0 },
+  navigationMaxPage: { type: Number, default: 0 },
   ragEnabled: { type: Boolean, required: true },
   ragQueueStudy: { type: Boolean, default: true },
   ragSettingsLoaded: { type: Boolean, required: true },
@@ -409,6 +412,28 @@ const noteEditContent = ref('')
 const currentNoteContent = ref('')
 const loadedTopicID = ref('')
 
+const effectiveStartPage = computed(() => {
+  if (props.navigationMinPage > 0 && props.navigationMaxPage >= props.navigationMinPage) {
+    return props.navigationMinPage
+  }
+  return props.topicStartPage || 0
+})
+
+const effectiveEndPage = computed(() => {
+  if (props.navigationMinPage > 0 && props.navigationMaxPage >= props.navigationMinPage) {
+    return props.navigationMaxPage
+  }
+  return props.topicEndPage || 0
+})
+
+const notePillTitle = computed(() => {
+  const baseTitle = props.selectedTopicTitle || 'Chapter Study Note'
+  if (effectiveStartPage.value > 0 && effectiveEndPage.value >= effectiveStartPage.value) {
+    return `${baseTitle} (Pages ${effectiveStartPage.value}–${effectiveEndPage.value})`
+  }
+  return baseTitle
+})
+
 const renderedNoteMarkdown = computed(() => {
   return renderMarkdown(currentNoteContent.value || '')
 })
@@ -422,8 +447,8 @@ async function fetchTopicNote(topicId) {
   noteLoading.value = true
   noteEditing.value = false
   try {
-    const startPage = props.topicStartPage || 0
-    const endPage = props.topicEndPage || 0
+    const startPage = effectiveStartPage.value
+    const endPage = effectiveEndPage.value
     let res = null
     if (startPage > 0 && endPage >= startPage) {
       res = await getTopicStudyNoteForRange(topicId, startPage, endPage)
@@ -468,8 +493,8 @@ async function saveNote() {
   if (!tid) return
   noteSaving.value = true
   try {
-    const startPage = props.topicStartPage || 0
-    const endPage = props.topicEndPage || 0
+    const startPage = effectiveStartPage.value
+    const endPage = effectiveEndPage.value
     const res = await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
     if (res && res.note) {
       currentNoteContent.value = res.note.content
@@ -496,12 +521,19 @@ async function generateNote() {
   noteGenerating.value = true
   noteEditing.value = false
   try {
-    const res = await generateTopicStudyNote(tid, nbid)
+    const startPage = effectiveStartPage.value
+    const endPage = effectiveEndPage.value
+    let res = null
+    if (startPage > 0 && endPage >= startPage) {
+      res = await generateTopicStudyNoteForRange(tid, nbid, startPage, endPage)
+    } else {
+      res = await generateTopicStudyNote(tid, nbid)
+    }
     if (res && res.note) {
       currentNoteContent.value = res.note.content
     }
     loadedTopicID.value = tid
-    logFrontendEvent('info', 'ReaderChat', 'study_note_generated', { topicID: tid })
+    logFrontendEvent('info', 'ReaderChat', 'study_note_generated', { topicID: tid, startPage, endPage })
   } catch (err) {
     console.error('[ReaderChat Note] Failed to generate note:', err)
   } finally {
@@ -520,8 +552,8 @@ function goToNotesPage() {
 
 // Watchers
 watch(
-  () => props.selectedTopicID,
-  (newTid) => {
+  [() => props.selectedTopicID, () => effectiveStartPage.value, () => effectiveEndPage.value],
+  ([newTid]) => {
     if (currentTab.value === 'note' && newTid) {
       void fetchTopicNote(newTid)
     } else {

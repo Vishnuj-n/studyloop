@@ -812,6 +812,8 @@ function jumpToReader(slot) {
       topicId: topicId || undefined,
       page: targetPage,
       from: 'notes',
+      fromOrigin: route.query.fromOrigin || route.query.from || undefined,
+      taskId: route.query.taskId || route.query.task_id || undefined,
     },
   })
 }

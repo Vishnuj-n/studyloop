@@ -98,70 +98,73 @@
                 v-if="route.query.from === 'notes'"
                 class="secondary"
                 title="Return to Study Notes"
-                @click="router.push({ path: '/notes', query: { notebookId: reader.selectedNotebookID.value, topicId: reader.selectedTopicID.value } })"
+                @click="goBackToNotes"
               >
                 <BaseIcon name="arrow-left" size="14" />
                 <span>Back to Notes</span>
               </button>
 
-              <!-- Copy Session -->
-              <button
-                class="secondary copy-session-btn"
-                :disabled="reader.loadingBundle.value || reader.loadingText.value"
-                title="Copy reading session text as Markdown"
-                @click="onCopyClick"
-              >
-                <BaseIcon :name="copiedSession ? 'check' : 'copy'" size="14" />
-                <span>{{ copiedSession ? 'Copied to Clipboard!' : 'Copy Session' }}</span>
-              </button>
-
-              <!-- AI Audio Overview -->
-              <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
+              <!-- Session Bounded Actions: Only available during bounded reading tasks -->
+              <template v-if="isTaskFlow">
+                <!-- Copy Session -->
                 <button
-                  class="secondary split-main-btn"
-                  :class="{ active: showAudioOverview }"
-                  :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
-                  title="Listen to AI Audio Overview"
-                  @click="startAudio('toggle')"
+                  class="secondary copy-session-btn"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value"
+                  title="Copy reading session text as Markdown"
+                  @click="onCopyClick"
                 >
-                  <BaseIcon name="headphones" size="14" />
-                  <span>{{ showAudioOverview ? 'AI Audio' : 'Audio' }}</span>
+                  <BaseIcon :name="copiedSession ? 'check' : 'copy'" size="14" />
+                  <span>{{ copiedSession ? 'Copied to Clipboard!' : 'Copy Session' }}</span>
                 </button>
-                <div class="split-dropdown-wrapper">
+
+                <!-- AI Audio Overview -->
+                <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
                   <button
-                    class="secondary split-chevron-btn audio-chevron-btn"
+                    class="secondary split-main-btn"
+                    :class="{ active: showAudioOverview }"
                     :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
-                    title="Audio Overview page range options"
-                    @click.stop="showAudioMenu = !showAudioMenu"
+                    title="Listen to AI Audio Overview"
+                    @click="startAudio('toggle')"
                   >
-                    <BaseIcon name="chevron-down" size="12" />
+                    <BaseIcon name="headphones" size="14" />
+                    <span>{{ showAudioOverview ? 'AI Audio' : 'Audio' }}</span>
                   </button>
-                  <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
-                    <button class="split-dropdown-item" @click="startAudio('session')">
-                      <span class="item-title">Full Session</span>
-                      <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+                  <div class="split-dropdown-wrapper">
+                    <button
+                      class="secondary split-chevron-btn audio-chevron-btn"
+                      :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                      title="Audio Overview page range options"
+                      @click.stop="showAudioMenu = !showAudioMenu"
+                    >
+                      <BaseIcon name="chevron-down" size="12" />
                     </button>
-                    <button class="split-dropdown-item" @click="startAudio('current')">
-                      <span class="item-title">From Current Page till End</span>
-                      <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
-                    </button>
+                    <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
+                      <button class="split-dropdown-item" @click="startAudio('session')">
+                        <span class="item-title">Full Session</span>
+                        <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+                      </button>
+                      <button class="split-dropdown-item" @click="startAudio('current')">
+                        <span class="item-title">From Current Page till End</span>
+                        <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- Text Simplifier -->
-              <button
-                v-if="isExtensionActive('text_simplifier')"
-                class="secondary simplify-btn"
-                :disabled="reader.loadingBundle.value || simplifying"
-                title="Open intuitive AI simplified breakdown"
-                @click="handleSimplify"
-              >
-                <BaseIcon name="sparkles" size="14" />
-                <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
-              </button>
+                <!-- Text Simplifier -->
+                <button
+                  v-if="isExtensionActive('text_simplifier')"
+                  class="secondary simplify-btn"
+                  :disabled="reader.loadingBundle.value || simplifying"
+                  title="Open intuitive AI simplified breakdown"
+                  @click="handleSimplify"
+                >
+                  <BaseIcon name="sparkles" size="14" />
+                  <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
+                </button>
+              </template>
 
-              <!-- Chapter Study Note -->
+              <!-- Chapter Study Note (Available in all modes for the active chapter) -->
               <button
                 class="secondary note-drawer-btn"
                 :class="{ active: !chat.chatCollapsed.value && currentSidebarTab === 'note' }"
@@ -175,7 +178,7 @@
             </div>
 
             <!-- Responsive Overflow Menu: Only displays when toolbar is congested (<1280px or mobile) -->
-            <div class="split-dropdown-wrapper more-actions-wrapper">
+            <div v-if="isTaskFlow" class="split-dropdown-wrapper more-actions-wrapper">
               <button
                 class="secondary more-actions-btn"
                 :class="{ active: showMoreMenu || showAudioOverview || (!chat.chatCollapsed.value && currentSidebarTab === 'note') }"
@@ -374,6 +377,8 @@
         :current-page="reader.currentPage.value"
         :topic-start-page="reader.topicStartPage.value"
         :topic-end-page="reader.topicEndPage.value"
+        :navigation-min-page="reader.navigationMinPage.value"
+        :navigation-max-page="reader.navigationMaxPage.value"
         :rag-enabled="ragEnabled"
         :rag-queue-study="ragQueueStudy"
         :rag-settings-loaded="ragSettingsLoaded"
@@ -640,6 +645,19 @@ function onSimplifyClick() {
 function onNoteClick() {
   showMoreMenu.value = false
   toggleNoteTab()
+}
+
+function goBackToNotes() {
+  router.push({
+    path: '/notes',
+    query: {
+      notebookId: reader.selectedNotebookID.value || undefined,
+      topicId: reader.selectedTopicID.value || undefined,
+      from: route.query.fromOrigin || undefined,
+      taskId: route.query.taskId || route.query.task_id || undefined,
+      page: reader.currentPage.value || route.query.page || undefined,
+    },
+  })
 }
 
 function handleDocumentClick() {
