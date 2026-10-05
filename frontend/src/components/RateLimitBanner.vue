@@ -114,7 +114,7 @@ function goToSettings(category) {
   border-left: 4px solid #f59e0b;
   border-radius: 12px;
   padding: 16px 18px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -237,12 +237,12 @@ function goToSettings(category) {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 1px solid transparent;
+  border: 1px solid var(--outline-variant);
 }
 
 .compression-btn {
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: #d97706;
   border-color: rgba(245, 158, 11, 0.3);
 }
 

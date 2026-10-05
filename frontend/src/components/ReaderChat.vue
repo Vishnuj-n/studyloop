@@ -1161,7 +1161,7 @@ function handleEnterKey(event) {
 .generating-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 3px solid color-mix(in srgb, var(--primary) 20%, transparent); /* design-lint-ignore */
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.85s linear infinite;

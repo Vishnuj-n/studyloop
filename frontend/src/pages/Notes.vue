@@ -1647,7 +1647,7 @@ onMounted(() => {
   padding: 10px 16px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--primary) 14%, var(--surface-container));
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--outline-variant));
+  border: 1px solid var(--outline-variant);
   color: var(--on-surface);
   font-size: 13px;
   display: flex;
@@ -1671,7 +1671,7 @@ onMounted(() => {
 .banner-toggle-sessions-btn {
   margin-left: 6px;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--primary);
@@ -1811,7 +1811,7 @@ onMounted(() => {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 18%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -1849,7 +1849,7 @@ onMounted(() => {
 .session-index-pill.new-badge {
   background: color-mix(in srgb, var(--primary) 15%, transparent);
   color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  border-color: var(--outline-variant);
 }
 
 .session-range-pill {
@@ -1869,7 +1869,7 @@ onMounted(() => {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -2276,7 +2276,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   animation: fadeIn 0.15s ease-out;
 }
 
