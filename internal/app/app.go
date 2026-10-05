@@ -350,11 +350,17 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 		activeSavedPct = (float64(activeSavedTokens) / float64(activeRawTokens)) * 100.0
 	}
 
+	isCompressing := false
+	if a.studyService != nil {
+		isCompressing = a.studyService.IsTopicCompressing(topicID)
+	}
+
 	return map[string]interface{}{
 		"topic_id":                 topicID,
 		"chunk_count":              len(chunks),
 		"compressed_chunk_count":   compressedCount,
 		"is_compressed":            isCompressed,
+		"is_compressing":           isCompressing,
 		"raw_tokens":               totalRawTokens,
 		"compressed_tokens":        totalCompressedTokens,
 		"tokens_saved":             savedTokens,

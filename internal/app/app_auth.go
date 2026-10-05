@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -80,6 +81,103 @@ func computeSessionSignature(machineID, userID, email string, isPro bool, verifi
 	mac := hmac.New(sha256.New, []byte(sessionSecretSalt))
 	mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func parseClerkSessionClaims(jwtStr string) (userID, email, plan, role string, isPro bool) {
+	jwtStr = strings.TrimSpace(jwtStr)
+	parts := strings.Split(jwtStr, ".")
+	if len(parts) < 2 {
+		return
+	}
+	payloadB64 := parts[1]
+	data, err := base64.RawURLEncoding.DecodeString(payloadB64)
+	if err != nil {
+		data, err = base64.URLEncoding.DecodeString(payloadB64)
+	}
+	if err != nil {
+		data, err = base64.RawStdEncoding.DecodeString(payloadB64)
+	}
+	if err != nil {
+		data, err = base64.StdEncoding.DecodeString(payloadB64)
+	}
+	if err != nil {
+		return
+	}
+
+	var claims struct {
+		Sub            string                 `json:"sub"`
+		Email          string                 `json:"email"`
+		PrimaryEmail   string                 `json:"primary_email_address"`
+		PublicMetadata map[string]interface{} `json:"public_metadata"`
+		UnsafeMetadata map[string]interface{} `json:"unsafe_metadata"`
+		OrgMemberships []struct {
+			Role string `json:"role"`
+		} `json:"org_memberships"`
+	}
+
+	if err := json.Unmarshal(data, &claims); err != nil {
+		return
+	}
+
+	userID = claims.Sub
+	email = claims.Email
+	if email == "" {
+		email = claims.PrimaryEmail
+	}
+
+	extractFromMap := func(m map[string]interface{}) {
+		if m == nil {
+			return
+		}
+		if p, ok := m["plan"].(string); ok && plan == "" {
+			plan = strings.ToLower(p)
+		}
+		if p, ok := m["tier"].(string); ok && plan == "" {
+			plan = strings.ToLower(p)
+		}
+		if p, ok := m["subscription"].(string); ok && plan == "" {
+			plan = strings.ToLower(p)
+		}
+		if r, ok := m["role"].(string); ok && role == "" {
+			role = strings.ToLower(r)
+		}
+		if flag, ok := m["isPro"].(bool); ok && flag {
+			isPro = true
+		}
+		if flag, ok := m["is_pro"].(bool); ok && flag {
+			isPro = true
+		}
+		if flag, ok := m["pro"].(bool); ok && flag {
+			isPro = true
+		}
+		if flag, ok := m["isPro"].(string); ok && (strings.ToLower(flag) == "true" || flag == "1") {
+			isPro = true
+		}
+	}
+
+	extractFromMap(claims.PublicMetadata)
+	extractFromMap(claims.UnsafeMetadata)
+
+	if !isPro {
+		for _, org := range claims.OrgMemberships {
+			r := strings.ToLower(org.Role)
+			if strings.Contains(r, "pro") || strings.Contains(r, "admin") || strings.Contains(r, "member") || strings.Contains(r, "owner") {
+				isPro = true
+				break
+			}
+		}
+	}
+
+	if !isPro {
+		if strings.Contains(plan, "pro") || strings.Contains(plan, "premium") || strings.Contains(plan, "lifetime") || strings.Contains(plan, "active") || strings.Contains(plan, "supporter") || strings.Contains(plan, "early_access") {
+			isPro = true
+		}
+		if strings.Contains(role, "pro") || strings.Contains(role, "admin") || strings.Contains(role, "owner") {
+			isPro = true
+		}
+	}
+
+	return
 }
 
 func getSessionFilePath() (string, error) {
@@ -408,11 +506,48 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
 		isPro := isProStr == "true" || isProStr == "1" || isProStr == "pro" || isProStr == "yes" || planStr == "pro" || roleStr == "pro"
 
-		// Only emit session immediately if email/user were explicitly provided in query params;
-		// otherwise, let the browser Clerk JS script authoritatively confirm via /api/auth-confirm.
-		if email != "" && userID != "" {
-			utils.Infof("[AUTH] Query param session detected on /callback: user=%s email=%s isPro=%v", userID, email, isPro)
-			fmt.Printf("[AUTH] Query param session detected on /callback: user=%s email=%s isPro=%v\n", userID, email, isPro)
+		// If user / email were not passed via query parameters, extract from Clerk session JWT cookie or token
+		if userID == "" || email == "" {
+			var jwtCandidates []string
+			if rawToken := q.Get("__clerk_db_jwt"); rawToken != "" {
+				jwtCandidates = append(jwtCandidates, rawToken)
+			}
+			if rawToken := q.Get("__clerk_session"); rawToken != "" {
+				jwtCandidates = append(jwtCandidates, rawToken)
+			}
+			for _, cookie := range req.Cookies() {
+				if strings.HasPrefix(cookie.Name, "__session") || strings.HasPrefix(cookie.Name, "__clerk_db_jwt") {
+					jwtCandidates = append(jwtCandidates, cookie.Value)
+				}
+			}
+
+			for _, candidate := range jwtCandidates {
+				cUserID, cEmail, cPlan, cRole, cIsPro := parseClerkSessionClaims(candidate)
+				if cUserID != "" {
+					if userID == "" {
+						userID = cUserID
+					}
+					if email == "" {
+						email = cEmail
+					}
+					if planStr == "" {
+						planStr = cPlan
+					}
+					if roleStr == "" {
+						roleStr = cRole
+					}
+					if cIsPro {
+						isPro = true
+					}
+					break
+				}
+			}
+		}
+
+		// Authenticate immediately if userID is identified (or both email & userID)
+		if userID != "" {
+			utils.Infof("[AUTH] Identified session on /callback: user=%s email=%s isPro=%v plan=%s role=%s", userID, email, isPro, planStr, roleStr)
+			fmt.Printf("[AUTH] Identified session on /callback: user=%s email=%s isPro=%v\n", userID, email, isPro)
 			a.setSession(userID, email, isPro)
 			result := AuthCallbackResult{
 				Success: true,
@@ -422,6 +557,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 			}
 			if a.ctx != nil {
 				wailsruntime.EventsEmit(a.ctx, "clerk_auth_success", result)
+				wailsruntime.WindowUnminimise(a.ctx)
 			}
 		} else {
 			utils.Infof("[AUTH] Awaiting client-side Clerk JS metadata confirmation from browser...")
@@ -431,7 +567,11 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 		userDisplay := email
 		if userDisplay == "" {
-			userDisplay = "Pro User"
+			if userID != "" {
+				userDisplay = userID
+			} else {
+				userDisplay = "Pro User"
+			}
 		}
 
 		escapedClerkKey := html.EscapeString(clerkKey)
@@ -669,26 +809,51 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
         logMsg('Clerk load() error: ' + (loadErr.message || loadErr));
       }
 
-      const currentUser = clerk.user;
+      let currentUser = clerk ? clerk.user : null;
+      let userId = currentUser?.id || '';
+      let email = currentUser?.primaryEmailAddress?.emailAddress || 
+                  (currentUser?.emailAddresses && currentUser?.emailAddresses[0]?.emailAddress) || 
+                  '';
+      let pubMetadata = currentUser?.publicMetadata || {};
+      let unsafeMetadata = currentUser?.unsafeMetadata || {};
+
       if (!currentUser) {
-        logMsg('No active Clerk session found in browser. Please sign in below:');
+        logMsg('No active clerk.user on window. Checking cookies and URL token...');
+        // Try parsing JWT from cookies or URL query
+        const urlParams = new URLSearchParams(window.location.search);
+        let jwtCandidate = urlParams.get('__clerk_db_jwt') || urlParams.get('__clerk_session');
+        if (!jwtCandidate) {
+          const match = document.cookie.match(/(?:^|;\s*)(?:__session|__clerk_db_jwt)[^=]*=([^;]+)/);
+          if (match) jwtCandidate = match[1];
+        }
+        if (jwtCandidate) {
+          try {
+            const parts = jwtCandidate.split('.');
+            if (parts.length >= 2) {
+              let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+              while (b64.length %% 4) b64 += '=';
+              const decoded = JSON.parse(atob(b64));
+              userId = decoded.sub || '';
+              email = decoded.email || decoded.primary_email_address || '';
+              pubMetadata = decoded.public_metadata || {};
+              unsafeMetadata = decoded.unsafe_metadata || {};
+              logMsg('Extracted session from client JWT token: ' + email + ' (sub: ' + userId + ')');
+            }
+          } catch (e) {
+            logMsg('JWT token parse notice: ' + (e.message || e));
+          }
+        }
+      }
+
+      if (!userId && !email) {
+        logMsg('No active Clerk session identified. Please complete sign in.');
         const emailEl = document.getElementById('user-display-email');
-        if (emailEl) emailEl.textContent = 'Not Signed In';
-        
-        // Provide in-place sign in modal trigger
-        if (clerk.openSignIn) {
+        if (emailEl) emailEl.textContent = 'Sign In Incomplete';
+        if (clerk && clerk.openSignIn) {
           clerk.openSignIn();
         }
         return;
       }
-
-      const userId = currentUser.id || '';
-      const email = currentUser.primaryEmailAddress?.emailAddress || 
-                    (currentUser.emailAddresses && currentUser.emailAddresses[0]?.emailAddress) || 
-                    'User';
-      
-      const pubMetadata = currentUser.publicMetadata || {};
-      const unsafeMetadata = currentUser.unsafeMetadata || {};
       
       logMsg('User identified: ' + email + ' (ID: ' + userId + ')');
       logMsg('Public Metadata: ' + JSON.stringify(pubMetadata));

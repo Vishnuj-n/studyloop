@@ -170,7 +170,7 @@
                 </span>
                 <span class="chip-tag info">
                   <BaseIcon name="layers" size="12" />
-                  <span>{{ sessionSlots.length }} {{ sessionSlots.length === 1 ? 'Card' : 'Cards' }}</span>
+                  <span>{{ isFromFlashcards && !showAllSessions && sessionSlots.length > 1 ? `1 of ${sessionSlots.length} Sessions` : `${sessionSlots.length} ${sessionSlots.length === 1 ? 'Card' : 'Cards'}` }}</span>
                 </span>
               </div>
               <h1 class="note-topic-title">{{ activeTopic?.title || selectedTopicID }}</h1>
@@ -212,6 +212,14 @@
             <div class="banner-left">
               <BaseIcon name="book-open" size="15" class="banner-icon" />
               <span>{{ flashcardBannerText }}</span>
+              <button
+                v-if="sessionSlots.length > 1"
+                type="button"
+                class="banner-toggle-sessions-btn"
+                @click="showAllSessions = !showAllSessions"
+              >
+                {{ showAllSessions ? 'Show target session only' : `Show all ${sessionSlots.length} sessions` }}
+              </button>
             </div>
             <button
               type="button"
@@ -322,22 +330,22 @@
 
             <!-- PPT / Deck of Cards for each Reading Session -->
             <div
-              v-for="(slot, idx) in sessionSlots"
+              v-for="({ slot, sessionNumber }, idx) in displayedSessionSlots"
               :id="`session-slot-${slot.start_page}-${slot.end_page}`"
               :key="`${slot.start_page}-${slot.end_page}`"
               class="session-note-card"
-              :class="{ 'target-highlight': isTargetSlot(slot, idx) }"
+              :class="{ 'target-highlight': isTargetSlot(slot, sessionNumber - 1) }"
             >
               <!-- Card Header -->
               <div class="session-card-header">
                 <div class="session-card-badge-row">
-                  <span class="session-index-pill">Session {{ idx + 1 }}</span>
+                  <span class="session-index-pill">Session {{ sessionNumber }}</span>
                   <span class="session-range-pill">
                     <BaseIcon :name="isCurrentTopicYouTube ? 'video' : 'book-open'" size="12" />
                     <span>{{ formatPageRange(slot.start_page, slot.end_page) }}</span>
                   </span>
                   <!-- Flashcard Source Badge when targeted from Flashcards -->
-                  <span v-if="isTargetSlot(slot, idx)" class="session-target-badge" title="Referenced by your current flashcard">
+                  <span v-if="isTargetSlot(slot, sessionNumber - 1)" class="session-target-badge" title="Referenced by your current flashcard">
                     <BaseIcon name="target" size="12" />
                     <span>{{ targetPageFromRoute ? `Flashcard Source (p. ${targetPageFromRoute})` : 'Flashcard Source' }}</span>
                   </span>
@@ -510,6 +518,7 @@ const isSidebarCollapsed = ref(false)
 
 const notesMap = ref({}) // topicID -> TopicStudyNote
 const sessionSlots = ref([])
+const showAllSessions = ref(false)
 
 // Slot editing & action state
 const editingSlotKey = ref(null)
@@ -691,8 +700,26 @@ const targetPageFromRoute = computed(() => {
   return p ? Number(p) : null
 })
 
+const displayedSessionSlots = computed(() => {
+  if (!isFromFlashcards.value || showAllSessions.value || sessionSlots.value.length <= 1) {
+    return sessionSlots.value.map((slot, idx) => ({ slot, sessionNumber: idx + 1 }))
+  }
+
+  const target = targetPageFromRoute.value
+  if (target) {
+    const idx = sessionSlots.value.findIndex(
+      (s) => s.start_page > 0 && s.end_page > 0 && target >= s.start_page && target <= s.end_page
+    )
+    if (idx !== -1) {
+      return [{ slot: sessionSlots.value[idx], sessionNumber: idx + 1 }]
+    }
+  }
+
+  // Fallback to the first slot if navigated from flashcards
+  return [{ slot: sessionSlots.value[0], sessionNumber: 1 }]
+})
+
 const flashcardBannerText = computed(() => {
-  const topicTitle = activeTopic.value?.title || activeNotebook.value?.title || ''
   const page = targetPageFromRoute.value
 
   let matchedSlot = null
@@ -724,27 +751,14 @@ const flashcardBannerText = computed(() => {
         : `(${sessionPages})`
 
     if (page && page >= matchedSlot.start_page && page <= matchedSlot.end_page) {
-      if (topicTitle) {
-        return `Reviewing notes for ${topicTitle} — Page ${page} in ${sessionLabel}`
-      }
       return `Reviewing notes for Page ${page} in ${sessionLabel}`
     }
 
-    if (topicTitle) {
-      return `Reviewing notes for ${topicTitle} — ${sessionLabel}`
-    }
     return `Reviewing notes for ${sessionLabel}`
   }
 
   if (page) {
-    if (topicTitle) {
-      return `Reviewing notes for ${topicTitle} — Page ${page}`
-    }
     return `Reviewing notes for Page ${page}`
-  }
-
-  if (topicTitle) {
-    return `Reviewing notes for ${topicTitle}`
   }
 
   return 'Reviewing study notes for your active flashcard session'
@@ -881,6 +895,7 @@ async function loadInitialData() {
 async function selectTopic(topic) {
   if (!topic || !topic.topic_id) return
   selectedTopicID.value = topic.topic_id
+  showAllSessions.value = false
   if (topic.notebook_id) {
     selectedNotebookID.value = topic.notebook_id
     expandedNotebooks.value.add(topic.notebook_id)
@@ -1557,6 +1572,24 @@ onMounted(() => {
 .notes-flashcard-context-banner .banner-icon {
   color: var(--primary);
   flex-shrink: 0;
+}
+
+.banner-toggle-sessions-btn {
+  margin-left: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.banner-toggle-sessions-btn:hover {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  border-color: var(--primary);
 }
 
 .banner-return-btn {

@@ -85,7 +85,7 @@
 
         <div class="popover-footer-note">
           <BaseIcon name="info" size="12" />
-          <span v-if="stats.chunk_count && stats.compressed_chunk_count && stats.compressed_chunk_count < stats.chunk_count">
+          <span v-if="stats.is_compressing && stats.chunk_count && stats.compressed_chunk_count && stats.compressed_chunk_count < stats.chunk_count">
             Batch progress: {{ stats.compressed_chunk_count }} / {{ stats.chunk_count }} chunks compressed ({{ activeSavingsPercent }}% pruned on compressed chunks).
           </span>
           <span v-else>
@@ -106,6 +106,7 @@ const props = defineProps({
     type: Object,
     default: () => ({
       is_compressed: false,
+      is_compressing: false,
       raw_tokens: 0,
       compressed_tokens: 0,
       tokens_saved: 0,

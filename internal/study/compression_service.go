@@ -82,6 +82,17 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 	}()
 }
 
+// IsTopicCompressing returns true if background compression is currently in flight for the given topic.
+func (s *StudyService) IsTopicCompressing(topicID string) bool {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return false
+	}
+	s.inFlightCompressMu.Lock()
+	defer s.inFlightCompressMu.Unlock()
+	return s.inFlightCompress[topicID]
+}
+
 // CompressTopicChunks evaluates whether compression is needed and executes it for the topic.
 func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) error {
 	topicID = strings.TrimSpace(topicID)
@@ -109,19 +120,19 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 		return nil
 	}
 
-	// Check if all substantive chunks are already compressed
+	// Check if all chunks are already compressed
 	var uncompressedChunks []models.Chunk
 	totalTokens := 0
 	for _, c := range chunks {
 		words := len(strings.Fields(c.Text))
 		totalTokens += int(float64(words) * 1.33)
-		if strings.TrimSpace(c.CompressedText) == "" && words >= 25 {
+		if strings.TrimSpace(c.CompressedText) == "" {
 			uncompressedChunks = append(uncompressedChunks, c)
 		}
 	}
 
 	if len(uncompressedChunks) == 0 {
-		utils.Debugf("[COMPRESSION] topic %s already fully compressed or chunks too short", topicID)
+		utils.Debugf("[COMPRESSION] topic %s already fully compressed", topicID)
 		return nil
 	}
 
@@ -196,66 +207,45 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	}
 
 	runner := extension.NewRunner()
-	const batchSize = 10
+	var chunkInputs []CompressionChunkInput
+	for _, c := range uncompressedChunks {
+		chunkInputs = append(chunkInputs, CompressionChunkInput{
+			ID:   c.ID,
+			Text: c.Text,
+		})
+	}
+
+	payload := CompressionPayload{
+		Rate:   rate,
+		Chunks: chunkInputs,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload for topic %s: %w", topicID, err)
+	}
+
+	outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
+	if err != nil {
+		return fmt.Errorf("failed to execute compression for topic %s: %w", topicID, err)
+	}
+
+	var output CompressionOutput
+	if err := json.Unmarshal(outputBytes, &output); err != nil {
+		return fmt.Errorf("failed to parse compression output for topic %s: %w", topicID, err)
+	}
+
+	if output.Error != "" {
+		return fmt.Errorf("compression error for topic %s: %s", topicID, output.Error)
+	}
+
 	totalProcessed := 0
-
-	for i := 0; i < len(uncompressedChunks); i += batchSize {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		end := i + batchSize
-		if end > len(uncompressedChunks) {
-			end = len(uncompressedChunks)
-		}
-		batch := uncompressedChunks[i:end]
-
-		var chunkInputs []CompressionChunkInput
-		for _, c := range batch {
-			chunkInputs = append(chunkInputs, CompressionChunkInput{
-				ID:   c.ID,
-				Text: c.Text,
-			})
-		}
-
-		payload := CompressionPayload{
-			Rate:   rate,
-			Chunks: chunkInputs,
-		}
-
-		payloadBytes, err := json.Marshal(payload)
-		if err != nil {
-			utils.Warnf("[COMPRESSION] failed to marshal batch payload for topic %s: %v", topicID, err)
-			continue
-		}
-
-		outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
-		if err != nil {
-			utils.Warnf("[COMPRESSION] failed to execute batch %d-%d for topic %s: %v", i, end, topicID, err)
-			continue
-		}
-
-		var output CompressionOutput
-		if err := json.Unmarshal(outputBytes, &output); err != nil {
-			utils.Warnf("[COMPRESSION] failed to parse batch output for topic %s: %v", topicID, err)
-			continue
-		}
-
-		if output.Error != "" {
-			utils.Warnf("[COMPRESSION] batch error for topic %s: %s", topicID, output.Error)
-			continue
-		}
-
-		// Update SQLite chunks immediately for this batch
-		for _, res := range output.Results {
-			if res.Error == "" && res.CompressedText != "" {
-				if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
-					utils.Warnf("[COMPRESSION] failed to update chunk %s compressed text: %v", res.ID, err)
-				} else {
-					totalProcessed++
-				}
+	for _, res := range output.Results {
+		if res.Error == "" && res.CompressedText != "" {
+			if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
+				utils.Warnf("[COMPRESSION] failed to update chunk %s compressed text: %v", res.ID, err)
+			} else {
+				totalProcessed++
 			}
 		}
 	}
