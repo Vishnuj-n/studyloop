@@ -326,6 +326,7 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseIcon from './BaseIcon.vue'
+import { useToast } from '../composables/useToast'
 import {
   logFrontendEvent,
   getTopicStudyNote,
@@ -356,6 +357,7 @@ const props = defineProps({
 const emit = defineEmits(['retry-settings', 'update:modelValue', 'update:activeTab', 'tab-changed'])
 
 const router = useRouter()
+const { showError } = useToast()
 
 const chat = inject('chat')
 const {
@@ -496,19 +498,28 @@ async function saveNote() {
     const startPage = effectiveStartPage.value
     const endPage = effectiveEndPage.value
     const res = await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
-    if (res && res.note) {
+    if (res && res.error) {
+      showError(res.error, 'Failed to Save Note')
+    } else if (res && res.note) {
       currentNoteContent.value = res.note.content
+      noteEditing.value = false
+      noteLastSaved.value = true
+      setTimeout(() => {
+        noteLastSaved.value = false
+      }, 2500)
+      logFrontendEvent('info', 'ReaderChat', 'study_note_saved', { topicID: tid, startPage, endPage })
     } else {
       currentNoteContent.value = noteEditContent.value
+      noteEditing.value = false
+      noteLastSaved.value = true
+      setTimeout(() => {
+        noteLastSaved.value = false
+      }, 2500)
+      logFrontendEvent('info', 'ReaderChat', 'study_note_saved', { topicID: tid, startPage, endPage })
     }
-    noteEditing.value = false
-    noteLastSaved.value = true
-    setTimeout(() => {
-      noteLastSaved.value = false
-    }, 2500)
-    logFrontendEvent('info', 'ReaderChat', 'study_note_saved', { topicID: tid, startPage, endPage })
   } catch (err) {
     console.error('[ReaderChat Note] Failed to save note:', err)
+    showError(err?.message || 'Failed to save study note', 'Failed to Save Note')
   } finally {
     noteSaving.value = false
   }
@@ -529,13 +540,21 @@ async function generateNote() {
     } else {
       res = await generateTopicStudyNote(tid, nbid)
     }
-    if (res && res.note) {
+    if (res && res.error) {
+      showError(res.error, 'Failed to Generate Note')
+    } else if (res && res.note && res.note.content) {
       currentNoteContent.value = res.note.content
+      loadedTopicID.value = tid
+      logFrontendEvent('info', 'ReaderChat', 'study_note_generated', { topicID: tid, startPage, endPage })
+    } else if (res && res.note) {
+      currentNoteContent.value = res.note.content || ''
+      loadedTopicID.value = tid
+    } else {
+      showError('No content was generated for this note', 'Failed to Generate Note')
     }
-    loadedTopicID.value = tid
-    logFrontendEvent('info', 'ReaderChat', 'study_note_generated', { topicID: tid, startPage, endPage })
   } catch (err) {
     console.error('[ReaderChat Note] Failed to generate note:', err)
+    showError(err?.message || 'Failed to generate study note', 'Failed to Generate Note')
   } finally {
     noteGenerating.value = false
   }

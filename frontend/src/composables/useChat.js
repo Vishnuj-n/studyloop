@@ -1,6 +1,7 @@
 import { ref, nextTick } from 'vue'
 import { askReaderAI, logFrontendEvent } from '../services/appApi'
 import { renderMarkdown } from '../services/markdown'
+import { useToast } from './useToast'
 
 /**
  * useChat - Extracted AI chat logic for reader component.
@@ -16,6 +17,7 @@ export function useChat() {
   const chatError = ref('')
   const chatScope = ref('current_chapter')
   const messagesPane = ref(null)
+  const { showError } = useToast()
 
   /**
    * Toggle chat panel visibility
@@ -79,6 +81,7 @@ export function useChat() {
 
       if (result?.error) {
         chatError.value = result.error
+        showError(result.error, 'AI Assistant Error')
         chatLoading.value = false
         logFrontendEvent('error', 'ReaderChat', 'send_message_api_error', {
           error: result.error,
@@ -112,6 +115,7 @@ export function useChat() {
     } catch (err) {
       const errMsg = err?.message || String(err)
       chatError.value = errMsg
+      showError(errMsg, 'AI Assistant Error')
       logFrontendEvent('error', 'ReaderChat', 'send_message_exception', {
         error: errMsg,
         topicID: context?.topicID,
