@@ -163,26 +163,14 @@
                   <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
                 </button>
               </template>
-
-              <!-- Chapter Study Note (Available in all modes for the active chapter) -->
-              <button
-                class="secondary note-drawer-btn"
-                :class="{ active: !chat.chatCollapsed.value && currentSidebarTab === 'note' }"
-                :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
-                title="View & Edit Chapter Study Note in Sidebar"
-                @click="toggleNoteTab"
-              >
-                <BaseIcon name="file-text" size="14" />
-                <span>Note</span>
-              </button>
             </div>
 
             <!-- Responsive Overflow Menu: Only displays when toolbar is congested (<1280px or mobile) -->
             <div v-if="isTaskFlow" class="split-dropdown-wrapper more-actions-wrapper">
               <button
                 class="secondary more-actions-btn"
-                :class="{ active: showMoreMenu || showAudioOverview || (!chat.chatCollapsed.value && currentSidebarTab === 'note') }"
-                title="More study tools (Copy, AI Audio, Simplify, Note)"
+                :class="{ active: showMoreMenu || showAudioOverview }"
+                title="More study tools (Copy, AI Audio, Simplify)"
                 @click.stop="toggleMoreMenu"
               >
                 <BaseIcon name="more-horizontal" size="16" />
@@ -231,21 +219,6 @@
                     <span class="item-title">{{ simplifying ? 'Opening...' : 'Simplify Chapter' }}</span>
                   </div>
                   <span class="item-desc">Break down complex concepts</span>
-                </button>
-
-                <!-- Chapter Study Note -->
-                <button
-                  class="split-dropdown-item"
-                  :class="{ 'item-active': !chat.chatCollapsed.value && currentSidebarTab === 'note' }"
-                  :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
-                  title="View & Edit Chapter Study Note in Sidebar"
-                  @click="onNoteClick"
-                >
-                  <div class="menu-item-row">
-                    <BaseIcon name="file-text" size="15" />
-                    <span class="item-title">Chapter Study Note</span>
-                  </div>
-                  <span class="item-desc">View & edit notes in sidebar</span>
                 </button>
               </div>
             </div>
@@ -433,17 +406,6 @@ const showAudioOverview = ref(false)
 const simplifying = ref(false)
 // Sidebar Companion State
 const currentSidebarTab = ref('chat')
-
-function toggleNoteTab() {
-  if (chat.chatCollapsed.value) {
-    chat.chatCollapsed.value = false
-    currentSidebarTab.value = 'note'
-  } else if (currentSidebarTab.value === 'note') {
-    chat.chatCollapsed.value = true
-  } else {
-    currentSidebarTab.value = 'note'
-  }
-}
 
 const compressionStats = ref({
   is_compressed: false,

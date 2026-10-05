@@ -78,14 +78,15 @@
         </template>
 
         <button
+          v-if="!chatCollapsed"
           class="ghost collapse-btn"
           :aria-expanded="!chatCollapsed"
           aria-controls="reader-chat-panel"
-          :title="chatCollapsed ? 'Expand panel' : 'Collapse panel'"
+          title="Collapse panel"
           @click="toggleChat"
         >
-          <BaseIcon :name="chatCollapsed ? 'chevron-left' : 'chevron-right'" size="13" />
-          <span>{{ chatCollapsed ? 'Expand' : 'Collapse' }}</span>
+          <BaseIcon name="chevron-right" size="13" />
+          <span>Collapse</span>
         </button>
       </div>
     </div>
