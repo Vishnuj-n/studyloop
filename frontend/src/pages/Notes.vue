@@ -177,6 +177,16 @@
             </div>
             <div class="note-header-actions">
               <button
+                v-if="isFromFlashcards"
+                type="button"
+                class="secondary-btn btn-sm back-flashcards-btn"
+                title="Return to Flashcards review session"
+                @click="goBackToFlashcards"
+              >
+                <BaseIcon name="arrow-left" size="14" />
+                <span>Back to Flashcards</span>
+              </button>
+              <button
                 type="button"
                 class="secondary-btn btn-sm open-folder-btn"
                 title="Open notes folder in File Explorer (Obsidian / Logseq compatible)"
@@ -197,8 +207,25 @@
             </div>
           </header>
 
+          <!-- Flashcard Navigation Context Banner -->
+          <div v-if="isFromFlashcards" class="notes-flashcard-context-banner">
+            <div class="banner-left">
+              <BaseIcon name="book-open" size="15" class="banner-icon" />
+              <span>{{ flashcardBannerText }}</span>
+            </div>
+            <button
+              type="button"
+              class="banner-return-btn"
+              title="Return to Flashcards review session"
+              @click="goBackToFlashcards"
+            >
+              <BaseIcon name="arrow-left" size="13" />
+              <span>Return to Flashcards</span>
+            </button>
+          </div>
+
           <!-- Interop Tip Callout -->
-          <div class="notes-obsidian-tip">
+          <div v-else class="notes-obsidian-tip">
             <BaseIcon name="info" size="14" class="tip-icon" />
             <span>
               <strong>Obsidian & Logseq Compatible:</strong> Notes are synced to local markdown files. Use <em>Open Folder</em> to add images (<code>![alt](./assets/pic.png)</code>) or edit notes in external markdown tools.
@@ -296,17 +323,35 @@
             <!-- PPT / Deck of Cards for each Reading Session -->
             <div
               v-for="(slot, idx) in sessionSlots"
+              :id="`session-slot-${slot.start_page}-${slot.end_page}`"
               :key="`${slot.start_page}-${slot.end_page}`"
               class="session-note-card"
+              :class="{ 'target-highlight': isTargetSlot(slot, idx) }"
             >
               <!-- Card Header -->
               <div class="session-card-header">
                 <div class="session-card-badge-row">
                   <span class="session-index-pill">Session {{ idx + 1 }}</span>
                   <span class="session-range-pill">
-                    <BaseIcon name="book-open" size="12" />
+                    <BaseIcon :name="isCurrentTopicYouTube ? 'video' : 'book-open'" size="12" />
                     <span>{{ formatPageRange(slot.start_page, slot.end_page) }}</span>
                   </span>
+                  <!-- Flashcard Source Badge when targeted from Flashcards -->
+                  <span v-if="isTargetSlot(slot, idx)" class="session-target-badge" title="Referenced by your current flashcard">
+                    <BaseIcon name="target" size="12" />
+                    <span>{{ targetPageFromRoute ? `Flashcard Source (p. ${targetPageFromRoute})` : 'Flashcard Source' }}</span>
+                  </span>
+                  <!-- Jump to Reader Source Badge Button -->
+                  <button
+                    v-if="canJumpToSource(slot)"
+                    type="button"
+                    class="jump-source-pill-btn"
+                    :title="isCurrentTopicYouTube ? 'Jump to video segment in Reader' : `Open Reader at page ${slot.start_page || 1}`"
+                    @click="jumpToReader(slot)"
+                  >
+                    <BaseIcon :name="isCurrentTopicYouTube ? 'play' : 'external-link'" size="11" />
+                    <span>{{ isCurrentTopicYouTube ? 'Watch ↗' : `Jump to p. ${slot.start_page || 1} ↗` }}</span>
+                  </button>
                   <span v-if="slot.last_reviewed_at" class="session-review-pill">
                     <BaseIcon name="check-circle" size="12" />
                     <span>Reviewed {{ formatTimeAgo(slot.last_reviewed_at) }}</span>
@@ -432,7 +477,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -625,6 +670,130 @@ const activeTopic = computed(() => {
   }
 })
 
+// Navigation & Loop helpers
+const isFromFlashcards = computed(() => {
+  return route.query.from === 'flashcards'
+})
+
+const activeNotebook = computed(() => {
+  const nbId = activeTopic.value?.notebook_id || selectedNotebookID.value
+  if (!nbId) return null
+  return notebooks.value.find((n) => (n.id || n.notebook_id) === nbId) || null
+})
+
+const isCurrentTopicYouTube = computed(() => {
+  const fileType = (activeNotebook.value?.file_type || '').toLowerCase()
+  return fileType === 'youtube'
+})
+
+const targetPageFromRoute = computed(() => {
+  const p = route.query.page || route.query.startPage || route.query.start_page
+  return p ? Number(p) : null
+})
+
+const flashcardBannerText = computed(() => {
+  const topicTitle = activeTopic.value?.title || activeNotebook.value?.title || ''
+  const page = targetPageFromRoute.value
+
+  let matchedSlot = null
+  let sessionIndex = -1
+
+  if (page && sessionSlots.value.length > 0) {
+    const idx = sessionSlots.value.findIndex(
+      (s) => s.start_page > 0 && s.end_page > 0 && page >= s.start_page && page <= s.end_page
+    )
+    if (idx !== -1) {
+      matchedSlot = sessionSlots.value[idx]
+      sessionIndex = idx + 1
+    }
+  }
+
+  if (!matchedSlot && sessionSlots.value.length > 0) {
+    matchedSlot = sessionSlots.value[0]
+    sessionIndex = 1
+  }
+
+  if (matchedSlot && matchedSlot.start_page > 0 && matchedSlot.end_page > 0) {
+    const sessionPages =
+      matchedSlot.start_page === matchedSlot.end_page
+        ? `p. ${matchedSlot.start_page}`
+        : `pp. ${matchedSlot.start_page}–${matchedSlot.end_page}`
+    const sessionLabel =
+      sessionSlots.value.length > 1
+        ? `Session ${sessionIndex} (${sessionPages})`
+        : `(${sessionPages})`
+
+    if (page && page >= matchedSlot.start_page && page <= matchedSlot.end_page) {
+      if (topicTitle) {
+        return `Reviewing notes for ${topicTitle} — Page ${page} in ${sessionLabel}`
+      }
+      return `Reviewing notes for Page ${page} in ${sessionLabel}`
+    }
+
+    if (topicTitle) {
+      return `Reviewing notes for ${topicTitle} — ${sessionLabel}`
+    }
+    return `Reviewing notes for ${sessionLabel}`
+  }
+
+  if (page) {
+    if (topicTitle) {
+      return `Reviewing notes for ${topicTitle} — Page ${page}`
+    }
+    return `Reviewing notes for Page ${page}`
+  }
+
+  if (topicTitle) {
+    return `Reviewing notes for ${topicTitle}`
+  }
+
+  return 'Reviewing study notes for your active flashcard session'
+})
+
+function isTargetSlot(slot, idx = 0) {
+  if (!isFromFlashcards.value || !slot) return false
+  const target = targetPageFromRoute.value
+  if (target && slot.start_page > 0 && slot.end_page > 0) {
+    return target >= slot.start_page && target <= slot.end_page
+  }
+  // When navigated from flashcard and either no specific page or single slot / chapter note
+  if (sessionSlots.value.length === 1 || idx === 0) {
+    return true
+  }
+  return false
+}
+
+function goBackToFlashcards() {
+  router.push({
+    path: '/flashcards',
+    query: {
+      taskId: route.query.taskId || undefined,
+      notebookId: activeTopic.value?.notebook_id || selectedNotebookID.value || undefined,
+    },
+  })
+}
+
+function canJumpToSource(slot) {
+  // Can jump to reader if we have an active topic with a valid notebook
+  return Boolean(activeTopic.value?.notebook_id || selectedNotebookID.value)
+}
+
+function jumpToReader(slot) {
+  const nbId = slot?.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value
+  const topicId = slot?.topic_id || activeTopic.value?.topic_id || selectedTopicID.value
+  const targetPage = slot?.start_page || activeTopic.value?.start_page || 1
+
+  router.push({
+    path: '/reader',
+    query: {
+      notebookId: nbId || undefined,
+      topicId: topicId || undefined,
+      page: targetPage,
+      from: 'notes',
+    },
+  })
+}
+
 function formatTimeAgo(unixSec) {
   if (!unixSec || unixSec <= 0) return 'Never'
   const nowSec = Math.floor(Date.now() / 1000)
@@ -690,6 +859,14 @@ async function loadInitialData() {
         selectedTopicID.value = queryTopic
         loadTopicSlots(queryTopic)
       }
+    } else if (queryNotebook) {
+      const nbTopic = allTopics.value.find((t) => t.notebook_id === queryNotebook)
+      if (nbTopic) {
+        selectTopic(nbTopic)
+      } else {
+        selectedTopicID.value = queryNotebook
+        loadTopicSlots(queryNotebook)
+      }
     } else if (allTopics.value.length > 0 && !selectedTopicID.value) {
       selectTopic(allTopics.value[0])
     }
@@ -720,6 +897,18 @@ async function loadTopicSlots(topicID) {
     const res = await getTopicStudyNoteSlots(topicID)
     const dbSlots = (res && Array.isArray(res.slots)) ? res.slots : []
     sessionSlots.value = dbSlots
+
+    if (targetPageFromRoute.value && dbSlots.length > 0) {
+      nextTick(() => {
+        const targetSlot = dbSlots.find((s) => isTargetSlot(s))
+        if (targetSlot) {
+          const el = document.getElementById(`session-slot-${targetSlot.start_page}-${targetSlot.end_page}`)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }
+      })
+    }
   } catch (err) {
     console.warn('[NOTES] Failed to fetch topic slots:', err)
     sessionSlots.value = []
@@ -1343,7 +1532,54 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* Interop tip banner */
+/* Interop tip & Flashcard Context banners */
+.notes-flashcard-context-banner {
+  margin: 16px 32px 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface-container));
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--outline-variant));
+  color: var(--on-surface);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.notes-flashcard-context-banner .banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notes-flashcard-context-banner .banner-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.banner-return-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.banner-return-btn:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  border-color: var(--primary);
+}
+
 .notes-obsidian-tip {
   margin: 16px 32px 0;
   padding: 10px 14px;
@@ -1410,12 +1646,48 @@ onMounted(() => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .session-note-card:hover {
   border-color: color-mix(in srgb, var(--primary) 30%, var(--outline-variant));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.session-note-card.target-highlight {
+  border-color: var(--primary);
+}
+
+.session-note-card.target-highlight .session-card-header {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-container));
+  border-bottom-color: color-mix(in srgb, var(--primary) 30%, var(--outline-variant));
+  animation: noteTargetHeaderGlow 4s ease-out forwards;
+}
+
+@keyframes noteTargetHeaderGlow {
+  0% {
+    background: color-mix(in srgb, var(--primary) 22%, var(--surface-container));
+  }
+  60% {
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface-container));
+  }
+  100% {
+    background: color-mix(in srgb, var(--primary) 8%, var(--surface-container));
+  }
+}
+
+.session-target-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .session-card-header {
@@ -1426,6 +1698,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: background 0.3s ease;
 }
 
 .session-card-badge-row {
@@ -1459,6 +1732,45 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted-text);
+}
+
+.jump-source-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.jump-source-pill-btn:hover {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.jump-source-pill-btn:active {
+  transform: scale(0.96);
+}
+
+.back-flashcards-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  font-weight: 600;
+}
+
+.back-flashcards-btn:hover {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .session-review-pill {

@@ -486,6 +486,7 @@ type ReviewSessionCard struct {
 	Position      int                  `json:"position"`
 	TopicID       string               `json:"topic_id"`
 	SourceChunkID string               `json:"source_chunk_id,omitempty"`
+	Page          int                  `json:"page,omitempty"`
 	Prompt        string               `json:"prompt"`
 	Answer        string               `json:"answer"`
 	DueAt         int64                `json:"due_at,omitempty"`

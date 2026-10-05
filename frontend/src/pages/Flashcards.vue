@@ -203,7 +203,19 @@
               </button>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <p class="card-text answer-text" v-html="currentCard.answer"></p>
-              <button class="flip-back-btn" title="Show Question (Space)" @click="flipped = false">Show Question</button>
+              <div class="card-action-links">
+                <button class="flip-back-btn" title="Show Question (Space)" @click="flipped = false">Show Question</button>
+                <button
+                  v-if="canViewCardNote"
+                  type="button"
+                  class="view-note-btn"
+                  title="View study notes for this chapter"
+                  @click.stop="goToTopicNotes"
+                >
+                  <BaseIcon name="book-open" size="13" />
+                  <span>View Note</span>
+                </button>
+              </div>
               <div class="rating-row">
                 <button
                   v-for="r in ratings"
@@ -380,6 +392,48 @@ const progressPercent = computed(() => {
 })
 
 const availableTopics = ref([])
+const currentCardTopicID = computed(() => {
+  const card = currentCard.value
+  if (!card) return ''
+  if (card.topic_id) return card.topic_id
+  if (card.topicId) return card.topicId
+  // Fallback: match by page range in availableTopics if available
+  if (card.page && availableTopics.value.length > 0) {
+    const pageNum = Number(card.page)
+    const match = availableTopics.value.find(
+      (t) => (!selectedNotebookID.value || t.notebook_id === selectedNotebookID.value) &&
+             t.start_page <= pageNum && t.end_page >= pageNum
+    )
+    if (match?.topic_id) return match.topic_id
+  }
+  // If the notebook has topics, default to first topic of the notebook
+  if (selectedNotebookID.value && availableTopics.value.length > 0) {
+    const firstMatch = availableTopics.value.find((t) => t.notebook_id === selectedNotebookID.value)
+    if (firstMatch?.topic_id) return firstMatch.topic_id
+  }
+  return ''
+})
+
+const canViewCardNote = computed(() => {
+  return Boolean(currentCardTopicID.value || selectedNotebookID.value)
+})
+
+function goToTopicNotes() {
+  const topicId = currentCardTopicID.value
+  const nbId = selectedNotebookID.value || undefined
+  const cardPage = currentCard.value?.page ? Number(currentCard.value.page) : undefined
+  router.push({
+    path: '/notes',
+    query: {
+      topicId: topicId || undefined,
+      notebookId: nbId,
+      page: cardPage || undefined,
+      from: 'flashcards',
+      taskId: route.query.taskId || undefined,
+    },
+  })
+}
+
 const currentBookTitle = computed(() => {
   const nb = notebooks.value.find((n) => n.id === selectedNotebookID.value)
   if (!nb?.title) return ''
@@ -1037,6 +1091,15 @@ async function loadQueueSession(taskID, notebookID = '') {
   cursor: not-allowed;
 }
 
+.card-action-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 4px 0;
+}
+
 .flip-back-btn {
   border: 0;
   border-radius: 8px;
@@ -1050,12 +1113,35 @@ async function loadQueueSession(taskID, notebookID = '') {
   transition:
     background-color 0.15s ease,
     transform 0.1s ease;
-  margin: 4px 0;
 }
 .flip-back-btn:hover {
   background: var(--surface-container-high);
 }
 .flip-back-btn:active {
+  transform: scale(0.97);
+}
+
+.view-note-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-lowest);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.view-note-btn:hover {
+  background: var(--surface-container);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.view-note-btn:active {
   transform: scale(0.97);
 }
 

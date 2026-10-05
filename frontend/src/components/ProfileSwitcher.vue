@@ -116,16 +116,18 @@ function profilePaceBadge(profile) {
   }
 
   const status = pace.feasibility_status
+  const gap = pace.days_gap
+  const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
+
   if (status === 'BEHIND' && pace.days_gap !== undefined) {
-    const lateDays = Math.abs(pace.days_gap)
     return {
-      text: `${lateDays}d behind`,
+      text: `${gapFormatted}d behind`,
       class: 'pace-behind',
     }
   }
   if (status === 'AHEAD' && pace.days_gap !== undefined) {
     return {
-      text: `${pace.days_gap}d ahead`,
+      text: `${gapFormatted}d ahead`,
       class: 'pace-ahead',
     }
   }

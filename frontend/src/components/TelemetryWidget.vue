@@ -65,14 +65,16 @@ defineEmits(['open-pace-modal'])
 const feasibilityPillText = computed(() => {
   if (!props.pace) return 'Study Pace'
   const s = props.pace.feasibility_status
+  const gap = props.pace.days_gap
+  const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
   if (s === 'AHEAD') {
-    return `On track · Finish ${props.pace.days_gap}d early`
+    return `On track · Finish ${gapFormatted}d early`
   }
   if (s === 'ON_TRACK') {
     return 'On track for deadline'
   }
   if (s === 'BEHIND') {
-    return `Behind pace · ${Math.abs(props.pace.days_gap || 0)}d late`
+    return `Behind pace · ${gapFormatted}d late`
   }
   return 'Estimating pace'
 })

@@ -91,7 +91,90 @@
                 </div>
               </div>
             </div>
-            <!-- Overflow Menu for Secondary Actions -->
+            <!-- Action Toolbar: Visible inline on wide screens, collapses to overflow menu on narrow/congested screens -->
+            <div class="stage-actions-inline">
+              <!-- Back to Notes Button (when navigated from Notes) -->
+              <button
+                v-if="route.query.from === 'notes'"
+                class="secondary"
+                title="Return to Study Notes"
+                @click="router.push({ path: '/notes', query: { notebookId: reader.selectedNotebookID.value, topicId: reader.selectedTopicID.value } })"
+              >
+                <BaseIcon name="arrow-left" size="14" />
+                <span>Back to Notes</span>
+              </button>
+
+              <!-- Copy Session -->
+              <button
+                class="secondary copy-session-btn"
+                :disabled="reader.loadingBundle.value || reader.loadingText.value"
+                title="Copy reading session text as Markdown"
+                @click="onCopyClick"
+              >
+                <BaseIcon :name="copiedSession ? 'check' : 'copy'" size="14" />
+                <span>{{ copiedSession ? 'Copied to Clipboard!' : 'Copy Session' }}</span>
+              </button>
+
+              <!-- AI Audio Overview -->
+              <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
+                <button
+                  class="secondary split-main-btn"
+                  :class="{ active: showAudioOverview }"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                  title="Listen to AI Audio Overview"
+                  @click="startAudio('toggle')"
+                >
+                  <BaseIcon name="headphones" size="14" />
+                  <span>{{ showAudioOverview ? 'AI Audio' : 'Audio' }}</span>
+                </button>
+                <div class="split-dropdown-wrapper">
+                  <button
+                    class="secondary split-chevron-btn audio-chevron-btn"
+                    :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                    title="Audio Overview page range options"
+                    @click.stop="showAudioMenu = !showAudioMenu"
+                  >
+                    <BaseIcon name="chevron-down" size="12" />
+                  </button>
+                  <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
+                    <button class="split-dropdown-item" @click="startAudio('session')">
+                      <span class="item-title">Full Session</span>
+                      <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+                    </button>
+                    <button class="split-dropdown-item" @click="startAudio('current')">
+                      <span class="item-title">From Current Page till End</span>
+                      <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Text Simplifier -->
+              <button
+                v-if="isExtensionActive('text_simplifier')"
+                class="secondary simplify-btn"
+                :disabled="reader.loadingBundle.value || simplifying"
+                title="Open intuitive AI simplified breakdown"
+                @click="handleSimplify"
+              >
+                <BaseIcon name="sparkles" size="14" />
+                <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
+              </button>
+
+              <!-- Chapter Study Note -->
+              <button
+                class="secondary note-drawer-btn"
+                :class="{ active: !chat.chatCollapsed.value && currentSidebarTab === 'note' }"
+                :disabled="reader.loadingBundle.value || !reader.selectedTopicID.value"
+                title="View & Edit Chapter Study Note in Sidebar"
+                @click="toggleNoteTab"
+              >
+                <BaseIcon name="file-text" size="14" />
+                <span>Note</span>
+              </button>
+            </div>
+
+            <!-- Responsive Overflow Menu: Only displays when toolbar is congested (<1280px or mobile) -->
             <div class="split-dropdown-wrapper more-actions-wrapper">
               <button
                 class="secondary more-actions-btn"
@@ -678,6 +761,21 @@ async function resolveTaskContext(taskQuery) {
 async function resolveBrowseContext() {
   console.log('[Reader] Browse mode — resolveBrowseContext')
   await reader.loadNotebookTree()
+
+  const queryNotebook = route.query.notebookId || route.query.notebook_id
+  const queryTopic = route.query.topicId || route.query.topic_id
+  const queryPage = Number.parseInt(route.query.page || route.query.startPage || route.query.start_page) || 0
+
+  if (queryNotebook) {
+    reader.selectedNotebookID.value = queryNotebook
+  }
+  if (queryTopic) {
+    reader.selectedTopicID.value = queryTopic
+    const loaded = await reader.loadBundle()
+    if (loaded && queryPage > 0) {
+      reader.updateCurrentPage(queryPage)
+    }
+  }
 }
 
 // ─── Mounted ──────────────────────────────────────────────────────────────────
@@ -1478,5 +1576,58 @@ button:disabled {
   color: var(--primary, #d79921) !important;
 }
 
+/* Secondary Action Bar & Responsive Overflow */
+.stage-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-actions-inline .copy-session-btn {
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.stage-actions-inline .copy-session-btn:hover:not(:disabled) {
+  background: var(--surface-bright);
+  border-color: var(--primary);
+}
+
+.stage-actions-inline .note-drawer-btn {
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  border-radius: 8px;
+}
+
+.stage-actions-inline .note-drawer-btn:hover:not(:disabled) {
+  background: var(--surface-bright);
+  border-color: var(--primary);
+}
+
+.stage-actions-inline .note-drawer-btn.active {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  color: var(--primary);
+}
+
+/* By default on desktop/wide viewports, inline actions are shown and overflow button is hidden */
+.more-actions-wrapper {
+  display: none;
+  position: relative;
+}
+
+/* When congested (narrow viewports or small container screens), hide inline actions and show the overflow ... menu */
+@media (max-width: 1320px) {
+  .stage-actions-inline {
+    display: none;
+  }
+  .more-actions-wrapper {
+    display: block;
+  }
+}
 </style>
 
