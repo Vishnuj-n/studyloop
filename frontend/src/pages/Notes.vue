@@ -170,7 +170,7 @@
                 </span>
                 <span class="chip-tag info">
                   <BaseIcon name="layers" size="12" />
-                  <span>{{ isFromFlashcards && !showAllSessions && sessionSlots.length > 1 ? `1 of ${sessionSlots.length} Sessions` : `${sessionSlots.length} ${sessionSlots.length === 1 ? 'Card' : 'Cards'}` }}</span>
+                  <span>{{ sessionSlotsSummaryText }}</span>
                 </span>
               </div>
               <h1 class="note-topic-title">{{ activeTopic?.title || selectedTopicID }}</h1>
@@ -330,7 +330,7 @@
 
             <!-- PPT / Deck of Cards for each Reading Session -->
             <div
-              v-for="({ slot, sessionNumber }, idx) in displayedSessionSlots"
+              v-for="{ slot, sessionNumber } in displayedSessionSlots"
               :id="`session-slot-${slot.start_page}-${slot.end_page}`"
               :key="`${slot.start_page}-${slot.end_page}`"
               class="session-note-card"
@@ -719,6 +719,14 @@ const displayedSessionSlots = computed(() => {
   return [{ slot: sessionSlots.value[0], sessionNumber: 1 }]
 })
 
+const sessionSlotsSummaryText = computed(() => {
+  const count = sessionSlots.value.length
+  if (isFromFlashcards.value && !showAllSessions.value && count > 1) {
+    return `1 of ${count} Sessions`
+  }
+  return `${count} ${count === 1 ? 'Card' : 'Cards'}`
+})
+
 const flashcardBannerText = computed(() => {
   const page = targetPageFromRoute.value
 
@@ -787,7 +795,7 @@ function goBackToFlashcards() {
   })
 }
 
-function canJumpToSource(slot) {
+function canJumpToSource(_slot) {
   // Can jump to reader if we have an active topic with a valid notebook
   return Boolean(activeTopic.value?.notebook_id || selectedNotebookID.value)
 }

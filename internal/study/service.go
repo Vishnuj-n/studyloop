@@ -88,15 +88,6 @@ func (s *StudyService) markFastCalled() {
 	s.lastFastCallTime = time.Now()
 }
 
-func (s *StudyService) timeSinceLastFastCall() time.Duration {
-	s.rateLimitMu.RLock()
-	defer s.rateLimitMu.RUnlock()
-	if s.lastFastCallTime.IsZero() {
-		return time.Hour // large duration if never called
-	}
-	return time.Since(s.lastFastCallTime)
-}
-
 func (s *StudyService) isPacingEnabled() bool {
 	if s.repo == nil {
 		return false
