@@ -728,7 +728,7 @@ const progressPercent = computed(() => {
   align-items: center;
   gap: 5px;
   background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid var(--outline-variant);
   color: #38bdf8;
   padding: 6px 12px;
   border-radius: 9999px;

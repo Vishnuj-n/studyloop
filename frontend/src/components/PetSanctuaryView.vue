@@ -87,7 +87,8 @@
               {{ act }}
             </button>
             <button type="button" class="stage-act-btn msg-btn" @click="testSpeechBubble">
-              💬 Tip
+              <BaseIcon name="chat" size="13" />
+              <span>Tip</span>
             </button>
           </div>
         </div>
@@ -462,7 +463,7 @@ async function handleUnlockSkin(pet, skin) {
   align-items: center;
   gap: 6px;
   background: color-mix(in srgb, #f59e0b 12%, var(--surface-container-lowest));
-  border: 1px solid color-mix(in srgb, #f59e0b 25%, transparent);
+  border: 1px solid var(--outline-variant);
   color: #d97706;
   padding: 6px 14px;
   border-radius: 9999px;
@@ -502,7 +503,7 @@ async function handleUnlockSkin(pet, skin) {
   align-items: center;
   gap: 10px;
   background: color-mix(in srgb, var(--danger, #ef4444) 12%, var(--surface-container-low));
-  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--danger, #ef4444);
   padding: 10px 14px;
   border-radius: 12px;

@@ -365,16 +365,6 @@ onUnmounted(() => {
   transform: scale(1.12);
 }
 
-.pet-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.pet-shadow {
-  fill: rgba(0, 0, 0, 0.14);
-}
-
 /* Animations */
 .action-idle .pet-body {
   animation: petBreathe 3s ease-in-out infinite;
@@ -394,10 +384,6 @@ onUnmounted(() => {
 
 .action-cheer .pet-tail {
   animation: tailWag 0.2s ease-in-out infinite;
-}
-
-.steam-line {
-  animation: steamRise 1.2s ease-out infinite;
 }
 
 @keyframes petBreathe {
@@ -424,12 +410,6 @@ onUnmounted(() => {
 @keyframes tailWag {
   0%, 100% { transform: rotate(0deg); transform-origin: 26px 66px; }
   50% { transform: rotate(-20deg); transform-origin: 26px 66px; }
-}
-
-@keyframes steamRise {
-  0% { opacity: 0; transform: translateY(0); }
-  50% { opacity: 0.8; }
-  100% { opacity: 0; transform: translateY(-4px); }
 }
 
 /* ── Dismiss / Close Button ────────────────────────────── */
