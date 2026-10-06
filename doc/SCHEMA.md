@@ -379,6 +379,8 @@ Singleton table for global preferences.
 | `log_level` | TEXT NOT NULL DEFAULT 'INFO' | Active diagnostic logging threshold (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `prompt_compression_mode` | TEXT NOT NULL DEFAULT 'OVER_LIMIT' | Background prompt compression mode (`OVER_LIMIT`, `ALWAYS`, `DISABLED`) |
 | `prompt_compression_rate` | REAL NOT NULL DEFAULT 0.80 | Compression rate / preserved token retention factor (0.1 to 1.0) |
+| `auto_generate_study_notes` | BOOLEAN DEFAULT 0 | Automatic post-compression study note generation toggle |
+| `rate_limit_strategy` | TEXT NOT NULL DEFAULT 'STANDARD' | Rate limit fallback strategy (`STANDARD` or `PACED`) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 

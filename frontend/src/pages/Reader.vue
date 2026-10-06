@@ -91,63 +91,137 @@
                 </div>
               </div>
             </div>
-            <button
-              class="secondary copy-session-btn"
-              :disabled="reader.loadingBundle.value || reader.loadingText.value"
-              title="Copy reading session text as Markdown"
-              @click="copySessionContent"
-            >
-              <template v-if="copiedSession">
-                <BaseIcon name="check" size="14" />
-                <span>Copied to Clipboard!</span>
-              </template>
-              <template v-else>
-                <BaseIcon name="copy" size="14" />
-                <span>Copy Session</span>
-              </template>
-            </button>
-            <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
+            <!-- Action Toolbar: Visible inline on wide screens, collapses to overflow menu on narrow/congested screens -->
+            <div class="stage-actions-inline">
+              <!-- Back to Notes Button (when navigated from Notes) -->
               <button
-                class="secondary split-main-btn audio-overview-btn"
-                :class="{ active: showAudioOverview }"
-                :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
-                :title="showAudioOverview ? 'Hide AI Audio' : 'Listen to AI Audio Overview'"
-                @click="startAudio('toggle')"
+                v-if="route.query.from === 'notes'"
+                class="secondary"
+                title="Return to Study Notes"
+                @click="goBackToNotes"
               >
-                <BaseIcon name="headphones" size="14" />
-                <span>{{ showAudioOverview ? 'AI Audio Active' : 'AI Audio Overview' }}</span>
+                <BaseIcon name="arrow-left" size="14" />
+                <span>Back to Notes</span>
               </button>
-              <div class="split-dropdown-wrapper">
+
+              <!-- Session Bounded Actions: Only available during bounded reading tasks -->
+              <template v-if="isTaskFlow">
+                <!-- Copy Session -->
                 <button
-                  class="secondary split-chevron-btn audio-chevron-btn"
-                  :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
-                  title="Audio Overview page range options"
-                  @click.stop="showAudioMenu = !showAudioMenu"
+                  class="secondary copy-session-btn"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value"
+                  title="Copy reading session text as Markdown"
+                  @click="onCopyClick"
                 >
-                  <BaseIcon name="chevron-down" size="12" />
+                  <BaseIcon :name="copiedSession ? 'check' : 'copy'" size="14" />
+                  <span>{{ copiedSession ? 'Copied to Clipboard!' : 'Copy Session' }}</span>
                 </button>
-                <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
-                  <button class="split-dropdown-item" @click="startAudio('session')">
-                    <span class="item-title">Full Session</span>
-                    <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+
+                <!-- AI Audio Overview -->
+                <div v-if="isExtensionActive('audio_overview')" class="split-btn-group">
+                  <button
+                    class="secondary split-main-btn"
+                    :class="{ active: showAudioOverview }"
+                    :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                    title="Listen to AI Audio Overview"
+                    @click="startAudio('toggle')"
+                  >
+                    <BaseIcon name="headphones" size="14" />
+                    <span>{{ showAudioOverview ? 'AI Audio' : 'Audio' }}</span>
                   </button>
-                  <button class="split-dropdown-item" @click="startAudio('current')">
-                    <span class="item-title">From Current Page till End</span>
-                    <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
-                  </button>
+                  <div class="split-dropdown-wrapper">
+                    <button
+                      class="secondary split-chevron-btn audio-chevron-btn"
+                      :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                      title="Audio Overview page range options"
+                      @click.stop="showAudioMenu = !showAudioMenu"
+                    >
+                      <BaseIcon name="chevron-down" size="12" />
+                    </button>
+                    <div v-if="showAudioMenu" class="split-dropdown-menu" @click.stop>
+                      <button class="split-dropdown-item" @click="startAudio('session')">
+                        <span class="item-title">Full Session</span>
+                        <span class="item-desc">Pages {{ defaultAudioStart }}–{{ defaultAudioEnd }}</span>
+                      </button>
+                      <button class="split-dropdown-item" @click="startAudio('current')">
+                        <span class="item-title">From Current Page till End</span>
+                        <span class="item-desc">Pages {{ reader.currentPage.value }}–{{ defaultAudioEnd }}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                <!-- Text Simplifier -->
+                <button
+                  v-if="isExtensionActive('text_simplifier')"
+                  class="secondary simplify-btn"
+                  :disabled="reader.loadingBundle.value || simplifying"
+                  title="Open intuitive AI simplified breakdown"
+                  @click="handleSimplify"
+                >
+                  <BaseIcon name="sparkles" size="14" />
+                  <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
+                </button>
+              </template>
+            </div>
+
+            <!-- Responsive Overflow Menu: Only displays when toolbar is congested (<1280px or mobile) -->
+            <div v-if="isTaskFlow" class="split-dropdown-wrapper more-actions-wrapper">
+              <button
+                class="secondary more-actions-btn"
+                :class="{ active: showMoreMenu || showAudioOverview }"
+                title="More study tools (Copy, AI Audio, Simplify)"
+                @click.stop="toggleMoreMenu"
+              >
+                <BaseIcon name="more-horizontal" size="16" />
+              </button>
+              <div v-show="showMoreMenu" class="split-dropdown-menu more-actions-dropdown" @click.stop>
+                <!-- Copy Session -->
+                <button
+                  class="split-dropdown-item copy-session-btn"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value"
+                  title="Copy reading session text as Markdown"
+                  @click="onCopyClick"
+                >
+                  <div class="menu-item-row">
+                    <BaseIcon :name="copiedSession ? 'check' : 'copy'" size="15" />
+                    <span class="item-title">{{ copiedSession ? 'Copied to Clipboard!' : 'Copy Session' }}</span>
+                  </div>
+                  <span class="item-desc">Copy reading text as Markdown</span>
+                </button>
+
+                <!-- AI Audio Overview -->
+                <button
+                  v-if="isExtensionActive('audio_overview')"
+                  class="split-dropdown-item"
+                  :class="{ 'item-active': showAudioOverview }"
+                  :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
+                  title="Listen to AI Audio Overview"
+                  @click="onAudioClick"
+                >
+                  <div class="menu-item-row">
+                    <BaseIcon name="headphones" size="15" />
+                    <span class="item-title">{{ showAudioOverview ? 'AI Audio Active' : 'AI Audio Overview' }}</span>
+                  </div>
+                  <span class="item-desc">Listen to overview of current chapter</span>
+                </button>
+
+                <!-- Text Simplifier -->
+                <button
+                  v-if="isExtensionActive('text_simplifier')"
+                  class="split-dropdown-item"
+                  :disabled="reader.loadingBundle.value || simplifying"
+                  title="Open intuitive AI simplified breakdown"
+                  @click="onSimplifyClick"
+                >
+                  <div class="menu-item-row">
+                    <BaseIcon name="sparkles" size="15" />
+                    <span class="item-title">{{ simplifying ? 'Opening...' : 'Simplify Chapter' }}</span>
+                  </div>
+                  <span class="item-desc">Break down complex concepts</span>
+                </button>
               </div>
             </div>
-            <button
-              v-if="isExtensionActive('text_simplifier')"
-              class="secondary simplify-btn"
-              :disabled="reader.loadingBundle.value || simplifying"
-              title="Open intuitive AI simplified breakdown on a dedicated Markdown reading screen"
-              @click="handleSimplify"
-            >
-              <BaseIcon name="sparkles" size="14" />
-              <span>{{ simplifying ? 'Opening...' : 'Simplify' }}</span>
-            </button>
             <span v-if="copyError" class="copy-error-msg" style="color: #b42318; font-size: 12px; font-weight: 500;">
               {{ copyError }}
             </span>
@@ -268,7 +342,7 @@
       </article>
 
       <ReaderChat
-        v-if="ragEnabled && ragQueueStudy"
+        v-model:active-tab="currentSidebarTab"
         :selected-topic-i-d="reader.selectedTopicID.value"
         :selected-topic-title="reader.topicTitle?.value || reader.selectedTopicTitle?.value || ''"
         :selected-notebook-i-d="reader.selectedNotebookID.value"
@@ -276,14 +350,14 @@
         :current-page="reader.currentPage.value"
         :topic-start-page="reader.topicStartPage.value"
         :topic-end-page="reader.topicEndPage.value"
+        :navigation-min-page="reader.navigationMinPage.value"
+        :navigation-max-page="reader.navigationMaxPage.value"
         :rag-enabled="ragEnabled"
+        :rag-queue-study="ragQueueStudy"
         :rag-settings-loaded="ragSettingsLoaded"
         :rag-settings-error="ragSettingsError"
         @retry-settings="retryGetUserSettings"
       />
-      <div v-else-if="ragEnabled && !ragQueueStudy" class="chat-disabled">
-        Chat is currently disabled in queue study mode.
-      </div>
     </div>
 
     <!-- Floating Audio Overview Bar -->
@@ -296,7 +370,6 @@
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />
-
   </section>
 </template>
 
@@ -331,6 +404,8 @@ const { isExtensionActive } = useExtensions()
 const { confirm } = useDialog()
 const showAudioOverview = ref(false)
 const simplifying = ref(false)
+// Sidebar Companion State
+const currentSidebarTab = ref('chat')
 
 const compressionStats = ref({
   is_compressed: false,
@@ -508,9 +583,45 @@ function startAudio(mode = 'session') {
   showAudioOverview.value = true
 }
 
+// Overflow menu for secondary actions
+const showMoreMenu = ref(false)
+
+function toggleMoreMenu() {
+  showMoreMenu.value = !showMoreMenu.value
+}
+
+function onCopyClick() {
+  copySessionContent()
+}
+
+function onAudioClick() {
+  showMoreMenu.value = false
+  startAudio('toggle')
+}
+
+function onSimplifyClick() {
+  showMoreMenu.value = false
+  handleSimplify()
+}
+
+
+function goBackToNotes() {
+  router.push({
+    path: '/notes',
+    query: {
+      notebookId: reader.selectedNotebookID.value || undefined,
+      topicId: reader.selectedTopicID.value || undefined,
+      from: route.query.fromOrigin || undefined,
+      taskId: route.query.taskId || route.query.task_id || undefined,
+      page: reader.currentPage.value || route.query.page || undefined,
+    },
+  })
+}
+
 function handleDocumentClick() {
   if (showDeferMenu.value) showDeferMenu.value = false
   if (showAudioMenu.value) showAudioMenu.value = false
+  if (showMoreMenu.value) showMoreMenu.value = false
 }
 
 onMounted(() => {
@@ -626,6 +737,21 @@ async function resolveTaskContext(taskQuery) {
 async function resolveBrowseContext() {
   console.log('[Reader] Browse mode — resolveBrowseContext')
   await reader.loadNotebookTree()
+
+  const queryNotebook = route.query.notebookId || route.query.notebook_id
+  const queryTopic = route.query.topicId || route.query.topic_id
+  const queryPage = Number.parseInt(route.query.page || route.query.startPage || route.query.start_page) || 0
+
+  if (queryNotebook) {
+    reader.selectedNotebookID.value = queryNotebook
+  }
+  if (queryTopic) {
+    reader.selectedTopicID.value = queryTopic
+    const loaded = await reader.loadBundle()
+    if (loaded && queryPage > 0) {
+      reader.updateCurrentPage(queryPage)
+    }
+  }
 }
 
 // ─── Mounted ──────────────────────────────────────────────────────────────────
@@ -1223,19 +1349,6 @@ button:disabled {
 }
 
 
-
-.chat-disabled {
-  color: var(--muted-text);
-  background: var(--surface-container-low);
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 14px;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .scroll-progress-bar {
   position: absolute;
   top: 0;
@@ -1382,4 +1495,115 @@ button:disabled {
   background: #faeedd !important;
   border-color: #c49a6c !important;
 }
+
+/* More Actions Overflow Menu */
+.more-actions-wrapper {
+  position: relative;
+}
+
+.more-actions-btn {
+  height: 32px !important;
+  width: 32px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  color: var(--on-surface, #ebdbb2) !important;
+  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.15)) !important;
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.05)) !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.more-actions-btn:hover:not(:disabled) {
+  background: var(--surface-bright, rgba(255, 255, 255, 0.1)) !important;
+  border-color: var(--primary, #d79921) !important;
+}
+
+.more-actions-btn.active {
+  background: color-mix(in srgb, var(--primary) 18%, transparent) !important;
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent) !important;
+  color: var(--primary, #d79921) !important;
+}
+
+.more-actions-dropdown {
+  min-width: 250px;
+}
+
+.menu-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.menu-item-row .item-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--on-surface, #ebdbb2);
+}
+
+.split-dropdown-item.item-active {
+  background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+}
+
+.split-dropdown-item.item-active .item-title {
+  color: var(--primary, #d79921) !important;
+}
+
+/* Secondary Action Bar & Responsive Overflow */
+.stage-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-actions-inline .copy-session-btn {
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.stage-actions-inline .copy-session-btn:hover:not(:disabled) {
+  background: var(--surface-bright);
+  border-color: var(--primary);
+}
+
+.stage-actions-inline .note-drawer-btn {
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  border-radius: 8px;
+}
+
+.stage-actions-inline .note-drawer-btn:hover:not(:disabled) {
+  background: var(--surface-bright);
+  border-color: var(--primary);
+}
+
+.stage-actions-inline .note-drawer-btn.active {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  color: var(--primary);
+}
+
+/* By default on desktop/wide viewports, inline actions are shown and overflow button is hidden */
+.more-actions-wrapper {
+  display: none;
+  position: relative;
+}
+
+/* When congested (narrow viewports or small container screens), hide inline actions and show the overflow ... menu */
+@media (max-width: 1320px) {
+  .stage-actions-inline {
+    display: none;
+  }
+  .more-actions-wrapper {
+    display: block;
+  }
+}
 </style>
+

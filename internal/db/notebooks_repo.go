@@ -908,7 +908,9 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 			COALESCE(t.id, ''),
 			COALESCE(t.title, ''),
 			COALESCE(t.start_page, 0),
-			COALESCE(t.end_page, 0)
+			COALESCE(t.end_page, 0),
+			COALESCE(t.status, ''),
+			COALESCE(t.current_page_cursor, 0)
 		FROM notebooks n
 		LEFT JOIN notebook_chunks nc ON nc.notebook_id = n.id
 		LEFT JOIN chunks c ON c.id = nc.chunk_id
@@ -939,8 +941,10 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 		var topicID string
 		var topicTitle string
 		var startPage, endPage int
+		var status string
+		var cursor int
 
-		if err := rows.Scan(&notebookID, &notebookTitle, &topicID, &topicTitle, &startPage, &endPage); err != nil {
+		if err := rows.Scan(&notebookID, &notebookTitle, &topicID, &topicTitle, &startPage, &endPage, &status, &cursor); err != nil {
 			return nil, err
 		}
 
@@ -970,10 +974,12 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 		}
 
 		tree[idx].Topics = append(tree[idx].Topics, models.NotebookTopicTreeTopic{
-			TopicID:   topicID,
-			Title:     cleanTitle,
-			StartPage: startPage,
-			EndPage:   endPage,
+			TopicID:           topicID,
+			Title:             cleanTitle,
+			StartPage:         startPage,
+			EndPage:           endPage,
+			Status:            status,
+			CurrentPageCursor: cursor,
 		})
 		seenTopics[notebookID][topicID] = struct{}{}
 	}

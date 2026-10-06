@@ -473,29 +473,15 @@ export function buyStreakFreeze() {
 }
 
 export function restoreSession(userID, email, isPro, verifiedAt) {
-  try {
-    return appBridge().RestoreSession(userID || '', email || '', !!isPro, verifiedAt || 0)
-  } catch (err) {
-    console.warn('[AUTH] RestoreSession bridge error:', err)
-    return false
-  }
+  return appBridge().RestoreSession(userID || '', email || '', !!isPro, verifiedAt || 0)
 }
 
 export function getUserSession() {
-  try {
-    return appBridge().GetUserSession()
-  } catch (err) {
-    console.warn('[AUTH] GetUserSession bridge error:', err)
-    return null
-  }
+  return appBridge().GetUserSession()
 }
 
 export function clearSession() {
-  try {
-    return appBridge().ClearSession()
-  } catch (err) {
-    console.warn('[AUTH] ClearSession bridge error:', err)
-  }
+  return appBridge().ClearSession()
 }
 
 export function setLLMPromptLogging(enabled) {
@@ -563,6 +549,95 @@ export function getNotebookCertificateStats(notebookID) {
     throw err
   }
 }
+
+export function generateTopicStudyNote(topicID, notebookID = '') {
+  try {
+    return appBridge().GenerateTopicStudyNote(topicID, notebookID)
+  } catch (err) {
+    console.error('Failed generating topic study note:', err)
+    throw err
+  }
+}
+
+export function generateTopicStudyNoteForRange(topicID, notebookID = '', startPage = 0, endPage = 0) {
+  try {
+    return appBridge().GenerateTopicStudyNoteForRange(topicID, notebookID, startPage, endPage)
+  } catch (err) {
+    console.error('Failed generating topic study note for range:', err)
+    throw err
+  }
+}
+
+export function getTopicStudyNote(topicID) {
+  try {
+    return appBridge().GetTopicStudyNote(topicID)
+  } catch (err) {
+    console.error('Failed fetching topic study note:', err)
+    throw err
+  }
+}
+
+export function getTopicStudyNoteForRange(topicID, startPage = 0, endPage = 0) {
+  try {
+    return appBridge().GetTopicStudyNoteForRange(topicID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed fetching topic study note for range:', err)
+    throw err
+  }
+}
+
+export function getTopicStudyNoteSlots(topicID) {
+  try {
+    return appBridge().GetTopicStudyNoteSlots(topicID)
+  } catch (err) {
+    console.error('Failed fetching topic study note slots:', err)
+    throw err
+  }
+}
+
+export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, content = '') {
+  try {
+    // If called with (topicID, content) backward-compatibility
+    if (typeof startPage === 'string' && content === '') {
+      content = startPage
+      startPage = 0
+      endPage = 0
+    }
+    return appBridge().UpdateTopicStudyNote(topicID, Number(startPage) || 0, Number(endPage) || 0, content)
+  } catch (err) {
+    console.error('Failed updating topic study note:', err)
+    throw err
+  }
+}
+
+export function getNotesByNotebook(notebookID = '') {
+  try {
+    return appBridge().GetNotesByNotebook(notebookID)
+  } catch (err) {
+    console.error('Failed fetching notes by notebook:', err)
+    throw err
+  }
+}
+
+export function markTopicReviewed(topicID, startPage = 0, endPage = 0) {
+  try {
+    return appBridge().MarkTopicReviewed(topicID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed marking topic reviewed:', err)
+    throw err
+  }
+}
+
+export function openNotesFolder(notebookID = '', topicID = '') {
+  try {
+    return appBridge().OpenNotesFolder(notebookID || '', topicID || '')
+  } catch (err) {
+    console.error('Failed opening notes folder:', err)
+    throw err
+  }
+}
+
+
 
 
 

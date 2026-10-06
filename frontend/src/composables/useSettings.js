@@ -32,6 +32,7 @@ export function useSettings(errorRef, successRef) {
     tutor_style: 'socratic',
     prompt_compression_mode: 'OVER_LIMIT',
     prompt_compression_rate: 0.80,
+    rate_limit_strategy: 'STANDARD',
   })
 
   const studyDuration = ref('')

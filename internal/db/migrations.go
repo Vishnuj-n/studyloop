@@ -46,6 +46,8 @@ var alterStatements = []struct {
 	{"user_settings", "log_level", "ALTER TABLE user_settings ADD COLUMN log_level TEXT NOT NULL DEFAULT 'INFO'"},
 	{"user_settings", "prompt_compression_mode", "ALTER TABLE user_settings ADD COLUMN prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT'"},
 	{"user_settings", "prompt_compression_rate", "ALTER TABLE user_settings ADD COLUMN prompt_compression_rate REAL NOT NULL DEFAULT 0.80"},
+	{"user_settings", "auto_generate_study_notes", "ALTER TABLE user_settings ADD COLUMN auto_generate_study_notes BOOLEAN DEFAULT 0"},
+	{"user_settings", "rate_limit_strategy", "ALTER TABLE user_settings ADD COLUMN rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD'"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 
 	// study_profiles

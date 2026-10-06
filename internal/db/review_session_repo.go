@@ -364,12 +364,14 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 			rtc.status,
 			fc.topic_id,
 			COALESCE(fc.source_chunk_id, ''),
+			COALESCE(ch.page_num, 0),
 			fc.prompt,
 			fc.answer,
 			COALESCE(fc.due_at, 0),
 			fc.suspended
 		FROM review_task_cards rtc
 		JOIN fsrs_cards fc ON fc.id = rtc.card_id
+		LEFT JOIN chunks ch ON ch.id = fc.source_chunk_id
 		WHERE rtc.task_id = ?
 		ORDER BY
 			CASE rtc.status WHEN 'pending' THEN 0 ELSE 1 END,
@@ -386,7 +388,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 		var card models.ReviewSessionCard
 		var suspended bool
 		card.TaskID = taskID
-		if err := rows.Scan(&card.CardID, &card.Status, &card.TopicID, &card.SourceChunkID, &card.Prompt, &card.Answer, &card.DueAt, &suspended); err != nil {
+		if err := rows.Scan(&card.CardID, &card.Status, &card.TopicID, &card.SourceChunkID, &card.Page, &card.Prompt, &card.Answer, &card.DueAt, &suspended); err != nil {
 			return nil, err
 		}
 		card.Suspended = suspended

@@ -10,34 +10,7 @@
         >
           <div class="toast-glow"></div>
           <div class="toast-icon-badge">
-            <svg
-              v-if="toast.type === 'notice'"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <svg
-              v-else
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
+            <BaseIcon :name="toast.type === 'notice' ? 'check' : 'info'" size="16" />
           </div>
 
           <div class="toast-body">
@@ -61,6 +34,7 @@
 </template>
 
 <script setup>
+import BaseIcon from './BaseIcon.vue'
 import { useToast } from '../composables/useToast'
 
 const { toast, hideToast } = useToast()
@@ -92,7 +66,7 @@ const { toast, hideToast } = useToast()
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--outline-variant);
   border-radius: 14px;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.45), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.12), 0 0 1px 1px rgba(255, 255, 255, 0.08);
   color: var(--on-surface, #e2e8f0);
   display: flex;
   align-items: flex-start;

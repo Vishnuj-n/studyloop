@@ -319,6 +319,8 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 	totalRawTokens := 0
 	totalCompressedTokens := 0
 	compressedCount := 0
+	activeRawTokens := 0
+	activeCompressedTokens := 0
 
 	for _, c := range chunks {
 		rawTokens := len(strings.Fields(c.Text))
@@ -326,7 +328,10 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 
 		if strings.TrimSpace(c.CompressedText) != "" {
 			compressedCount++
-			totalCompressedTokens += len(strings.Fields(c.CompressedText))
+			compTokens := len(strings.Fields(c.CompressedText))
+			totalCompressedTokens += compTokens
+			activeRawTokens += rawTokens
+			activeCompressedTokens += compTokens
 		} else {
 			totalCompressedTokens += rawTokens
 		}
@@ -339,15 +344,31 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 		savedPct = (float64(savedTokens) / float64(totalRawTokens)) * 100.0
 	}
 
+	activeSavedTokens := activeRawTokens - activeCompressedTokens
+	activeSavedPct := 0.0
+	if activeRawTokens > 0 && activeSavedTokens > 0 {
+		activeSavedPct = (float64(activeSavedTokens) / float64(activeRawTokens)) * 100.0
+	}
+
+	isCompressing := false
+	if a.studyService != nil {
+		isCompressing = a.studyService.IsTopicCompressing(topicID)
+	}
+
 	return map[string]interface{}{
 		"topic_id":                 topicID,
 		"chunk_count":              len(chunks),
 		"compressed_chunk_count":   compressedCount,
 		"is_compressed":            isCompressed,
+		"is_compressing":           isCompressing,
 		"raw_tokens":               totalRawTokens,
 		"compressed_tokens":        totalCompressedTokens,
 		"tokens_saved":             savedTokens,
 		"saved_percentage":         savedPct,
+		"active_raw_tokens":        activeRawTokens,
+		"active_compressed_tokens": activeCompressedTokens,
+		"active_tokens_saved":      activeSavedTokens,
+		"active_saved_percentage":  activeSavedPct,
 	}
 }
 
@@ -806,12 +827,14 @@ func (a *App) reloadRetrievalEngine() error {
 		}
 	}
 
+	notesDir, _ := runtime.ResolveNotesDir()
 	// Recreate study service to bind the new engine; update both under lock.
 	newSvc := study.NewStudyService(study.Config{
 		Repo:             repo,
 		FastLLMProvider:  a.fastLLMProvider,
 		HeavyLLMProvider: a.heavyLLMProvider,
 		RetrievalEngine:  engine,
+		NotesDir:         notesDir,
 	})
 	a.aiMutex.Lock()
 	a.retrievalEngine = engine

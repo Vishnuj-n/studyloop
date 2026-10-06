@@ -109,6 +109,7 @@
               :llm-settings="llmSettings"
               :llm-fast-key="llmFastKey"
               :llm-heavy-key="llmHeavyKey"
+              :settings="settings"
               :target-session-words="settings.target_session_words || 3000"
               :disabled="loading || savingLLM"
               @apply-preset="applyProviderPreset"
@@ -515,6 +516,16 @@ watch(
   (newTheme) => {
     if (!newTheme || loading.value) return
     document.documentElement.setAttribute('data-theme', newTheme)
+  }
+)
+
+watch(
+  () => [route.query.category, route.query.tab],
+  ([newCat, newTab]) => {
+    const target = newCat || newTab
+    if (target && categories.some((c) => c.id === target)) {
+      activeCategory.value = target
+    }
   }
 )
 

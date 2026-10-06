@@ -9,6 +9,7 @@ import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
 import PrivacyNoticeModal from './components/PrivacyNoticeModal.vue'
 import FloatingPet from './components/FloatingPet.vue'
+import RateLimitBanner from './components/RateLimitBanner.vue'
 import ExtensionSetupToast from './components/ExtensionSetupToast.vue'
 import ExtensionSetupModal from './components/ExtensionSetupModal.vue'
 import { useExtensions } from './composables/useExtensions'
@@ -533,8 +534,9 @@ onUnmounted(() => {
         @close="handleDismissPrivacyNotice"
       />
 
-      <!-- Global Toaster -->
+      <!-- Global Toaster & Rate Limit Remediation Banner -->
       <AppToast />
+      <RateLimitBanner />
 
       <!-- Floating Extension Setup Progress Toast -->
       <ExtensionSetupToast />

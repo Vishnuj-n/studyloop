@@ -48,6 +48,16 @@ Compression is controlled dynamically via `user_settings.prompt_compression_mode
 
 ## Empirical Benchmarks
 
+### Word Count Latency & Throughput (CPU)
+Empirical latency benchmarks measured across document sizes (`scripts/benchmark_word_latency.py`, detailed in [`doc/BENCHMARK_PROMPT_COMPRESSION.md`](../BENCHMARK_PROMPT_COMPRESSION.md)):
+
+| Document Size | Raw Tokens | Compressed Tokens | Token Savings | Latency (CPU) | Throughput |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **2,000 words** | ~2,678 | ~2,111 | **21.2%** | **5.08s – 8.03s** | **250 – 393 w/s** |
+| **3,000 words** | ~4,017 | ~3,164 | **21.2%** | **7.85s – 10.74s** | **280 – 382 w/s** |
+| **5,000 words** | ~6,707 | ~5,278 | **21.3%** | **12.99s – 17.51s** | **285 – 385 w/s** |
+
+### Chunk Retention & Savings
 Empirical performance measured via `scripts/benchmark_prompt_compression.py`:
 
 | Compression Rate | Token Savings (% Reduction) | Keyword / Term Retention | Per-Chunk Latency (CPU) |

@@ -59,13 +59,15 @@ vi.mock('../components/PdfViewer.vue', () => ({
   },
 }))
 
+const pushMock = vi.fn()
+
 // Mock vue-router hooks
 vi.mock('vue-router', () => ({
   useRoute: () => ({
     query: routeQuery.value,
   }),
   useRouter: () => ({
-    push: vi.fn(),
+    push: pushMock,
   }),
 }))
 
@@ -391,4 +393,37 @@ describe('Reader.vue Integration', () => {
     expect(wrapper.find('.browse-badge').exists()).toBe(true)
     expect(wrapper.find('.controls').exists()).toBe(true)
   })
+
+  it('navigates back to notes preserving upstream origin and task context', async () => {
+    routeQuery.value = {
+      notebookId: 'nb-1',
+      topicId: 'topic-1',
+      from: 'notes',
+      fromOrigin: 'flashcards',
+      taskId: 'task-fc-123',
+      page: 3,
+    }
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const backBtn = wrapper.findAll('button.secondary').find((b) => b.text().includes('Back to Notes'))
+    expect(backBtn).toBeDefined()
+    expect(backBtn.exists()).toBe(true)
+
+    await backBtn.trigger('click')
+    await flushPromises()
+
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/notes',
+      query: {
+        notebookId: 'nb-1',
+        topicId: 'topic-1',
+        from: 'flashcards',
+        taskId: 'task-fc-123',
+        page: 1, // current reader page
+      },
+    })
+  })
 })
+

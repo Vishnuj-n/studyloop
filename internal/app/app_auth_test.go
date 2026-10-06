@@ -60,13 +60,17 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 		t.Fatalf("failed to write tampered file: %v", err)
 	}
 
-	// Restore tampered session -> must reject and set isPro = false
+	// Restore tampered session -> must reject, set isPro = false, and expose no user
 	a3 := &App{}
 	if a3.RestoreSession("attacker", "hacker@evil.com", true, time.Now().Unix()) {
 		t.Fatalf("expected RestoreSession to reject tampered file signature")
 	}
 	if a3.IsProUser() {
 		t.Fatalf("expected a3.IsProUser() to be false after tampering attempt")
+	}
+	tamperedSess := a3.GetUserSession()
+	if tamperedSess["userId"] != "" || tamperedSess["email"] != "" {
+		t.Fatalf("expected empty user session on failed restore, got %#v", tamperedSess)
 	}
 
 	// 3. Grace Period Expiration (>10 days)
@@ -192,5 +196,71 @@ func TestResolveClerkPublishableKey(t *testing.T) {
 	if k := resolveClerkPublishableKey(); k != "pk_test_env_vite" {
 		t.Fatalf("expected pk_test_env_vite from env, got %q", k)
 	}
+}
+
+func TestParseClerkSessionClaims(t *testing.T) {
+	// Real token sample from test session
+	testJWT := "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyXzNJSnc1YlBhMVVKSkxSUkJRV1FWVjVZVkl4QiIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsInB1YmxpY19tZXRhZGF0YSI6eyJwbGFuIjoicHJvIn19.signature"
+
+	userID, email, plan, _, isPro := parseClerkSessionClaims(testJWT)
+	if userID != "user_3IJw5bPa1UJJLRRBQWQVV5YVIxB" {
+		t.Fatalf("unexpected userID: %s", userID)
+	}
+	if email != "test@example.com" {
+		t.Fatalf("unexpected email: %s", email)
+	}
+	if plan != "pro" || !isPro {
+		t.Fatalf("expected pro plan and isPro=true, got plan=%s isPro=%v", plan, isPro)
+	}
+}
+
+func TestAuthCallback_JWTTokenHandling(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("APP_ENV", "dev")
+	origWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(origWd) }()
+	_ = os.Chdir(tempDir)
+
+	a := &App{}
+	res, err := a.StartBrowserAuth("sign-in")
+	if err != nil {
+		t.Fatalf("StartBrowserAuth failed: %v", err)
+	}
+	if res["url"] == "" {
+		t.Fatalf("expected url")
+	}
+
+	activeAuthServer.mu.Lock()
+	validNonce := activeAuthServer.stateNonce
+	srv := activeAuthServer.server
+	activeAuthServer.mu.Unlock()
+
+	// Create JWT token payload with pro entitlement
+	testJWT := "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyX2p3dF90ZXN0IiwiZW1haWwiOiJqd3RfdXNlckBleGFtcGxlLmNvbSIsInB1YmxpY19tZXRhZGF0YSI6eyJpc1BybyI6dHJ1ZX19.dummy"
+
+	req := httptest.NewRequest(http.MethodGet, "/callback?state="+validNonce+"&__clerk_db_jwt="+testJWT, nil)
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for callback, got %d", w.Code)
+	}
+
+	if !a.IsProUser() {
+		t.Fatalf("expected user to be Pro after JWT callback")
+	}
+
+	sess := a.GetUserSession()
+	if sess["userId"] != "user_jwt_test" || sess["email"] != "jwt_user@example.com" {
+		t.Fatalf("unexpected session from JWT callback: %#v", sess)
+	}
+
+	// Clean up
+	activeAuthServer.mu.Lock()
+	if activeAuthServer.server != nil {
+		_ = activeAuthServer.server.Close()
+		activeAuthServer.server = nil
+	}
+	activeAuthServer.mu.Unlock()
 }
 

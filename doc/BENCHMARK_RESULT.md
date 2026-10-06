@@ -176,5 +176,32 @@ The optimal embedding batch strategy also depends on the **total chunk count and
   - Embedding runs in the background `VectorIndexQueue` without blocking the desktop UI.
   - Chunks are dispatched in mini-batches dynamically bounded by `4–16` (`runtime.NumCPU() / 2` clamped), ensuring rapid feedback on small assignments while achieving near-instant insertion rates (>100k rows/s) into SQLite WAL via `UpsertChunkVectorsBatch`.
 
+---
+
+## 9. Empirical Prompt Compression Benchmarks (LLMLingua-2 Light BERT)
+
+Evaluated the **LLMLingua-2 (110M BERT base multilingual meetingbank)** model used in Studyloop's prompt compression sidecar (`extensions/prompt_compressor/compress.py`) across document sizes (**2,000**, **3,000**, and **5,000** words) natively on CPU.
+
+### 📊 Results Matrix
+
+* **Model**: `microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank` (~110M parameters, ~250MB RAM footprint)
+* **Inference Device**: Native CPU
+* **Target Compression Rate**: `0.80` (20% reduction target preserving crucial academic keywords and syntax)
+
+| Document Size | Raw Tokens (WordPiece) | Compressed Tokens | Token Savings (% Pruned) | Single Block Latency | 500-Word Chunks Latency | Throughput (Chunks Pipeline) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **2,000 words** | ~2,680 | ~2,113 | **21.2%** | 6.73s | **9.28s** (4 chunks) | **215.6 words/sec** |
+| **3,000 words** | ~4,018 | ~3,167 | **21.2%** | 7.69s | **8.35s** (6 chunks) | **359.2 words/sec** |
+| **5,000 words** | ~6,706 | ~5,283 | **21.2%** | 40.24s | **11.95s** (10 chunks) | **418.5 words/sec** |
+
+*Note: Initial first-run model load + warm-up takes ~51s (loading tensor weights into RAM). Subsequent chunked pipeline inferences execute at high throughput (~350–420 words/sec).*
+
+### ⚡ Architectural Decision & Sub-Chunking Rules
+1. **Transformer 512 Positional Limit**: BERT architectures natively limit sequence length to 512 tokens (`max_position_embeddings = 512`). Documents are divided into sub-chunks of $\le 250$ words (~330 tokens) prior to inference to strictly prevent index length errors or truncation.
+2. **Single Resident Model**: A single resident model instance handles sequential sub-chunks in memory, maintaining a capped ~250MB footprint.
+3. **Chunking Speedup**: Processing 5,000 words in 500-word chunks is **over 3x faster** (11.95s vs 40.24s) due to localized quadratic attention complexity ($O(N^2)$ per window).
+4. **Progressive SQLite Persistence**: In [`internal/study/compression_service.go`](../internal/study/compression_service.go), batches of 10 chunks are committed immediately to SQLite, ensuring partial progress is preserved across application restarts.
+
+
 
 

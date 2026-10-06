@@ -36,6 +36,63 @@ func (r *Repository) EnsureTopicWithStatus(topicID, title, status string) error 
 	return err
 }
 
+// GetTopic retrieves basic metadata for a single topic.
+func (r *Repository) GetTopic(topicID string) (*models.TopicSummary, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return nil, fmt.Errorf("topic id is required")
+	}
+	var t models.TopicSummary
+	err := r.db.QueryRow(`
+		SELECT id, COALESCE(title, ''), COALESCE(status, '')
+		FROM topics WHERE id = ?
+	`, topicID).Scan(&t.ID, &t.Title, &t.Status)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	t.Title = utils.CleanTopicTitle(t.Title)
+	return &t, nil
+}
+
+// GetNotebookTitle returns the title of a notebook by its ID.
+func (r *Repository) GetNotebookTitle(notebookID string) (string, error) {
+	notebookID = strings.TrimSpace(notebookID)
+	if notebookID == "" {
+		return "", nil
+	}
+	var title string
+	err := r.db.QueryRow(`SELECT COALESCE(title, '') FROM notebooks WHERE id = ?`, notebookID).Scan(&title)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return title, err
+}
+
+// GetNotebookIDForTopic resolves the parent notebook ID for a given topic ID.
+func (r *Repository) GetNotebookIDForTopic(topicID string) (string, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return "", fmt.Errorf("topic id is required")
+	}
+	var notebookID string
+	err := r.db.QueryRow(`
+		SELECT notebook_id FROM notebook_topics WHERE topic_id = ?
+		UNION
+		SELECT id AS notebook_id FROM notebooks WHERE topic_id = ?
+		LIMIT 1
+	`, topicID, topicID).Scan(&notebookID)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return notebookID, nil
+}
+
 // TopicBatchItem represents a topic to be created/updated in batch
 type TopicBatchItem struct {
 	TopicID string
@@ -644,3 +701,44 @@ func (r *Repository) IsTopicFullyReadTx(tx *sql.Tx, topicID string) (bool, error
 	}
 	return endPage > 0 && cursor >= endPage, nil
 }
+
+// GetCompletedReadingSessionsForTopic returns active or completed reading sessions from study_queue
+// for surfacing reading session note slots in study notes.
+func (r *Repository) GetCompletedReadingSessionsForTopic(topicID string) ([]models.StudyQueueTask, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return nil, fmt.Errorf("topic id is required")
+	}
+
+	rows, err := r.db.Query(`
+		SELECT sq.id, sq.topic_id, COALESCE(t.title, ''), sq.notebook_id, COALESCE(nb.title, ''),
+		       COALESCE(sq.start_page, 0), COALESCE(sq.end_page, 0)
+		FROM study_queue sq
+		LEFT JOIN topics t ON t.id = sq.topic_id
+		LEFT JOIN notebooks nb ON nb.id = sq.notebook_id
+		WHERE sq.topic_id = ? 
+		  AND sq.task_type IN ('READING', 'REREAD')
+		  AND sq.status IN ('COMPLETED', 'ACTIVE')
+		  AND COALESCE(sq.start_page, 0) > 0
+		  AND COALESCE(sq.end_page, 0) >= COALESCE(sq.start_page, 0)
+		ORDER BY sq.start_page ASC, sq.end_page ASC
+	`, topicID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var tasks []models.StudyQueueTask
+	for rows.Next() {
+		var task models.StudyQueueTask
+		var topicTitle, nbTitle string
+		if err := rows.Scan(&task.ID, &task.TopicID, &topicTitle, &task.NotebookID, &nbTitle, &task.StartPage, &task.EndPage); err != nil {
+			return nil, err
+		}
+		task.Title = topicTitle
+		tasks = append(tasks, task)
+	}
+	return tasks, rows.Err()
+}
+
+

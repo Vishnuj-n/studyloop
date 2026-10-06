@@ -240,12 +240,19 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 	// Initialize fast and heavy LLM providers
 	res.FastLLMProvider, res.HeavyLLMProvider = initLLMProviders(repo)
 
+	// Resolve study notes directory
+	notesDir, err := ResolveNotesDir()
+	if err != nil {
+		utils.Warnf("resolving notes directory: %v", err)
+	}
+
 	// Construct core StudyService orchestrator
 	res.StudyService = study.NewStudyService(study.Config{
 		Repo:             repo,
 		FastLLMProvider:  res.FastLLMProvider,
 		HeavyLLMProvider: res.HeavyLLMProvider,
 		RetrievalEngine:  res.RetrievalEngine,
+		NotesDir:         notesDir,
 	})
 
 	// Resolve and initialize notebook service directory
@@ -518,4 +525,23 @@ func ResolveNotebookDir() (string, error) {
 		return "", err
 	}
 	return uploadDir, nil
+}
+
+// ResolveNotesDir returns the directory path for storing study notes.
+func ResolveNotesDir() (string, error) {
+	if custom := strings.TrimSpace(os.Getenv("STUDYLOOP_NOTES_DIR")); custom != "" {
+		if err := os.MkdirAll(custom, defaultDirPerm); err != nil {
+			return "", fmt.Errorf("failed to create custom notes directory %s: %w", custom, err)
+		}
+		return custom, nil
+	}
+	appDir, err := ResolveAppDir()
+	if err != nil {
+		return "", err
+	}
+	notesDir := filepath.Join(appDir, "notes")
+	if err := os.MkdirAll(notesDir, defaultDirPerm); err != nil {
+		return "", fmt.Errorf("failed to create notes directory %s: %w", notesDir, err)
+	}
+	return notesDir, nil
 }

@@ -44,6 +44,11 @@ const (
 	StudyTaskStatusReserved  StudyTaskStatus = "RESERVED"
 )
 
+const (
+	RateLimitStrategyStandard = "STANDARD"
+	RateLimitStrategyPaced    = "PACED"
+)
+
 // ReviewTaskDailyID is the synthetic task ID for daily flashcard review materialization.
 const ReviewTaskDailyID = "task-review-daily"
 
@@ -264,10 +269,12 @@ type NotebookChunk struct {
 
 // NotebookTopicTreeTopic is one topic option nested under a notebook.
 type NotebookTopicTreeTopic struct {
-	TopicID   string `json:"topic_id"`
-	Title     string `json:"title"`
-	StartPage int    `json:"start_page,omitempty"`
-	EndPage   int    `json:"end_page,omitempty"`
+	TopicID           string `json:"topic_id"`
+	Title             string `json:"title"`
+	StartPage         int    `json:"start_page,omitempty"`
+	EndPage           int    `json:"end_page,omitempty"`
+	Status            string `json:"status,omitempty"`
+	CurrentPageCursor int    `json:"current_page_cursor,omitempty"`
 }
 
 // NotebookTopicTreeNode is the notebook-scoped topic tree returned to the UI.
@@ -479,6 +486,7 @@ type ReviewSessionCard struct {
 	Position      int                  `json:"position"`
 	TopicID       string               `json:"topic_id"`
 	SourceChunkID string               `json:"source_chunk_id,omitempty"`
+	Page          int                  `json:"page,omitempty"`
 	Prompt        string               `json:"prompt"`
 	Answer        string               `json:"answer"`
 	DueAt         int64                `json:"due_at,omitempty"`
@@ -676,6 +684,25 @@ type UserSettings struct {
 	LogLevel                string  `json:"log_level"`
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
+	AutoGenerateStudyNotes  bool    `json:"auto_generate_study_notes"`
+	RateLimitStrategy       string  `json:"rate_limit_strategy"`
+}
+
+// TopicStudyNote represents a structured study summary note for one reading session of a topic.
+// StartPage and EndPage identify the session scope. (0, 0) means a whole-chapter / on-demand note.
+type TopicStudyNote struct {
+	ID             string `json:"id"`
+	TopicID        string `json:"topic_id"`
+	TopicTitle     string `json:"topic_title,omitempty"`
+	NotebookID     string `json:"notebook_id"`
+	NotebookTitle  string `json:"notebook_title,omitempty"`
+	StartPage      int    `json:"start_page"`
+	EndPage        int    `json:"end_page"`
+	FilePath       string `json:"file_path,omitempty"`
+	Content        string `json:"content"`
+	LastReviewedAt int64  `json:"last_reviewed_at"`
+	CreatedAt      string `json:"created_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
 }
 
 type AnalyticsEventSync struct {

@@ -92,13 +92,24 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	// Trigger asynchronous background compression on topic opening (soft skip if study service is not yet initialized)
+	// Trigger sequential background processing on topic opening:
+	// Compression runs first so study note generation consumes pre-compressed chunks (~20% smaller prompt).
 	if task.TopicID != "" && a.studyService != nil {
 		reqCtx := a.ctx
 		if reqCtx == nil {
 			reqCtx = context.Background()
 		}
-		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID)
+
+		noteGenCallback := func() {
+			if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
+				existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
+				if checkErr == nil && existingNote == nil {
+					a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+				}
+			}
+		}
+
+		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID, noteGenCallback)
 	}
 
 	currentPage := task.CurrentPage
@@ -302,6 +313,7 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 	if err != nil {
 		return fail(err.Error())
 	}
+
 
 	resp := map[string]interface{}{
 		"ok":           true,

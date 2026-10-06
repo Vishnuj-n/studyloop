@@ -51,43 +51,37 @@ async function syncWithBackend(force = false) {
         return
       }
 
-      // 1. First hydrate/verify session from backend signed session storage
-      const verifiedPro = await restoreSession(
-        user.value?.id || '',
-        user.value?.email || '',
-        isPro.value,
-        Math.floor((lastVerifiedAt.value || 0) / 1000)
-      )
+      // 1. Ask Go backend to verify/restore signed session.json
+      await restoreSession('', '', false, 0)
 
-      // 2. Retrieve active session state
+      // 2. Retrieve active session state verified strictly by Go backend
       const backendSession = await getUserSession()
       if (backendSession && backendSession.userId && backendSession.email) {
-        if (!user.value) {
-          user.value = {
-            id: backendSession.userId,
-            email: backendSession.email,
-            fullName: 'Authenticated User',
-          }
+        user.value = {
+          id: backendSession.userId,
+          email: backendSession.email,
+          fullName: 'Authenticated User',
         }
         if (backendSession.verifiedAt) {
           lastVerifiedAt.value = backendSession.verifiedAt * 1000
         }
         isPro.value = Boolean(backendSession.isPro)
         saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
-      } else if (typeof verifiedPro === 'boolean') {
-        if (isPro.value !== verifiedPro) {
-          console.warn(`[AUTH] isPro status changed by backend verification: ${isPro.value} -> ${verifiedPro}`)
-          logFrontendEvent('warn', 'Auth', 'is_pro_transition', { from: isPro.value, to: verifiedPro })
+      } else if (backendSession && typeof backendSession === 'object') {
+        // Go backend explicitly reported no session -> reset frontend auth state
+        if (isPro.value || user.value) {
+          console.warn('[AUTH] Go backend session invalid or missing. Resetting frontend user and isPro state to unauthenticated/free.')
+          logFrontendEvent('info', 'Auth', 'backend_session_reset', { fromPro: isPro.value })
         }
-        isPro.value = verifiedPro
-        if (user.value) {
-          saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
-        }
+        user.value = null
+        isPro.value = false
+        lastVerifiedAt.value = 0
+        saveLocalSession(null, false, 0)
       }
       lastSyncSuccessTime = Date.now()
       hasInitialSyncRan = true
     } catch (err) {
-      console.warn('[AUTH] Could not sync session with backend:', err)
+      console.warn('[AUTH] Bridge or transport error syncing session with backend:', err)
     } finally {
       inFlightSync = null
     }

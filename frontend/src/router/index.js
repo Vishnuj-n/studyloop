@@ -15,6 +15,11 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', name: 'dashboard', component: Dashboard },
   { path: '/reader', name: 'reader', component: Reader },
+  {
+    path: '/notes',
+    name: 'notes',
+    component: () => import('../pages/Notes.vue'),
+  },
   { path: '/quiz', name: 'quiz', component: Quiz },
   { path: '/flashcards', name: 'flashcards', component: Flashcards },
   {

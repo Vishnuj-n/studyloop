@@ -176,6 +176,7 @@ onUnmounted(() => {
 const topItems = [
   { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
   { to: '/reader', label: 'Reader', icon: 'book' },
+  { to: '/notes', label: 'Notes', icon: 'file-text' },
   { to: '/notebooks', label: 'Notebooks', icon: 'folder' },
   { to: '/quiz', label: 'Quiz', icon: 'puzzle' },
   { to: '/flashcards', label: 'Flashcards', icon: 'cards' },

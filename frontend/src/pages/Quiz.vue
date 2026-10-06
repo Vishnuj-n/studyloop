@@ -364,6 +364,13 @@
     </form>
   </StudyPageLayout>
 
+  <!-- Pre-Milestone Exam Retrieval Modal -->
+  <MilestoneNoteReviewModal
+    :show="showMilestonePreReview"
+    :topics="milestoneReviewTopics"
+    :notebook-id="taskMeta?.notebook_id || ''"
+    @start-exam="onMilestonePreReviewComplete"
+  />
 </template>
 
 <script setup>
@@ -382,6 +389,8 @@ import {
   getUserSettings,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
+import MilestoneNoteReviewModal from '../components/MilestoneNoteReviewModal.vue'
+import { cleanTopicTitle } from '../composables/useReaderBase'
 import { playCorrectChime, playIncorrectThud } from '../utils/audioJuice'
 
 const route = useRoute()
@@ -401,6 +410,8 @@ const generatingFlashcards = ref(false)
 
 const isMilestoneExam = ref(false)
 const milestonePayload = ref(null)
+const showMilestonePreReview = ref(false)
+const milestoneReviewTopics = ref([])
 
 // Manual generation state
 const notebooks = ref([])
@@ -526,9 +537,26 @@ async function loadQuizTask() {
     if (task.task_type === 'MILESTONE_EXAM') {
       isMilestoneExam.value = true
       milestonePayload.value = payload
+
+      // Extract unique topic IDs / covered topics from payload
+      const topicList = []
+      if (payload?.quizzes && typeof payload.quizzes === 'object') {
+        for (const tid of Object.keys(payload.quizzes)) {
+          const title = (task.topic_id === tid && (task.topic_title || task.title)) ? (task.topic_title || task.title) : cleanTopicTitle(tid)
+          topicList.push({ topic_id: tid, title: title || 'Chapter Review' })
+        }
+      }
+      if (topicList.length === 0 && task.topic_id) {
+        const title = task.topic_title || task.title || cleanTopicTitle(task.topic_id) || 'Chapter Review'
+        topicList.push({ topic_id: task.topic_id, title })
+      }
+      milestoneReviewTopics.value = topicList
+      showMilestonePreReview.value = true
     } else {
       isMilestoneExam.value = false
       milestonePayload.value = null
+      showMilestonePreReview.value = false
+      milestoneReviewTopics.value = []
     }
     answers.value = {}
     submitted.value = false
@@ -538,6 +566,10 @@ async function loadQuizTask() {
   } finally {
     loading.value = false
   }
+}
+
+function onMilestonePreReviewComplete() {
+  showMilestonePreReview.value = false
 }
 
 async function submitMilestone() {

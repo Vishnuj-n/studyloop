@@ -1293,10 +1293,10 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		remainingSessions = math.Ceil(float64(remainingWords) / float64(targetWords))
 	}
 
-	// Calculate required daily sessions
+	// Calculate required daily sessions (keep 1 decimal precision to avoid aggressive rounding)
 	requiredDailySessions := 0.0
 	if daysRemaining > 0 && remainingSessions > 0 {
-		requiredDailySessions = math.Ceil(remainingSessions / float64(daysRemaining))
+		requiredDailySessions = remainingSessions / float64(daysRemaining)
 	} else if remainingSessions > 0 {
 		requiredDailySessions = remainingSessions
 	}
@@ -1307,7 +1307,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	// Feasibility status evaluation: NO_DATA, AHEAD, ON_TRACK, BEHIND
 	feasibilityStatus := "NO_DATA"
 	projectedFinishStr := ""
-	daysGap := 0
+	daysGap := 0.0
 	currentDailySessions := 0.0
 	extraDailySessionsNeeded := 0.0
 
@@ -1322,12 +1322,13 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 		}
 
 		if currentDailySessions > 0 {
-			daysToFinish := int(math.Ceil(remainingSessions / currentDailySessions))
+			daysToFinishFloat := remainingSessions / currentDailySessions
+			daysToFinish := int(math.Ceil(daysToFinishFloat))
 			projectedFinishDate := today.AddDate(0, 0, daysToFinish)
 			projectedFinishStr = projectedFinishDate.Format(dateFormatYYYYMMDD)
-			daysGap = daysRemaining - daysToFinish // positive: buffer before exam; negative: late
+			daysGap = math.Round((float64(daysRemaining)-daysToFinishFloat)*10) / 10
 
-			if daysGap >= 2 {
+			if daysGap >= 1.0 {
 				feasibilityStatus = "AHEAD"
 			} else if daysGap >= 0 {
 				feasibilityStatus = "ON_TRACK"
@@ -1335,7 +1336,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 				feasibilityStatus = "BEHIND"
 				diff := requiredDailySessions - currentDailySessions
 				if diff > 0 {
-					extraDailySessionsNeeded = math.Ceil(diff)
+					extraDailySessionsNeeded = math.Round(diff*10) / 10
 				}
 			}
 		}
@@ -1347,11 +1348,20 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	case "NO_DATA":
 		paceLabel = "Estimating pace"
 	case "AHEAD":
-		paceLabel = fmt.Sprintf("On track — %d days ahead", daysGap)
+		if math.Mod(daysGap, 1) == 0 {
+			paceLabel = fmt.Sprintf("On track — %d days ahead", int(daysGap))
+		} else {
+			paceLabel = fmt.Sprintf("On track — %.1f days ahead", daysGap)
+		}
 	case "ON_TRACK":
 		paceLabel = "On track for deadline"
 	case "BEHIND":
-		paceLabel = fmt.Sprintf("Behind pace — %d days late", -daysGap)
+		absGap := math.Abs(daysGap)
+		if math.Mod(absGap, 1) == 0 {
+			paceLabel = fmt.Sprintf("Behind pace — %d days late", int(absGap))
+		} else {
+			paceLabel = fmt.Sprintf("Behind pace — %.1f days late", absGap)
+		}
 	}
 
 	return map[string]interface{}{
