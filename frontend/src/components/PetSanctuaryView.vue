@@ -64,113 +64,11 @@
             </transition>
 
             <!-- Render Vector Avatar for Selected Pet & Skin -->
-            <svg
-              viewBox="0 0 100 100"
-              class="stage-pet-svg"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <ellipse cx="50" cy="88" rx="28" ry="6" class="stage-shadow" />
-
-              <!-- Cat (Mochi) -->
-              <g v-if="selectedPet.id === 'cat'">
-                <path d="M 24 72 C 14 70 10 58 12 50 C 14 54 20 62 26 66" :fill="previewSkin.accentColor" class="pet-tail" />
-                <path d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z" :fill="previewSkin.primaryColor" class="pet-body" />
-                <ellipse cx="50" cy="62" rx="15" ry="14" :fill="previewSkin.secondaryColor" />
-                <polygon points="30,34 38,14 48,30" :fill="previewSkin.primaryColor" class="pet-ear ear-left" />
-                <polygon points="33,31 38,18 45,28" :fill="previewSkin.secondaryColor" />
-                <polygon points="70,34 62,14 52,30" :fill="previewSkin.primaryColor" class="pet-ear ear-right" />
-                <polygon points="67,31 62,18 55,28" :fill="previewSkin.secondaryColor" />
-
-                <g v-if="previewAction === 'sleep'">
-                  <path d="M 38 46 Q 42 50 46 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <path d="M 54 46 Q 58 50 62 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else-if="previewAction === 'blink'">
-                  <line x1="38" y1="46" x2="46" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <line x1="54" y1="46" x2="62" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else>
-                  <ellipse cx="42" cy="45" rx="3.5" ry="4.5" fill="#1E293B" />
-                  <circle cx="43.5" cy="43.5" r="1.5" fill="#FFFFFF" />
-                  <ellipse cx="58" cy="45" rx="3.5" ry="4.5" fill="#1E293B" />
-                  <circle cx="59.5" cy="43.5" r="1.5" fill="#FFFFFF" />
-                </g>
-                <polygon points="48,51 52,51 50,54" fill="#F43F5E" />
-                <path d="M 46 55 Q 50 58 50 55 Q 50 58 54 55" fill="none" stroke="#1E293B" stroke-width="1.5" stroke-linecap="round" />
-                <line x1="28" y1="48" x2="36" y2="50" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-                <line x1="28" y1="54" x2="36" y2="53" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-                <line x1="64" y1="50" x2="72" y2="48" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-                <line x1="64" y1="53" x2="72" y2="54" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-              </g>
-
-              <!-- Dog (Buster) -->
-              <g v-else-if="selectedPet.id === 'dog'">
-                <path d="M 74 72 C 84 68 88 56 86 48 C 84 52 78 60 72 66" :fill="previewSkin.accentColor" class="pet-tail" />
-                <path d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z" :fill="previewSkin.primaryColor" class="pet-body" />
-                <path d="M 30 32 C 20 34 16 46 18 56 C 20 60 25 60 27 54 C 29 48 31 38 33 34 Z" :fill="previewSkin.accentColor" class="pet-ear ear-left" />
-                <path d="M 70 32 C 80 34 84 46 82 56 C 80 60 75 60 73 54 C 71 48 69 38 67 34 Z" :fill="previewSkin.accentColor" class="pet-ear ear-right" />
-                <ellipse cx="50" cy="63" rx="16" ry="14" :fill="previewSkin.secondaryColor" />
-                <ellipse cx="50" cy="52" rx="12" ry="9" :fill="previewSkin.secondaryColor" />
-
-                <g v-if="previewAction === 'sleep'">
-                  <path d="M 38 45 Q 42 49 46 45" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <path d="M 54 45 Q 58 49 62 45" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else-if="previewAction === 'blink'">
-                  <line x1="38" y1="45" x2="46" y2="45" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <line x1="54" y1="45" x2="62" y2="45" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else>
-                  <circle cx="41" cy="44" r="4" fill="#1E293B" />
-                  <circle cx="42.5" cy="42.5" r="1.5" fill="#FFFFFF" />
-                  <circle cx="59" cy="44" r="4" fill="#1E293B" />
-                  <circle cx="60.5" cy="42.5" r="1.5" fill="#FFFFFF" />
-                </g>
-                <ellipse cx="50" cy="50" rx="4.5" ry="3.5" fill="#1E293B" />
-                <path d="M 46 54 Q 50 57 50 54 Q 50 57 54 54" fill="none" stroke="#1E293B" stroke-width="1.6" stroke-linecap="round" />
-              </g>
-
-              <!-- Dragon (Ignis) -->
-              <g v-else-if="selectedPet.id === 'dragon'">
-                <path d="M 28 50 C 14 38 12 24 24 22 C 22 30 20 40 28 48 Z" :fill="previewSkin.accentColor" class="pet-ear ear-left" />
-                <path d="M 72 50 C 86 38 88 24 76 22 C 78 30 80 40 72 48 Z" :fill="previewSkin.accentColor" class="pet-ear ear-right" />
-                <path d="M 22 74 C 10 72 6 56 10 46 C 14 52 18 64 24 68" :fill="previewSkin.primaryColor" class="pet-tail" />
-                <polygon points="10,46 6,40 14,44" :fill="previewSkin.accentColor" />
-                <path d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z" :fill="previewSkin.primaryColor" class="pet-body" />
-                <polygon points="32,32 26,12 40,26" :fill="previewSkin.accentColor" class="pet-ear ear-left" />
-                <polygon points="68,32 74,12 60,26" :fill="previewSkin.accentColor" class="pet-ear ear-right" />
-                <path d="M 40 50 Q 50 54 60 50 Q 50 62 40 50 Z" :fill="previewSkin.secondaryColor" />
-                <path d="M 38 60 Q 50 65 62 60 Q 50 72 38 60 Z" :fill="previewSkin.secondaryColor" />
-                <path d="M 42 70 Q 50 74 58 70 Q 50 79 42 70 Z" :fill="previewSkin.secondaryColor" />
-
-                <g v-if="previewAction === 'sleep'">
-                  <path d="M 37 46 Q 42 50 47 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <path d="M 53 46 Q 58 50 63 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else-if="previewAction === 'blink'">
-                  <line x1="37" y1="46" x2="47" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                  <line x1="53" y1="46" x2="63" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-                </g>
-                <g v-else>
-                  <polygon points="42,42 46,45 42,48 38,45" fill="#FEF08A" stroke="#1E293B" stroke-width="1" />
-                  <line x1="42" y1="43" x2="42" y2="47" stroke="#1E293B" stroke-width="1.8" />
-                  <polygon points="58,42 62,45 58,48 54,45" fill="#FEF08A" stroke="#1E293B" stroke-width="1" />
-                  <line x1="58" y1="43" x2="58" y2="47" stroke="#1E293B" stroke-width="1.8" />
-                </g>
-                <ellipse cx="47" cy="52" rx="1.5" ry="1" fill="#1E293B" />
-                <ellipse cx="53" cy="52" rx="1.5" ry="1" fill="#1E293B" />
-              </g>
-
-              <!-- Coffee Mug for coffee action -->
-              <g v-if="previewAction === 'coffee'">
-                <rect x="44" y="66" width="12" height="11" rx="2" fill="#E2E8F0" stroke="#475569" stroke-width="1" />
-                <path d="M 56 68 Q 60 71 56 74" fill="none" stroke="#475569" stroke-width="1" />
-                <path d="M 48 63 Q 50 60 50 58" fill="none" stroke="#94A3B8" stroke-width="1" stroke-linecap="round" class="steam-line" />
-              </g>
-
-              <ellipse cx="40" cy="78" rx="5" ry="4" :fill="previewSkin.secondaryColor" />
-              <ellipse cx="60" cy="78" rx="5" ry="4" :fill="previewSkin.secondaryColor" />
-            </svg>
+            <PetAvatar
+              :pet-id="selectedPet.id"
+              :skin="previewSkin"
+              :action="previewAction"
+            />
           </div>
         </div>
 
@@ -220,12 +118,26 @@
             >
               Set as Active Companion
             </button>
-            <div v-else class="active-pill-note">
-              <BaseIcon name="check" size="14" /> {{ selectedPet.name }} is currently by your side
+            <div v-else class="active-companion-actions">
+              <button
+                type="button"
+                class="stage-companion-toggle-btn"
+                :class="{ enabled: petState.enabled }"
+                @click="togglePet()"
+              >
+                <BaseIcon :name="petState.enabled ? 'check' : 'eye'" size="16" />
+                <span>{{ petState.enabled ? `${selectedPet.name} is on Screen (Click to Hide)` : `Summon ${selectedPet.name} to Screen` }}</span>
+              </button>
+              <button
+                v-if="petState.enabled"
+                type="button"
+                class="stage-reset-btn"
+                title="Reset floating pet to bottom-right corner"
+                @click="resetPosition()"
+              >
+                Reset Position
+              </button>
             </div>
-            <button type="button" class="stage-reset-btn" @click="resetPosition()">
-              Reset Screen Coordinates
-            </button>
           </div>
         </div>
       </div>
@@ -252,8 +164,13 @@
               @click="selectPet(pet.id)"
             >
               <div class="pet-card-top">
-                <div class="pet-mini-preview" :style="{ background: pet.skins[0].primaryColor }">
-                  <span class="pet-mini-accent" :style="{ background: pet.skins[0].secondaryColor }"></span>
+                <div class="pet-card-avatar">
+                  <PetAvatar
+                    :pet-id="pet.id"
+                    :skin="pet.skins[0]"
+                    action="idle"
+                    :show-shadow="false"
+                  />
                 </div>
                 <div class="pet-card-meta">
                   <span class="pet-card-name">{{ pet.name }}</span>
@@ -295,9 +212,13 @@
               }"
               @click="selectSkin(skin.id)"
             >
-              <div class="skin-swatch-box" :style="{ background: skin.primaryColor }">
-                <span class="swatch-secondary" :style="{ background: skin.secondaryColor }"></span>
-                <span class="swatch-accent" :style="{ background: skin.accentColor }"></span>
+              <div class="skin-avatar-thumb">
+                <PetAvatar
+                  :pet-id="selectedPet.id"
+                  :skin="skin"
+                  action="idle"
+                  :show-shadow="false"
+                />
               </div>
 
               <div class="skin-info">
@@ -349,6 +270,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import PetAvatar from './PetAvatar.vue'
 import { usePet } from '../composables/usePet'
 import { PET_REGISTRY, PET_MESSAGES } from '../config/pets'
 import { unlockCosmeticItem } from '../services/appApi'
@@ -432,6 +354,7 @@ function equipSelectedPet() {
   if (isSkinUnlocked(selectedPetId.value, selectedSkinId.value)) {
     setSkin(selectedSkinId.value)
   }
+  togglePet(true)
 }
 
 function applySkin(skinId) {
@@ -497,28 +420,34 @@ async function handleUnlockSkin(pet, skin) {
 .pet-sanctuary-hub {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 .sanctuary-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
   flex-wrap: wrap;
+  gap: 1rem;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
 }
 
 .sanctuary-title {
+  margin: 0 0 0.2rem;
+  font-family: 'Manrope', sans-serif;
   font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-color, #f8fafc);
-  margin: 0 0 4px;
+  font-weight: 800;
+  color: var(--on-surface);
 }
 
 .sanctuary-subtitle {
-  font-size: 0.88rem;
-  color: var(--text-muted, #94a3b8);
   margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.84rem;
+  color: var(--muted-text);
   max-width: 650px;
 }
 
@@ -532,10 +461,10 @@ async function handleUnlockSkin(pet, skin) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(234, 179, 8, 0.12);
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  color: #facc15;
-  padding: 6px 12px;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface-container-lowest));
+  border: 1px solid color-mix(in srgb, #f59e0b 25%, transparent);
+  color: #d97706;
+  padding: 6px 14px;
   border-radius: 9999px;
   font-weight: 700;
   font-size: 0.88rem;
@@ -545,32 +474,38 @@ async function handleUnlockSkin(pet, skin) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-surface, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  color: var(--text-muted, #94a3b8);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  color: var(--muted-text);
   padding: 6px 14px;
   border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.2s ease;
+}
+
+.companion-toggle-btn:hover {
+  color: var(--on-surface);
+  background: var(--surface-container-highest);
 }
 
 .companion-toggle-btn.active {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.4);
-  color: #34d399;
+  background: color-mix(in srgb, #10b981 14%, var(--surface-container-lowest));
+  border-color: color-mix(in srgb, #10b981 35%, transparent);
+  color: #059669;
+  font-weight: 700;
 }
 
 .sanctuary-error-banner {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #f87171;
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 30%, transparent);
+  color: var(--danger, #ef4444);
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.86rem;
 }
 
@@ -578,7 +513,7 @@ async function handleUnlockSkin(pet, skin) {
   margin-left: auto;
   background: none;
   border: none;
-  color: #f87171;
+  color: var(--danger, #ef4444);
   font-size: 1.1rem;
   cursor: pointer;
 }
@@ -587,7 +522,7 @@ async function handleUnlockSkin(pet, skin) {
 .sanctuary-layout {
   display: grid;
   grid-template-columns: 380px 1fr;
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 @media (max-width: 900px) {
@@ -598,10 +533,10 @@ async function handleUnlockSkin(pet, skin) {
 
 /* Left Column Stage */
 .showcase-card {
-  background: var(--bg-surface, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -615,46 +550,48 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .pet-species-badge {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 700;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
-  padding: 2px 8px;
-  border-radius: 4px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  padding: 3px 8px;
+  border-radius: 6px;
 }
 
 .active-equipped-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #34d399;
-  background: rgba(16, 185, 129, 0.15);
-  padding: 2px 8px;
-  border-radius: 4px;
+  color: #059669;
+  background: color-mix(in srgb, #10b981 14%, transparent);
+  padding: 3px 8px;
+  border-radius: 6px;
 }
 
 .showcase-pet-name {
-  font-size: 1.4rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.3rem;
   font-weight: 800;
-  color: var(--text-color, #f8fafc);
+  color: var(--on-surface);
   margin: 0 0 4px;
 }
 
 .showcase-pet-desc {
+  font-family: 'Inter', sans-serif;
   font-size: 0.85rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted-text);
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .preview-stage {
-  background: radial-gradient(circle at center, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%);
-  border: 1px dashed var(--border-color, #334155);
-  border-radius: 10px;
+  background: var(--surface-container-lowest);
+  border: 1px dashed var(--outline-variant);
+  border-radius: 14px;
   height: 200px;
   display: flex;
   align-items: center;
@@ -669,25 +606,20 @@ async function handleUnlockSkin(pet, skin) {
   position: relative;
 }
 
-.stage-pet-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
 .stage-speech-bubble {
   position: absolute;
   top: -38px;
   left: 50%;
   transform: translateX(-50%);
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
   padding: 5px 10px;
   border-radius: 8px;
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   z-index: 10;
 }
@@ -701,7 +633,7 @@ async function handleUnlockSkin(pet, skin) {
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #ffffff;
+  border-top: 5px solid var(--surface-container-highest);
 }
 
 .stage-controls {
@@ -711,10 +643,11 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .controls-label {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--text-muted, #64748b);
+  color: var(--muted-text);
+  letter-spacing: 0.05em;
 }
 
 .action-btn-group {
@@ -724,39 +657,39 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .stage-act-btn {
-  background: var(--bg-surface-elevated, #242c3d);
-  border: 1px solid var(--border-color, #334155);
-  color: var(--text-muted, #94a3b8);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  color: var(--muted-text);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   text-transform: capitalize;
   transition: all 0.15s ease;
 }
 
 .stage-act-btn:hover {
-  background: #334155;
-  color: #f8fafc;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
 }
 
 .stage-act-btn.active {
-  background: #38bdf8;
-  color: #0f172a;
-  border-color: #38bdf8;
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
   font-weight: 700;
 }
 
 .stage-act-btn.msg-btn {
-  background: rgba(234, 179, 8, 0.12);
-  border-color: rgba(234, 179, 8, 0.35);
-  color: #facc15;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface-container-low));
+  border-color: color-mix(in srgb, #f59e0b 25%, transparent);
+  color: #d97706;
 }
 
 .stage-footer {
   margin-top: auto;
-  border-top: 1px solid var(--border-color, #334155);
+  border-top: 1px solid var(--outline-variant);
   padding-top: 14px;
 }
 
@@ -766,28 +699,35 @@ async function handleUnlockSkin(pet, skin) {
   justify-content: space-between;
   margin-bottom: 10px;
   font-size: 0.88rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted-text);
 }
 
 .cost-callout strong {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #facc15;
+  color: #d97706;
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .primary-adopt-btn {
   width: 100%;
-  background: #f59e0b;
+  background: linear-gradient(135deg, #d97706, #b45309);
   border: none;
-  color: #0f172a;
+  color: #ffffff;
+  font-family: 'Manrope', sans-serif;
   font-weight: 700;
   font-size: 0.9rem;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.primary-adopt-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
 .primary-adopt-btn:disabled {
@@ -797,39 +737,67 @@ async function handleUnlockSkin(pet, skin) {
 
 .primary-equip-btn {
   width: 100%;
-  background: #38bdf8;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dim));
   border: none;
-  color: #0f172a;
+  color: var(--on-primary);
+  font-family: 'Manrope', sans-serif;
   font-weight: 700;
   font-size: 0.9rem;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
 }
 
-.active-pill-note {
+.primary-equip-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.active-companion-actions {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stage-companion-toggle-btn {
+  width: 100%;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
-  font-size: 0.84rem;
-  font-weight: 600;
-  padding: 8px;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stage-companion-toggle-btn.enabled {
+  background: color-mix(in srgb, #10b981 14%, var(--surface-container-lowest));
+  border-color: color-mix(in srgb, #10b981 35%, transparent);
+  color: #059669;
 }
 
 .stage-reset-btn {
   width: 100%;
   background: transparent;
-  border: 1px dashed var(--border-color, #475569);
-  color: var(--text-muted, #94a3b8);
+  border: 1px dashed var(--outline-variant);
+  color: var(--muted-text);
   font-size: 0.78rem;
   padding: 6px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stage-reset-btn:hover {
+  color: var(--on-surface);
+  border-color: var(--muted-text);
 }
 
 /* Right Column */
@@ -840,10 +808,10 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .card {
-  background: var(--bg-surface, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 12px;
-  padding: 18px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 1.25rem;
 }
 
 .card-head {
@@ -851,15 +819,17 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .card-title {
+  font-family: 'Manrope', sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-color, #f8fafc);
+  color: var(--on-surface);
   margin: 0 0 2px;
 }
 
 .card-subtitle {
+  font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted-text);
 }
 
 /* Pets Grid */
@@ -870,9 +840,9 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .pet-select-card {
-  background: var(--bg-surface-elevated, #242c3d);
-  border: 2px solid transparent;
-  border-radius: 10px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
   padding: 12px;
   cursor: pointer;
   display: flex;
@@ -882,35 +852,39 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .pet-select-card:hover {
-  border-color: rgba(56, 189, 248, 0.4);
+  background: var(--surface-container-lowest);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 .pet-select-card.selected {
-  border-color: #38bdf8;
-  background: rgba(56, 189, 248, 0.08);
+  border-color: var(--primary);
+  background: var(--surface-container-lowest);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .pet-card-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.pet-mini-preview {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  position: relative;
+.pet-card-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  padding: 3px;
+  transition: transform 0.15s ease;
 }
 
-.pet-mini-accent {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  bottom: 4px;
-  right: 4px;
+.pet-select-card:hover .pet-card-avatar {
+  transform: scale(1.06);
 }
 
 .pet-card-meta {
@@ -919,14 +893,16 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .pet-card-name {
+  font-family: 'Manrope', sans-serif;
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--text-color, #f8fafc);
+  color: var(--on-surface);
 }
 
 .pet-card-title {
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
+  color: var(--muted-text);
 }
 
 .pet-card-bottom {
@@ -940,33 +916,30 @@ async function handleUnlockSkin(pet, skin) {
   font-size: 0.72rem;
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-.badge.equipped-tag {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+.badge.equipped-tag,
+.badge.active-badge {
+  background: color-mix(in srgb, #10b981 14%, transparent);
+  color: #059669;
 }
 
 .badge.unlocked-tag {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
 }
 
 .badge.price-tag,
 .badge.price-badge {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
-}
-
-.badge.active-badge {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+  color: #d97706;
 }
 
 .badge.unlocked-badge {
-  background: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
+  background: var(--surface-container-highest);
+  color: var(--muted-text);
+  border: 1px solid var(--outline-variant);
 }
 
 /* Skins Grid */
@@ -977,10 +950,10 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .skin-shop-item {
-  background: var(--bg-surface-elevated, #242c3d);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 8px;
-  padding: 10px 12px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -989,38 +962,26 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .skin-shop-item:hover {
-  border-color: #475569;
+  background: var(--surface-container-lowest);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .skin-shop-item.selected {
-  border-color: #38bdf8;
-  background: rgba(56, 189, 248, 0.06);
+  border-color: var(--primary);
+  background: var(--surface-container-lowest);
 }
 
-.skin-swatch-box {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  position: relative;
+.skin-avatar-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-}
-
-.swatch-secondary {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.swatch-accent {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  padding: 2px;
 }
 
 .skin-info {
@@ -1034,7 +995,7 @@ async function handleUnlockSkin(pet, skin) {
 .skin-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-color, #f8fafc);
+  color: var(--on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1045,13 +1006,13 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .skin-buy-btn {
-  background: #f59e0b;
+  background: linear-gradient(135deg, #d97706, #b45309);
   border: none;
-  color: #0f172a;
+  color: #ffffff;
   font-size: 0.76rem;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -1061,13 +1022,13 @@ async function handleUnlockSkin(pet, skin) {
 }
 
 .skin-equip-btn {
-  background: #38bdf8;
+  background: var(--primary);
   border: none;
-  color: #0f172a;
+  color: var(--on-primary);
   font-size: 0.76rem;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
   cursor: pointer;
 }
 

@@ -85,264 +85,11 @@
       title="Click to interact · Drag to move"
       @click="onPetClick"
     >
-      <svg
-        viewBox="0 0 100 100"
-        class="pet-svg"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <!-- Shadow -->
-        <ellipse cx="50" cy="88" rx="28" ry="6" class="pet-shadow" />
-
-        <!-- === CAT (Mochi) === -->
-        <g v-if="petState.activePetId === 'cat'" class="pet-model-cat">
-          <!-- Tail -->
-          <path
-            d="M 24 72 C 14 70 10 58 12 50 C 14 54 20 62 26 66"
-            :fill="currentSkin.accentColor"
-            class="pet-tail"
-          />
-
-          <!-- Main Body -->
-          <path
-            d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z"
-            :fill="currentSkin.primaryColor"
-            class="pet-body"
-          />
-
-          <!-- Belly Patch -->
-          <ellipse
-            cx="50"
-            cy="62"
-            rx="15"
-            ry="14"
-            :fill="currentSkin.secondaryColor"
-            class="pet-belly"
-          />
-
-          <!-- Left Ear -->
-          <polygon
-            points="30,34 38,14 48,30"
-            :fill="currentSkin.primaryColor"
-            class="pet-ear ear-left"
-          />
-          <polygon
-            points="33,31 38,18 45,28"
-            :fill="currentSkin.secondaryColor"
-            class="pet-ear-inner"
-          />
-
-          <!-- Right Ear -->
-          <polygon
-            points="70,34 62,14 52,30"
-            :fill="currentSkin.primaryColor"
-            class="pet-ear ear-right"
-          />
-          <polygon
-            points="67,31 62,18 55,28"
-            :fill="currentSkin.secondaryColor"
-            class="pet-ear-inner"
-          />
-
-          <!-- Eyes: Normal vs Blink vs Sleep -->
-          <g v-if="currentAction === 'sleep'" class="eyes-sleeping">
-            <path d="M 38 46 Q 42 50 46 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <path d="M 54 46 Q 58 50 62 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else-if="currentAction === 'blink'" class="eyes-blink">
-            <line x1="38" y1="46" x2="46" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <line x1="54" y1="46" x2="62" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else class="eyes-open">
-            <ellipse cx="42" cy="45" rx="3.5" ry="4.5" fill="#1E293B" />
-            <circle cx="43.5" cy="43.5" r="1.5" fill="#FFFFFF" />
-            <ellipse cx="58" cy="45" rx="3.5" ry="4.5" fill="#1E293B" />
-            <circle cx="59.5" cy="43.5" r="1.5" fill="#FFFFFF" />
-          </g>
-
-          <!-- Nose -->
-          <polygon points="48,51 52,51 50,54" fill="#F43F5E" />
-
-          <!-- Mouth -->
-          <path
-            d="M 46 55 Q 50 58 50 55 Q 50 58 54 55"
-            fill="none"
-            stroke="#1E293B"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          />
-
-          <!-- Whiskers -->
-          <line x1="28" y1="48" x2="36" y2="50" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-          <line x1="28" y1="54" x2="36" y2="53" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-          <line x1="64" y1="50" x2="72" y2="48" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-          <line x1="64" y1="53" x2="72" y2="54" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" />
-        </g>
-
-        <!-- === DOG (Buster) === -->
-        <g v-else-if="petState.activePetId === 'dog'" class="pet-model-dog">
-          <!-- Wagging Tail -->
-          <path
-            d="M 74 72 C 84 68 88 56 86 48 C 84 52 78 60 72 66"
-            :fill="currentSkin.accentColor"
-            class="pet-tail"
-          />
-
-          <!-- Main Body -->
-          <path
-            d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z"
-            :fill="currentSkin.primaryColor"
-            class="pet-body"
-          />
-
-          <!-- Dog Floppy Ears -->
-          <path
-            d="M 30 32 C 20 34 16 46 18 56 C 20 60 25 60 27 54 C 29 48 31 38 33 34 Z"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-left"
-          />
-          <path
-            d="M 70 32 C 80 34 84 46 82 56 C 80 60 75 60 73 54 C 71 48 69 38 67 34 Z"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-right"
-          />
-
-          <!-- Belly & Muzzle Patch -->
-          <ellipse
-            cx="50"
-            cy="63"
-            rx="16"
-            ry="14"
-            :fill="currentSkin.secondaryColor"
-            class="pet-belly"
-          />
-          <ellipse
-            cx="50"
-            cy="52"
-            rx="12"
-            ry="9"
-            :fill="currentSkin.secondaryColor"
-          />
-
-          <!-- Eyes -->
-          <g v-if="currentAction === 'sleep'" class="eyes-sleeping">
-            <path d="M 38 45 Q 42 49 46 45" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <path d="M 54 45 Q 58 49 62 45" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else-if="currentAction === 'blink'" class="eyes-blink">
-            <line x1="38" y1="45" x2="46" y2="45" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <line x1="54" y1="45" x2="62" y2="45" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else class="eyes-open">
-            <circle cx="41" cy="44" r="4" fill="#1E293B" />
-            <circle cx="42.5" cy="42.5" r="1.5" fill="#FFFFFF" />
-            <circle cx="59" cy="44" r="4" fill="#1E293B" />
-            <circle cx="60.5" cy="42.5" r="1.5" fill="#FFFFFF" />
-          </g>
-
-          <!-- Dog Nose -->
-          <ellipse cx="50" cy="50" rx="4.5" ry="3.5" fill="#1E293B" />
-
-          <!-- Dog Mouth -->
-          <path
-            d="M 46 54 Q 50 57 50 54 Q 50 57 54 54"
-            fill="none"
-            stroke="#1E293B"
-            stroke-width="1.6"
-            stroke-linecap="round"
-          />
-        </g>
-
-        <!-- === DRAGON (Ignis) === -->
-        <g v-else-if="petState.activePetId === 'dragon'" class="pet-model-dragon">
-          <!-- Wings -->
-          <path
-            d="M 28 50 C 14 38 12 24 24 22 C 22 30 20 40 28 48 Z"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-left"
-          />
-          <path
-            d="M 72 50 C 86 38 88 24 76 22 C 78 30 80 40 72 48 Z"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-right"
-          />
-
-          <!-- Spiked Tail -->
-          <path
-            d="M 22 74 C 10 72 6 56 10 46 C 14 52 18 64 24 68"
-            :fill="currentSkin.primaryColor"
-            class="pet-tail"
-          />
-          <polygon
-            points="10,46 6,40 14,44"
-            :fill="currentSkin.accentColor"
-          />
-
-          <!-- Main Body -->
-          <path
-            d="M 26 52 C 26 36 36 28 50 28 C 64 28 74 36 74 52 C 74 68 70 82 50 82 C 30 82 26 68 26 52 Z"
-            :fill="currentSkin.primaryColor"
-            class="pet-body"
-          />
-
-          <!-- Dragon Horns -->
-          <polygon
-            points="32,32 26,12 40,26"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-left"
-          />
-          <polygon
-            points="68,32 74,12 60,26"
-            :fill="currentSkin.accentColor"
-            class="pet-ear ear-right"
-          />
-
-          <!-- Belly Scales -->
-          <path
-            d="M 40 50 Q 50 54 60 50 Q 50 62 40 50 Z"
-            :fill="currentSkin.secondaryColor"
-            class="pet-belly"
-          />
-          <path
-            d="M 38 60 Q 50 65 62 60 Q 50 72 38 60 Z"
-            :fill="currentSkin.secondaryColor"
-          />
-          <path
-            d="M 42 70 Q 50 74 58 70 Q 50 79 42 70 Z"
-            :fill="currentSkin.secondaryColor"
-          />
-
-          <!-- Eyes -->
-          <g v-if="currentAction === 'sleep'" class="eyes-sleeping">
-            <path d="M 37 46 Q 42 50 47 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <path d="M 53 46 Q 58 50 63 46" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else-if="currentAction === 'blink'" class="eyes-blink">
-            <line x1="37" y1="46" x2="47" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-            <line x1="53" y1="46" x2="63" y2="46" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
-          </g>
-          <g v-else class="eyes-open">
-            <polygon points="42,42 46,45 42,48 38,45" fill="#FEF08A" stroke="#1E293B" stroke-width="1" />
-            <line x1="42" y1="43" x2="42" y2="47" stroke="#1E293B" stroke-width="1.8" />
-            <polygon points="58,42 62,45 58,48 54,45" fill="#FEF08A" stroke="#1E293B" stroke-width="1" />
-            <line x1="58" y1="43" x2="58" y2="47" stroke="#1E293B" stroke-width="1.8" />
-          </g>
-
-          <!-- Snout Nostrils -->
-          <ellipse cx="47" cy="52" rx="1.5" ry="1" fill="#1E293B" />
-          <ellipse cx="53" cy="52" rx="1.5" ry="1" fill="#1E293B" />
-        </g>
-
-        <!-- Coffee Mug (Shown during 'coffee' action) -->
-        <g v-if="currentAction === 'coffee'" class="pet-coffee-mug">
-          <rect x="44" y="66" width="12" height="11" rx="2" fill="#E2E8F0" stroke="#475569" stroke-width="1" />
-          <path d="M 56 68 Q 60 71 56 74" fill="none" stroke="#475569" stroke-width="1" />
-          <path d="M 48 63 Q 50 60 50 58" fill="none" stroke="#94A3B8" stroke-width="1" stroke-linecap="round" class="steam-line" />
-        </g>
-
-        <!-- Front Paws -->
-        <ellipse cx="40" cy="78" rx="5" ry="4" :fill="currentSkin.secondaryColor" />
-        <ellipse cx="60" cy="78" rx="5" ry="4" :fill="currentSkin.secondaryColor" />
-      </svg>
+      <PetAvatar
+        :pet-id="petState.activePetId"
+        :skin="currentSkin"
+        :action="currentAction"
+      />
     </div>
   </div>
 </template>
@@ -350,6 +97,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import PetAvatar from './PetAvatar.vue'
 import { usePet } from '../composables/usePet'
 import { PET_REGISTRY, PET_MESSAGES } from '../config/pets'
 
@@ -685,7 +433,7 @@ onUnmounted(() => {
 }
 
 /* ── Dismiss / Close Button ────────────────────────────── */
-/* Small close button on top-right corner of Mochi */
+/* Small close button on top-right corner of pet */
 .pet-dismiss-btn {
   position: absolute;
   top: -8px;
@@ -694,8 +442,8 @@ onUnmounted(() => {
   height: 20px;
   border-radius: 50%;
   border: 1px solid var(--outline-variant);
-  background: var(--surface-container, #1e293b);
-  color: var(--muted-text, #94a3b8);
+  background: var(--surface-container-lowest);
+  color: var(--muted-text);
   font-size: 10px;
   line-height: 1;
   display: flex;
@@ -714,8 +462,8 @@ onUnmounted(() => {
 }
 
 .pet-dismiss-btn:hover {
-  background: #ef4444;
-  border-color: #f87171;
+  background: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
   color: #ffffff;
 }
 
@@ -730,8 +478,8 @@ onUnmounted(() => {
   height: 20px;
   border-radius: 50%;
   border: 1px solid var(--outline-variant);
-  background: var(--surface-container, #1e293b);
-  color: var(--muted-text, #64748b);
+  background: var(--surface-container-lowest);
+  color: var(--muted-text);
   font-size: 10px;
   line-height: 1;
   display: flex;
@@ -745,15 +493,15 @@ onUnmounted(() => {
 }
 
 .dev-toggle-btn:hover {
-  background: #334155;
-  color: #f1f5f9;
-  border-color: #6366f1;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  border-color: var(--primary);
 }
 
 .dev-toggle-btn.active {
-  background: #6366f1;
-  border-color: #818cf8;
-  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 /* Panel slide-fade */
@@ -773,11 +521,11 @@ onUnmounted(() => {
   bottom: 108px;
   right: 0;
   width: 160px;
-  background: var(--surface-container-high, #0f172a);
+  background: var(--surface-container);
   border: 1px solid var(--outline-variant);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   font-family: ui-monospace, monospace;
   pointer-events: auto;
   z-index: 1;
@@ -794,7 +542,7 @@ onUnmounted(() => {
   margin-left: auto;
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--muted-text);
   font-size: 10px;
   cursor: pointer;
   padding: 0 2px;
@@ -802,14 +550,14 @@ onUnmounted(() => {
 }
 
 .dev-close-btn:hover {
-  color: #f1f5f9;
+  color: var(--on-surface);
 }
 
 .dev-badge {
   font-size: 9px;
   font-weight: 700;
-  background: #f43f5e;
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   padding: 1px 5px;
   border-radius: 4px;
   letter-spacing: 0.05em;
@@ -817,7 +565,7 @@ onUnmounted(() => {
 
 .dev-action-label {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--muted-text);
   flex: 1;
   text-align: right;
 }
@@ -834,32 +582,31 @@ onUnmounted(() => {
   padding: 3px 6px;
   border-radius: 5px;
   border: 1px solid var(--outline-variant);
-  background: var(--surface-container, #1e293b);
-  color: #cbd5e1;
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .dev-action-btn:hover {
-  background: #334155;
-  color: #f1f5f9;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
 }
 
 .dev-action-btn.active {
-  background: #6366f1;
-  border-color: #818cf8;
-  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 .dev-msg-btn {
-  background: #0f766e;
-  border-color: #14b8a6;
-  color: #ccfbf1;
+  background: color-mix(in srgb, #0f766e 25%, var(--surface-container-low));
+  border-color: color-mix(in srgb, #14b8a6 40%, transparent);
+  color: #0d9488;
 }
 
 .dev-msg-btn:hover {
-  background: #115e59;
-  color: #f0fdfa;
+  background: color-mix(in srgb, #0f766e 40%, var(--surface-container-low));
 }
 
 /* ── Speech / Thought Bubble ────────────────────────────── */
@@ -870,16 +617,16 @@ onUnmounted(() => {
   transform: translateX(-50%);
   width: max-content;
   max-width: 170px;
-  background: var(--surface-container-highest, #1e293b);
-  border: 1px solid var(--outline-variant, #475569);
-  color: var(--on-surface, #f8fafc);
+  background: var(--surface-container-highest);
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
   padding: 6px 10px;
   border-radius: 12px;
   font-size: 11px;
   line-height: 1.35;
   font-weight: 500;
   text-align: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
   cursor: pointer;
   pointer-events: auto;
   z-index: 10;
@@ -889,7 +636,7 @@ onUnmounted(() => {
 }
 
 .pet-speech-bubble:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.05);
 }
 
 .bubble-text {
@@ -905,7 +652,7 @@ onUnmounted(() => {
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-top: 6px solid var(--surface-container-highest, #1e293b);
+  border-top: 6px solid var(--surface-container-highest);
 }
 
 /* Bubble pop-fade transitions */

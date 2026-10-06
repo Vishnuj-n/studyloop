@@ -57,7 +57,7 @@ This document details the architectural decisions, interaction rules, click vs a
 
 2. **Unlockable Companions & Paid Skins**:
    - **Buster the Dog**: 1,000 Coins. Comes with Golden Retriever default skin; additional paid skins include Shiba Inu (250 coins) and Midnight Husky (500 coins).
-   - **Ignis the Mythic Dragon**: 25,000 Coins. Comes with Ruby Crimson default skin; additional legendary skins include Celestial Gold (5,000 coins) and Abyssal Void (10,000 coins).
+   - **Rusty the Clever Fox**: 2,500 Coins. Comes with Red Fox (Classic) default skin; additional unlockable skins include Arctic Snow (500 coins) and Midnight Shadow (1,000 coins).
 
 3. **Dedicated "Pet Sanctuary" Tab in Rewards**:
    - Located as a dedicated 5th tab on the **Rewards & Milestones** page.

@@ -161,9 +161,14 @@
             }"
             @click="isSkinUnlocked(currentPet.id, skin.id) ? setSkin(skin.id) : $emit('switch-tab', 'sanctuary')"
           >
-            <span class="skin-color-preview" :style="{ background: skin.primaryColor }">
-              <span class="skin-color-dot" :style="{ background: skin.secondaryColor }"></span>
-            </span>
+            <div class="skin-card-avatar-mini">
+              <PetAvatar
+                :pet-id="currentPet.id"
+                :skin="skin"
+                action="idle"
+                :show-shadow="false"
+              />
+            </div>
             <span class="skin-name">{{ skin.name }}</span>
             <span v-if="!isSkinUnlocked(currentPet.id, skin.id)" class="skin-locked-badge">
               <BaseIcon name="lock" size="10" />
@@ -184,6 +189,7 @@
 import { computed } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import GamificationIcon from './icons/GamificationIcon.vue'
+import PetAvatar from './PetAvatar.vue'
 import { getTitleEmoji } from '../utils/gamification'
 import { usePet } from '../composables/usePet'
 
@@ -678,20 +684,16 @@ const progressPercent = computed(() => {
   background: rgba(99, 102, 241, 0.12);
 }
 
-.skin-color-preview {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.skin-card-avatar-mini {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.skin-color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  padding: 1px;
 }
 
 .skin-name {

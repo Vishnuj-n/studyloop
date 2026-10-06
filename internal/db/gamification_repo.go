@@ -542,11 +542,10 @@ func getCosmeticCatalog() []models.CosmeticItem {
 		{ID: "skin:dog:golden", Name: "Buster Golden Skin", Type: "pet_skin", Price: 0},
 		{ID: "skin:dog:shiba", Name: "Buster Shiba Inu Skin", Type: "pet_skin", Price: 250},
 		{ID: "skin:dog:husky", Name: "Buster Midnight Husky Skin", Type: "pet_skin", Price: 500},
-
-		{ID: "pet:dragon", Name: "Ignis the Dragon", Type: "pet", Price: 25000},
-		{ID: "skin:dragon:ruby", Name: "Ignis Ruby Crimson Skin", Type: "pet_skin", Price: 0},
-		{ID: "skin:dragon:celestial", Name: "Ignis Celestial Gold Skin", Type: "pet_skin", Price: 5000},
-		{ID: "skin:dragon:abyssal", Name: "Ignis Abyssal Void Skin", Type: "pet_skin", Price: 10000},
+		{ID: "pet:fox", Name: "Rusty the Fox", Type: "pet", Price: 2500},
+		{ID: "skin:fox:red", Name: "Rusty Classic Red Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:fox:arctic", Name: "Rusty Arctic Snow Skin", Type: "pet_skin", Price: 500},
+		{ID: "skin:fox:midnight", Name: "Rusty Midnight Shadow Skin", Type: "pet_skin", Price: 1000},
 	}
 }
 

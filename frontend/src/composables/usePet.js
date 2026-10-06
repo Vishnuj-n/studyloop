@@ -14,7 +14,7 @@ const defaultState = {
     'cat:matcha',
     'cat:lavender',
     'dog:golden',
-    'dragon:ruby',
+    'fox:red',
   ],
   position: { x: null, y: null },
 }

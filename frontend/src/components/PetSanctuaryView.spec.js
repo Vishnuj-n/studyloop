@@ -30,7 +30,7 @@ describe('PetSanctuaryView.vue', () => {
     expect(wrapper.text()).toContain('Pet Sanctuary & Companions')
     expect(wrapper.text()).toContain('Mochi')
     expect(wrapper.text()).toContain('Buster')
-    expect(wrapper.text()).toContain('Ignis')
+    expect(wrapper.text()).toContain('Rusty')
 
     // Find dog select card
     const cards = wrapper.findAll('.pet-select-card')
