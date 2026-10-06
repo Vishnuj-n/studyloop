@@ -92,4 +92,35 @@ describe('Rewards.vue Theme Handling', () => {
     expect(localStorage.getItem('app-theme')).toBe('dark-emerald')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark-emerald')
   })
+
+  it('renders Pet Sanctuary tab and navigates into it', async () => {
+    const wrapper = mount(Rewards, {
+      global: {
+        stubs: {
+          StudyPageLayout: { template: '<div><slot /></div>' },
+          PetSanctuaryView: {
+            name: 'PetSanctuaryView',
+            props: ['coins'],
+            template: '<div class="pet-sanctuary-stub">Pet Sanctuary Active</div>',
+          },
+          RewardsOverviewView: true,
+          MysteryChestModal: true,
+          StreakFreezeModal: true,
+          GamificationIcon: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const tabs = wrapper.findAll('.rewards-tab-btn')
+    const petTab = tabs.find((t) => t.text().includes('Pet Sanctuary'))
+    expect(petTab).toBeDefined()
+    expect(petTab.exists()).toBe(true)
+
+    await petTab.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Pet Sanctuary Active')
+  })
 })

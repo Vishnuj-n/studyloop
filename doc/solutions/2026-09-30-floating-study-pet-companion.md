@@ -49,6 +49,23 @@ This document details the architectural decisions, interaction rules, click vs a
 
 ---
 
+## Companion Economy & Pet Sanctuary
+
+1. **Free Starter Companion (Mochi)**:
+   - Mochi the Cat is 100% free and unlocked by default.
+   - All Mochi classic and aesthetic skins (Calico, Void Black, Matcha Green, Lavender Dusk) are free.
+
+2. **Unlockable Companions & Paid Skins**:
+   - **Buster the Dog**: 1,000 Coins. Comes with Golden Retriever default skin; additional paid skins include Shiba Inu (250 coins) and Midnight Husky (500 coins).
+   - **Ignis the Mythic Dragon**: 25,000 Coins. Comes with Ruby Crimson default skin; additional legendary skins include Celestial Gold (5,000 coins) and Abyssal Void (10,000 coins).
+
+3. **Dedicated "Pet Sanctuary" Tab in Rewards**:
+   - Located as a dedicated 5th tab on the **Rewards & Milestones** page.
+   - Features a live interactive preview stage with behavior animations (`idle`, `blink`, `coffee`, `wiggle`, `cheer`, `sleep`), speech bubble tester, adoption catalog, and skin wardrobe atelier.
+   - Purchases securely validate and deduct coins via `UnlockCosmeticItem` backend binding and synchronize with local storage.
+
+---
+
 ## How to Add New Pets (e.g., Dog, Owl, Capybara)
 
 Adding new pets is designed to be simple and modular:
@@ -58,16 +75,21 @@ Adding new pets is designed to be simple and modular:
    {
      id: 'dog',
      name: 'Buster',
+     title: 'Loyal Study Pup',
      description: 'A loyal study puppy who wags his tail when you learn.',
+     isFree: false,
+     priceCoins: 1000,
      defaultSkin: 'golden',
      skins: [
-       { id: 'golden', name: 'Golden', primaryColor: '#F59E0B', secondaryColor: '#FEF3C7', accentColor: '#D97706', isFree: true },
-       { id: 'husky', name: 'Husky', primaryColor: '#475569', secondaryColor: '#F1F5F9', accentColor: '#334155', isFree: false, priceCoins: 150 }
+       { id: 'golden', name: 'Golden Retriever', primaryColor: '#F59E0B', secondaryColor: '#FEF3C7', accentColor: '#D97706', isFree: true, priceCoins: 0 },
+       { id: 'husky', name: 'Midnight Husky', primaryColor: '#334155', secondaryColor: '#F1F5F9', accentColor: '#0F172A', isFree: false, priceCoins: 500 }
      ],
-     actions: ['idle', 'blink', 'bark', 'wiggle', 'cheer', 'sleep']
+     actions: ['idle', 'blink', 'coffee', 'wiggle', 'cheer', 'sleep']
    }
    ```
-2. **Add the SVG Avatar in `frontend/src/components/FloatingPet.vue`**:
-   - Wrap the cat SVG with `v-if="petState.activePetId === 'cat'"` and create the corresponding Dog SVG with `v-else-if="petState.activePetId === 'dog'"`.
-3. **No extra plumbing required**:
-   - `usePet.js`, dragging, bounds clamping, settings modal, skin selection, and persistence work automatically for all registered pets.
+2. **Add the SVG Avatar in `frontend/src/components/FloatingPet.vue` & `frontend/src/components/PetSanctuaryView.vue`**:
+   - Render the corresponding vector paths and ears/tail/wings based on `activePetId` or `selectedPet.id`.
+3. **Register item codes in `internal/db/gamification_repo.go`**:
+   - Add `pet:<id>` and `skin:<id>:<skin_id>` to `getCosmeticCatalog()` for server-side coin validation.
+4. **Zero extra plumbing required**:
+   - `usePet.js`, dragging, bounds clamping, sanctuary shop, and persistence work automatically.

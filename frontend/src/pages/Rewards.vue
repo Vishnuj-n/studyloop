@@ -62,6 +62,16 @@
           <BaseIcon name="palette" size="18" custom-class="tab-icon" />
           <span>Theme Wardrobe</span>
         </button>
+
+        <button
+          type="button"
+          class="rewards-tab-btn"
+          :class="{ active: currentView === 'sanctuary' }"
+          @click="currentView = 'sanctuary'"
+        >
+          <BaseIcon name="sparkles" size="18" custom-class="tab-icon" />
+          <span>Pet Sanctuary</span>
+        </button>
       </div>
 
       <!-- Tab Content Views -->
@@ -100,6 +110,12 @@
         />
         <p v-if="themeError" class="buy-error-msg">{{ themeError }}</p>
       </div>
+
+      <PetSanctuaryView
+        v-else-if="currentView === 'sanctuary'"
+        :coins="profile.coins"
+        @coins-updated="loadData"
+      />
     </div>
 
     <!-- Modals -->
@@ -134,6 +150,7 @@ import RewardsOverviewView from '../components/RewardsOverviewView.vue'
 import RankRoadmapView from '../components/RankRoadmapView.vue'
 import AchievementsView from '../components/AchievementsView.vue'
 import RewardsShopModal from '../components/RewardsShopModal.vue'
+import PetSanctuaryView from '../components/PetSanctuaryView.vue'
 import MilestoneCelebrationModal from '../components/MilestoneCelebrationModal.vue'
 import MysteryChestModal from '../components/MysteryChestModal.vue'
 import StreakFreezeModal from '../components/StreakFreezeModal.vue'
