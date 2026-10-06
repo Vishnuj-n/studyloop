@@ -10,10 +10,15 @@ export default defineConfig({
   plugins: [
     vue(),
     {
-      name: 'wails-notebooks-fallback',
+      name: 'wails-assets-fallback',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url && req.url.startsWith('/notebooks/')) {
+          if (
+            req.url &&
+            (req.url.startsWith('/notebooks/') ||
+              req.url.startsWith('/note-assets/') ||
+              req.url.startsWith('/notes/'))
+          ) {
             res.statusCode = 404
             res.end('Not Found')
             return
