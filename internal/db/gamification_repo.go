@@ -530,6 +530,22 @@ func getCosmeticCatalog() []models.CosmeticItem {
 		{ID: "light-zen", Name: "Zen Minimalist", Type: "theme", Price: 300},
 		{ID: "dark-obsidian", Name: "Obsidian Black", Type: "theme", Price: 0, UnlockCondition: "Achievement: Night Scholar"},
 		{ID: "light-monochrome", Name: "Monochrome Paper", Type: "theme", Price: 0, UnlockCondition: "Achievement: Quiz Master"},
+
+		// Companion Pets
+		{ID: "pet:cat", Name: "Mochi the Cat", Type: "pet", Price: 0},
+		{ID: "skin:cat:calico", Name: "Mochi Calico Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:cat:void", Name: "Mochi Void Black Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:cat:matcha", Name: "Mochi Matcha Green Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:cat:lavender", Name: "Mochi Lavender Dusk Skin", Type: "pet_skin", Price: 0},
+
+		{ID: "pet:dog", Name: "Buster the Dog", Type: "pet", Price: 1000},
+		{ID: "skin:dog:golden", Name: "Buster Golden Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:dog:shiba", Name: "Buster Shiba Inu Skin", Type: "pet_skin", Price: 250},
+		{ID: "skin:dog:husky", Name: "Buster Midnight Husky Skin", Type: "pet_skin", Price: 500},
+		{ID: "pet:fox", Name: "Rusty the Fox", Type: "pet", Price: 2500},
+		{ID: "skin:fox:red", Name: "Rusty Classic Red Skin", Type: "pet_skin", Price: 0},
+		{ID: "skin:fox:arctic", Name: "Rusty Arctic Snow Skin", Type: "pet_skin", Price: 500},
+		{ID: "skin:fox:midnight", Name: "Rusty Midnight Shadow Skin", Type: "pet_skin", Price: 1000},
 	}
 }
 
@@ -991,13 +1007,16 @@ func (r *Repository) GetGamificationStore() (*models.GamificationStore, error) {
 	}
 
 	catalog := getCosmeticCatalog()
-	allThemes := make([]models.CosmeticItem, len(catalog))
-	for i, c := range catalog {
+	allThemes := make([]models.CosmeticItem, 0, len(catalog))
+	for _, c := range catalog {
+		if c.Type != "" && c.Type != "theme" {
+			continue
+		}
 		c.Unlocked = unlockedMap[c.ID]
 		if c.ID == "dark-gruvbox" || c.ID == "light-classic" {
 			c.Unlocked = true
 		}
-		allThemes[i] = c
+		allThemes = append(allThemes, c)
 	}
 
 	achDefs := getAchievementDefinitions()

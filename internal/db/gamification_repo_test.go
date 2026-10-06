@@ -132,6 +132,13 @@ func TestGamificationRepo(t *testing.T) {
 		t.Fatalf("expected coins 185, got %d", afterUnlockProf.Coins)
 	}
 
+	// 6b. Test UnlockCosmetic for companion pet skin (skin:dog:husky)
+	afterHuskyProf, err := repo.UnlockCosmetic("skin:dog:husky", 500)
+	if err == nil {
+		t.Fatalf("expected error due to insufficient coins (have 185, need 500), got nil")
+	}
+	_ = afterHuskyProf
+
 	// 7. Test IncrementStat, Claimable state & manual ClaimAchievement
 	if err := repo.IncrementStat("quizzes_passed", 5); err != nil {
 		t.Fatalf("IncrementStat failed: %v", err)

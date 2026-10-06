@@ -36,4 +36,44 @@ describe('usePet Composable', () => {
     resetPosition()
     expect(petState.value.position).toEqual({ x: null, y: null })
   })
+
+  it('manages pet and skin unlocks correctly', () => {
+    const {
+      petState,
+      isPetUnlocked,
+      isSkinUnlocked,
+      unlockPet,
+      unlockSkin,
+      setPet,
+      setSkin,
+    } = usePet()
+
+    // Mochi is free by default
+    expect(isPetUnlocked('cat')).toBe(true)
+    expect(isSkinUnlocked('cat', 'calico')).toBe(true)
+    expect(isSkinUnlocked('cat', 'void')).toBe(true)
+
+    // Dog is locked initially until unlocked
+    expect(isPetUnlocked('dog')).toBe(false)
+    setPet('dog')
+    // Should NOT switch to locked pet
+    expect(petState.value.activePetId).toBe('cat')
+
+    // Unlock dog
+    unlockPet('dog')
+    expect(isPetUnlocked('dog')).toBe(true)
+    setPet('dog')
+    expect(petState.value.activePetId).toBe('dog')
+
+    // Dog paid skin (husky) is locked initially
+    expect(isSkinUnlocked('dog', 'husky')).toBe(false)
+    setSkin('husky')
+    expect(petState.value.activeSkinId).not.toBe('husky')
+
+    // Unlock skin
+    unlockSkin('dog', 'husky')
+    expect(isSkinUnlocked('dog', 'husky')).toBe(true)
+    setSkin('husky')
+    expect(petState.value.activeSkinId).toBe('husky')
+  })
 })

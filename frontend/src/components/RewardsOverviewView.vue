@@ -117,21 +117,34 @@
       </div>
     </div>
 
-    <!-- Study Companion (Mochi) -->
+    <!-- Study Companion Card -->
     <div class="card companion-card">
       <div class="companion-header">
         <div>
-          <h3 class="card-section-title">Study Companion</h3>
-          <p class="companion-desc">Mochi sits on your screen and cheers you on while you study. Toggle it on/off and pick a skin.</p>
+          <div class="companion-title-row">
+            <h3 class="card-section-title">Study Companion</h3>
+            <span class="active-pet-tag">{{ currentPet.name }}</span>
+          </div>
+          <p class="companion-desc">{{ currentPet.description }} Toggle visibility or visit the Sanctuary to adopt new pets and unlock skins.</p>
         </div>
-        <button
-          type="button"
-          class="toggle-btn"
-          :class="{ active: petState.enabled }"
-          @click="togglePet()"
-        >
-          {{ petState.enabled ? 'Enabled' : 'Disabled' }}
-        </button>
+        <div class="companion-header-actions">
+          <button
+            type="button"
+            class="sanctuary-link-btn"
+            @click="$emit('switch-tab', 'sanctuary')"
+          >
+            <BaseIcon name="sparkles" size="13" />
+            <span>Pet Sanctuary</span>
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            :class="{ active: petState.enabled }"
+            @click="togglePet()"
+          >
+            {{ petState.enabled ? 'Enabled' : 'Disabled' }}
+          </button>
+        </div>
       </div>
 
       <div v-if="petState.enabled" class="companion-body">
@@ -142,18 +155,31 @@
             :key="skin.id"
             type="button"
             class="skin-card"
-            :class="{ active: petState.activeSkinId === skin.id }"
-            @click="setSkin(skin.id)"
+            :class="{
+              active: petState.activeSkinId === skin.id,
+              locked: !isSkinUnlocked(currentPet.id, skin.id)
+            }"
+            @click="isSkinUnlocked(currentPet.id, skin.id) ? setSkin(skin.id) : $emit('switch-tab', 'sanctuary')"
           >
-            <span class="skin-color-preview" :style="{ background: skin.primaryColor }">
-              <span class="skin-color-dot" :style="{ background: skin.secondaryColor }"></span>
-            </span>
+            <div class="skin-card-avatar-mini">
+              <PetAvatar
+                :pet-id="currentPet.id"
+                :skin="skin"
+                action="idle"
+                :show-shadow="false"
+              />
+            </div>
             <span class="skin-name">{{ skin.name }}</span>
+            <span v-if="!isSkinUnlocked(currentPet.id, skin.id)" class="skin-locked-badge">
+              <BaseIcon name="lock" size="10" />
+            </span>
           </button>
         </div>
-        <button type="button" class="reset-pos-btn" @click="resetPosition()">
-          Reset Screen Position
-        </button>
+        <div class="companion-footer-actions">
+          <button type="button" class="reset-pos-btn" @click="resetPosition()">
+            Reset Screen Position
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -163,10 +189,11 @@
 import { computed } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import GamificationIcon from './icons/GamificationIcon.vue'
+import PetAvatar from './PetAvatar.vue'
 import { getTitleEmoji } from '../utils/gamification'
 import { usePet } from '../composables/usePet'
 
-const { petState, currentPet, togglePet, setSkin, resetPosition } = usePet()
+const { petState, currentPet, isSkinUnlocked, togglePet, setSkin, resetPosition } = usePet()
 
 const props = defineProps({
   profile: {
@@ -657,26 +684,72 @@ const progressPercent = computed(() => {
   background: rgba(99, 102, 241, 0.12);
 }
 
-.skin-color-preview {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.skin-card-avatar-mini {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.skin-color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  padding: 1px;
 }
 
 .skin-name {
   font-size: 12px;
   font-weight: 500;
   color: var(--on-surface);
+}
+
+.companion-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.active-pet-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.companion-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sanctuary-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sanctuary-link-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.skin-card.locked {
+  opacity: 0.6;
+}
+
+.skin-locked-badge {
+  margin-left: auto;
+  color: #94a3b8;
+  display: flex;
 }
 
 .reset-pos-btn {

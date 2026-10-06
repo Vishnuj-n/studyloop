@@ -7,6 +7,15 @@ const defaultState = {
   enabled: true,
   activePetId: 'cat',
   activeSkinId: 'calico',
+  unlockedPets: ['cat'],
+  unlockedSkins: [
+    'cat:calico',
+    'cat:void',
+    'cat:matcha',
+    'cat:lavender',
+    'dog:golden',
+    'fox:red',
+  ],
   position: { x: null, y: null },
 }
 
@@ -15,7 +24,12 @@ function loadInitialState() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultState
     const parsed = JSON.parse(raw)
-    return { ...defaultState, ...parsed }
+    return {
+      ...defaultState,
+      ...parsed,
+      unlockedPets: Array.from(new Set([...defaultState.unlockedPets, ...(parsed.unlockedPets || [])])),
+      unlockedSkins: Array.from(new Set([...defaultState.unlockedSkins, ...(parsed.unlockedSkins || [])])),
+    }
   } catch {
     return defaultState
   }
@@ -45,13 +59,49 @@ export function usePet() {
     return pet.skins.find((s) => s.id === petState.value.activeSkinId) || pet.skins[0]
   })
 
+  function isPetUnlocked(petId) {
+    const pet = PET_REGISTRY.find((p) => p.id === petId)
+    if (!pet) return false
+    if (pet.isFree) return true
+    return (petState.value.unlockedPets || []).includes(petId)
+  }
+
+  function isSkinUnlocked(petId, skinId) {
+    const pet = PET_REGISTRY.find((p) => p.id === petId)
+    if (!pet) return false
+    const skin = pet.skins.find((s) => s.id === skinId)
+    if (!skin) return false
+    if (skin.isFree) return true
+    const key = `${petId}:${skinId}`
+    return (petState.value.unlockedSkins || []).includes(key)
+  }
+
+  function unlockPet(petId) {
+    if (!petState.value.unlockedPets) {
+      petState.value.unlockedPets = ['cat']
+    }
+    if (!petState.value.unlockedPets.includes(petId)) {
+      petState.value.unlockedPets.push(petId)
+    }
+  }
+
+  function unlockSkin(petId, skinId) {
+    if (!petState.value.unlockedSkins) {
+      petState.value.unlockedSkins = []
+    }
+    const key = `${petId}:${skinId}`
+    if (!petState.value.unlockedSkins.includes(key)) {
+      petState.value.unlockedSkins.push(key)
+    }
+  }
+
   function togglePet(val) {
     petState.value.enabled = val !== undefined ? val : !petState.value.enabled
   }
 
   function setPet(petId) {
     const pet = PET_REGISTRY.find((p) => p.id === petId)
-    if (pet) {
+    if (pet && isPetUnlocked(petId)) {
       petState.value.activePetId = petId
       petState.value.activeSkinId = pet.defaultSkin || pet.skins[0].id
     }
@@ -59,7 +109,7 @@ export function usePet() {
 
   function setSkin(skinId) {
     const pet = currentPet.value
-    if (pet.skins.some((s) => s.id === skinId)) {
+    if (pet.skins.some((s) => s.id === skinId) && isSkinUnlocked(pet.id, skinId)) {
       petState.value.activeSkinId = skinId
     }
   }
@@ -76,6 +126,10 @@ export function usePet() {
     petState,
     currentPet,
     currentSkin,
+    isPetUnlocked,
+    isSkinUnlocked,
+    unlockPet,
+    unlockSkin,
     togglePet,
     setPet,
     setSkin,
