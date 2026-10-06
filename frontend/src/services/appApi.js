@@ -637,6 +637,16 @@ export function openNotesFolder(notebookID = '', topicID = '') {
   }
 }
 
+export function saveNoteImage(topicID = '', notebookID = '', fileName = 'pasted_image.png', fileBytes = []) {
+  try {
+    return appBridge().SaveNoteImage(topicID || '', notebookID || '', fileName || 'pasted_image.png', fileBytes)
+  } catch (err) {
+    console.error('Failed saving note image:', err)
+    throw err
+  }
+}
+
+
 
 
 

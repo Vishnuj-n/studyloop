@@ -902,6 +902,21 @@ func (a *App) UpdateTopicStudyNote(topicID string, startPage, endPage int, conte
 	}
 }
 
+// SaveNoteImage saves a pasted image into the topic's assets folder for markdown embedding.
+func (a *App) SaveNoteImage(topicID, notebookID, fileName string, fileData []byte) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	relPath, err := a.studyService.SaveNoteImage(topicID, notebookID, fileName, fileData)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+		"path":    relPath,
+	}
+}
+
 // GetNotesByNotebook retrieves all study notes for topics in a notebook.
 func (a *App) GetNotesByNotebook(notebookID string) map[string]interface{} {
 	if a.studyService == nil {

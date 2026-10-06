@@ -810,3 +810,38 @@ func (s *StudyService) OpenNotesFolder(notebookID, topicID string) (string, erro
 
 	return absPath, nil
 }
+
+// SaveNoteImage saves raw base64 or binary image data into the topic note's assets directory.
+func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileData []byte) (string, error) {
+	if len(fileData) == 0 {
+		return "", fmt.Errorf("file data is empty")
+	}
+
+	_, assetsPath := s.GetTopicNoteFolder(topicID, notebookID)
+	if err := os.MkdirAll(assetsPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create assets folder: %w", err)
+	}
+
+	ext := strings.ToLower(filepath.Ext(fileName))
+	if ext == "" || (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" && ext != ".gif" && ext != ".svg") {
+		ext = ".png"
+	}
+
+	cleanBase := strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+	if cleanBase == "" || cleanBase == "." {
+		cleanBase = "pasted_image"
+	}
+	cleanBase = SanitizePathSegment(cleanBase)
+
+	uniqueName := fmt.Sprintf("%s_%d%s", cleanBase, time.Now().UnixMilli(), ext)
+	targetPath := filepath.Join(assetsPath, uniqueName)
+
+	if err := os.WriteFile(targetPath, fileData, 0644); err != nil {
+		return "", fmt.Errorf("failed to write image file: %w", err)
+	}
+
+	// Return relative path suitable for markdown image embedding
+	relPath := fmt.Sprintf("assets/%s", uniqueName)
+	return relPath, nil
+}
+

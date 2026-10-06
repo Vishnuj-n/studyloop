@@ -230,13 +230,37 @@
 
       <!-- ================= TAB 2: STUDY NOTE ================= -->
       <div v-show="currentTab === 'note'" class="tab-pane-container note-tab-pane">
-        <!-- Subheader Chapter Label -->
+        <!-- Subheader Chapter Label & Action Buttons -->
         <div class="note-meta-bar">
           <div class="note-chapter-pill" :title="displayContextTitle">
             <BaseIcon name="book" size="12" custom-class="context-pill-icon" />
             <span class="note-chapter-title">{{ notePillTitle }}</span>
           </div>
-          <span v-if="noteLastSaved" class="note-saved-status">Saved</span>
+          
+          <div class="note-header-actions">
+            <button
+              v-if="!noteEditing"
+              type="button"
+              class="note-hdr-btn ghost"
+              title="Add personal note block or write new note"
+              @click="addPersonalNote"
+            >
+              <BaseIcon name="plus" size="12" />
+              <span>Add Note</span>
+            </button>
+            <button
+              v-if="!noteEditing"
+              type="button"
+              class="note-hdr-btn ghost"
+              :disabled="noteGenerating || !selectedTopicID"
+              title="Generate AI structured summary for this chapter"
+              @click="generateNote"
+            >
+              <BaseIcon name="sparkles" size="12" />
+              <span>{{ currentNoteContent ? 'AI Note' : 'AI Generate' }}</span>
+            </button>
+            <span v-if="noteLastSaved" class="note-saved-status">Saved</span>
+          </div>
         </div>
 
         <!-- Note Scroll Body -->
@@ -251,11 +275,16 @@
             <span class="generating-sub">Extracting key concepts, formulas & takeaways</span>
           </div>
           <div v-else-if="noteEditing" class="note-edit-box">
+            <div class="note-edit-tips-bar">
+              <span>Markdown supported • Paste screenshots directly with <strong>Ctrl+V</strong></span>
+            </div>
             <textarea
+              ref="noteTextareaRef"
               v-model="noteEditContent"
               class="reader-note-textarea"
-              placeholder="Write chapter summary note (Markdown supported)..."
+              placeholder="Write chapter study notes, add custom explanations, or paste diagrams (Ctrl+V)..."
               rows="16"
+              @paste="handleNotePaste"
             ></textarea>
           </div>
           <div v-else-if="currentNoteContent" class="note-view-box">
@@ -267,16 +296,26 @@
               <BaseIcon name="file-text" size="20" />
             </div>
             <p class="empty-title">No Study Note Yet</p>
-            <p class="empty-desc">Generate structured AI notes for this chapter or create your own summary.</p>
-            <button
-              type="button"
-              class="primary generate-note-hero-btn"
-              :disabled="noteGenerating || !selectedTopicID"
-              @click="generateNote"
-            >
-              <BaseIcon name="sparkles" size="14" />
-              <span>Generate Study Note</span>
-            </button>
+            <p class="empty-desc">Generate structured AI notes for this chapter or create your own personal notes.</p>
+            <div class="note-empty-actions-row">
+              <button
+                type="button"
+                class="primary generate-note-hero-btn"
+                :disabled="noteGenerating || !selectedTopicID"
+                @click="generateNote"
+              >
+                <BaseIcon name="sparkles" size="14" />
+                <span>Generate AI Note</span>
+              </button>
+              <button
+                type="button"
+                class="secondary add-note-hero-btn"
+                @click="addPersonalNote"
+              >
+                <BaseIcon name="plus" size="14" />
+                <span>Write My Note</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -305,7 +344,7 @@
               @click="generateNote"
             >
               <BaseIcon name="sparkles" size="13" />
-              <span>{{ noteGenerating ? 'Generating...' : 'Regenerate' }}</span>
+              <span>{{ noteGenerating ? 'Generating...' : 'Regenerate AI' }}</span>
             </button>
             <button
               type="button"
@@ -324,7 +363,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseIcon from './BaseIcon.vue'
 import { useToast } from '../composables/useToast'
@@ -335,6 +374,7 @@ import {
   generateTopicStudyNote,
   generateTopicStudyNoteForRange,
   updateTopicStudyNote,
+  saveNoteImage,
 } from '../services/appApi'
 
 const props = defineProps({
@@ -478,6 +518,73 @@ async function ensureNoteLoaded() {
   const tid = props.selectedTopicID
   if (tid && loadedTopicID.value !== tid) {
     await fetchTopicNote(tid)
+  }
+}
+
+const noteTextareaRef = ref(null)
+
+function addPersonalNote() {
+  if (currentNoteContent.value && currentNoteContent.value.trim().length > 0) {
+    noteEditContent.value = `${currentNoteContent.value.trim()}\n\n### My Notes\n- `
+  } else {
+    noteEditContent.value = '### My Notes\n- '
+  }
+  noteEditing.value = true
+  nextTick(() => {
+    if (noteTextareaRef.value) {
+      noteTextareaRef.value.focus()
+      noteTextareaRef.value.scrollTop = noteTextareaRef.value.scrollHeight
+    }
+  })
+}
+
+async function handleNotePaste(e) {
+  const clipboardData = e.clipboardData || window.clipboardData
+  if (!clipboardData) return
+  const items = clipboardData.items
+  if (!items || items.length === 0) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.indexOf('image') !== -1) {
+      e.preventDefault()
+      const blob = item.getAsFile()
+      if (!blob) continue
+
+      try {
+        const arrayBuffer = await blob.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        const fileBytes = Array.from(uint8Array)
+
+        const ext = blob.type.split('/')[1] || 'png'
+        const fileName = `screenshot_${Date.now()}.${ext}`
+        const res = await saveNoteImage(props.selectedTopicID, props.selectedNotebookID, fileName, fileBytes)
+
+        if (res && res.error) {
+          showError(res.error, 'Failed to save pasted image')
+          return
+        }
+
+        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const textarea = noteTextareaRef.value
+        if (textarea) {
+          const start = textarea.selectionStart || noteEditContent.value.length
+          const end = textarea.selectionEnd || noteEditContent.value.length
+          noteEditContent.value =
+            noteEditContent.value.substring(0, start) + imageMarkdown + noteEditContent.value.substring(end)
+          nextTick(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length
+            textarea.focus()
+          })
+        } else {
+          noteEditContent.value += imageMarkdown
+        }
+      } catch (err) {
+        console.error('[ReaderChat Note Paste] Failed to process image paste:', err)
+        showError('Could not process pasted image', 'Paste Error')
+      }
+      break
+    }
   }
 }
 
@@ -916,6 +1023,60 @@ function handleEnterKey(event) {
   background: color-mix(in srgb, #10b981 12%, transparent);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.note-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.note-hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.note-hdr-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-low));
+}
+
+.note-empty-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.add-note-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.note-edit-tips-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--muted-text);
+  margin-bottom: 4px;
 }
 
 .scope-compact-wrap {

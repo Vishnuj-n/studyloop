@@ -269,20 +269,18 @@ func buildQuizContext(
 
 func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []string) string {
 	return strings.Join([]string{
-		"You are an expert academic tutor and quiz generator creating an immediate comprehension check quiz.",
-		"Return STRICT JSON only.",
+		"Generate a multiple-choice comprehension quiz in STRICT JSON only.",
 		fmt.Sprintf("Notebook: \"%s\"", notebookTitle),
-		fmt.Sprintf("Generate exactly %d multiple-choice questions grounded strictly in the provided text.", targetCount),
+		fmt.Sprintf("Generate exactly %d questions grounded in the context.", targetCount),
 		"",
-		"=== GUIDELINES ===",
-		"1. Grounding: Questions must be answerable purely from the explicit concepts in the text (no outside knowledge, no meta/author/book-structure trivia).",
-		"2. Mechanisms: Focus on cause-and-effect, mechanisms, and 'why/how' outcomes (avoid raw facts, dates, names, or shallow definitions).",
-		"3. Distractors: Incorrect options must represent plausible conceptual misunderstandings, not obviously absurd answers.",
-		"4. Option Length & Uniformity: Exactly 4 options per question. All 4 options must be concise and of roughly equal length/detail to prevent answer-length bias. The correct_answer must match one option exactly.",
-		"5. Format: Prefer 'why', 'how', 'what happens if', and 'what causes' questions (no yes/no questions).",
+		"Rules:",
+		"1. Each question must have 4 options. All options must be concise (4-10 words).",
+		"2. Anti-guessing: Never make the correct answer the longest option. Include 1 close/subtle distractor, and occasionally make a WRONG option the longest or most detailed one.",
+		"3. Focus on mechanisms ('why', 'how', cause-and-effect), not trivia.",
+		"4. The correct_answer must match one option exactly.",
 		"",
 		"JSON schema: {\"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",
-		"Chunks:",
+		"Context:",
 		strings.Join(contextParts, "\n"),
 	}, "\n")
 }
