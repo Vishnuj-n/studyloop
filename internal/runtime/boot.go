@@ -61,6 +61,9 @@ type BootResult struct {
 	// NotebookUploadDir is the absolute directory path where uploaded notebook sources are saved.
 	NotebookUploadDir string
 
+	// NotesDir is the absolute directory path where markdown study notes and assets are saved.
+	NotesDir string
+
 	// AiReady indicates whether local ONNX embedding and vector search are ready for use.
 	AiReady bool
 
@@ -245,6 +248,7 @@ func Bootstrap(ctx context.Context) (*BootResult, error) {
 	if err != nil {
 		utils.Warnf("resolving notes directory: %v", err)
 	}
+	res.NotesDir = notesDir
 
 	// Construct core StudyService orchestrator
 	res.StudyService = study.NewStudyService(study.Config{

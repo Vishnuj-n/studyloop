@@ -373,8 +373,9 @@
                   <textarea
                     v-model="newNoteBuffer"
                     class="shared-textarea slot-textarea"
-                    placeholder="Write markdown notes or summaries for this session/chapter..."
+                    placeholder="Write markdown notes or summaries for this session/chapter... (paste images with Ctrl+V)"
                     rows="8"
+                    @paste="handleNewNotePaste"
                   ></textarea>
                 </div>
               </div>
@@ -512,8 +513,9 @@
                   <textarea
                     v-model="editSlotBuffer"
                     class="shared-textarea slot-textarea"
-                    placeholder="Write or edit notes for this reading session..."
+                    placeholder="Write or edit notes for this reading session... (paste images with Ctrl+V)"
                     rows="8"
+                    @paste="(e) => handleSlotPaste(e, slot)"
                   ></textarea>
                 </div>
 
@@ -521,7 +523,7 @@
                 <div
                   v-else-if="slot.content"
                   class="slot-markdown-content shared-markdown-content"
-                  v-html="renderMarkdown(slot.content)"
+                  v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"
                 ></div>
 
                 <!-- Empty State within Card -->
@@ -567,6 +569,7 @@ import {
   getTopicStudyNoteSlots,
   generateTopicStudyNoteForRange,
   updateTopicStudyNote,
+  saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
   openNotesFolder,
 } from '../services/appApi'
@@ -1038,6 +1041,88 @@ function cancelEditSlot() {
   editSlotBuffer.value = ''
 }
 
+async function handleNewNotePaste(e) {
+  const clipboardData = e.clipboardData || window.clipboardData
+  if (!clipboardData) return
+  const items = clipboardData.items
+  if (!items || items.length === 0) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.indexOf('image') !== -1) {
+      e.preventDefault()
+      const blob = item.getAsFile()
+      if (!blob) continue
+
+      try {
+        const arrayBuffer = await blob.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        const fileBytes = Array.from(uint8Array)
+
+        const ext = blob.type.split('/')[1] || 'png'
+        const fileName = `screenshot_${Date.now()}.${ext}`
+        const nbID = activeTopic.value?.notebook_id || selectedNotebookID.value || ''
+        const res = await saveNoteImage(selectedTopicID.value, nbID, fileName, fileBytes)
+
+        if (res && res.error) {
+          errorMsg.value = res.error
+          return
+        }
+
+        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        newNoteBuffer.value += imageMarkdown
+      } catch (err) {
+        console.error('[NOTES Paste] Failed to process image paste:', err)
+        errorMsg.value = 'Failed to paste diagram image.'
+      }
+      break
+    }
+  }
+}
+
+async function handleSlotPaste(e, slot) {
+  const clipboardData = e.clipboardData || window.clipboardData
+  if (!clipboardData) return
+  const items = clipboardData.items
+  if (!items || items.length === 0) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.indexOf('image') !== -1) {
+      e.preventDefault()
+      const blob = item.getAsFile()
+      if (!blob) continue
+
+      try {
+        const arrayBuffer = await blob.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        const fileBytes = Array.from(uint8Array)
+
+        const ext = blob.type.split('/')[1] || 'png'
+        const fileName = `screenshot_${Date.now()}.${ext}`
+        const nbID = slot.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value || ''
+        const res = await saveNoteImage(slot.topic_id, nbID, fileName, fileBytes)
+
+        if (res && res.error) {
+          errorMsg.value = res.error
+          return
+        }
+
+        if (res && res.relative_folder_path) {
+          slot.relative_folder_path = res.relative_folder_path
+        }
+
+        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        editSlotBuffer.value += imageMarkdown
+      } catch (err) {
+        console.error('[NOTES Slot Paste] Failed to process image paste:', err)
+        errorMsg.value = 'Failed to paste diagram image.'
+      }
+      break
+    }
+  }
+}
+
 async function saveSlot(slot) {
   const key = getSlotKey(slot)
   savingSlotKey.value = key
@@ -1053,7 +1138,10 @@ async function saveSlot(slot) {
       errorMsg.value = res.error
       return
     }
-    slot.content = editSlotBuffer.value
+    slot.content = res.note?.content || editSlotBuffer.value
+    if (res.note?.relative_folder_path) {
+      slot.relative_folder_path = res.note.relative_folder_path
+    }
     editingSlotKey.value = null
     successMsg.value = 'Note saved.'
     setTimeout(() => { successMsg.value = '' }, 3000)
@@ -1070,6 +1158,16 @@ async function generateSlot(slot) {
   generatingSlotKey.value = key
   errorMsg.value = ''
   try {
+    // If currently editing this slot with unsaved text, auto-save first so backend preserves it
+    if (editingSlotKey.value === key && editSlotBuffer.value.trim().length > 0) {
+      try {
+        await updateTopicStudyNote(slot.topic_id, slot.start_page, slot.end_page, editSlotBuffer.value)
+      } catch (saveErr) {
+        console.warn('[NOTES] Auto-save before generate failed:', saveErr)
+      }
+      editingSlotKey.value = null
+    }
+
     const nbID = slot.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value || ''
     const res = await generateTopicStudyNoteForRange(
       slot.topic_id,
@@ -1083,6 +1181,9 @@ async function generateSlot(slot) {
     }
     if (res && res.note) {
       slot.content = res.note.content
+      if (res.note.relative_folder_path) {
+        slot.relative_folder_path = res.note.relative_folder_path
+      }
       slot.last_reviewed_at = res.note.last_reviewed_at
       successMsg.value = 'Note generated!'
       setTimeout(() => { successMsg.value = '' }, 3000)

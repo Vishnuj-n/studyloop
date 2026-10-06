@@ -48,7 +48,7 @@ func main() {
 		},
 		AssetServer: &assetserver.Options{
 			Assets:  assets,
-			Handler: notebookHandler(a),
+			Handler: customAssetHandler(a),
 		},
 		BackgroundColour: &options.RGBA{R: 249, G: 249, B: 251, A: 255},
 		OnStartup:        a.Startup,
@@ -66,34 +66,60 @@ func main() {
 	}
 }
 
-func notebookHandler(a *app.App) http.Handler {
+func customAssetHandler(a *app.App) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		// Only handle requests under /notebooks/
-		if !strings.HasPrefix(req.URL.Path, "/notebooks/") {
+		if strings.HasPrefix(req.URL.Path, "/notebooks/") {
+			if a == nil {
+				utils.Warnf("[customAssetHandler] Service unavailable: app is nil")
+				http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			uploadDir := a.GetNotebookUploadDir()
+			if uploadDir == "" {
+				utils.Warnf("[customAssetHandler] Service unavailable: upload dir empty")
+				http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
+				return
+			}
+
+			if req.Method != http.MethodGet {
+				utils.Warnf("[customAssetHandler] Rejected method: %s", req.Method)
+				rw.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			fs := noDirListingFS{fs: http.Dir(uploadDir)}
+			http.StripPrefix("/notebooks/", http.FileServer(fs)).ServeHTTP(rw, req)
 			return
 		}
 
-		if a == nil {
-			utils.Warnf("[notebookHandler] Service unavailable: app is nil")
-			http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
-			return
-		}
-		uploadDir := a.GetNotebookUploadDir()
-		if uploadDir == "" {
-			utils.Warnf("[notebookHandler] Service unavailable: upload dir empty")
-			http.Error(rw, "notebook directory unavailable", http.StatusServiceUnavailable)
-			return
-		}
+		if strings.HasPrefix(req.URL.Path, "/note-assets/") || strings.HasPrefix(req.URL.Path, "/notes/") {
+			if a == nil {
+				utils.Warnf("[customAssetHandler] Service unavailable: app is nil")
+				http.Error(rw, "notes directory unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			notesDir := a.GetNotesDir()
+			if notesDir == "" {
+				utils.Warnf("[customAssetHandler] Service unavailable: notes dir empty")
+				http.Error(rw, "notes directory unavailable", http.StatusServiceUnavailable)
+				return
+			}
 
-		// Serve only GET requests.
-		if req.Method != http.MethodGet {
-			utils.Warnf("[notebookHandler] Rejected method: %s", req.Method)
-			rw.WriteHeader(http.StatusMethodNotAllowed)
+			if req.Method != http.MethodGet {
+				utils.Warnf("[customAssetHandler] Rejected method: %s", req.Method)
+				rw.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+
+			prefix := "/notes/"
+			if strings.HasPrefix(req.URL.Path, "/note-assets/") {
+				prefix = "/note-assets/"
+			}
+
+			fs := noDirListingFS{fs: http.Dir(notesDir)}
+			http.StripPrefix(prefix, http.FileServer(fs)).ServeHTTP(rw, req)
 			return
 		}
-
-		fs := noDirListingFS{fs: http.Dir(uploadDir)}
-		http.StripPrefix("/notebooks/", http.FileServer(fs)).ServeHTTP(rw, req)
 	})
 }
 

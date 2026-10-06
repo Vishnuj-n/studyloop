@@ -47,4 +47,29 @@ describe('renderMarkdown', () => {
     expect(dirty).not.toContain('<script>')
     expect(dirty).toContain('Safe text')
   })
+
+  it('resolves relative note image paths with noteRelativeFolder', () => {
+    const md = '![Diagram](assets/screenshot_123.png)'
+    const folder = 'Designing Data Intensive Applications/Consistency and Consensus_ch-09'
+    const html = renderMarkdown(md, { noteRelativeFolder: folder })
+    expect(html).toContain(
+      'src="/note-assets/Designing%20Data%20Intensive%20Applications/Consistency%20and%20Consensus_ch-09/assets/screenshot_123.png"'
+    )
+    expect(html).toContain('alt="Diagram"')
+  })
+
+  it('resolves ./assets/ note image paths', () => {
+    const md = '![Diagram](./assets/diagram.svg)'
+    const folder = 'Book/Chapter'
+    const html = renderMarkdown(md, { noteRelativeFolder: folder })
+    expect(html).toContain('src="/note-assets/Book/Chapter/assets/diagram.svg"')
+  })
+
+  it('preserves external and data URLs untouched', () => {
+    const md = '![Web](https://example.com/pic.png)\n![Data](data:image/png;base64,AAAA)'
+    const folder = 'Book/Chapter'
+    const html = renderMarkdown(md, { noteRelativeFolder: folder })
+    expect(html).toContain('src="https://example.com/pic.png"')
+    expect(html).toContain('src="data:image/png;base64,AAAA"')
+  })
 })

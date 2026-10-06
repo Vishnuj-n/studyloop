@@ -61,6 +61,69 @@ const md = new MarkdownIt({
   .use(githubAlerts)
   .use(footnote)
 
+const defaultImageRender = md.renderer.rules.image || function (tokens, idx, options, env, self) {
+  return self.renderToken(tokens, idx, options)
+}
+
+export function resolveNoteAssetSrc(src, noteRelativeFolder = '') {
+  if (!src || typeof src !== 'string') return src
+  const raw = src.trim()
+  if (
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('data:') ||
+    raw.startsWith('blob:')
+  ) {
+    return raw
+  }
+
+  // Normalize Windows slashes
+  let normalized = raw.replace(/\\/g, '/')
+
+  // Handle absolute notes paths (e.g. C:/Users/.../Studyloop/notes/<relativeFolder>/assets/pic.png or /notes/...)
+  const notesMatch = normalized.match(/(?:^|\/)(?:notes|note-assets)\/(.+)$/i)
+  if (notesMatch && notesMatch[1]) {
+    const encoded = notesMatch[1]
+      .split('/')
+      .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+      .join('/')
+    return `/note-assets/${encoded}`
+  }
+
+  // Handle relative assets (e.g. assets/pic.png or ./assets/pic.png)
+  if (normalized.startsWith('./')) {
+    normalized = normalized.slice(2)
+  }
+
+  if (noteRelativeFolder) {
+    const cleanFolder = noteRelativeFolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+    let targetRelPath = normalized
+    if (targetRelPath.startsWith('assets/')) {
+      targetRelPath = `${cleanFolder}/${targetRelPath}`
+    } else if (!targetRelPath.startsWith('/')) {
+      targetRelPath = `${cleanFolder}/assets/${targetRelPath}`
+    }
+    const encoded = targetRelPath
+      .split('/')
+      .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+      .join('/')
+    return `/note-assets/${encoded}`
+  }
+
+  return raw
+}
+
+md.renderer.rules.image = function (tokens, idx, options, env, self) {
+  const token = tokens[idx]
+  const srcIndex = token.attrIndex('src')
+  if (srcIndex >= 0) {
+    const src = token.attrs[srcIndex][1]
+    const noteFolder = env && env.noteRelativeFolder ? env.noteRelativeFolder : ''
+    token.attrs[srcIndex][1] = resolveNoteAssetSrc(src, noteFolder)
+  }
+  return defaultImageRender(tokens, idx, options, env, self)
+}
+
 const SANITIZE_CONFIG = {
   ADD_TAGS: [
     'math',
@@ -89,8 +152,11 @@ const SANITIZE_CONFIG = {
   ADD_ATTR: ['aria-hidden', 'type', 'checked', 'disabled', 'src', 'alt', 'title', 'width', 'height', 'controls', 'poster'],
 }
 
-export function renderMarkdown(input) {
+export function renderMarkdown(input, options = {}) {
   let source = typeof input === 'string' ? input : ''
+  const noteRelativeFolder =
+    typeof options === 'string' ? options : options?.noteRelativeFolder || ''
+
   // Normalize LaTeX delimiters \( ... \) and \[ ... \] to $ ... $ and $$ ... $$ only in Markdown prose
   const parts = source.split(/(```[\s\S]*?```|`[^`\n]+`)/g)
   source = parts
@@ -101,5 +167,5 @@ export function renderMarkdown(input) {
         .replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => `$${math.trim()}$`)
     })
     .join('')
-  return DOMPurify.sanitize(md.render(source), SANITIZE_CONFIG)
+  return DOMPurify.sanitize(md.render(source, { noteRelativeFolder }), SANITIZE_CONFIG)
 }

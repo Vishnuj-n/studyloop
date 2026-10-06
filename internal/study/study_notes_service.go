@@ -206,6 +206,51 @@ func (s *StudyService) resolveNotebookAndTopicTitles(topicID, notebookID string)
 	return nbID, nbTitle, tID, tTitle
 }
 
+// ExtractUserNotesSection extracts user-authored notes (e.g. "### My Notes", "## Personal Notes", or custom manual notes)
+// from an existing study note markdown so they can be preserved across AI regenerations.
+func ExtractUserNotesSection(content string) string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return ""
+	}
+
+	lines := strings.Split(trimmed, "\n")
+	myNotesHeaderIndex := -1
+
+	// Check for a heading matching "My Notes", "Personal Notes", "User Notes", "Custom Notes"
+	for i, line := range lines {
+		l := strings.TrimSpace(line)
+		if strings.HasPrefix(l, "#") {
+			headerText := strings.ToLower(strings.TrimLeft(l, "# "))
+			if strings.HasPrefix(headerText, "my notes") ||
+				strings.HasPrefix(headerText, "personal notes") ||
+				strings.HasPrefix(headerText, "user notes") ||
+				strings.HasPrefix(headerText, "custom notes") {
+				myNotesHeaderIndex = i
+				break
+			}
+		}
+	}
+
+	if myNotesHeaderIndex != -1 {
+		return strings.TrimSpace(strings.Join(lines[myNotesHeaderIndex:], "\n"))
+	}
+
+	// If no explicit "My Notes" header was found: check if this was a manually created note (not AI generated)
+	lower := strings.ToLower(trimmed)
+	hasAITemplate := strings.Contains(lower, "core concept") ||
+		strings.Contains(lower, "key mechanisms") ||
+		strings.Contains(lower, "structured study note") ||
+		strings.Contains(lower, "summary of pages")
+
+	if !hasAITemplate {
+		// The entire note was written by the user! Preserve it wrapped in "### My Notes"
+		return fmt.Sprintf("### My Notes\n%s", trimmed)
+	}
+
+	return ""
+}
+
 // GetTopicNoteFolder returns the directory path and assets subfolder for a given topic.
 func (s *StudyService) GetTopicNoteFolder(topicID, notebookID string) (folderPath, assetsPath string) {
 	_, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
@@ -229,6 +274,20 @@ func (s *StudyService) GetTopicNoteFolder(topicID, notebookID string) (folderPat
 
 	assetsPath = filepath.Join(folderPath, "assets")
 	return folderPath, assetsPath
+}
+
+// GetTopicRelativeFolder returns the relative folder path from NotesBaseDir for a topic (e.g. "Notebook/Topic_id").
+func (s *StudyService) GetTopicRelativeFolder(topicID, notebookID string) string {
+	folderPath, _ := s.GetTopicNoteFolder(topicID, notebookID)
+	baseDir := s.NotesBaseDir()
+	if baseDir == "" || folderPath == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(baseDir, folderPath)
+	if err != nil {
+		return ""
+	}
+	return filepath.ToSlash(rel)
 }
 
 // GetNoteFilePath computes the standard disk file path for a (topic, startPage, endPage) note.
@@ -266,6 +325,9 @@ func (s *StudyService) SaveNoteToDisk(note models.TopicStudyNote) (string, error
 	}
 	note.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	note.FilePath = filePath
+	if note.RelativeFolderPath == "" {
+		note.RelativeFolderPath = s.GetTopicRelativeFolder(note.TopicID, note.NotebookID)
+	}
 
 	formatted := FormatMarkdownNote(note)
 	if err := os.WriteFile(filePath, []byte(formatted), 0644); err != nil {
@@ -389,18 +451,39 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 		cleanedContent = strings.TrimSpace(cleanedContent)
 	}
 
+	// Check for existing note to preserve user notes / ### My Notes sections and timestamps
+	existingNote, _ := s.GetTopicStudyNoteForRange(tID, startPage, endPage)
+	var userNotes string
+	createdAt := ""
+	var lastReviewedAt int64
+	if existingNote != nil {
+		createdAt = existingNote.CreatedAt
+		lastReviewedAt = existingNote.LastReviewedAt
+		userNotes = ExtractUserNotesSection(existingNote.Content)
+	}
+
+	finalContent := cleanedContent
+	if strings.TrimSpace(userNotes) != "" {
+		finalContent = strings.TrimSpace(cleanedContent) + "\n\n" + strings.TrimSpace(userNotes)
+	}
+
+	if createdAt == "" {
+		createdAt = time.Now().UTC().Format(time.RFC3339)
+	}
+
 	note := models.TopicStudyNote{
-		ID:             fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
-		TopicID:        tID,
-		TopicTitle:     tTitle,
-		NotebookID:     nbID,
-		NotebookTitle:  nbTitle,
-		StartPage:      startPage,
-		EndPage:        endPage,
-		Content:        cleanedContent,
-		LastReviewedAt: 0,
-		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt:      time.Now().UTC().Format(time.RFC3339),
+		ID:                 fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
+		TopicID:            tID,
+		TopicTitle:         tTitle,
+		NotebookID:         nbID,
+		NotebookTitle:      nbTitle,
+		StartPage:          startPage,
+		EndPage:            endPage,
+		RelativeFolderPath: s.GetTopicRelativeFolder(tID, nbID),
+		Content:            finalContent,
+		LastReviewedAt:     lastReviewedAt,
+		CreatedAt:          createdAt,
+		UpdatedAt:          time.Now().UTC().Format(time.RFC3339),
 	}
 
 	filePath, saveErr := s.SaveNoteToDisk(note)
@@ -486,14 +569,15 @@ func (s *StudyService) GetTopicStudyNoteForRange(topicID string, startPage, endP
 	}
 
 	fallback := models.TopicStudyNote{
-		ID:            fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
-		TopicID:       tID,
-		TopicTitle:    tTitle,
-		NotebookID:    nbID,
-		NotebookTitle: nbTitle,
-		StartPage:     startPage,
-		EndPage:       endPage,
-		FilePath:      filePath,
+		ID:                 fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
+		TopicID:            tID,
+		TopicTitle:         tTitle,
+		NotebookID:         nbID,
+		NotebookTitle:      nbTitle,
+		StartPage:          startPage,
+		EndPage:            endPage,
+		FilePath:           filePath,
+		RelativeFolderPath: s.GetTopicRelativeFolder(tID, nbID),
 	}
 
 	note := ParseMarkdownNote(string(data), fallback)
@@ -514,6 +598,9 @@ func (s *StudyService) GetTopicStudyNoteForRange(topicID string, startPage, endP
 	}
 	if note.NotebookTitle == "" {
 		note.NotebookTitle = nbTitle
+	}
+	if note.RelativeFolderPath == "" {
+		note.RelativeFolderPath = s.GetTopicRelativeFolder(note.TopicID, note.NotebookID)
 	}
 	return &note, nil
 }
@@ -558,14 +645,15 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 			}
 
 			fallback := models.TopicStudyNote{
-				ID:            fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startP, endP),
-				TopicID:       tID,
-				TopicTitle:    tTitle,
-				NotebookID:    nbID,
-				NotebookTitle: nbTitle,
-				StartPage:     startP,
-				EndPage:       endP,
-				FilePath:      filePath,
+				ID:                 fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startP, endP),
+				TopicID:            tID,
+				TopicTitle:         tTitle,
+				NotebookID:         nbID,
+				NotebookTitle:      nbTitle,
+				StartPage:          startP,
+				EndPage:            endP,
+				FilePath:           filePath,
+				RelativeFolderPath: s.GetTopicRelativeFolder(tID, nbID),
 			}
 
 			note := ParseMarkdownNote(string(data), fallback)
@@ -587,6 +675,9 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 			if note.NotebookTitle == "" {
 				note.NotebookTitle = nbTitle
 			}
+			if note.RelativeFolderPath == "" {
+				note.RelativeFolderPath = s.GetTopicRelativeFolder(note.TopicID, note.NotebookID)
+			}
 
 			key := fmt.Sprintf("%d_%d", note.StartPage, note.EndPage)
 			if note.StartPage == 0 && note.EndPage == 0 && nameNoExt != "chapter_summary" {
@@ -603,14 +694,15 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 				key := fmt.Sprintf("%d_%d", sess.StartPage, sess.EndPage)
 				if _, exists := slotsMap[key]; !exists {
 					slotsMap[key] = models.TopicStudyNote{
-						ID:            fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), sess.StartPage, sess.EndPage),
-						TopicID:       tID,
-						TopicTitle:    tTitle,
-						NotebookID:    nbID,
-						NotebookTitle: nbTitle,
-						StartPage:     sess.StartPage,
-						EndPage:       sess.EndPage,
-						Content:       "",
+						ID:                 fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), sess.StartPage, sess.EndPage),
+						TopicID:            tID,
+						TopicTitle:         tTitle,
+						NotebookID:         nbID,
+						NotebookTitle:      nbTitle,
+						StartPage:          sess.StartPage,
+						EndPage:            sess.EndPage,
+						RelativeFolderPath: s.GetTopicRelativeFolder(tID, nbID),
+						Content:            "",
 					}
 				}
 			}
@@ -719,6 +811,11 @@ func (s *StudyService) GetNotesByNotebook(notebookID string) ([]models.TopicStud
 		if note.TopicTitle != "" {
 			note.TopicTitle = utils.CleanTopicTitle(note.TopicTitle)
 		}
+		if baseDir != "" {
+			if rel, err := filepath.Rel(baseDir, filepath.Dir(path)); err == nil {
+				note.RelativeFolderPath = filepath.ToSlash(rel)
+			}
+		}
 		if strings.TrimSpace(note.Content) != "" {
 			notes = append(notes, note)
 		}
@@ -812,14 +909,14 @@ func (s *StudyService) OpenNotesFolder(notebookID, topicID string) (string, erro
 }
 
 // SaveNoteImage saves raw base64 or binary image data into the topic note's assets directory.
-func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileData []byte) (string, error) {
+func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileData []byte) (string, string, error) {
 	if len(fileData) == 0 {
-		return "", fmt.Errorf("file data is empty")
+		return "", "", fmt.Errorf("file data is empty")
 	}
 
 	_, assetsPath := s.GetTopicNoteFolder(topicID, notebookID)
 	if err := os.MkdirAll(assetsPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create assets folder: %w", err)
+		return "", "", fmt.Errorf("failed to create assets folder: %w", err)
 	}
 
 	ext := strings.ToLower(filepath.Ext(fileName))
@@ -837,11 +934,12 @@ func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileD
 	targetPath := filepath.Join(assetsPath, uniqueName)
 
 	if err := os.WriteFile(targetPath, fileData, 0644); err != nil {
-		return "", fmt.Errorf("failed to write image file: %w", err)
+		return "", "", fmt.Errorf("failed to write image file: %w", err)
 	}
 
 	// Return relative path suitable for markdown image embedding
 	relPath := fmt.Sprintf("assets/%s", uniqueName)
-	return relPath, nil
+	relFolder := s.GetTopicRelativeFolder(topicID, notebookID)
+	return relPath, relFolder, nil
 }
 

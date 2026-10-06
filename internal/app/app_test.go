@@ -87,15 +87,23 @@ func initTestProvider(t *testing.T) *llm.Provider {
 		content := "Round Robin gives each process a fixed time slice."
 		if len(body.Messages) > 0 {
 			prompt := body.Messages[0].Content
+			promptLower := strings.ToLower(prompt)
 			switch {
-			case strings.Contains(prompt, "flashcard generator"):
+			case strings.Contains(promptLower, "flashcard"):
 				count := extractRequestedCount(prompt, "Generate up to ")
 				if count == 1 {
 					count = extractRequestedCount(prompt, "Generate exactly ")
 				}
 				content = flashcardJSON(count, extractFirstChunkID(prompt))
-			case strings.Contains(prompt, "quiz generator"):
-				content = questionJSON(extractRequestedCount(prompt, "Generate exactly "), extractFirstChunkID(prompt))
+			case strings.Contains(promptLower, "quiz"):
+				count := extractRequestedCount(prompt, "Generate exactly ")
+				if count <= 0 {
+					count = extractRequestedCount(prompt, "Generate up to ")
+				}
+				if count <= 0 {
+					count = 3
+				}
+				content = questionJSON(count, extractFirstChunkID(prompt))
 			}
 		}
 

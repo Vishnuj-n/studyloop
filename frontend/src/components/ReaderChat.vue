@@ -477,13 +477,18 @@ const notePillTitle = computed(() => {
   return baseTitle
 })
 
+const currentNoteRelativeFolder = ref('')
+
 const renderedNoteMarkdown = computed(() => {
-  return renderMarkdown(currentNoteContent.value || '')
+  return renderMarkdown(currentNoteContent.value || '', {
+    noteRelativeFolder: currentNoteRelativeFolder.value,
+  })
 })
 
 async function fetchTopicNote(topicId) {
   if (!topicId) {
     currentNoteContent.value = ''
+    currentNoteRelativeFolder.value = ''
     loadedTopicID.value = ''
     return
   }
@@ -501,8 +506,12 @@ async function fetchTopicNote(topicId) {
     }
     if (res && res.note && res.note.content) {
       currentNoteContent.value = res.note.content
+      currentNoteRelativeFolder.value = res.note.relative_folder_path || ''
     } else {
       currentNoteContent.value = ''
+      if (res && res.note && res.note.relative_folder_path) {
+        currentNoteRelativeFolder.value = res.note.relative_folder_path
+      }
     }
     loadedTopicID.value = topicId
   } catch (err) {
@@ -565,6 +574,10 @@ async function handleNotePaste(e) {
           return
         }
 
+        if (res && res.relative_folder_path) {
+          currentNoteRelativeFolder.value = res.relative_folder_path
+        }
+
         const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
         const textarea = noteTextareaRef.value
         if (textarea) {
@@ -610,6 +623,9 @@ async function saveNote() {
       showError(res.error, 'Failed to Save Note')
     } else if (res && res.note) {
       currentNoteContent.value = res.note.content
+      if (res.note.relative_folder_path) {
+        currentNoteRelativeFolder.value = res.note.relative_folder_path
+      }
       noteEditing.value = false
       noteLastSaved.value = true
       setTimeout(() => {
@@ -638,10 +654,20 @@ async function generateNote() {
   const nbid = props.selectedNotebookID
   if (!tid) return
   noteGenerating.value = true
-  noteEditing.value = false
   try {
     const startPage = effectiveStartPage.value
     const endPage = effectiveEndPage.value
+
+    // If user is currently editing with unsaved text, auto-save first so backend preserves it
+    if (noteEditing.value && noteEditContent.value.trim().length > 0) {
+      try {
+        await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
+      } catch (saveErr) {
+        console.warn('[ReaderChat Note] Auto-save before generate failed:', saveErr)
+      }
+    }
+    noteEditing.value = false
+
     let res = null
     if (startPage > 0 && endPage >= startPage) {
       res = await generateTopicStudyNoteForRange(tid, nbid, startPage, endPage)
@@ -652,10 +678,16 @@ async function generateNote() {
       showError(res.error, 'Failed to Generate Note')
     } else if (res && res.note && res.note.content) {
       currentNoteContent.value = res.note.content
+      if (res.note.relative_folder_path) {
+        currentNoteRelativeFolder.value = res.note.relative_folder_path
+      }
       loadedTopicID.value = tid
       logFrontendEvent('info', 'ReaderChat', 'study_note_generated', { topicID: tid, startPage, endPage })
     } else if (res && res.note) {
       currentNoteContent.value = res.note.content || ''
+      if (res.note.relative_folder_path) {
+        currentNoteRelativeFolder.value = res.note.relative_folder_path
+      }
       loadedTopicID.value = tid
     } else {
       showError('No content was generated for this note', 'Failed to Generate Note')

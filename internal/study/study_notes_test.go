@@ -241,4 +241,72 @@ func TestGenerateTopicStudyNoteForRange_SessionSlots(t *testing.T) {
 	if afterReview.LastReviewedAt < beforeReview {
 		t.Errorf("expected last_reviewed_at >= %d, got %d", beforeReview, afterReview.LastReviewedAt)
 	}
+
+	// 6. Test User Notes Preservation on AI Regeneration
+	userNoteContent := "**Basics**: Multi-layer perceptrons.\n\n### My Notes\n- Remember to review Figure 9.1\n- ![Pasted Diagram](assets/screenshot_123.png)"
+	if err := svc.UpdateTopicStudyNote(topicID, 1, 10, userNoteContent); err != nil {
+		t.Fatalf("failed to save custom user notes: %v", err)
+	}
+
+	mockLLM.response = "**Regenerated AI Basics**: Convolutional neural networks."
+	regenNote, err := svc.GenerateTopicStudyNoteForRange(topicID, "nb-dl", 1, 10)
+	if err != nil {
+		t.Fatalf("regenerate failed: %v", err)
+	}
+	if !strings.Contains(regenNote.Content, "Convolutional neural networks") {
+		t.Errorf("expected regenerated AI content, got: %s", regenNote.Content)
+	}
+	if !strings.Contains(regenNote.Content, "### My Notes") || !strings.Contains(regenNote.Content, "Figure 9.1") || !strings.Contains(regenNote.Content, "screenshot_123.png") {
+		t.Errorf("expected user notes to be preserved across regeneration, got: %s", regenNote.Content)
+	}
+
+	// 7. Test SaveNoteImage and RelativeFolderPath
+	relPath, relFolder, err := svc.SaveNoteImage(topicID, "nb-dl", "test_diagram.png", []byte("fake png content"))
+	if err != nil {
+		t.Fatalf("SaveNoteImage failed: %v", err)
+	}
+	if !strings.HasPrefix(relPath, "assets/test_diagram_") || !strings.HasSuffix(relPath, ".png") {
+		t.Errorf("expected relPath 'assets/test_diagram_*.png', got: %s", relPath)
+	}
+	if relFolder == "" {
+		t.Errorf("expected non-empty relative folder path, got empty")
+	}
+}
+
+func TestExtractUserNotesSection(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "empty content",
+			input:    "",
+			expected: "",
+		},
+		{
+			name: "ai note with My Notes",
+			input: "### Core Concept & Motivation\nDistributed consensus.\n\n### My Notes\n- Custom point 1\n- Custom point 2",
+			expected: "### My Notes\n- Custom point 1\n- Custom point 2",
+		},
+		{
+			name: "pure manual user note",
+			input: "- Read pages 10-20\n- Diagram pasted: ![alt](assets/pic.png)",
+			expected: "### My Notes\n- Read pages 10-20\n- Diagram pasted: ![alt](assets/pic.png)",
+		},
+		{
+			name: "ai note without user notes",
+			input: "### Core Concept & Motivation\nLinearizability.\n\n### Key Mechanisms & Principles\n- 2PC\n- Raft",
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ExtractUserNotesSection(tc.input)
+			if result != tc.expected {
+				t.Errorf("ExtractUserNotesSection() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
 }

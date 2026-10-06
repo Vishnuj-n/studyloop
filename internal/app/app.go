@@ -52,6 +52,7 @@ type App struct {
 	extManager        *extension.Manager
 	extRunner         *extension.Runner
 	notebookUploadDir string
+	notesDir          string
 	aiReady           bool
 	aiInitError       string
 	extInitError      string
@@ -169,6 +170,7 @@ func (a *App) startup(ctx context.Context) {
 	a.scheduler = boot.Scheduler
 	a.notebookService = boot.NotebookService
 	a.notebookUploadDir = boot.NotebookUploadDir
+	a.notesDir = boot.NotesDir
 
 	a.aiMutex.Lock()
 	a.embedder = boot.Embedder
@@ -227,6 +229,20 @@ func (a *App) GetCtx() context.Context {
 // GetNotebookUploadDir returns the uploaded notebook files directory path.
 func (a *App) GetNotebookUploadDir() string {
 	return a.notebookUploadDir
+}
+
+// GetNotesDir returns the study notes and assets directory path.
+func (a *App) GetNotesDir() string {
+	if a.notesDir != "" {
+		return a.notesDir
+	}
+	a.aiMutex.Lock()
+	svc := a.studyService
+	a.aiMutex.Unlock()
+	if svc != nil {
+		return svc.NotesBaseDir()
+	}
+	return study.NotesBaseDir()
 }
 
 // LogFrontendEvent accepts a structured log event from the frontend and writes it to the queue logger.

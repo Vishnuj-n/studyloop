@@ -907,13 +907,14 @@ func (a *App) SaveNoteImage(topicID, notebookID, fileName string, fileData []byt
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
-	relPath, err := a.studyService.SaveNoteImage(topicID, notebookID, fileName, fileData)
+	relPath, relFolder, err := a.studyService.SaveNoteImage(topicID, notebookID, fileName, fileData)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{
-		"success": true,
-		"path":    relPath,
+		"success":              true,
+		"path":                 relPath,
+		"relative_folder_path": relFolder,
 	}
 }
 

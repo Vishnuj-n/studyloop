@@ -691,18 +691,19 @@ type UserSettings struct {
 // TopicStudyNote represents a structured study summary note for one reading session of a topic.
 // StartPage and EndPage identify the session scope. (0, 0) means a whole-chapter / on-demand note.
 type TopicStudyNote struct {
-	ID             string `json:"id"`
-	TopicID        string `json:"topic_id"`
-	TopicTitle     string `json:"topic_title,omitempty"`
-	NotebookID     string `json:"notebook_id"`
-	NotebookTitle  string `json:"notebook_title,omitempty"`
-	StartPage      int    `json:"start_page"`
-	EndPage        int    `json:"end_page"`
-	FilePath       string `json:"file_path,omitempty"`
-	Content        string `json:"content"`
-	LastReviewedAt int64  `json:"last_reviewed_at"`
-	CreatedAt      string `json:"created_at,omitempty"`
-	UpdatedAt      string `json:"updated_at,omitempty"`
+	ID                 string `json:"id"`
+	TopicID            string `json:"topic_id"`
+	TopicTitle         string `json:"topic_title,omitempty"`
+	NotebookID         string `json:"notebook_id"`
+	NotebookTitle      string `json:"notebook_title,omitempty"`
+	StartPage          int    `json:"start_page"`
+	EndPage            int    `json:"end_page"`
+	FilePath           string `json:"file_path,omitempty"`
+	RelativeFolderPath string `json:"relative_folder_path,omitempty"`
+	Content            string `json:"content"`
+	LastReviewedAt     int64  `json:"last_reviewed_at"`
+	CreatedAt          string `json:"created_at,omitempty"`
+	UpdatedAt          string `json:"updated_at,omitempty"`
 }
 
 type AnalyticsEventSync struct {
