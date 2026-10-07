@@ -49,6 +49,7 @@ var alterStatements = []struct {
 	{"user_settings", "auto_generate_study_notes", "ALTER TABLE user_settings ADD COLUMN auto_generate_study_notes BOOLEAN DEFAULT 0"},
 	{"user_settings", "notes_detail_level", "ALTER TABLE user_settings ADD COLUMN notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary'"},
 	{"user_settings", "notes_model_tier", "ALTER TABLE user_settings ADD COLUMN notes_model_tier TEXT NOT NULL DEFAULT 'fast'"},
+	{"user_settings", "show_recap_before_reading", "ALTER TABLE user_settings ADD COLUMN show_recap_before_reading BOOLEAN DEFAULT 1"},
 	{"user_settings", "rate_limit_strategy", "ALTER TABLE user_settings ADD COLUMN rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD'"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 

@@ -36,6 +36,7 @@ export function useSettings(errorRef, successRef) {
     auto_generate_study_notes: false,
     notes_detail_level: 'exec_summary',
     notes_model_tier: 'fast',
+    show_recap_before_reading: true,
   })
 
   const studyDuration = ref('')

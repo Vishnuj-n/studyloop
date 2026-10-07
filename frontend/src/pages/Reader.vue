@@ -396,6 +396,7 @@ import {
   getTopicCompressionStats,
   skipReadingTask,
   getTopicStudyNoteSlots,
+  setStudyNotesSettings,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
@@ -653,14 +654,34 @@ const anonymousUserID = ref('')
 const ragSettingsLoaded = ref(false)
 const ragSettingsError = ref(null)
 const autoNotesEnabled = ref(false)
+const showRecapEnabled = ref(true)
+const noteDetailLevel = ref('exec_summary')
 
 // Previous Session Recap State
 const showPreviousSessionRecap = ref(false)
 const previousSessionSlot = ref(null)
 const loadingPreviousSessionSlot = ref(false)
 
-function onDismissRecap() {
+async function onDismissRecap(payload) {
   showPreviousSessionRecap.value = false
+  if (payload?.dontShowAgain) {
+    showRecapEnabled.value = false
+    try {
+      await setStudyNotesSettings(autoNotesEnabled.value, noteDetailLevel.value, false)
+      window.dispatchEvent(
+        new CustomEvent('settings-updated', {
+          detail: {
+            auto_generate_study_notes: Boolean(autoNotesEnabled.value),
+            notes_detail_level: noteDetailLevel.value || 'exec_summary',
+            show_recap_before_reading: false,
+          },
+        })
+      )
+    } catch (e) {
+      console.error('[Reader] Failed to disable auto recap setting:', e)
+    }
+  }
+
   if (reader.selectedTopicID.value) {
     try {
       sessionStorage.setItem(`hide_recap_${reader.selectedTopicID.value}`, 'true')
@@ -671,8 +692,8 @@ function onDismissRecap() {
 }
 
 async function checkAndShowPreviousSessionRecap() {
-  // Only trigger if task flow is active, autoNotes is enabled, and topic ID is present
-  if (!isTaskFlow.value || !autoNotesEnabled.value || !reader.selectedTopicID.value) {
+  // Only trigger if task flow is active, autoNotes is enabled, showRecap is enabled, and topic ID is present
+  if (!isTaskFlow.value || !autoNotesEnabled.value || !showRecapEnabled.value || !reader.selectedTopicID.value) {
     return
   }
 
@@ -793,6 +814,8 @@ async function loadRagSettings() {
     analyticsEnabled.value = settings?.analytics_enabled ?? false
     anonymousUserID.value = settings?.anonymous_user_id ?? ''
     autoNotesEnabled.value = settings?.auto_generate_study_notes ?? false
+    showRecapEnabled.value = settings?.show_recap_before_reading ?? true
+    noteDetailLevel.value = settings?.notes_detail_level ?? 'exec_summary'
   } catch (err) {
     console.error('Failed to load settings in Reader:', err)
     ragSettingsError.value = err?.message || 'Failed to load settings'

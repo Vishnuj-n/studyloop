@@ -382,6 +382,7 @@ Singleton table for global preferences.
 | `auto_generate_study_notes` | BOOLEAN DEFAULT 0 | Automatic post-compression study note generation toggle |
 | `notes_detail_level` | TEXT NOT NULL DEFAULT 'exec_summary' | Summary format variant (`exec_summary`, `concept_card`, `cheatsheet`, `feynman`, `detailed`) |
 | `notes_model_tier` | TEXT NOT NULL DEFAULT 'fast' | LLM performance tier used for study notes generation (`fast` or `heavy`) |
+| `show_recap_before_reading` | BOOLEAN DEFAULT 1 | Whether previous session notes recap modal automatically pops up before reading |
 | `rate_limit_strategy` | TEXT NOT NULL DEFAULT 'STANDARD' | Rate limit fallback strategy (`STANDARD` or `PACED`) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |

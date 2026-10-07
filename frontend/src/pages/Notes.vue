@@ -132,6 +132,23 @@
                     <option value="detailed">Comprehensive Deep Dive</option>
                   </select>
                 </div>
+
+                <div class="popover-setting-row">
+                  <span class="popover-label">Recap in Reader</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="showRecapEnabled"
+                    class="switch-toggle-btn small"
+                    :class="{ 'is-checked': showRecapEnabled }"
+                    title="Show previous session recap modal before reading"
+                    @click="handleToggleShowRecap(!showRecapEnabled)"
+                  >
+                    <span class="switch-slider-track">
+                      <span class="switch-slider-thumb"></span>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -625,6 +642,7 @@ const showAllSessions = ref(false)
 const autoNotesEnabled = ref(false)
 const noteDetailLevel = ref('exec_summary')
 const noteModelTier = ref('fast')
+const showRecapEnabled = ref(true)
 const showNotesSettingsPopover = ref(false)
 
 function getDetailLevelLabel(val) {
@@ -672,12 +690,18 @@ async function handleToggleAutoNotes(targetVal) {
   }
 }
 
+async function handleToggleShowRecap(targetVal) {
+  showRecapEnabled.value = Boolean(targetVal)
+  await saveAutoNotesSetting()
+}
+
 async function loadNotesSettings() {
   try {
     const res = await getStudyNotesSettings()
     if (res && !res.error) {
       autoNotesEnabled.value = Boolean(res.auto_generate_study_notes)
       noteDetailLevel.value = res.notes_detail_level || 'exec_summary'
+      showRecapEnabled.value = res.show_recap_before_reading !== undefined ? Boolean(res.show_recap_before_reading) : true
     }
   } catch (err) {
     console.error('[NOTES] Failed to load settings from SQLite:', err)
@@ -686,7 +710,7 @@ async function loadNotesSettings() {
 
 async function saveAutoNotesSetting() {
   try {
-    const res = await setStudyNotesSettings(autoNotesEnabled.value, noteDetailLevel.value)
+    const res = await setStudyNotesSettings(autoNotesEnabled.value, noteDetailLevel.value, showRecapEnabled.value)
     if (res && res.error) {
       console.error('[NOTES] Failed to save settings to SQLite:', res.error)
       errorMsg.value = res.error
@@ -697,6 +721,7 @@ async function saveAutoNotesSetting() {
         detail: {
           auto_generate_study_notes: Boolean(autoNotesEnabled.value),
           notes_detail_level: noteDetailLevel.value || 'exec_summary',
+          show_recap_before_reading: Boolean(showRecapEnabled.value),
         },
       })
     )
@@ -712,6 +737,9 @@ function handleExternalSettingsUpdated(e) {
     }
     if (e.detail.notes_detail_level) {
       noteDetailLevel.value = e.detail.notes_detail_level
+    }
+    if (typeof e.detail.show_recap_before_reading === 'boolean') {
+      showRecapEnabled.value = e.detail.show_recap_before_reading
     }
   }
 }

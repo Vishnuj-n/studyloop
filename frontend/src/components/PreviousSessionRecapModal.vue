@@ -38,6 +38,14 @@
       </div>
 
       <footer class="recap-modal-footer">
+        <label class="dont-show-again-label">
+          <input
+            v-model="dontShowAgain"
+            type="checkbox"
+            class="recap-checkbox"
+          />
+          <span>Don't show recap automatically</span>
+        </label>
         <div class="footer-actions">
           <button
             type="button"
@@ -53,7 +61,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 import { renderMarkdown } from '../services/markdown'
 
@@ -82,6 +90,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'dismiss'])
 
+const dontShowAgain = ref(false)
+
 const previousSlotRange = computed(() => {
   if (!props.previousSlot) return ''
   const start = props.previousSlot.start_page
@@ -103,7 +113,7 @@ const renderedMarkdown = computed(() => {
 })
 
 function handleDismiss() {
-  emit('dismiss')
+  emit('dismiss', { dontShowAgain: dontShowAgain.value })
 }
 </script>
 
@@ -286,7 +296,30 @@ function handleDismiss() {
   background: var(--surface-container, #282828);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dont-show-again-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted-text, #a89984);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dont-show-again-label:hover {
+  color: var(--on-surface, #ebdbb2);
+}
+
+.recap-checkbox {
+  cursor: pointer;
+  accent-color: var(--primary, #d79921);
+  width: 14px;
+  height: 14px;
 }
 
 .footer-actions {

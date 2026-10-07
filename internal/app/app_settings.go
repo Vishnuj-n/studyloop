@@ -87,20 +87,21 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"auto_generate_study_notes":  s.AutoGenerateStudyNotes,
 		"notes_detail_level":         s.NotesDetailLevel,
 		"notes_model_tier":           s.NotesModelTier,
+		"show_recap_before_reading":  s.ShowRecapBeforeReading,
 		"rate_limit_strategy":        s.RateLimitStrategy,
 	}
 }
 
-// SetStudyNotesSettings updates only auto_generate_study_notes and notes_detail_level in SQLite without needing global settings.
-func (a *App) SetStudyNotesSettings(autoGenerate bool, detailLevel string) map[string]interface{} {
+// SetStudyNotesSettings updates auto_generate_study_notes, notes_detail_level, and show_recap_before_reading in SQLite.
+func (a *App) SetStudyNotesSettings(autoGenerate bool, detailLevel string, showRecap bool) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
 	}
-	if err := repo.UpdateStudyNotesSettings(autoGenerate, detailLevel); err != nil {
+	if err := repo.UpdateStudyNotesSettings(autoGenerate, detailLevel, showRecap); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGenerate, "notes_detail_level": detailLevel}
+	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGenerate, "notes_detail_level": detailLevel, "show_recap_before_reading": showRecap}
 }
 
 // GetStudyNotesSettings returns the scoped study notes configuration directly.
@@ -109,11 +110,11 @@ func (a *App) GetStudyNotesSettings() map[string]interface{} {
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
 	}
-	autoGen, detail, err := repo.GetStudyNotesSettings()
+	autoGen, detail, showRecap, err := repo.GetStudyNotesSettings()
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGen, "notes_detail_level": detail}
+	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGen, "notes_detail_level": detail, "show_recap_before_reading": showRecap}
 }
 
 func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {

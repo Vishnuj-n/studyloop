@@ -256,8 +256,8 @@ export function getStudyNotesSettings() {
   return appBridge().GetStudyNotesSettings()
 }
 
-export function setStudyNotesSettings(autoGenerate, detailLevel = 'exec_summary') {
-  return appBridge().SetStudyNotesSettings(Boolean(autoGenerate), detailLevel || 'exec_summary')
+export function setStudyNotesSettings(autoGenerate, detailLevel = 'exec_summary', showRecap = true) {
+  return appBridge().SetStudyNotesSettings(Boolean(autoGenerate), detailLevel || 'exec_summary', Boolean(showRecap))
 }
 
 export function trackAnalyticsEvent(eventType, fileHash, pageNumber, metadata) {

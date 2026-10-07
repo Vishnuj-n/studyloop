@@ -158,6 +158,7 @@ func InitSchema(tx *sql.Tx) error {
 			auto_generate_study_notes BOOLEAN DEFAULT 0,
 			notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary',
 			notes_model_tier TEXT NOT NULL DEFAULT 'fast',
+			show_recap_before_reading BOOLEAN DEFAULT 1,
 			rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD',
 			extension_settings TEXT DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
