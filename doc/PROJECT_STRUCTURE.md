@@ -117,31 +117,39 @@ frontend/src/
   pages/
     Dashboard.vue        # Pending tasks from queue
     Reader.vue           # PDF reading module
+    Notes.vue            # Structured markdown notes & auto-notes configuration
     Quiz.vue             # Quiz generation + scoring
     Flashcards.vue       # Flashcard review with FSRS
     WrittenAssessment.vue # Written assessment (Examiner)
     Socratic.vue         # Socratic tutor chat (in-app)
     SocraticRescue.vue   # Concept rescue (dual-lane)
+    Rewards.vue          # XP progression, loot boxes & Pet Sanctuary
+    Extensions.vue       # Extension marketplace & uv runtime status
     Notebook.vue         # Notebook management
     Onboarding.vue       # First-time setup
     Settings.vue         # Provider config, themes, profiles
 
   components/
-    Sidebar.vue          # Navigation sidebar (7 items)
+    Sidebar.vue          # Navigation sidebar with progression pill
     BaseButton.vue       # Reusable button
     ErrorMessage.vue     # Error display
-    ReaderChat.vue       # Ask AI panel for Reader
+    ReaderChat.vue       # Ask AI panel for Reader & inline image pasting
     StudyPageLayout.vue  # Shared study page layout
     YouTubeReader.vue    # Embedded video player & transcript drawer
     MarkdownReader.vue   # Structured Markdown reader for deep PDF ingestion
     NotebookUpload.vue   # PDF / Deep PDF / YouTube upload modal
+    FloatingPet.vue      # Interactive floating study pet companion
+    PetAvatar.vue        # Animated SVG avatar for pet species & skins
+    PetSanctuaryView.vue # Pet companion collection & skin management
+    PreviousSessionRecapModal.vue # Pre-reading high-yield previous session recap
+    CompressionBadge.vue # LLMLingua-2 background prompt compression stats
 
   services/
     appApi.js            # Wails backend bridge
     markdown.js          # Markdown rendering utilities
 ```
 
-Sidebar: Dashboard, Reader, Notebooks, Quiz, Flashcards, Examiner, Tutor. Settings + Sync at bottom.
+Sidebar: Dashboard, Reader, Notes, Notebooks, Quiz, Flashcards, Examiner, Tutor, Rewards, Extensions. Settings + Sync at bottom.
 
 ---
 

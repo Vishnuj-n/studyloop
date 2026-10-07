@@ -211,9 +211,37 @@ Stable SHA-256 file hashes + page numbers replace local IDs for cross-student an
 
 ---
 
+## 6d. Structured Study Notes & Session Recap Flow
+
+1. **Pre-Reading Session Recap**:
+   - When a user enters a reading session from the queue or notebook list, `show_recap_before_reading` is checked.
+   - If enabled and prior session notes exist, `PreviousSessionRecapModal` renders the prior session's high-yield summary before diving into new material.
+   - Users can proceed directly or toggle "Don't show again" to disable the automatic popup.
+2. **Post-Reading / In-Session Auto Notes Generation**:
+   - When `auto_generate_study_notes` is active, notes are generated synchronously from the read text/chunks.
+   - Preserves user additions under `## My Notes` on regeneration.
+   - Allows inline image pasting and markdown rendering.
+   - Notes are saved on disk under `dev_data/notes/<Notebook>/<Topic>/pages_<start>_<end>.md`.
+
+---
+
+## 6e. Rewards, Gamification & Pet Companion
+
+1. **XP & Progression**:
+   - Completing reading sessions, quizzes, reviews, and exams awards XP and coins (`user_gamification`).
+   - Reaching XP thresholds dynamically promotes the user across narrative titles (Apprentice, Scholar, Master, Archon).
+2. **Mystery Loot Boxes**:
+   - Task completion triggers drop evaluations (`pending_loot_boxes`) with bronze, silver, gold, and mythic chests.
+   - Users open chests in the Rewards page (`Rewards.vue`) to claim bonus coins, XP, and streak freeze shields.
+3. **Pet Sanctuary & Floating Companion**:
+   - Floating companion avatar (`FloatingPet.vue`) accompanies the learner during active sessions.
+   - Companion sanctuary (`PetSanctuaryView.vue`) allows unlocking and selecting pets (cat, dog, fox, dragon) and custom skins using coins.
+
+---
+
 ## 7. Navigation
 
-Left sidebar: Dashboard, Reader, Notebooks, Quiz, Flashcards, Examiner, Tutor, Settings, Sync. Dashboard queue is primary workflow.
+Left sidebar: Dashboard, Reader, Notes, Notebooks, Quiz, Flashcards, Examiner, Tutor, Rewards, Extensions. Settings + Sync at bottom. Dashboard queue is primary workflow.
 
 ---
 

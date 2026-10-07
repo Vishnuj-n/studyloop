@@ -98,13 +98,16 @@ Sidebar sections:
 
 1. Dashboard
 2. Reader
-3. Notebooks
-4. Quiz
-5. Flashcards
-6. Examiner (WrittenAssessment)
-7. Tutor (Socratic)
-8. Settings (bottom)
-9. Sync (bottom)
+3. Notes
+4. Notebooks
+5. Quiz
+6. Flashcards
+7. Examiner (WrittenAssessment)
+8. Tutor (Socratic)
+9. Rewards (Gamification & Pet Sanctuary)
+10. Extensions
+11. Settings (bottom)
+12. Sync (bottom)
 
 Pages open from queue task or manual exploratory action; both converge on same initialization pipeline.
 
@@ -448,6 +451,32 @@ LIMIT 1;
 - Flashcard Reviews Hero Card: High-priority widget showing due count + overdue deck size
 - Action Contexts: "Continue Reading" titles with "Resume" buttons for active readings
 - Telemetry Widget Relocation: Profile Study Pacing moved to bottom of main column
+
+### Structured Study Notes & Auto-Generation System
+
+**Deterministic File-Based Notes Architecture:**
+- **Storage**: Clean Markdown files organized hierarchically on disk in `dev_data/notes/<Notebook>/<Topic>/` (dev) or `%APPDATA%/Studyloop/notes/` (prod).
+- **Session Note Granularity**: Notes are keyed to deterministic reading session page ranges (`pages_<start>_<end>.md`) or whole-topic summaries (`chapter_summary.md`), with dedicated nested `assets/` folders for pasted images and diagrams.
+- **YAML Frontmatter Metadata**: Files embed standardized frontmatter (`id`, `notebook_id`, `notebook_title`, `topic_id`, `topic_title`, `start_page`, `end_page`, `last_reviewed_at`, `created_at`, `updated_at`).
+- **User Annotation Preservation**: When regenerating notes with AI, any user-authored content under `## My Notes` or manual annotations is detected and preserved automatically.
+- **Configurable Auto-Notes Generation**:
+  - Automatically generates structured study notes on session start and completion when `auto_generate_study_notes` is enabled.
+  - **Detail Level Variants**: `exec_summary` (120–150 words high-density summary), `concept_card` (<180 words core mechanism card), `cheatsheet` (dense formula/rule bullet points), `feynman` (first-principles intuition), `detailed` (exhaustive deep dive).
+  - **LLM Tier Selector**: Configurable model tier (`fast` vs `heavy`) based on user preferences in `user_settings.notes_model_tier`.
+- **Previous Session Recap Flow**:
+  - When starting a new reading session, if previous notes exist for the topic/notebook and `show_recap_before_reading` is enabled (default `1`), a `PreviousSessionRecapModal` automatically presents the prior session's high-yield summary.
+  - Includes a "Don't show again" toggle and dedicated setting switch to suppress or re-enable the recap modal.
+
+### Rewards, Gamification & Pet Companion System
+
+**Dual-Track Progression & Economy:**
+- **XP & Narrative Rank Titles**: Experience points earned from completing reading sessions, passing quizzes, reviewing flashcards, and milestone exams (`user_gamification.total_xp`). Levels scale dynamically, unlocking narrative titles (`The Apprentice`, `The Scholar`, `The Grand Archon`, etc.).
+- **Study Coins & Rewards Shop**: Earned via daily tasks and loot chests, spendable on cosmetic themes, streak freeze shields (capped at 2 max, rate-limited to 1/week), and companion pet unlocks.
+- **Mystery Loot Boxes**: Task completions award tier-based loot boxes (`pending_loot_boxes`: `BRONZE`, `SILVER`, `GOLD`, `MYTHIC`) with drop animations and random distributions of XP, coins, or streak freeze items.
+- **Floating Study Pet Companion**:
+  - Interactive companion avatar rendered on screen during study sessions (`FloatingPet.vue`, `PetAvatar.vue`).
+  - **Pet Sanctuary**: Dedicated sanctuary hub (`PetSanctuaryView.vue`) supporting multiple companion species (cat, dog, fox, dragon, etc.) with customizable unlockable skins and idle/study mood animations.
+  - **Mood & Interaction**: Pet reacts dynamically to active study timers, quiz success streaks, and focus milestones.
 
 ### Cloud Sync with Stable Identifiers (2026-06-28)
 

@@ -465,6 +465,7 @@ Generated Reader → Quiz handoffs flow through queue router only; not direct mo
 internal/
   study/             # Study session logic
     service.go       # Core study service
+    study_notes_service.go # Structured study notes generation & disk persistence
     flashcard.go     # Flashcard review session
     examiner.go      # Written assessment session
     quiz_sync.go     # Synchronous quiz generation + scoring
@@ -506,11 +507,13 @@ internal/
 frontend/src/pages/
   Dashboard.vue      # Task display + metrics
   Reader.vue         # Reading module
+  Notes.vue          # Structured markdown notes & auto-notes settings
   Quiz.vue           # Quiz module + milestone exam UI
   Flashcards.vue     # Flashcard module
   WrittenAssessment.vue # Written assessment (Examiner)
   Socratic.vue       # Socratic tutor
   SocraticRescue.vue # Concept rescue (2-strike Socratic prompt)
+  Rewards.vue        # Progression, loot boxes & Pet Sanctuary
   Notebook.vue       # Notebook management + AI cleanup fallback
   Onboarding.vue     # First-time setup
   Settings.vue       # Provider config

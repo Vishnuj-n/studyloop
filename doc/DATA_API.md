@@ -179,6 +179,38 @@ Get/set user's quiz failure preference: `CLASSIC` (reread first) or `FAST` (dire
 
 ---
 
+## Study Notes API
+
+### GenerateTopicStudyNote / GenerateTopicStudyNoteForRange
+Generates structured study note with YAML frontmatter from candidate chunks for a topic or specific reading session page range $[start\_page \dots end\_page]$. Preserves user's `## My Notes` section on regeneration.
+
+### GetTopicStudyNote / GetTopicStudyNotes
+Retrieves existing topic study notes and all session slot notes stored on disk.
+
+### SaveTopicStudyNote
+Saves/updates a structured markdown note with frontmatter to disk under `dev_data/notes/<Notebook>/<Topic>/pages_<start>_<end>.md`.
+
+### GetPreviousSessionNote
+Retrieves the most recent prior session note for a notebook/topic to display in the pre-reading recap modal.
+
+### SaveNoteAsset
+Persists pasted images or diagrams into `dev_data/notes/<Notebook>/<Topic>/assets/` and returns markdown asset references.
+
+---
+
+## Gamification & Rewards API
+
+### GetGamificationState
+Returns user's cumulative XP, study coins balance, current narrative title, streak freeze status, and pending unopened loot boxes.
+
+### ClaimLootBox / OpenLootBox
+Opens a pending mystery loot box (`BRONZE`, `SILVER`, `GOLD`, `MYTHIC`), rolls rewards (XP, coins, freeze), and updates state.
+
+### PurchaseCosmetic / EquipCosmetic
+Spends coins in the rewards shop to unlock UI themes, pet skins, or streak freeze shields.
+
+---
+
 ## Ingestion & Notebook API
 
 ### ProcessPDF
