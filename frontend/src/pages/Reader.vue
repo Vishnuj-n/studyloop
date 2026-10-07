@@ -1238,7 +1238,7 @@ h3 {
 
 .layout {
   display: grid;
-  grid-template-columns: 1.8fr 1fr;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 12px;
   flex: 1;
   min-height: 0;
@@ -1246,7 +1246,7 @@ h3 {
 }
 
 .layout.collapsed {
-  grid-template-columns: 1fr 78px;
+  grid-template-columns: minmax(0, 1fr) 78px;
 }
 
 .stage {

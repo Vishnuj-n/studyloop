@@ -77,7 +77,7 @@ def parse_css_rules(style_content, start_pos, full_content):
             selector_text = "".join(current_selector).strip()
             if selector_text.startswith('@keyframes') or selector_text.startswith('@-webkit-keyframes'):
                 stack.append((i, "keyframes"))
-            elif selector_text.startswith('@media'):
+            elif selector_text.startswith('@media') or selector_text.startswith('@container') or selector_text.startswith('@supports'):
                 stack.append((i, "media"))
             else:
                 is_in_keyframes = any(t == "keyframes" for _, t in stack)
