@@ -658,7 +658,7 @@ async function handleToggleAutoNotes(targetVal) {
   const ok = await confirmDialog({
     title: 'Enable Auto Study Notes?',
     message:
-      'Auto Notes automatically summarizes each chapter in the background when you start reading.\n\n⚠️ Rate Limit (429) Notice:\nBackground AI calls can hit provider rate limits on free API keys (such as Groq Free).\n\nTo prevent errors:\n• Enable "PACED" rate limiting in Settings\n• Or configure separate Fast and Heavy API keys\n• Or use a paid API provider (OpenAI / Azure / Groq)',
+      'Auto Notes automatically summarizes each chapter in the background when you start reading.\n\nRate Limit (429) Notice:\nBackground AI calls can hit provider rate limits on free API keys (such as Groq Free).\n\nTo prevent errors:\n• Enable "PACED" rate limiting in Settings\n• Or configure separate Fast and Heavy API keys\n• Or use a paid API provider (OpenAI / Azure / Groq)',
     confirmText: 'Enable Auto Notes',
     cancelText: 'Cancel',
     type: 'warning',
@@ -2454,7 +2454,7 @@ onUnmounted(() => {
 .auto-notes-status-badge.badge-active {
   background: color-mix(in srgb, #10b981 20%, transparent);
   color: #10b981;
-  border: 1px solid color-mix(in srgb, #10b981 40%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .auto-notes-status-badge.badge-inactive {
@@ -2510,7 +2510,7 @@ onUnmounted(() => {
   background-color: #fff;
   border-radius: 50%;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .switch-toggle-btn.is-checked .switch-slider-track {
@@ -2568,7 +2568,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   animation: fadeIn 0.15s ease-out;
 }
 
