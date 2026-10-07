@@ -17,21 +17,98 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-const studyNoteSystemPrompt = `You are a high-yield academic study notes assistant.
-Generate a structured, concise study note designed for rapid conceptual review and high retention from the provided reference material.
+const studyNoteSystemPrompt = `You are an expert academic summarizer.
+Generate a crisp, high-density study note that can be reviewed in under 30 seconds from the provided material.
 
 Requirements:
-- Length & Density: Scale length dynamically to match the density of the source material. Be as concise as possible while ensuring zero loss of core concepts. No padding, filler, or fluff.
-- Tone: Rigorous, clear, conceptual, direct and limit it to the essential information. Avoid casual language, jokes, or personal commentary. 
+- Length: Maximum 120–150 words total.
+- Tone: Rigorous, clear, conceptual, direct. No filler or conversational transitions.
 - Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
-- Formatting: Clean markdown with bold technical terms and structured bullet points.
+- Formatting: Clean markdown with bold technical terms and strictly capped bullet points.
 
 Structure:
-- **Core Concept & Motivation**: 1–2 sentences defining the central idea and why it matters.
-- **Key Mechanisms & Principles**: High-yield bullet points breaking down essential mechanics, relationships, and distinctions. Include relevant formulas, notation, or algorithmic steps if present.
-- **Critical Nuances / Edge Cases**: Key trade-offs, boundary conditions, or common pitfalls (if applicable to the content).
-- **Operational Takeaway**: 1 concluding rule of thumb, heuristic, or high-yield synthesis.
+### Summary
+A direct 2–3 sentence distillation of what this topic is, why it works, and its core significance.
+
+### Key Points
+- **[Concept 1]**: 1-line definition or rule.
+- **[Concept 2]**: 1-line mechanism, formula, or relationship.
+- **[Concept 3]**: 1-line key takeaway or practical implication.
+(Limit to exactly 3–4 high-yield bullets maximum).
 `
+
+func getStudyNoteSystemPrompt(detailLevel string) string {
+	switch strings.ToLower(strings.TrimSpace(detailLevel)) {
+	case "concept_card":
+		return `You are a high-yield study assistant.
+Extract the fundamental conceptual core from the reference text into a tight, focused reference card.
+
+Requirements:
+- Hard Limits: Keep the entire output under 180 words. Maximum 4 bullet points total across the note.
+- Tone: Academic, rigorous, direct.
+- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
+- Formatting: Clean Markdown. Bold key terms on first mention.
+
+Structure:
+- **Core Definition**: 1–2 precise sentences defining the concept and why it matters.
+- **Core Mechanism**: 3 to 4 concise bullet points explaining how it operates, equations, or governing rules.
+- **Key Takeaway**: 1 practical rule of thumb or memory hook.
+`
+	case "cheatsheet", "bullet":
+		return `You are a technical cheatsheet generator.
+Convert the provided material into an ultra-concise reference cheatsheet.
+
+Requirements:
+- Format: Strictly bullet points, definitions, and equations. Zero narrative paragraphs.
+- Length: Maximum 5–6 single-line bullet points total.
+- Tone: Dense, factual, direct. No filler or fluff.
+- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
+
+Structure:
+- **Definition**: 1 single-line definition of the core topic.
+- **Key Rules & Formulas**: 2–3 single-line bullet points with equations, laws, or syntax.
+- **Distinction / Pitfall**: 1 single-line common trap, distinction, or boundary condition.
+`
+	case "feynman":
+		return `You are a study synthesis engine.
+Synthesize the reference text into a fast, intuitive study note using first principles.
+
+Requirements:
+- Length: 100–140 words total.
+- Tone: Clear, plain-spoken yet technically accurate.
+- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
+- Formatting: Clean markdown with bold technical terms.
+
+Structure:
+### Intuition
+1–2 sentences explaining the idea in simple, intuitive terms.
+
+### Mechanics
+- **[Core Rule]**: 1 line on what governs this system or concept.
+- **[Application / Formula]**: 1 line on how it is calculated or applied.
+- **[Watch Out For]**: 1 line on the single most critical exception or edge case.
+`
+	case "detailed":
+		return `You are a comprehensive academic study notes assistant.
+Generate an in-depth, structured study note covering the full breadth and nuance of the provided reference material.
+
+Requirements:
+- Coverage: Thorough and exhaustive. Capture all key arguments, subtopics, derivations, mechanisms, and examples.
+- Tone: Academic, rigorous, clear, and structured.
+- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
+- Formatting: Clean markdown with structured headers, bold terminology, and clear bullet points.
+
+Structure:
+- **Comprehensive Overview & Context**: Detailed definition of core concepts, context, and motivations.
+- **Deep-Dive Mechanisms & Principles**: In-depth breakdown of concepts, processes, mathematical formulations, and distinctions.
+- **Examples & Applications**: Concrete applications, scenarios, or case studies illustrated in the text.
+- **Nuances, Exceptions & Edge Cases**: Boundary conditions, common misconceptions, and critical caveats.
+- **Executive Summary**: 2–3 sentence high-yield takeaway.
+`
+	default: // "exec_summary", "concise", "summary"
+		return studyNoteSystemPrompt
+	}
+}
 
 // NotesBaseDir returns the base directory where markdown notes are stored on disk for this service instance.
 func (s *StudyService) NotesBaseDir() string {
@@ -346,22 +423,31 @@ func (s *StudyService) GenerateTopicStudyNote(topicID, notebookID string) (*mode
 func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPage, endPage int) (*models.TopicStudyNote, error) {
 	topicID = strings.TrimSpace(topicID)
 	notebookID = strings.TrimSpace(notebookID)
-	if topicID == "" {
-		return nil, fmt.Errorf("topic ID is required")
+	if topicID == "" && notebookID == "" {
+		return nil, fmt.Errorf("topic ID or notebook ID is required")
 	}
 
 	nbID, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, notebookID)
 
-	// Fetch candidate chunks (scoped to session page range if provided)
+	// Fetch candidate chunks (scoped to session page range if provided with fallback ladder)
 	var chunks []models.Chunk
 	var err error
-	if startPage > 0 && endPage >= startPage {
+	if startPage > 0 && endPage >= startPage && tID != "" {
 		chunks, err = s.repo.GetChunksForTopicPageRange(tID, startPage, endPage)
-	} else {
+	} else if tID != "" {
 		chunks, err = s.repo.GetChunksForTopic(tID)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch chunks for topic %s: %w", topicID, err)
+		utils.Warnf("[STUDY_NOTES] fetch chunks for topic %s err: %v", topicID, err)
+	}
+	if len(chunks) == 0 && tID != "" {
+		chunks, _ = s.repo.GetChunksForTopic(tID)
+	}
+	if len(chunks) == 0 && nbID != "" && startPage > 0 && endPage >= startPage {
+		chunks, _ = s.repo.GetChunksForNotebookPageRange(nbID, startPage, endPage)
+	}
+	if len(chunks) == 0 && nbID != "" {
+		chunks, _ = s.repo.GetChunksForNotebook(nbID)
 	}
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("no content chunks available for topic %s", topicID)
@@ -377,8 +463,38 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 		return sortedChunks[i].PageNum < sortedChunks[j].PageNum
 	})
 
-	// Select LLM provider
-	provider, tier := s.selectLLM("")
+	// User settings for model tier and detail level
+	detailLevel := "concise"
+	modelTierPref := "fast"
+	if s.repo != nil {
+		if uSettings, sErr := s.repo.GetUserSettings(); sErr == nil && uSettings != nil {
+			if strings.TrimSpace(uSettings.NotesDetailLevel) != "" {
+				detailLevel = uSettings.NotesDetailLevel
+			}
+			if strings.TrimSpace(uSettings.NotesModelTier) != "" {
+				modelTierPref = uSettings.NotesModelTier
+			}
+		}
+	}
+
+	// Select LLM provider respecting modelTierPref
+	var provider LLMProvider
+	var tier string
+	if strings.EqualFold(modelTierPref, "heavy") && s.heavyLLMProvider != nil {
+		provider = s.heavyLLMProvider
+		tier = "heavy"
+	} else {
+		provider, tier = s.selectLLM("")
+	}
+	if provider == nil {
+		if s.fastLLMProvider != nil {
+			provider = s.fastLLMProvider
+			tier = "fast"
+		} else if s.heavyLLMProvider != nil {
+			provider = s.heavyLLMProvider
+			tier = "heavy"
+		}
+	}
 	if provider == nil {
 		return nil, fmt.Errorf("no LLM provider configured")
 	}
@@ -433,7 +549,8 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 		sectionContext = fmt.Sprintf(" (Pages %d–%d)", startPage, endPage)
 	}
 
-	prompt := fmt.Sprintf("%s\n\nTopic Title: %s%s\n\nReference Material:\n%s\n\nStructured Study Note:", studyNoteSystemPrompt, tTitle, sectionContext, referenceText)
+	systemPrompt := getStudyNoteSystemPrompt(detailLevel)
+	prompt := fmt.Sprintf("%s\n\nTopic Title: %s%s\n\nReference Material:\n%s\n\nStructured Study Note:", systemPrompt, tTitle, sectionContext, referenceText)
 
 	answer, genErr := provider.GenerateAnswer(prompt)
 	if genErr != nil {
@@ -492,18 +609,19 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 	}
 	note.FilePath = filePath
 
-	utils.Infof("[STUDY_NOTES] successfully generated study note for topic %s%s at %s (tier=%s)", topicID, sectionContext, filePath, tier)
+	utils.Infof("[STUDY_NOTES] successfully generated study note for topic %s%s at %s (tier=%s, detail=%s)", topicID, sectionContext, filePath, tier, detailLevel)
 	return &note, nil
 }
 
 // GenerateTopicStudyNoteAsync triggers asynchronous study note generation in the background.
 func (s *StudyService) GenerateTopicStudyNoteAsync(ctx context.Context, topicID, notebookID string, startPage, endPage int) {
 	topicID = strings.TrimSpace(topicID)
-	if topicID == "" {
+	notebookID = strings.TrimSpace(notebookID)
+	if topicID == "" && notebookID == "" {
 		return
 	}
 
-	key := fmt.Sprintf("%s:%d:%d", topicID, startPage, endPage)
+	key := fmt.Sprintf("%s:%s:%d:%d", topicID, notebookID, startPage, endPage)
 	s.inFlightNotesMu.Lock()
 	if s.inFlightNotes == nil {
 		s.inFlightNotes = make(map[string]bool)
@@ -526,21 +644,13 @@ func (s *StudyService) GenerateTopicStudyNoteAsync(ctx context.Context, topicID,
 			}
 		}()
 
-		reqCtx := ctx
-		if reqCtx == nil {
-			reqCtx = context.Background()
-		}
-		bgCtx, cancel := context.WithTimeout(reqCtx, 2*time.Minute)
+		bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 
-		select {
-		case <-bgCtx.Done():
-			return
-		default:
-		}
+		_ = bgCtx
 
 		if _, err := s.GenerateTopicStudyNoteForRange(topicID, notebookID, startPage, endPage); err != nil {
-			utils.Warnf("[STUDY_NOTES] async note generation failed for topic %s (pages %d-%d): %v", topicID, startPage, endPage, err)
+			utils.Warnf("[STUDY_NOTES] async note generation failed for topic %s notebook %s (pages %d-%d): %v", topicID, notebookID, startPage, endPage, err)
 		}
 	}()
 }

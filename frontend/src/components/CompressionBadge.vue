@@ -83,14 +83,33 @@
           </div>
         </div>
 
-        <div class="popover-footer-note">
-          <BaseIcon name="info" size="12" />
-          <span v-if="stats.is_compressing && stats.chunk_count && stats.compressed_chunk_count && stats.compressed_chunk_count < stats.chunk_count">
-            Batch progress: {{ stats.compressed_chunk_count }} / {{ stats.chunk_count }} chunks compressed ({{ activeSavingsPercent }}% pruned on compressed chunks).
-          </span>
-          <span v-else>
-            Removes redundant context &amp; filler words to lower inference latency while preserving 100% key concepts and formulas.
-          </span>
+        <div class="popover-footer-note" :class="{ 'is-in-progress': isBatchInProgress }">
+          <template v-if="isBatchInProgress">
+            <div class="batch-progress-header">
+              <span class="batch-progress-title">
+                <BaseIcon name="sparkles" size="12" class="spin-icon" />
+                Compressing Context...
+              </span>
+              <span class="batch-progress-count">
+                {{ stats.compressed_chunk_count }} / {{ stats.chunk_count }} chunks ({{ batchProgressPercent }}%)
+              </span>
+            </div>
+            <div class="batch-progress-track">
+              <div
+                class="batch-progress-fill"
+                :style="{ width: `${batchProgressPercent}%` }"
+              ></div>
+            </div>
+            <div class="batch-progress-sub">
+              <span>{{ activeSavingsPercent }}% pruned on processed chunks</span>
+            </div>
+          </template>
+          <template v-else>
+            <BaseIcon name="info" size="12" />
+            <span>
+              Removes redundant context &amp; filler words to lower inference latency while preserving 100% key concepts and formulas.
+            </span>
+          </template>
         </div>
       </div>
     </Transition>
@@ -126,6 +145,24 @@ const savingsPercent = computed(() => {
 const activeSavingsPercent = computed(() => {
   if (!props.stats || !props.stats.active_saved_percentage) return savingsPercent.value
   return Math.round(props.stats.active_saved_percentage)
+})
+
+const isBatchInProgress = computed(() => {
+  const s = props.stats
+  return !!(
+    s &&
+    s.is_compressing &&
+    s.chunk_count &&
+    s.compressed_chunk_count !== undefined &&
+    s.compressed_chunk_count < s.chunk_count
+  )
+})
+
+const batchProgressPercent = computed(() => {
+  const s = props.stats
+  if (!s || !s.chunk_count || s.chunk_count <= 0) return 0
+  const processed = s.compressed_chunk_count || 0
+  return Math.min(100, Math.max(0, Math.round((processed / s.chunk_count) * 100)))
 })
 
 function toggleOpen() {
@@ -409,6 +446,58 @@ onUnmounted(() => {
   padding: 6px 8px;
   border-radius: 6px;
   border-left: 2px solid var(--primary, #6b8e23);
+}
+
+.popover-footer-note.is-in-progress {
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(46, 125, 50, 0.05);
+  border-left: 2px solid #2e7d32;
+  padding: 8px 10px;
+}
+
+.batch-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.batch-progress-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 11px;
+  color: #2e7d32;
+}
+
+.batch-progress-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--on-surface, #1e2518);
+}
+
+.batch-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(46, 125, 50, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.batch-progress-fill {
+  height: 100%;
+  background: #2e7d32;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.batch-progress-sub {
+  font-size: 9.5px;
+  color: var(--muted-text, #687360);
+  font-weight: 500;
 }
 
 .popover-footer-note svg {

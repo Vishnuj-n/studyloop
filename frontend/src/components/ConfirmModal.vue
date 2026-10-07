@@ -210,7 +210,8 @@ onUnmounted(() => {
   margin: 0;
   font-size: 0.9rem;
   color: var(--on-surface-variant);
-  line-height: 1.5;
+  line-height: 1.55;
+  white-space: pre-line;
 }
 
 .dialog-actions {

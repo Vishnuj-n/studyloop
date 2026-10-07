@@ -94,22 +94,21 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 
 	// Trigger sequential background processing on topic opening:
 	// Compression runs first so study note generation consumes pre-compressed chunks (~20% smaller prompt).
-	if task.TopicID != "" && a.studyService != nil {
-		reqCtx := a.ctx
-		if reqCtx == nil {
-			reqCtx = context.Background()
-		}
-
+	if (task.TopicID != "" || task.NotebookID != "") && a.studyService != nil {
 		noteGenCallback := func() {
 			if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
 				existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
-				if checkErr == nil && existingNote == nil {
-					a.studyService.GenerateTopicStudyNoteAsync(reqCtx, task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+				if checkErr == nil && (existingNote == nil || strings.TrimSpace(existingNote.Content) == "") {
+					a.studyService.GenerateTopicStudyNoteAsync(context.Background(), task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
 				}
 			}
 		}
 
-		a.studyService.CompressTopicChunksAsync(reqCtx, task.TopicID, noteGenCallback)
+		if task.TopicID != "" {
+			a.studyService.CompressTopicChunksAsync(context.Background(), task.TopicID, noteGenCallback)
+		} else {
+			go noteGenCallback()
+		}
 	}
 
 	currentPage := task.CurrentPage
@@ -319,6 +318,16 @@ func (a *App) CompleteReading(taskID string, splitPage int) map[string]interface
 		"ok":           true,
 		"quiz_task_id": transitionRes.NextTaskID,
 		"rewards":      transitionRes.Rewards,
+	}
+
+	// Trigger note generation if auto notes enabled and not already created
+	if (task.TopicID != "" || task.NotebookID != "") && a.studyService != nil {
+		if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
+			existingNote, checkErr := a.studyService.GetTopicStudyNoteForRange(task.TopicID, task.StartPage, task.EndPage)
+			if checkErr == nil && (existingNote == nil || strings.TrimSpace(existingNote.Content) == "") {
+				a.studyService.GenerateTopicStudyNoteAsync(context.Background(), task.TopicID, task.NotebookID, task.StartPage, task.EndPage)
+			}
+		}
 	}
 
 	// 7. Auto-seed and return next continuous reading task if available

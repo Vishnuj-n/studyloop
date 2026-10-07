@@ -42,74 +42,96 @@
             </button>
           </div>
 
-          <!-- Quick Sidebar Auto Notes & Settings Bar -->
-          <div class="sidebar-quick-toolbar">
-            <label class="auto-notes-pill-toggle" title="Automatically queue study notes when completing reading sessions">
-              <input
-                v-model="autoNotesEnabled"
-                type="checkbox"
-                @change="saveAutoNotesSetting"
-              />
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">Auto Notes</span>
-            </label>
+          <!-- Prominent Auto-Notes Controller Card -->
+          <div class="sidebar-auto-notes-card" :class="{ 'is-active': autoNotesEnabled }">
+            <div class="auto-notes-card-main">
+              <div class="auto-notes-info">
+                <div class="auto-notes-badge-row">
+                  <span class="auto-notes-title">Auto Notes</span>
+                  <span class="auto-notes-status-badge" :class="autoNotesEnabled ? 'badge-active' : 'badge-inactive'">
+                    {{ autoNotesEnabled ? 'ON' : 'OFF' }}
+                  </span>
+                </div>
+                <span class="auto-notes-desc">
+                  {{ autoNotesEnabled ? getDetailLevelLabel(noteDetailLevel) : 'Background summaries' }}
+                </span>
+              </div>
 
-            <button
-              type="button"
-              class="sidebar-settings-quick-btn"
-              :class="{ active: showNotesSettingsPopover }"
-              title="Notes Generation Settings"
-              aria-label="Notes settings"
-              @click="showNotesSettingsPopover = !showNotesSettingsPopover"
-            >
-              <BaseIcon name="settings" size="13" />
-            </button>
-          </div>
+              <div class="auto-notes-actions">
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="autoNotesEnabled"
+                  class="switch-toggle-btn"
+                  :class="{ 'is-checked': autoNotesEnabled }"
+                  title="Toggle Auto Note Generation"
+                  @click="handleToggleAutoNotes(!autoNotesEnabled)"
+                >
+                  <span class="switch-slider-track">
+                    <span class="switch-slider-thumb"></span>
+                  </span>
+                </button>
 
-          <!-- Notes Settings Popover -->
-          <div v-if="showNotesSettingsPopover" class="notes-settings-popover">
-            <div class="popover-header">
-              <span class="popover-title">Notes Settings</span>
-              <button
-                type="button"
-                class="popover-close-btn"
-                title="Close settings"
-                @click="showNotesSettingsPopover = false"
-              >
-                <BaseIcon name="x" size="12" />
-              </button>
+                <button
+                  type="button"
+                  class="card-settings-btn"
+                  :class="{ active: showNotesSettingsPopover }"
+                  title="Configure notes prompt style & model tier"
+                  @click="showNotesSettingsPopover = !showNotesSettingsPopover"
+                >
+                  <BaseIcon name="settings" size="14" />
+                </button>
+              </div>
             </div>
-            <div class="popover-body">
-              <div class="popover-setting-row">
-                <span class="popover-label">Auto-Generate</span>
-                <input
-                  v-model="autoNotesEnabled"
-                  type="checkbox"
-                  @change="saveAutoNotesSetting"
-                />
-              </div>
-              <div class="popover-setting-row">
-                <span class="popover-label">Summary Detail</span>
-                <select
-                  v-model="noteDetailLevel"
-                  class="popover-select"
-                  @change="saveAutoNotesSetting"
+
+            <!-- Notes Settings Popover Dropdown -->
+            <div v-if="showNotesSettingsPopover" class="notes-settings-popover">
+              <div class="popover-header">
+                <div class="popover-title-group">
+                  <BaseIcon name="sparkles" size="13" class="popover-icon" />
+                  <span class="popover-title">Notes Configuration</span>
+                </div>
+                <button
+                  type="button"
+                  class="popover-close-btn"
+                  title="Close settings"
+                  @click="showNotesSettingsPopover = false"
                 >
-                  <option value="concise">Concise Summary</option>
-                  <option value="detailed">Comprehensive Deck</option>
-                  <option value="bullet">Key Takeaways & Formulas</option>
-                </select>
+                  <BaseIcon name="x" size="12" />
+                </button>
               </div>
-              <div class="popover-setting-row">
-                <span class="popover-label">AI Model Tier</span>
-                <select
-                  v-model="noteModelTier"
-                  class="popover-select"
-                  @change="saveAutoNotesSetting"
-                >
-                  <option value="fast">Fast Model (Speed)</option>
-                  <option value="heavy">Heavy Model (Deep)</option>
-                </select>
+
+              <div class="popover-body">
+                <div class="popover-setting-row">
+                  <span class="popover-label">Auto-Generate</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="autoNotesEnabled"
+                    class="switch-toggle-btn small"
+                    :class="{ 'is-checked': autoNotesEnabled }"
+                    @click="handleToggleAutoNotes(!autoNotesEnabled)"
+                  >
+                    <span class="switch-slider-track">
+                      <span class="switch-slider-thumb"></span>
+                    </span>
+                  </button>
+                </div>
+
+                <div class="popover-setting-row">
+                  <span class="popover-label">Prompt Style</span>
+                  <select
+                    v-model="noteDetailLevel"
+                    class="popover-select"
+                    @change="saveAutoNotesSetting"
+                  >
+                    <option value="exec_summary">Executive Summary (30-Sec)</option>
+                    <option value="concept_card">High-Yield Concept Card</option>
+                    <option value="cheatsheet">Minimalist Cheatsheet</option>
+                    <option value="feynman">Feynman (Intuition + Rules)</option>
+                    <option value="detailed">Comprehensive Deep Dive</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -559,7 +581,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -572,11 +594,15 @@ import {
   saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
   openNotesFolder,
+  getStudyNotesSettings,
+  setStudyNotesSettings,
 } from '../services/appApi'
 import { renderMarkdown } from '../services/markdown'
+import { useDialog } from '../composables/useDialog'
 
 const route = useRoute()
 const router = useRouter()
+const { confirm: confirmDialog } = useDialog()
 
 const loading = ref(true)
 const loadingSlots = ref(false)
@@ -595,16 +621,99 @@ const notesMap = ref({}) // topicID -> TopicStudyNote
 const sessionSlots = ref([])
 const showAllSessions = ref(false)
 
-// Auto-notes & sidebar settings state
-const autoNotesEnabled = ref(localStorage.getItem('studyloop_auto_notes_enabled') === 'true')
-const noteDetailLevel = ref(localStorage.getItem('studyloop_notes_detail_level') || 'concise')
-const noteModelTier = ref(localStorage.getItem('studyloop_notes_model_tier') || 'fast')
+// Auto-notes & sidebar settings state (persisted to SQLite user_settings)
+const autoNotesEnabled = ref(false)
+const noteDetailLevel = ref('exec_summary')
+const noteModelTier = ref('fast')
 const showNotesSettingsPopover = ref(false)
 
-function saveAutoNotesSetting() {
-  localStorage.setItem('studyloop_auto_notes_enabled', autoNotesEnabled.value ? 'true' : 'false')
-  localStorage.setItem('studyloop_notes_detail_level', noteDetailLevel.value)
-  localStorage.setItem('studyloop_notes_model_tier', noteModelTier.value)
+function getDetailLevelLabel(val) {
+  switch (val) {
+    case 'concept_card':
+      return 'Concept Card'
+    case 'cheatsheet':
+    case 'bullet':
+      return 'Cheatsheet'
+    case 'feynman':
+      return 'Feynman Note'
+    case 'detailed':
+      return 'Deep Dive'
+    default:
+      return '30s Summary'
+  }
+}
+
+function navigateToSettings() {
+  showNotesSettingsPopover.value = false
+  router.push('/settings')
+}
+
+async function handleToggleAutoNotes(targetVal) {
+  if (!targetVal) {
+    autoNotesEnabled.value = false
+    await saveAutoNotesSetting()
+    return
+  }
+
+  const ok = await confirmDialog({
+    title: 'Enable Auto Study Notes?',
+    message:
+      'Auto Notes automatically summarizes each chapter in the background when you start reading.\n\n⚠️ Rate Limit (429) Notice:\nBackground AI calls can hit provider rate limits on free API keys (such as Groq Free).\n\nTo prevent errors:\n• Enable "PACED" rate limiting in Settings\n• Or configure separate Fast and Heavy API keys\n• Or use a paid API provider (OpenAI / Azure / Groq)',
+    confirmText: 'Enable Auto Notes',
+    cancelText: 'Cancel',
+    type: 'warning',
+  })
+
+  if (ok) {
+    autoNotesEnabled.value = true
+    await saveAutoNotesSetting()
+  } else {
+    autoNotesEnabled.value = false
+  }
+}
+
+async function loadNotesSettings() {
+  try {
+    const res = await getStudyNotesSettings()
+    if (res && !res.error) {
+      autoNotesEnabled.value = Boolean(res.auto_generate_study_notes)
+      noteDetailLevel.value = res.notes_detail_level || 'exec_summary'
+    }
+  } catch (err) {
+    console.error('[NOTES] Failed to load settings from SQLite:', err)
+  }
+}
+
+async function saveAutoNotesSetting() {
+  try {
+    const res = await setStudyNotesSettings(autoNotesEnabled.value, noteDetailLevel.value)
+    if (res && res.error) {
+      console.error('[NOTES] Failed to save settings to SQLite:', res.error)
+      errorMsg.value = res.error
+      return
+    }
+    window.dispatchEvent(
+      new CustomEvent('settings-updated', {
+        detail: {
+          auto_generate_study_notes: Boolean(autoNotesEnabled.value),
+          notes_detail_level: noteDetailLevel.value || 'exec_summary',
+        },
+      })
+    )
+  } catch (err) {
+    console.error('[NOTES] Failed to save settings to SQLite:', err)
+  }
+}
+
+function handleExternalSettingsUpdated(e) {
+  if (e?.detail) {
+    if (typeof e.detail.auto_generate_study_notes === 'boolean') {
+      autoNotesEnabled.value = e.detail.auto_generate_study_notes
+    }
+    if (e.detail.notes_detail_level) {
+      noteDetailLevel.value = e.detail.notes_detail_level
+    }
+  }
 }
 
 // Slot editing & action state
@@ -1302,6 +1411,12 @@ async function markSlotReviewed(slot) {
 
 onMounted(() => {
   loadInitialData()
+  loadNotesSettings()
+  window.addEventListener('settings-updated', handleExternalSettingsUpdated)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('settings-updated', handleExternalSettingsUpdated)
 })
 </script>
 
@@ -2281,73 +2396,149 @@ onMounted(() => {
   align-items: center;
 }
 
-/* Sidebar Quick Toolbar & Auto Notes Toggle */
-.sidebar-quick-toolbar {
+/* Sidebar Auto Notes Card & Popover */
+.sidebar-auto-notes-card {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.sidebar-auto-notes-card.is-active {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--outline-variant));
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface-container));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.auto-notes-card-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 2px;
 }
 
-.auto-notes-pill-toggle {
-  display: inline-flex;
+.auto-notes-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.auto-notes-badge-row {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--on-surface-variant, var(--muted-text));
-  padding: 3px 6px;
-  border-radius: 6px;
-  transition: background 0.15s ease;
+  gap: 6px;
 }
 
-.auto-notes-pill-toggle:hover {
-  background: var(--surface-container-high, rgba(255, 255, 255, 0.05));
+.auto-notes-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--on-surface);
+  letter-spacing: -0.01em;
 }
 
-.auto-notes-pill-toggle input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
+.auto-notes-status-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.toggle-slider {
-  position: relative;
-  width: 28px;
-  height: 16px;
-  background-color: var(--surface-container-highest, #3a3a3c);
-  border-radius: 12px;
-  transition: 0.2s ease;
+.auto-notes-status-badge.badge-active {
+  background: color-mix(in srgb, #10b981 20%, transparent);
+  color: #10b981;
+  border: 1px solid color-mix(in srgb, #10b981 40%, transparent);
+}
+
+.auto-notes-status-badge.badge-inactive {
+  background: var(--surface-container-high);
+  color: var(--muted-text);
   border: 1px solid var(--outline-variant);
 }
 
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 10px;
-  width: 10px;
-  left: 2px;
-  bottom: 2px;
-  background-color: var(--on-surface-variant, #fff);
-  border-radius: 50%;
-  transition: 0.2s ease;
+.auto-notes-desc {
+  font-size: 11px;
+  color: var(--muted-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.auto-notes-pill-toggle input:checked + .toggle-slider {
+.auto-notes-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Switch Toggle Button */
+.switch-toggle-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  outline: none;
+}
+
+.switch-slider-track {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  background-color: var(--surface-container-highest, #3a3a3c);
+  border: 1px solid var(--outline-variant);
+  border-radius: 18px;
+  transition: all 0.2s ease;
+}
+
+.switch-slider-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  height: 12px;
+  width: 12px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.switch-toggle-btn.is-checked .switch-slider-track {
   background-color: var(--primary);
   border-color: var(--primary);
 }
 
-.auto-notes-pill-toggle input:checked + .toggle-slider:before {
-  transform: translateX(12px);
-  background-color: #fff;
+.switch-toggle-btn.is-checked .switch-slider-thumb {
+  transform: translateX(14px);
 }
 
-.sidebar-settings-quick-btn {
+.switch-toggle-btn.small .switch-slider-track {
+  width: 28px;
+  height: 16px;
+}
+
+.switch-toggle-btn.small .switch-slider-thumb {
+  height: 10px;
+  width: 10px;
+  top: 2px;
+  left: 2px;
+}
+
+.switch-toggle-btn.small.is-checked .switch-slider-thumb {
+  transform: translateX(12px);
+}
+
+.card-settings-btn {
   background: transparent;
   border: 1px solid var(--outline-variant);
   color: var(--muted-text);
@@ -2360,16 +2551,16 @@ onMounted(() => {
   transition: all 0.15s ease;
 }
 
-.sidebar-settings-quick-btn:hover,
-.sidebar-settings-quick-btn.active {
-  background: var(--surface-container);
+.card-settings-btn:hover,
+.card-settings-btn.active {
+  background: var(--surface-container-high);
   color: var(--primary);
   border-color: var(--primary);
 }
 
 /* Notes Settings Popover */
 .notes-settings-popover {
-  background: var(--surface-container);
+  background: var(--surface-container-high);
   border: 1px solid var(--outline-variant);
   border-radius: 8px;
   padding: 10px 12px;
@@ -2377,7 +2568,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 10px;
   margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   animation: fadeIn 0.15s ease-out;
 }
 
@@ -2394,9 +2585,19 @@ onMounted(() => {
   padding-bottom: 6px;
 }
 
+.popover-title-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.popover-icon {
+  color: var(--primary);
+}
+
 .popover-title {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--on-surface);
 }
 
@@ -2429,17 +2630,22 @@ onMounted(() => {
 
 .popover-label {
   font-size: 11.5px;
-  color: var(--muted-text);
+  font-weight: 500;
+  color: var(--on-surface-variant);
 }
 
 .popover-select {
   font-size: 11.5px;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
   border: 1px solid var(--outline-variant);
-  background: var(--surface-container-low);
+  background: var(--surface-container);
   color: var(--on-surface);
   outline: none;
-  max-width: 140px;
+  max-width: 155px;
+}
+
+.popover-select:focus {
+  border-color: var(--primary);
 }
 </style>

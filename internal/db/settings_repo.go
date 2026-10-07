@@ -64,10 +64,10 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(rate_limit_strategy, 'STANDARD')
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'exec_summary'), COALESCE(notes_model_tier, 'fast'), COALESCE(rate_limit_strategy, 'STANDARD')
 		FROM user_settings
 		WHERE id = 1
-	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.AutoGenerateStudyNotes, &s.RateLimitStrategy)
+	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.RateLimitStrategy)
 	if err == sql.ErrNoRows {
 		s = models.UserSettings{
 			MaxFlashcardsPerSession: 30,
@@ -94,6 +94,8 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			PromptCompressionMode:   "OVER_LIMIT",
 			PromptCompressionRate:   0.80,
 			AutoGenerateStudyNotes:  false,
+			NotesDetailLevel:        "exec_summary",
+			NotesModelTier:          "fast",
 			RateLimitStrategy:       models.RateLimitStrategyStandard,
 		}
 	} else if err != nil {
@@ -102,6 +104,12 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		if activeProfileID.Valid {
 			s.ActiveProfileID = activeProfileID.String
 		}
+	}
+	if s.NotesDetailLevel == "" {
+		s.NotesDetailLevel = "exec_summary"
+	}
+	if s.NotesModelTier == "" {
+		s.NotesModelTier = "fast"
 	}
 	if s.StudySlotsJSON == "" {
 		s.StudySlotsJSON = "[]"
@@ -269,6 +277,18 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 		logLevel = "INFO"
 	}
 
+	detailLevel := strings.ToLower(strings.TrimSpace(s.NotesDetailLevel))
+	switch detailLevel {
+	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet":
+		// valid
+	default:
+		detailLevel = "exec_summary"
+	}
+	modelTier := strings.ToLower(strings.TrimSpace(s.NotesModelTier))
+	if modelTier != "heavy" {
+		modelTier = "fast"
+	}
+
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err
@@ -276,8 +296,8 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, auto_generate_study_notes, rate_limit_strategy)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, auto_generate_study_notes, notes_detail_level, notes_model_tier, rate_limit_strategy)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			max_flashcards_per_session = excluded.max_flashcards_per_session,
 			study_start_time = excluded.study_start_time,
@@ -310,9 +330,11 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			prompt_compression_mode = excluded.prompt_compression_mode,
 			prompt_compression_rate = excluded.prompt_compression_rate,
 			auto_generate_study_notes = excluded.auto_generate_study_notes,
+			notes_detail_level = excluded.notes_detail_level,
+			notes_model_tier = excluded.notes_model_tier,
 			rate_limit_strategy = excluded.rate_limit_strategy,
 			updated_at = CURRENT_TIMESTAMP
-	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, s.AutoGenerateStudyNotes, rateLimitStrategy)
+	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, s.AutoGenerateStudyNotes, detailLevel, modelTier, rateLimitStrategy)
 	if err != nil {
 		return err
 	}
@@ -338,6 +360,42 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	}
 
 	return tx.Commit()
+}
+
+// UpdateStudyNotesSettings updates only auto_generate_study_notes and notes_detail_level in user_settings.
+func (r *Repository) UpdateStudyNotesSettings(autoGenerate bool, detailLevel string) error {
+	detailLevel = strings.ToLower(strings.TrimSpace(detailLevel))
+	switch detailLevel {
+	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet":
+		// valid
+	default:
+		detailLevel = "exec_summary"
+	}
+
+	_, err := r.db.Exec(`
+		UPDATE user_settings
+		SET auto_generate_study_notes = ?,
+		    notes_detail_level = ?,
+		    notes_model_tier = 'fast',
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = 1
+	`, autoGenerate, detailLevel)
+	return err
+}
+
+// GetStudyNotesSettings returns the notes auto generation toggle and detail level directly from user_settings.
+func (r *Repository) GetStudyNotesSettings() (bool, string, error) {
+	var autoGenerate bool
+	var detailLevel string
+	err := r.db.QueryRow(`
+		SELECT COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'exec_summary')
+		FROM user_settings
+		WHERE id = 1
+	`).Scan(&autoGenerate, &detailLevel)
+	if err == sql.ErrNoRows {
+		return false, "exec_summary", nil
+	}
+	return autoGenerate, detailLevel, err
 }
 
 // SetLastSyncedAt updates the last_synced_at timestamp after a successful cloud sync.

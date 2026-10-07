@@ -422,7 +422,9 @@ async function refreshCompressionStats() {
     return
   }
   try {
-    const stats = await getTopicCompressionStats(tid)
+    const startPage = isTaskFlow.value ? (reader.effectiveMinPage.value || 0) : 0
+    const endPage = isTaskFlow.value ? (reader.effectiveMaxPage.value || 0) : 0
+    const stats = await getTopicCompressionStats(tid, startPage, endPage)
     if (tid === reader.selectedTopicID.value && stats && !stats.error) {
       compressionStats.value = stats
     }

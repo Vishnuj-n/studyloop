@@ -156,6 +156,8 @@ func InitSchema(tx *sql.Tx) error {
 			prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT',
 			prompt_compression_rate REAL NOT NULL DEFAULT 0.80,
 			auto_generate_study_notes BOOLEAN DEFAULT 0,
+			notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary',
+			notes_model_tier TEXT NOT NULL DEFAULT 'fast',
 			rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD',
 			extension_settings TEXT DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

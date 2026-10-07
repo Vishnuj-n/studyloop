@@ -85,14 +85,124 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"llm_prompt_logging":         s.LLMPromptLogging,
 		"log_level":                  s.LogLevel,
 		"auto_generate_study_notes":  s.AutoGenerateStudyNotes,
+		"notes_detail_level":         s.NotesDetailLevel,
+		"notes_model_tier":           s.NotesModelTier,
 		"rate_limit_strategy":        s.RateLimitStrategy,
 	}
+}
+
+// SetStudyNotesSettings updates only auto_generate_study_notes and notes_detail_level in SQLite without needing global settings.
+func (a *App) SetStudyNotesSettings(autoGenerate bool, detailLevel string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	if err := repo.UpdateStudyNotesSettings(autoGenerate, detailLevel); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGenerate, "notes_detail_level": detailLevel}
+}
+
+// GetStudyNotesSettings returns the scoped study notes configuration directly.
+func (a *App) GetStudyNotesSettings() map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	autoGen, detail, err := repo.GetStudyNotesSettings()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "auto_generate_study_notes": autoGen, "notes_detail_level": detail}
 }
 
 func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+
+	existing, _ := repo.GetUserSettings()
+	if existing != nil {
+		if s.MaxFlashcardsPerSession <= 0 {
+			s.MaxFlashcardsPerSession = existing.MaxFlashcardsPerSession
+		}
+		if s.StudyStartTime == "" {
+			s.StudyStartTime = existing.StudyStartTime
+		}
+		if s.StudyEndTime == "" {
+			s.StudyEndTime = existing.StudyEndTime
+		}
+		if s.StudySlotsJSON == "" {
+			s.StudySlotsJSON = existing.StudySlotsJSON
+		}
+		if s.ActiveProfileID == "" {
+			s.ActiveProfileID = existing.ActiveProfileID
+		}
+		if s.Theme == "" {
+			s.Theme = existing.Theme
+		}
+		if s.CloudSyncURL == "" {
+			s.CloudSyncURL = existing.CloudSyncURL
+		}
+		if s.CloudAPIToken == "" {
+			s.CloudAPIToken = existing.CloudAPIToken
+		}
+		if s.DefaultRemedialStrategy == "" {
+			s.DefaultRemedialStrategy = existing.DefaultRemedialStrategy
+		}
+		if s.TargetSessionWords <= 0 {
+			s.TargetSessionWords = existing.TargetSessionWords
+		}
+		if s.MinSessionWords <= 0 {
+			s.MinSessionWords = existing.MinSessionWords
+		}
+		if s.QuizQuestionCount <= 0 {
+			s.QuizQuestionCount = existing.QuizQuestionCount
+		}
+		if s.QuizPassingScore <= 0 {
+			s.QuizPassingScore = existing.QuizPassingScore
+		}
+		if s.TutorStyle == "" {
+			s.TutorStyle = existing.TutorStyle
+		}
+		if s.LogLevel == "" {
+			s.LogLevel = existing.LogLevel
+		}
+		if s.PromptCompressionMode == "" {
+			s.PromptCompressionMode = existing.PromptCompressionMode
+		}
+		if s.PromptCompressionRate <= 0 {
+			s.PromptCompressionRate = existing.PromptCompressionRate
+		}
+		if s.RateLimitStrategy == "" {
+			s.RateLimitStrategy = existing.RateLimitStrategy
+		}
+		if s.NotesDetailLevel == "" {
+			s.NotesDetailLevel = existing.NotesDetailLevel
+		}
+		if s.NotesModelTier == "" {
+			s.NotesModelTier = existing.NotesModelTier
+		}
+	}
+
+	if s.NotesDetailLevel == "" {
+		s.NotesDetailLevel = "exec_summary"
+	}
+	switch s.NotesDetailLevel {
+	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet", "summary":
+		// valid options
+	default:
+		s.NotesDetailLevel = "exec_summary"
+	}
+	if s.NotesModelTier == "" {
+		s.NotesModelTier = "fast"
+	}
+	switch s.NotesModelTier {
+	case "fast", "heavy":
+		// valid
+	default:
+		s.NotesModelTier = "fast"
 	}
 	if s.MaxActiveNotebooks < 0 || s.MaxActiveNotebooks > maxActiveNotebooksLimit {
 		return map[string]interface{}{"error": fmt.Sprintf("max active notebooks must be between 0 (unlimited) and %d", maxActiveNotebooksLimit)}
