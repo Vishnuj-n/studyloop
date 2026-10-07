@@ -428,9 +428,19 @@ const compressionStats = ref({
   saved_percentage: 0,
 })
 
+let compressionPollTimer = null
+
+function clearCompressionPolling() {
+  if (compressionPollTimer) {
+    clearTimeout(compressionPollTimer)
+    compressionPollTimer = null
+  }
+}
+
 async function refreshCompressionStats() {
   const tid = reader.selectedTopicID.value
   if (!tid) {
+    clearCompressionPolling()
     compressionStats.value = { is_compressed: false, raw_tokens: 0, compressed_tokens: 0, tokens_saved: 0, saved_percentage: 0 }
     return
   }
@@ -440,9 +450,16 @@ async function refreshCompressionStats() {
     const stats = await getTopicCompressionStats(tid, startPage, endPage)
     if (tid === reader.selectedTopicID.value && stats && !stats.error) {
       compressionStats.value = stats
+      if (stats.is_compressing) {
+        clearCompressionPolling()
+        compressionPollTimer = setTimeout(refreshCompressionStats, 3000)
+      } else {
+        clearCompressionPolling()
+      }
     }
   } catch (e) {
     console.debug('[Reader] failed to fetch compression stats:', e)
+    clearCompressionPolling()
   }
 }
 
@@ -645,6 +662,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('click', handleDocumentClick)
+  clearCompressionPolling()
 })
 const sessionTask = ref(null)
 const ragEnabled = ref(false)

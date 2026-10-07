@@ -215,44 +215,115 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 		})
 	}
 
-	payload := CompressionPayload{
-		Rate:   rate,
-		Chunks: chunkInputs,
-	}
+	const batchSize = 6
+	var chunksToRetry []CompressionChunkInput
+	succeededCount := 0
+	failedCount := 0
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal payload for topic %s: %w", topicID, err)
-	}
+	// Process chunks in progressive mini-batches of batchSize
+	for i := 0; i < len(chunkInputs); i += batchSize {
+		end := i + batchSize
+		if end > len(chunkInputs) {
+			end = len(chunkInputs)
+		}
+		batch := chunkInputs[i:end]
 
-	outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
-	if err != nil {
-		return fmt.Errorf("failed to execute compression for topic %s: %w", topicID, err)
-	}
+		results, err := executeCompressionBatch(ctx, runner, pythonPath, scriptPath, batch, rate)
+		if err != nil {
+			utils.Warnf("[COMPRESSION] batch execution failed for %d chunks in topic %s: %v (scheduling single-chunk retry)", len(batch), topicID, err)
+			chunksToRetry = append(chunksToRetry, batch...)
+			continue
+		}
 
-	var output CompressionOutput
-	if err := json.Unmarshal(outputBytes, &output); err != nil {
-		return fmt.Errorf("failed to parse compression output for topic %s: %w", topicID, err)
-	}
+		// Map returned results by ID
+		resultByID := make(map[string]CompressionChunkResult)
+		for _, r := range results {
+			resultByID[r.ID] = r
+		}
 
-	if output.Error != "" {
-		return fmt.Errorf("compression error for topic %s: %s", topicID, output.Error)
-	}
+		for _, item := range batch {
+			res, found := resultByID[item.ID]
+			if !found || res.Error != "" || strings.TrimSpace(res.CompressedText) == "" {
+				errMsg := "no result returned"
+				if found && res.Error != "" {
+					errMsg = res.Error
+				}
+				utils.Warnf("[COMPRESSION] chunk %s failed during batch: %s (scheduling retry)", item.ID, errMsg)
+				chunksToRetry = append(chunksToRetry, item)
+				continue
+			}
 
-	totalProcessed := 0
-	for _, res := range output.Results {
-		if res.Error == "" && res.CompressedText != "" {
 			if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
 				utils.Warnf("[COMPRESSION] failed to update chunk %s compressed text: %v", res.ID, err)
+				failedCount++
 			} else {
-				totalProcessed++
+				succeededCount++
 			}
 		}
 	}
 
-	utils.Infof("[COMPRESSION] successfully compressed and persisted %d chunks for topic %s", totalProcessed, topicID)
+	// Single-chunk retry degradation for failed chunks
+	if len(chunksToRetry) > 0 {
+		utils.Infof("[COMPRESSION] retrying %d failed chunks individually for topic %s", len(chunksToRetry), topicID)
+		for _, retryChunk := range chunksToRetry {
+			results, err := executeCompressionBatch(ctx, runner, pythonPath, scriptPath, []CompressionChunkInput{retryChunk}, rate)
+			if err != nil || len(results) == 0 || results[0].Error != "" || strings.TrimSpace(results[0].CompressedText) == "" {
+				errMsg := "retry failed"
+				if err != nil {
+					errMsg = err.Error()
+				} else if len(results) > 0 && results[0].Error != "" {
+					errMsg = results[0].Error
+				}
+				utils.Warnf("[COMPRESSION] chunk %s permanently failed compression: %s", retryChunk.ID, errMsg)
+				failedCount++
+				continue
+			}
+
+			res := results[0]
+			if err := s.repo.UpdateChunkCompressedText(res.ID, res.CompressedText, res.CompressedTokens); err != nil {
+				utils.Warnf("[COMPRESSION] failed to update chunk %s after retry: %v", res.ID, err)
+				failedCount++
+			} else {
+				succeededCount++
+			}
+		}
+	}
+
+	utils.Infof("[COMPRESSION] topic %s compression complete: %d persisted, %d failed out of %d uncompressed chunks", topicID, succeededCount, failedCount, len(uncompressedChunks))
 
 	return nil
+}
+
+func executeCompressionBatch(ctx context.Context, runner *extension.Runner, pythonPath, scriptPath string, chunks []CompressionChunkInput, rate float64) ([]CompressionChunkResult, error) {
+	if len(chunks) == 0 {
+		return nil, nil
+	}
+
+	payload := CompressionPayload{
+		Rate:   rate,
+		Chunks: chunks,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	outputBytes, err := runExtensionWithInput(ctx, runner, pythonPath, scriptPath, payloadBytes)
+	if err != nil {
+		return nil, fmt.Errorf("extension execution failed: %w", err)
+	}
+
+	var output CompressionOutput
+	if err := json.Unmarshal(outputBytes, &output); err != nil {
+		return nil, fmt.Errorf("failed to parse output: %w", err)
+	}
+
+	if output.Error != "" {
+		return nil, fmt.Errorf("extension reported error: %s", output.Error)
+	}
+
+	return output.Results, nil
 }
 
 func runExtensionWithInput(ctx context.Context, runner *extension.Runner, pythonPath, scriptPath string, input []byte) ([]byte, error) {

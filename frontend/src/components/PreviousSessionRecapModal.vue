@@ -1,63 +1,65 @@
 <template>
-  <div v-if="show" class="modal-backdrop recap-modal-backdrop" @click.self="handleDismiss">
-    <div class="recap-modal-card" role="dialog" aria-modal="true" aria-labelledby="recap-title">
-      <header class="recap-modal-header">
-        <div class="header-badge-row">
-          <span class="recap-chip">
-            <BaseIcon name="book-open" size="14" />
-            <span>Session Memory Recall</span>
-          </span>
-          <span v-if="previousSlotRange" class="page-range-chip">
-            Pages {{ previousSlotRange }}
-          </span>
-        </div>
-        <h2 id="recap-title" class="recap-title">
-          {{ topicTitle ? `${topicTitle}: Previous Session Notes` : 'Previous Session Notes' }}
-        </h2>
-        <p class="recap-desc">
-          Quickly review your key takeaways and notes from the last reading session before diving in.
-        </p>
-      </header>
+  <Teleport to="body">
+    <div v-if="show" class="modal-backdrop recap-modal-backdrop" @click.self="handleDismiss">
+      <div class="recap-modal-card" role="dialog" aria-modal="true" aria-labelledby="recap-title">
+        <header class="recap-modal-header">
+          <div class="header-badge-row">
+            <span class="recap-chip">
+              <BaseIcon name="book-open" size="14" />
+              <span>Session Memory Recall</span>
+            </span>
+            <span v-if="previousSlotRange" class="page-range-chip">
+              Pages {{ previousSlotRange }}
+            </span>
+          </div>
+          <h2 id="recap-title" class="recap-title">
+            {{ topicTitle ? `${topicTitle}: Previous Session Notes` : 'Previous Session Notes' }}
+          </h2>
+          <p class="recap-desc">
+            Quickly review your key takeaways and notes from the last reading session before diving in.
+          </p>
+        </header>
 
-      <div class="recap-modal-body">
-        <div v-if="loading" class="recap-loading">
-          <div class="spinner"></div>
-          <span>Loading previous session notes...</span>
+        <div class="recap-modal-body">
+          <div v-if="loading" class="recap-loading">
+            <div class="spinner"></div>
+            <span>Loading previous session notes...</span>
+          </div>
+
+          <div v-else-if="noteContent" class="recap-content-box">
+            <div
+              class="shared-markdown-content recap-markdown"
+              v-html="renderedMarkdown"
+            ></div>
+          </div>
+
+          <div v-else class="recap-empty-box">
+            <p>No notes available for the previous session.</p>
+          </div>
         </div>
 
-        <div v-else-if="noteContent" class="recap-content-box">
-          <div
-            class="shared-markdown-content recap-markdown"
-            v-html="renderedMarkdown"
-          ></div>
-        </div>
-
-        <div v-else class="recap-empty-box">
-          <p>No notes available for the previous session.</p>
-        </div>
+        <footer class="recap-modal-footer">
+          <label class="dont-show-again-label">
+            <input
+              v-model="dontShowAgain"
+              type="checkbox"
+              class="recap-checkbox"
+            />
+            <span>Don't show recap automatically</span>
+          </label>
+          <div class="footer-actions">
+            <button
+              type="button"
+              class="primary continue-btn"
+              @click="handleDismiss"
+            >
+              <span>Continue to Reading ({{ startPage ? `Page ${startPage}` : 'Next' }}) →</span>
+            </button>
+          </div>
+        </footer>
       </div>
-
-      <footer class="recap-modal-footer">
-        <label class="dont-show-again-label">
-          <input
-            v-model="dontShowAgain"
-            type="checkbox"
-            class="recap-checkbox"
-          />
-          <span>Don't show recap automatically</span>
-        </label>
-        <div class="footer-actions">
-          <button
-            type="button"
-            class="primary continue-btn"
-            @click="handleDismiss"
-          >
-            <span>Continue to Reading ({{ startPage ? `Page ${startPage}` : 'Next' }}) →</span>
-          </button>
-        </div>
-      </footer>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -121,13 +123,13 @@ function handleDismiss() {
 .recap-modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 17, 19, 0.65);
-  backdrop-filter: blur(6px);
-  z-index: 9999;
+  background-color: rgba(15, 17, 19, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 10005;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 2rem;
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -144,13 +146,13 @@ function handleDismiss() {
 
 .recap-modal-card {
   background: var(--surface-container-low, #232526);
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   width: 100%;
-  max-width: 640px;
-  max-height: 85vh;
+  max-width: 820px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.14), 0 0 0 1px var(--outline-variant, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--outline-variant, rgba(255, 255, 255, 0.08));
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
