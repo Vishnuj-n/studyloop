@@ -31,8 +31,6 @@ Central task table.
 | `notebook_id`  | TEXT NOT NULL                       | Parent notebook. FK → `notebooks(id)`                       |
 | `topic_id`     | TEXT                                | Optional task context. FK → `topics(id)`                    |
 | `task_type`    | TEXT NOT NULL                       | `READING`, `QUIZ`, `REREAD`, `FLASHCARD_REVIEW`, `MILESTONE_EXAM`, `EXAMINER`, `SOCRATIC_REMEDIAL`, `FLASHCARD_GENERATE` |
-
-**Note:** `MILESTONE_EXAM` is an aggregate exam task composed from multiple past quiz attempts for a notebook. It does not generate new questions — it reuses questions from completed quiz tasks. `FLASHCARD_GENERATE` is used when cloud sync fails to re-trigger local generation.
 | `status`       | TEXT NOT NULL                       | `PENDING`, `ACTIVE`, `COMPLETED`, `SKIPPED`, `FAILED`       |
 | `priority`     | INTEGER DEFAULT 0                   | Task priority: lower = higher priority (ASC). Distinct from notebook priority (higher = more frequent). |
 | `created_at`   | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Creation time                                               |
@@ -41,6 +39,9 @@ Central task table.
 | `payload_json` | TEXT                                | Optional task payload                                       |
 | `start_page`   | INTEGER                             | Reading start page                                          |
 | `end_page`     | INTEGER                             | Reading end page                                            |
+| `current_page` | INTEGER                             | Current reading page cursor                                 |
+
+**Note:** `MILESTONE_EXAM` is an aggregate exam task composed from multiple past quiz attempts for a notebook. It does not generate new questions — it reuses questions from completed quiz tasks. `FLASHCARD_GENERATE` is used when cloud sync fails to re-trigger local generation.
 
 **Foreign keys:** `notebook_id` → `notebooks(id)`, `topic_id` → `topics(id)`.
 
@@ -81,6 +82,7 @@ Top-level container for uploaded study material.
 | `title` | TEXT NOT NULL | Notebook title |
 | `file_path` | TEXT NOT NULL | Local file path |
 | `file_type` | TEXT DEFAULT 'pdf' | File type |
+| `file_hash` | TEXT DEFAULT '' | SHA256/MD5 hash of source file for deduplication & verification |
 | `topic_id` | TEXT | Primary topic reference. FK → `topics(id)` |
 | `priority` | INTEGER DEFAULT 5 | Notebook priority (1-10): higher = more frequent in queue (DESC). Distinct from task priority (lower = higher). |
 | `status` | TEXT DEFAULT 'uploaded' | Notebook status |
@@ -354,6 +356,7 @@ Singleton table for global preferences.
 | `max_flashcards_per_session` | INTEGER NOT NULL DEFAULT 30 | Max flashcards per session |
 | `study_start_time` | TEXT DEFAULT '17:00' | Study window start time (HH:MM format) |
 | `study_end_time` | TEXT DEFAULT '18:00' | Study window end time (HH:MM format) |
+| `study_slots_json` | TEXT DEFAULT '[]' | JSON list of custom scheduled study time slots |
 | `reminders_enabled` | BOOLEAN DEFAULT 1 | Whether study reminders enabled |
 | `show_reward_notifications` | BOOLEAN DEFAULT 1 | Whether reward popups & toasts are shown upon task completion |
 | `active_profile_id` | TEXT | Active study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
@@ -375,6 +378,8 @@ Singleton table for global preferences.
 | `quiz_question_count` | INTEGER NOT NULL DEFAULT 8 | Target number of questions generated per quiz attempt (3–15) |
 | `quiz_passing_score` | INTEGER NOT NULL DEFAULT 70 | Minimum percentage score required to pass topic quizzes (50–100%) |
 | `tutor_style` | TEXT NOT NULL DEFAULT 'socratic' | AI remedial tutor tone/style (`socratic`, `direct`, `detailed`) |
+| `analytics_enabled` | BOOLEAN DEFAULT 0 | Opt-in anonymous telemetry toggle |
+| `anonymous_user_id` | TEXT DEFAULT '' | Anonymous telemetry user identifier |
 | `llm_prompt_logging` | BOOLEAN DEFAULT 0 | Whether raw LLM prompt inputs and model parameters are logged to `logs/llm_prompt.log` |
 | `log_level` | TEXT NOT NULL DEFAULT 'INFO' | Active diagnostic logging threshold (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `prompt_compression_mode` | TEXT NOT NULL DEFAULT 'OVER_LIMIT' | Background prompt compression mode (`OVER_LIMIT`, `ALWAYS`, `DISABLED`) |
@@ -394,10 +399,13 @@ Singleton table for global preferences.
 ### `analytics_events`
 
 | Field | Type | Description |
-|-------|------|-------------|
+|---|---|---|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Event identifier |
-| `event_type` | TEXT NOT NULL | Type of event (e.g., 'task_completed') |
-| `payload_json` | TEXT | JSON representation of the event payload |
+| `event_type` | TEXT NOT NULL | Type of event (e.g. 'task_completed') |
+| `file_hash` | TEXT DEFAULT '' | SHA256/MD5 of source material related to the event |
+| `page_number` | INTEGER DEFAULT 0 | Page context when event occurred |
+| `metadata` | TEXT DEFAULT '' | Additional metadata context |
+| `synced` | BOOLEAN DEFAULT 0 | Cloud telemetry sync status flag |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Record creation time |
 
 ### `llm_settings`
@@ -411,6 +419,8 @@ LLM provider config per performance tier.
 | `base_url` | TEXT NOT NULL DEFAULT '' | API base URL |
 | `model` | TEXT NOT NULL DEFAULT '' | Model identifier string |
 | `timeout_ms` | INTEGER NOT NULL DEFAULT 30000 | Request timeout in milliseconds |
+| `max_input_tokens` | INTEGER NOT NULL DEFAULT 4000 | Maximum input context token budget |
+| `max_output_tokens` | INTEGER NOT NULL DEFAULT 2500 | Maximum output generation token limit |
 | `api_key_source` | TEXT NOT NULL DEFAULT 'keyring' | Key storage backend |
 | `has_api_key` | BOOLEAN DEFAULT 0 | Whether API key configured |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |

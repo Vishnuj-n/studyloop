@@ -35,3 +35,7 @@ jobs:
       - name: Check UI Design & Token Violations
         if: success() || failure()
         run: python scripts/check_design_violations.py
+
+      - name: Check Documentation Drift
+        if: success() || failure()
+        run: python scripts/verify_docs_drift.py

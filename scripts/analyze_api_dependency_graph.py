@@ -142,7 +142,7 @@ def parse_go_definitions(go_dir, project_root):
                 go_files.append(filepath)
                 
     for filepath in go_files:
-        rel_path = os.path.relpath(filepath, project_root)
+        rel_path = os.path.relpath(filepath, project_root).replace("\\", "/")
         try:
             with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
                 for line_num, line in enumerate(f, 1):
@@ -261,13 +261,13 @@ def main():
     if args.output:
         validate_path(os.path.join(project_root, args.output), project_root)
     
-    print("Step 1: Parsing frontend API services...")
+    print("Step 1: Parsing frontend API services...", file=sys.stderr)
     api_mappings, api_file_paths = parse_all_api_files(api_path)
     
-    print("Step 2: Checking JS usages in frontend...")
+    print("Step 2: Checking JS usages in frontend...", file=sys.stderr)
     js_usages = find_js_usages(frontend_dir, api_file_paths, api_mappings.keys())
     
-    print("Step 3: Parsing Go definitions...")
+    print("Step 3: Parsing Go definitions...", file=sys.stderr)
     app_methods, other_go_funcs = parse_go_definitions(go_dir, project_root)
     
     # Classify App receiver methods:
@@ -298,7 +298,7 @@ def main():
         
     all_go_funcs.update(other_go_funcs)
     
-    print("Step 4: Building Go Call Graph...")
+    print("Step 4: Building Go Call Graph...", file=sys.stderr)
     call_graph = build_go_call_graph(go_dir, all_go_funcs, project_root)
     
     # Trace reachability starting from:

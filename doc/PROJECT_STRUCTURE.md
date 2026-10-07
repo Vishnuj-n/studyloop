@@ -20,6 +20,12 @@ Directory organization and package ownership. For architecture, see `ARCHITECTUR
 
 ```
 internal/
+  app/                # Wails API bridge endpoints and app lifecycle (12 files)
+    app.go            # Central application receiver and bridge initialization
+    app_study.go      # Study task execution and queue endpoints
+    app_settings.go   # Profile and global settings endpoints
+    notebook_endpoints.go # Ingestion and notebook management
+
   db/                 # Data persistence (24 files)
     store.go          # Database init + connection
     schema.go         # Table definitions + migrations
@@ -69,6 +75,14 @@ internal/
   llm/                # LLM provider adapter (2 files)
     provider.go       # OpenAI-compatible client
     keyring.go        # OS keyring for API keys
+
+  pomodoro/           # Focus timer & audio background services (3 files)
+    pomodoro.go       # Pomodoro timer lifecycle
+    audio.go          # Lo-fi audio playback engine
+
+  telemetry/          # Opt-in usage metrics and analytics (2 files)
+    telemetry.go      # Local metrics collection
+    sync.go           # Anonymous metrics dispatcher
 
   runtime/            # Application bootstrap (2 files)
     boot.go           # Startup initialization
