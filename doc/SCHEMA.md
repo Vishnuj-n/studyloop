@@ -390,6 +390,7 @@ Singleton table for global preferences.
 | `show_recap_before_reading` | BOOLEAN DEFAULT 1 | Whether previous session notes recap modal automatically pops up before reading |
 | `rate_limit_strategy` | TEXT NOT NULL DEFAULT 'STANDARD' | Rate limit fallback strategy (`STANDARD` or `PACED`) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
+| `session_cache_json` | TEXT DEFAULT '' | HMAC-signed session cache blob for resilient auth restoration across updates |
 | `updated_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Last update time |
 
 **Foreign keys:** `active_profile_id` → `study_profiles(id)` ON DELETE SET NULL.

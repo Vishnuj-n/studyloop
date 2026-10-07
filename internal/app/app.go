@@ -103,6 +103,13 @@ func (a *App) getRepo() *db.Repository {
 	return a.repo
 }
 
+// getRepoDirect returns the repository reference without blocking on readyChan.
+func (a *App) getRepoDirect() *db.Repository {
+	a.repoMutex.RLock()
+	defer a.repoMutex.RUnlock()
+	return a.repo
+}
+
 func initLogging() {
 	appDir, err := runtime.ResolveAppDir()
 	if err != nil {

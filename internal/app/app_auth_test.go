@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ai-tutor/internal/db"
 )
 
 func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
@@ -262,5 +264,72 @@ func TestAuthCallback_JWTTokenHandling(t *testing.T) {
 		activeAuthServer.server = nil
 	}
 	activeAuthServer.mu.Unlock()
+}
+
+func TestRestoreSession_DatabaseFallback(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("APP_ENV", "dev")
+	origWd, _ := os.Getwd()
+	defer func() { _ = os.Chdir(origWd) }()
+	_ = os.Chdir(tempDir)
+
+	repo, err := db.Init(tempDir+"/Studyloop.db", "")
+	if err != nil {
+		t.Fatalf("failed to create repository: %v", err)
+	}
+	defer repo.Close()
+
+	a := &App{
+		repo: repo,
+	}
+
+	// 1. Persist session (writes to both session.json and database cache)
+	a.setSession("user_db_fallback", "pro_fallback@example.com", true)
+	if !a.IsProUser() {
+		t.Fatalf("expected user to be Pro")
+	}
+
+	filePath, err := getSessionFilePath()
+	if err != nil {
+		t.Fatalf("failed to get session file path: %v", err)
+	}
+
+	// 2. Simulate installer update or file cleanup: delete session.json
+	if err := os.Remove(filePath); err != nil {
+		t.Fatalf("failed to delete session.json: %v", err)
+	}
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Fatalf("session.json was not deleted")
+	}
+
+	// 3. New app instance boots with repo -> restores from DB fallback and re-writes session.json
+	a2 := &App{
+		repo: repo,
+	}
+	if !a2.RestoreSession("", "", false, 0) {
+		t.Fatalf("expected RestoreSession to successfully recover from database cache fallback")
+	}
+	if !a2.IsProUser() {
+		t.Fatalf("expected a2 to be Pro after DB fallback restore")
+	}
+	sess := a2.GetUserSession()
+	if sess["userId"] != "user_db_fallback" || sess["email"] != "pro_fallback@example.com" {
+		t.Fatalf("unexpected restored session: %#v", sess)
+	}
+
+	// 4. Verify session.json was automatically re-created
+	if _, err := os.Stat(filePath); err != nil {
+		t.Fatalf("expected session.json to be re-created from database fallback: %v", err)
+	}
+
+	// 5. ClearSession removes both disk file and DB cache
+	a2.ClearSession()
+	if a2.IsProUser() {
+		t.Fatalf("expected IsProUser to be false after ClearSession")
+	}
+	cached, err := repo.GetSessionCache()
+	if err != nil || cached != "" {
+		t.Fatalf("expected DB session cache to be empty after ClearSession, got: %q (err: %v)", cached, err)
+	}
 }
 

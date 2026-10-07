@@ -76,6 +76,27 @@ func getNormalizedMachineID() string {
 	return strings.ToLower(strings.TrimSpace(h)) + "::" + strings.ToLower(strings.TrimSpace(u))
 }
 
+// getMachineIDVariants returns all valid machine ID representations for the current host
+// (including host-only fallback to prevent session drops when running under elevated/updater context).
+func getMachineIDVariants() []string {
+	h, _ := os.Hostname()
+	normHost := strings.ToLower(strings.TrimSpace(h))
+	u := os.Getenv("USERNAME")
+	if u == "" {
+		u = os.Getenv("USER")
+	}
+	normUser := strings.ToLower(strings.TrimSpace(u))
+
+	variants := []string{
+		normHost + "::" + normUser,
+		strings.TrimSpace(h) + "::" + strings.TrimSpace(u),
+	}
+	if normHost != "" {
+		variants = append(variants, normHost+"::any", normHost)
+	}
+	return variants
+}
+
 func computeSessionSignature(machineID, userID, email string, isPro bool, verifiedAt int64) string {
 	payload := fmt.Sprintf("%s|%s|%s|%t|%d", machineID, userID, email, isPro, verifiedAt)
 	mac := hmac.New(sha256.New, []byte(sessionSecretSalt))
@@ -185,12 +206,6 @@ func getSessionFilePath() (string, error) {
 }
 
 func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64) {
-	filePath, err := runtime.ResolveSessionPath()
-	if err != nil {
-		utils.Warnf("[AUTH] Failed to resolve session file path: %v", err)
-		return
-	}
-
 	machineID := getNormalizedMachineID()
 	sig := computeSessionSignature(machineID, userID, email, isPro, verifiedAt)
 	sess := persistentSession{
@@ -207,21 +222,31 @@ func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64)
 		return
 	}
 
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		utils.Warnf("[AUTH] Failed to create session directory %s: %v", dir, err)
-		return
+	// 1. Primary write to session.json
+	filePath, err := runtime.ResolveSessionPath()
+	if err == nil {
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0o755); err == nil {
+			if err := os.WriteFile(filePath, data, 0o600); err != nil {
+				utils.Warnf("[AUTH] Failed to write session file to %s: %v", filePath, err)
+			} else {
+				utils.Infof("[AUTH] Successfully persisted session to %s (user=%s, isPro=%v, verifiedAt=%d)",
+					filePath, userID, isPro, verifiedAt)
+			}
+		}
 	}
 
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
-		utils.Warnf("[AUTH] Failed to write session file to %s: %v", filePath, err)
-	} else {
-		utils.Infof("[AUTH] Successfully persisted session to %s (user=%s, isPro=%v, verifiedAt=%d)",
-			filePath, userID, isPro, verifiedAt)
+	// 2. Resilient backup write to database (preserves session across installer updates/cleanups)
+	if repo := a.getRepoDirect(); repo != nil {
+		if err := repo.SetSessionCache(string(data)); err != nil {
+			utils.Warnf("[AUTH] Failed to persist session to database cache: %v", err)
+		} else {
+			utils.Debugf("[AUTH] Successfully persisted session to database cache")
+		}
 	}
 }
 
-// setSession sets the active session in memory and persists signed session to disk.
+// setSession sets the active session in memory and persists signed session to disk and DB.
 func (a *App) setSession(userID, email string, isPro bool) {
 	now := time.Now().Unix()
 	utils.Infof("[AUTH] setSession called: user=%s, isPro=%v, now=%d", userID, isPro, now)
@@ -235,42 +260,70 @@ func (a *App) setSession(userID, email string, isPro bool) {
 	a.persistSession(userID, email, isPro, now)
 }
 
-// RestoreSession re-hydrates offline session on launch from machine-bound signed storage on disk.
-// Session validity and 10-day grace period are evaluated strictly inside Go backend.
-func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
-	filePath, err := runtime.ResolveSessionPath()
-	if err != nil {
-		utils.Warnf("[AUTH] Could not resolve session file path: %v", err)
-		a.applyRestoredSession("", "", false, 0)
+// verifySessionSignature verifies the HMAC signature of a session across machine variants.
+func verifySessionSignature(sess *persistentSession) bool {
+	if sess == nil || sess.Signature == "" {
 		return false
 	}
+	variants := getMachineIDVariants()
+	for _, m := range variants {
+		expectedSig := computeSessionSignature(m, sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
+		if hmac.Equal([]byte(sess.Signature), []byte(expectedSig)) {
+			return true
+		}
+	}
+	return false
+}
 
+// RestoreSession re-hydrates offline session on launch from machine-bound signed storage on disk/database.
+// Session validity and 10-day grace period are evaluated strictly inside Go backend.
+func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64) bool {
+	filePath, _ := runtime.ResolveSessionPath()
 	utils.Infof("[AUTH] RestoreSession called: user=%q, email=%q, isPro=%v, verifiedAt=%d. Session path: %s",
 		userID, email, isPro, verifiedAt, filePath)
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		utils.Warnf("[AUTH] Session file not found at %s (err=%v). Resetting active session to Free.", filePath, err)
+	var data []byte
+	var readErr error
+
+	// 1. Attempt reading primary session.json file
+	if filePath != "" {
+		data, readErr = os.ReadFile(filePath)
+	}
+
+	// 2. If file missing or unreadable, fall back to SQLite database session cache
+	if readErr != nil || len(data) == 0 {
+		utils.Infof("[AUTH] Primary session file not accessible (%v), checking database cache fallback...", readErr)
+		if repo := a.getRepoDirect(); repo != nil {
+			if dbCache, err := repo.GetSessionCache(); err == nil && strings.TrimSpace(dbCache) != "" {
+				data = []byte(dbCache)
+				utils.Infof("[AUTH] Retrieved session from database cache fallback.")
+				// Re-create missing session.json file from valid DB record
+				if filePath != "" {
+					dir := filepath.Dir(filePath)
+					if err := os.MkdirAll(dir, 0o755); err == nil {
+						_ = os.WriteFile(filePath, data, 0o600)
+					}
+				}
+			}
+		}
+	}
+
+	if len(data) == 0 {
+		utils.Warnf("[AUTH] No valid session found in disk or database. Resetting active session to Free.")
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
 
 	var sess persistentSession
 	if err := json.Unmarshal(data, &sess); err != nil {
-		utils.Warnf("[AUTH] Invalid session JSON format in %s: %v", filePath, err)
+		utils.Warnf("[AUTH] Invalid session JSON format: %v", err)
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
 
 	// Verify HMAC signature across machine ID variations
-	machineID := getMachineID()
-	normalizedMachineID := getNormalizedMachineID()
-	sig1 := computeSessionSignature(machineID, sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
-	sig2 := computeSessionSignature(normalizedMachineID, sess.UserID, sess.Email, sess.IsPro, sess.VerifiedAt)
-
-	isValidSig := hmac.Equal([]byte(sess.Signature), []byte(sig1)) || hmac.Equal([]byte(sess.Signature), []byte(sig2))
-	if !isValidSig {
-		utils.Warnf("[AUTH] Session signature mismatch at %s. Downgrading to free.", filePath)
+	if !verifySessionSignature(&sess) {
+		utils.Warnf("[AUTH] Session signature mismatch. Downgrading to free.")
 		a.applyRestoredSession("", "", false, 0)
 		return false
 	}
@@ -279,8 +332,8 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 	now := time.Now().Unix()
 	actualIsPro := sess.IsPro
 	if actualIsPro && sess.VerifiedAt > 0 && (now-sess.VerifiedAt) > tenDaysSec {
-		utils.Warnf("[AUTH] Session 10-day grace period expired at %s. VerifiedAt=%d, Now=%d, DiffSec=%d, MaxSec=%d. Re-verification required.",
-			filePath, sess.VerifiedAt, now, (now - sess.VerifiedAt), tenDaysSec)
+		utils.Warnf("[AUTH] Session 10-day grace period expired. VerifiedAt=%d, Now=%d, DiffSec=%d, MaxSec=%d. Re-verification required.",
+			sess.VerifiedAt, now, (now - sess.VerifiedAt), tenDaysSec)
 		actualIsPro = false
 	} else {
 		utils.Debugf("[AUTH] Session 10-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
@@ -301,7 +354,7 @@ func (a *App) applyRestoredSession(userID, email string, isPro bool, verifiedAt 
 	a.sessionVerifiedAt = verifiedAt
 }
 
-// ClearSession clears the current in-memory session and removes disk cache.
+// ClearSession clears the current in-memory session and removes disk and database caches.
 func (a *App) ClearSession() {
 	a.sessionMu.Lock()
 	a.sessionUserID = ""
@@ -312,6 +365,9 @@ func (a *App) ClearSession() {
 
 	if filePath, err := runtime.ResolveSessionPath(); err == nil {
 		_ = os.Remove(filePath)
+	}
+	if repo := a.getRepoDirect(); repo != nil {
+		_ = repo.SetSessionCache("")
 	}
 }
 

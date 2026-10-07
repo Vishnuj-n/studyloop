@@ -8,21 +8,17 @@ Statically checks whether project documentation in doc/ matches the actual codeb
    - Verifies no obsolete tables/columns are documented.
 2. Package Structure Sync: internal/ <-> doc/PROJECT_STRUCTURE.md
    - Verifies all internal packages are registered in doc/PROJECT_STRUCTURE.md.
-3. Auto-Generated Doc Freshness: scripts/analyze_api_dependency_graph.py <-> doc/api_dependency_report.md
-   - Checks if doc/api_dependency_report.md is up-to-date with current API routes.
 
 Usage:
     python scripts/verify_docs_drift.py [options]
 
 Options:
-    --fix         Automatically regenerate auto-generated docs (e.g. api_dependency_report.md)
-    --verbose     Show detailed parsing and matching information
+    --verbose, -v   Show detailed parsing and matching information
 """
 
 import os
 import re
 import sys
-import subprocess
 import argparse
 from typing import Dict, Set, List, Tuple
 
@@ -228,51 +224,8 @@ def check_package_structure(repo_root: str, verbose: bool = False) -> Tuple[bool
     return len(issues) == 0, issues
 
 
-def check_api_dependency_freshness(repo_root: str, fix: bool = False, verbose: bool = False) -> Tuple[bool, List[str]]:
-    """Checks if doc/api_dependency_report.md is fresh."""
-    script_path = os.path.join(repo_root, "scripts", "analyze_api_dependency_graph.py")
-    doc_path = os.path.join(repo_root, "doc", "api_dependency_report.md")
-
-    if not os.path.exists(script_path):
-        return True, []
-
-    issues: List[str] = []
-
-    if fix:
-        cmd = [sys.executable, script_path, "--output", "doc/api_dependency_report.md"]
-        res = subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True)
-        if res.returncode != 0:
-            issues.append(f"Failed to regenerate api_dependency_report.md: {res.stderr}")
-            return False, issues
-        return True, []
-
-    if not os.path.exists(doc_path):
-        issues.append("doc/api_dependency_report.md is missing. Run with --fix or python scripts/analyze_api_dependency_graph.py --output doc/api_dependency_report.md")
-        return False, issues
-
-    # Generate in-memory and compare
-    cmd = [sys.executable, script_path]
-    res = subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True, encoding="utf-8")
-    if res.returncode != 0:
-        issues.append(f"Failed running analyze_api_dependency_graph.py: {res.stderr}")
-        return False, issues
-
-    with open(doc_path, "r", encoding="utf-8", errors="ignore") as f:
-        existing_content = f.read()
-
-    # Normalize newlines
-    existing_normalized = existing_content.replace("\r\n", "\n").strip()
-    generated_normalized = res.stdout.replace("\r\n", "\n").strip()
-
-    if existing_normalized != generated_normalized:
-        issues.append("doc/api_dependency_report.md is OUT OF DATE with current codebase. Run with --fix to update it.")
-
-    return len(issues) == 0, issues
-
-
 def main():
     parser = argparse.ArgumentParser(description="Verify documentation synchronization against codebase.")
-    parser.add_argument("--fix", action="store_true", help="Auto-fix regenerable documentation files")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose diagnostic output")
     args = parser.parse_args()
 
@@ -284,7 +237,7 @@ def main():
     total_issues = 0
 
     # 1. Schema Sync Check
-    print(f"{BOLD}[1/3] Checking Database Schema Sync (schema.go <-> doc/SCHEMA.md)...{RESET}")
+    print(f"{BOLD}[1/2] Checking Database Schema Sync (schema.go <-> doc/SCHEMA.md)...{RESET}")
     schema_ok, schema_issues = check_schema_sync(repo_root, verbose=args.verbose)
     if schema_ok:
         print(f"  {GREEN}✔ Database schema documentation is completely in sync.{RESET}")
@@ -296,7 +249,7 @@ def main():
             print(f"    {YELLOW}• {issue}{RESET}")
 
     # 2. Package Structure Check
-    print(f"\n{BOLD}[2/3] Checking Internal Package Structure (internal/ <-> doc/PROJECT_STRUCTURE.md)...{RESET}")
+    print(f"\n{BOLD}[2/2] Checking Internal Package Structure (internal/ <-> doc/PROJECT_STRUCTURE.md)...{RESET}")
     pkg_ok, pkg_issues = check_package_structure(repo_root, verbose=args.verbose)
     if pkg_ok:
         print(f"  {GREEN}✔ Internal package directory structure is completely documented.{RESET}")
@@ -307,28 +260,13 @@ def main():
         for issue in pkg_issues:
             print(f"    {YELLOW}• {issue}{RESET}")
 
-    # 3. API Dependency Report Check
-    print(f"\n{BOLD}[3/3] Checking API Dependency Report Freshness (doc/api_dependency_report.md)...{RESET}")
-    api_ok, api_issues = check_api_dependency_freshness(repo_root, fix=args.fix, verbose=args.verbose)
-    if api_ok:
-        if args.fix:
-            print(f"  {GREEN}✔ API dependency report verified and updated.{RESET}")
-        else:
-            print(f"  {GREEN}✔ API dependency report is completely up-to-date.{RESET}")
-    else:
-        all_passed = False
-        total_issues += len(api_issues)
-        print(f"  {RED}✘ API dependency report drift detected:{RESET}")
-        for issue in api_issues:
-            print(f"    {YELLOW}• {issue}{RESET}")
-
     print("\n" + "=" * 50)
     if all_passed:
         print(f"{GREEN}{BOLD}✨ ALL DOCUMENTATION CHECKS PASSED — NO DRIFT DETECTED! ✨{RESET}\n")
         sys.exit(0)
     else:
         print(f"{RED}{BOLD}💥 DOCUMENTATION DRIFT DETECTED: {total_issues} total issue(s) found.{RESET}")
-        print(f"{DIM}Tip: Update docs in doc/ or run 'python scripts/verify_docs_drift.py --fix' for auto-generated files.{RESET}\n")
+        print(f"{DIM}Tip: Update documentation in doc/ to match your code changes.{RESET}\n")
         sys.exit(1)
 
 

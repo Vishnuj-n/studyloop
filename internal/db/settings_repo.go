@@ -928,3 +928,19 @@ func (r *Repository) SetLogLevel(level string) error {
 	return err
 }
 
+// GetSessionCache retrieves the HMAC-signed session cache blob from user_settings.
+func (r *Repository) GetSessionCache() (string, error) {
+	var cache string
+	err := r.db.QueryRow(`SELECT COALESCE(session_cache_json, '') FROM user_settings WHERE id = 1`).Scan(&cache)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return cache, err
+}
+
+// SetSessionCache persists or clears the HMAC-signed session cache blob in user_settings.
+func (r *Repository) SetSessionCache(cacheJSON string) error {
+	_, err := r.db.Exec(`UPDATE user_settings SET session_cache_json = ? WHERE id = 1`, strings.TrimSpace(cacheJSON))
+	return err
+}
+

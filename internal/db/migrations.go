@@ -52,6 +52,7 @@ var alterStatements = []struct {
 	{"user_settings", "show_recap_before_reading", "ALTER TABLE user_settings ADD COLUMN show_recap_before_reading BOOLEAN DEFAULT 1"},
 	{"user_settings", "rate_limit_strategy", "ALTER TABLE user_settings ADD COLUMN rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD'"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
+	{"user_settings", "session_cache_json", "ALTER TABLE user_settings ADD COLUMN session_cache_json TEXT DEFAULT ''"},
 
 	// study_profiles
 	{"study_profiles", "classroom_code", "ALTER TABLE study_profiles ADD COLUMN classroom_code TEXT DEFAULT ''"},
