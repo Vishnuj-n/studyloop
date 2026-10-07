@@ -125,6 +125,7 @@
                     class="popover-select"
                     @change="saveAutoNotesSetting"
                   >
+                    <option value="briefing">Briefing Document (Mid-Size)</option>
                     <option value="exec_summary">Executive Summary (30-Sec)</option>
                     <option value="concept_card">High-Yield Concept Card</option>
                     <option value="cheatsheet">Minimalist Cheatsheet</option>
@@ -640,13 +641,17 @@ const showAllSessions = ref(false)
 
 // Auto-notes & sidebar settings state (persisted to SQLite user_settings)
 const autoNotesEnabled = ref(false)
-const noteDetailLevel = ref('exec_summary')
+const noteDetailLevel = ref('briefing')
 const noteModelTier = ref('fast')
 const showRecapEnabled = ref(true)
 const showNotesSettingsPopover = ref(false)
 
 function getDetailLevelLabel(val) {
   switch (val) {
+    case 'briefing':
+      return 'Briefing Document'
+    case 'exec_summary':
+      return '30s Summary'
     case 'concept_card':
       return 'Concept Card'
     case 'cheatsheet':
@@ -657,7 +662,7 @@ function getDetailLevelLabel(val) {
     case 'detailed':
       return 'Deep Dive'
     default:
-      return '30s Summary'
+      return 'Briefing Document'
   }
 }
 
@@ -700,7 +705,7 @@ async function loadNotesSettings() {
     const res = await getStudyNotesSettings()
     if (res && !res.error) {
       autoNotesEnabled.value = Boolean(res.auto_generate_study_notes)
-      noteDetailLevel.value = res.notes_detail_level || 'exec_summary'
+      noteDetailLevel.value = res.notes_detail_level || 'briefing'
       showRecapEnabled.value = res.show_recap_before_reading !== undefined ? Boolean(res.show_recap_before_reading) : true
     }
   } catch (err) {
@@ -720,7 +725,7 @@ async function saveAutoNotesSetting() {
       new CustomEvent('settings-updated', {
         detail: {
           auto_generate_study_notes: Boolean(autoNotesEnabled.value),
-          notes_detail_level: noteDetailLevel.value || 'exec_summary',
+          notes_detail_level: noteDetailLevel.value || 'briefing',
           show_recap_before_reading: Boolean(showRecapEnabled.value),
         },
       })

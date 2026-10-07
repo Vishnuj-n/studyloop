@@ -673,7 +673,7 @@ const ragSettingsLoaded = ref(false)
 const ragSettingsError = ref(null)
 const autoNotesEnabled = ref(false)
 const showRecapEnabled = ref(true)
-const noteDetailLevel = ref('exec_summary')
+const noteDetailLevel = ref('briefing')
 
 // Previous Session Recap State
 const showPreviousSessionRecap = ref(false)
@@ -690,7 +690,7 @@ async function onDismissRecap(payload) {
         new CustomEvent('settings-updated', {
           detail: {
             auto_generate_study_notes: Boolean(autoNotesEnabled.value),
-            notes_detail_level: noteDetailLevel.value || 'exec_summary',
+            notes_detail_level: noteDetailLevel.value || 'briefing',
             show_recap_before_reading: false,
           },
         })
@@ -830,7 +830,7 @@ async function loadRagSettings() {
     anonymousUserID.value = settings?.anonymous_user_id ?? ''
     autoNotesEnabled.value = settings?.auto_generate_study_notes ?? false
     showRecapEnabled.value = settings?.show_recap_before_reading ?? true
-    noteDetailLevel.value = settings?.notes_detail_level ?? 'exec_summary'
+    noteDetailLevel.value = settings?.notes_detail_level ?? 'briefing'
   } catch (err) {
     console.error('Failed to load settings in Reader:', err)
     ragSettingsError.value = err?.message || 'Failed to load settings'

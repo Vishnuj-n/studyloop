@@ -461,7 +461,7 @@ LIMIT 1;
 - **User Annotation Preservation**: When regenerating notes with AI, any user-authored content under `## My Notes` or manual annotations is detected and preserved automatically.
 - **Configurable Auto-Notes Generation**:
   - Automatically generates structured study notes on session start and completion when `auto_generate_study_notes` is enabled.
-  - **Detail Level Variants**: `exec_summary` (120–150 words high-density summary), `concept_card` (<180 words core mechanism card), `cheatsheet` (dense formula/rule bullet points), `feynman` (first-principles intuition), `detailed` (exhaustive deep dive).
+  - **Detail Level Variants**: `briefing` (default: 300–450 words balanced mid-size briefing document), `exec_summary` (150–200 words high-density summary), `concept_card` (180–220 words core mechanism card), `cheatsheet` (120–180 words dense formula/rule bullet points), `feynman` (180–260 words first-principles intuition), `detailed` (500–800 words exhaustive deep dive).
   - **LLM Tier Selector**: Configurable model tier (`fast` vs `heavy`) based on user preferences in `user_settings.notes_model_tier`.
 - **Previous Session Recap Flow**:
   - When starting a new reading session, if previous notes exist for the topic/notebook and `show_recap_before_reading` is enabled (default `1`), a `PreviousSessionRecapModal` automatically presents the prior session's high-yield summary.

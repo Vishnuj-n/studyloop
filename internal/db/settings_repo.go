@@ -64,7 +64,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'exec_summary'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(rate_limit_strategy, 'STANDARD')
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(rate_limit_strategy, 'STANDARD')
 		FROM user_settings
 		WHERE id = 1
 	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.ShowRecapBeforeReading, &s.RateLimitStrategy)
@@ -94,7 +94,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			PromptCompressionMode:   "OVER_LIMIT",
 			PromptCompressionRate:   0.80,
 			AutoGenerateStudyNotes:  false,
-			NotesDetailLevel:        "exec_summary",
+			NotesDetailLevel:        "briefing",
 			NotesModelTier:          "fast",
 			ShowRecapBeforeReading:  true,
 			RateLimitStrategy:       models.RateLimitStrategyStandard,
@@ -107,7 +107,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		}
 	}
 	if s.NotesDetailLevel == "" {
-		s.NotesDetailLevel = "exec_summary"
+		s.NotesDetailLevel = "briefing"
 	}
 	if s.NotesModelTier == "" {
 		s.NotesModelTier = "fast"
@@ -280,10 +280,10 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 
 	detailLevel := strings.ToLower(strings.TrimSpace(s.NotesDetailLevel))
 	switch detailLevel {
-	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet":
+	case "briefing", "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet", "summary":
 		// valid
 	default:
-		detailLevel = "exec_summary"
+		detailLevel = "briefing"
 	}
 	modelTier := strings.ToLower(strings.TrimSpace(s.NotesModelTier))
 	if modelTier != "heavy" {
@@ -368,10 +368,10 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 func (r *Repository) UpdateStudyNotesSettings(autoGenerate bool, detailLevel string, showRecap bool) error {
 	detailLevel = strings.ToLower(strings.TrimSpace(detailLevel))
 	switch detailLevel {
-	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet":
+	case "briefing", "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet", "summary":
 		// valid
 	default:
-		detailLevel = "exec_summary"
+		detailLevel = "briefing"
 	}
 
 	_, err := r.db.Exec(`
@@ -392,12 +392,12 @@ func (r *Repository) GetStudyNotesSettings() (bool, string, bool, error) {
 	var detailLevel string
 	var showRecap bool
 	err := r.db.QueryRow(`
-		SELECT COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'exec_summary'), COALESCE(show_recap_before_reading, 1)
+		SELECT COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(show_recap_before_reading, 1)
 		FROM user_settings
 		WHERE id = 1
 	`).Scan(&autoGenerate, &detailLevel, &showRecap)
 	if err == sql.ErrNoRows {
-		return false, "exec_summary", true, nil
+		return false, "briefing", true, nil
 	}
 	return autoGenerate, detailLevel, showRecap, err
 }

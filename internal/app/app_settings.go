@@ -188,13 +188,13 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 	}
 
 	if s.NotesDetailLevel == "" {
-		s.NotesDetailLevel = "exec_summary"
+		s.NotesDetailLevel = "briefing"
 	}
 	switch s.NotesDetailLevel {
-	case "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet", "summary":
+	case "briefing", "exec_summary", "concept_card", "cheatsheet", "feynman", "detailed", "concise", "bullet", "summary":
 		// valid options
 	default:
-		s.NotesDetailLevel = "exec_summary"
+		s.NotesDetailLevel = "briefing"
 	}
 	if s.NotesModelTier == "" {
 		s.NotesModelTier = "fast"
