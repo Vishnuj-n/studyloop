@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue'
 import { useClerkAuth } from '../services/clerkAuth'
 import { listExtensions, getExtensionConfig, saveExtensionConfig, setupExtension, cancelExtensionSetup, getUserSettings, updateUserSettings } from '../services/appApi'
-import { EventsOn } from '../../wailsjs/runtime/runtime'
 
 const STORAGE_KEY = 'studyloop_extensions_enabled'
 const SETUP_COMPLETED_KEY = 'studyloop_extensions_setup_completed'
@@ -95,8 +94,8 @@ export const setupModalState = ref({
 let setupEventsInitialized = false
 function initSetupEventListener() {
   if (setupEventsInitialized) return
-  if (typeof window !== 'undefined' && window.runtime && typeof EventsOn === 'function') {
-    EventsOn('extension:setup:progress', (data) => {
+  if (typeof window !== 'undefined' && window.runtime && typeof window.runtime.EventsOn === 'function') {
+    window.runtime.EventsOn('extension:setup:progress', (data) => {
       if (!data || !activeSetup.value.extensionId || data.id !== activeSetup.value.extensionId) return
       if (Array.isArray(data.logs) && data.logs.length > 0) {
         activeSetup.value.logs = data.logs

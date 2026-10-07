@@ -685,6 +685,9 @@ type UserSettings struct {
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
 	AutoGenerateStudyNotes  bool    `json:"auto_generate_study_notes"`
+	NotesDetailLevel        string  `json:"notes_detail_level"`
+	NotesModelTier          string  `json:"notes_model_tier"`
+	ShowRecapBeforeReading  bool    `json:"show_recap_before_reading"`
 	RateLimitStrategy       string  `json:"rate_limit_strategy"`
 }
 

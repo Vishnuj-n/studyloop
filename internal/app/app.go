@@ -12,6 +12,7 @@ import (
 	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/extension"
 	"ai-tutor/internal/llm"
+	"ai-tutor/internal/models"
 	"ai-tutor/internal/notebook"
 	"ai-tutor/internal/retrieval"
 	"ai-tutor/internal/runtime"
@@ -316,8 +317,9 @@ func (a *App) GetTopicSectionsContent(topicID string, notebookID string) map[str
 	}
 }
 
-// GetTopicCompressionStats returns token metrics and compression status for a topic.
-func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
+// GetTopicCompressionStats returns token metrics and compression status for a topic,
+// optionally bounded to a specific page range (e.g. for reading sessions).
+func (a *App) GetTopicCompressionStats(topicID string, startPage, endPage int) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -327,7 +329,13 @@ func (a *App) GetTopicCompressionStats(topicID string) map[string]interface{} {
 		return map[string]interface{}{"error": "topic ID is required"}
 	}
 
-	chunks, err := repo.GetChunksForTopic(topicID)
+	var chunks []models.Chunk
+	var err error
+	if startPage > 0 && endPage >= startPage {
+		chunks, err = repo.GetChunksForTopicPageRange(topicID, startPage, endPage)
+	} else {
+		chunks, err = repo.GetChunksForTopic(topicID)
+	}
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}

@@ -11,8 +11,8 @@ export function getReaderTopicBundle(topicID, notebookID = '') {
   return appBridge().GetReaderTopicBundle(topicID, notebookID)
 }
 
-export function getTopicCompressionStats(topicID) {
-  return appBridge().GetTopicCompressionStats(topicID)
+export function getTopicCompressionStats(topicID, startPage = 0, endPage = 0) {
+  return appBridge().GetTopicCompressionStats(topicID, startPage, endPage)
 }
 
 export function getAvailableTopics() {
@@ -250,6 +250,14 @@ export function getUserSettings() {
 
 export function updateUserSettings(settings) {
   return appBridge().UpdateUserSettings(settings)
+}
+
+export function getStudyNotesSettings() {
+  return appBridge().GetStudyNotesSettings()
+}
+
+export function setStudyNotesSettings(autoGenerate, detailLevel = 'exec_summary', showRecap = true) {
+  return appBridge().SetStudyNotesSettings(Boolean(autoGenerate), detailLevel || 'exec_summary', Boolean(showRecap))
 }
 
 export function trackAnalyticsEvent(eventType, fileHash, pageNumber, metadata) {

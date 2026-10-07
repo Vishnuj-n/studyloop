@@ -33,6 +33,10 @@ export function useSettings(errorRef, successRef) {
     prompt_compression_mode: 'OVER_LIMIT',
     prompt_compression_rate: 0.80,
     rate_limit_strategy: 'STANDARD',
+    auto_generate_study_notes: false,
+    notes_detail_level: 'exec_summary',
+    notes_model_tier: 'fast',
+    show_recap_before_reading: true,
   })
 
   const studyDuration = ref('')

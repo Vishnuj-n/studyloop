@@ -370,6 +370,16 @@
       :topic-title="reader.topicTitle.value"
       @close="showAudioOverview = false"
     />
+
+    <!-- Previous Session Notes Recap Modal -->
+    <PreviousSessionRecapModal
+      :show="showPreviousSessionRecap"
+      :topic-title="reader.topicTitle.value || reader.selectedTopicTitle.value || ''"
+      :start-page="reader.effectiveMinPage.value || reader.currentPage.value || 0"
+      :previous-slot="previousSessionSlot"
+      :loading="loadingPreviousSessionSlot"
+      @dismiss="onDismissRecap"
+    />
   </section>
 </template>
 
@@ -385,6 +395,8 @@ import {
   getTopicSectionsContent,
   getTopicCompressionStats,
   skipReadingTask,
+  getTopicStudyNoteSlots,
+  setStudyNotesSettings,
 } from '../services/appApi'
 import { useReaderBase, cleanTopicTitle } from '../composables/useReaderBase'
 import { useChat } from '../composables/useChat'
@@ -398,6 +410,7 @@ import MarkdownReader from '../components/MarkdownReader.vue'
 import YouTubeReader from '../components/YouTubeReader.vue'
 import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import PdfViewer from '../components/PdfViewer.vue'
+import PreviousSessionRecapModal from '../components/PreviousSessionRecapModal.vue'
 import { copyTextToClipboard } from '../utils/clipboard'
 
 const { isExtensionActive } = useExtensions()
@@ -422,7 +435,9 @@ async function refreshCompressionStats() {
     return
   }
   try {
-    const stats = await getTopicCompressionStats(tid)
+    const startPage = isTaskFlow.value ? (reader.effectiveMinPage.value || 0) : 0
+    const endPage = isTaskFlow.value ? (reader.effectiveMaxPage.value || 0) : 0
+    const stats = await getTopicCompressionStats(tid, startPage, endPage)
     if (tid === reader.selectedTopicID.value && stats && !stats.error) {
       compressionStats.value = stats
     }
@@ -638,6 +653,109 @@ const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const ragSettingsLoaded = ref(false)
 const ragSettingsError = ref(null)
+const autoNotesEnabled = ref(false)
+const showRecapEnabled = ref(true)
+const noteDetailLevel = ref('exec_summary')
+
+// Previous Session Recap State
+const showPreviousSessionRecap = ref(false)
+const previousSessionSlot = ref(null)
+const loadingPreviousSessionSlot = ref(false)
+
+async function onDismissRecap(payload) {
+  showPreviousSessionRecap.value = false
+  if (payload?.dontShowAgain) {
+    showRecapEnabled.value = false
+    try {
+      await setStudyNotesSettings(autoNotesEnabled.value, noteDetailLevel.value, false)
+      window.dispatchEvent(
+        new CustomEvent('settings-updated', {
+          detail: {
+            auto_generate_study_notes: Boolean(autoNotesEnabled.value),
+            notes_detail_level: noteDetailLevel.value || 'exec_summary',
+            show_recap_before_reading: false,
+          },
+        })
+      )
+    } catch (e) {
+      console.error('[Reader] Failed to disable auto recap setting:', e)
+    }
+  }
+
+  if (reader.selectedTopicID.value) {
+    try {
+      sessionStorage.setItem(`hide_recap_${reader.selectedTopicID.value}`, 'true')
+    } catch (e) {
+      console.debug('[Reader] sessionStorage error:', e)
+    }
+  }
+}
+
+async function checkAndShowPreviousSessionRecap() {
+  // Only trigger if task flow is active, autoNotes is enabled, showRecap is enabled, and topic ID is present
+  if (!isTaskFlow.value || !autoNotesEnabled.value || !showRecapEnabled.value || !reader.selectedTopicID.value) {
+    return
+  }
+
+  // Check if suppressed for this session/topic in sessionStorage
+  try {
+    if (sessionStorage.getItem(`hide_recap_${reader.selectedTopicID.value}`) === 'true') {
+      return
+    }
+  } catch (e) {
+    // ignore sessionStorage errors
+  }
+
+  const currentStart = reader.effectiveMinPage.value || reader.currentPage.value || 0
+  loadingPreviousSessionSlot.value = true
+
+  try {
+    const res = await getTopicStudyNoteSlots(reader.selectedTopicID.value)
+    const slots = (res && Array.isArray(res.slots)) ? res.slots : []
+
+    // Filter slots with valid content
+    const validSlots = slots.filter((s) => s && s.content && s.content.trim() !== '')
+    if (validSlots.length === 0) {
+      return
+    }
+
+    // Find the immediately preceding slot relative to currentStart
+    // If currentStart > 0, find a slot with end_page < currentStart or start_page < currentStart
+    let prevSlot = null
+    if (currentStart > 1) {
+      const priorSlots = validSlots
+        .filter((s) => s.end_page > 0 && s.end_page < currentStart)
+        .sort((a, b) => b.end_page - a.end_page)
+
+      if (priorSlots.length > 0) {
+        prevSlot = priorSlots[0]
+      } else {
+        // Fallback: any slot that started before this one
+        const earlierSlots = validSlots
+          .filter((s) => s.start_page > 0 && s.start_page < currentStart)
+          .sort((a, b) => b.start_page - a.start_page)
+        if (earlierSlots.length > 0) {
+          prevSlot = earlierSlots[0]
+        }
+      }
+    }
+
+    // If we are at page 1 or no strict prior range slot was found, but a prior session note exists
+    if (!prevSlot && currentStart > 1 && validSlots.length > 0) {
+      // Pick the latest available slot that is not the current range
+      prevSlot = validSlots[0]
+    }
+
+    if (prevSlot && prevSlot.content && prevSlot.content.trim() !== '') {
+      previousSessionSlot.value = prevSlot
+      showPreviousSessionRecap.value = true
+    }
+  } catch (err) {
+    console.debug('[Reader] checkAndShowPreviousSessionRecap failed:', err)
+  } finally {
+    loadingPreviousSessionSlot.value = false
+  }
+}
 
 const resolvedTaskID = computed(() => {
   return (
@@ -695,6 +813,9 @@ async function loadRagSettings() {
     ragQueueStudy.value = settings?.rag_queue_study ?? true
     analyticsEnabled.value = settings?.analytics_enabled ?? false
     anonymousUserID.value = settings?.anonymous_user_id ?? ''
+    autoNotesEnabled.value = settings?.auto_generate_study_notes ?? false
+    showRecapEnabled.value = settings?.show_recap_before_reading ?? true
+    noteDetailLevel.value = settings?.notes_detail_level ?? 'exec_summary'
   } catch (err) {
     console.error('Failed to load settings in Reader:', err)
     ragSettingsError.value = err?.message || 'Failed to load settings'
@@ -731,6 +852,8 @@ async function resolveTaskContext(taskQuery) {
   })
   if (init) {
     sessionTask.value = init.task
+    // Check and show previous session recap note if available
+    await checkAndShowPreviousSessionRecap()
   }
 }
 
