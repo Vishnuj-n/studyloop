@@ -227,8 +227,8 @@
             </span>
           </div>
           <div v-if="isTaskFlow" class="stage-head-right">
-            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info">
-              Reading Window: Pages {{ reader.navigationMinPage.value }}-{{
+            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info" :title="`Reading Window: Pages ${reader.navigationMinPage.value}-${reader.navigationMaxPage.value}`">
+              <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ reader.navigationMinPage.value }}-{{
                 reader.navigationMaxPage.value
               }}
             </span>
@@ -719,31 +719,28 @@ async function checkAndShowPreviousSessionRecap() {
       return
     }
 
-    // Find the immediately preceding slot relative to currentStart
-    // If currentStart > 0, find a slot with end_page < currentStart or start_page < currentStart
+    // Find the immediately preceding slot strictly before currentStart
+    // (i.e. end_page < currentStart or start_page < currentStart, and excluding current session range)
     let prevSlot = null
-    if (currentStart > 1) {
-      const priorSlots = validSlots
-        .filter((s) => s.end_page > 0 && s.end_page < currentStart)
-        .sort((a, b) => b.end_page - a.end_page)
+    const priorSlots = validSlots
+      .filter((s) => {
+        // Exclude notes that encompass or start at/after the current start page
+        if (s.start_page >= currentStart) return false
+        if (s.end_page >= currentStart) return false
+        return true
+      })
+      .sort((a, b) => (b.end_page || b.start_page) - (a.end_page || a.start_page))
 
-      if (priorSlots.length > 0) {
-        prevSlot = priorSlots[0]
-      } else {
-        // Fallback: any slot that started before this one
-        const earlierSlots = validSlots
-          .filter((s) => s.start_page > 0 && s.start_page < currentStart)
-          .sort((a, b) => b.start_page - a.start_page)
-        if (earlierSlots.length > 0) {
-          prevSlot = earlierSlots[0]
-        }
+    if (priorSlots.length > 0) {
+      prevSlot = priorSlots[0]
+    } else if (currentStart > 1) {
+      // Fallback if end_page overlaps or is 0, but started before currentStart
+      const earlierSlots = validSlots
+        .filter((s) => s.start_page > 0 && s.start_page < currentStart)
+        .sort((a, b) => b.start_page - a.start_page)
+      if (earlierSlots.length > 0) {
+        prevSlot = earlierSlots[0]
       }
-    }
-
-    // If we are at page 1 or no strict prior range slot was found, but a prior session note exists
-    if (!prevSlot && currentStart > 1 && validSlots.length > 0) {
-      // Pick the latest available slot that is not the current range
-      prevSlot = validSlots[0]
     }
 
     if (prevSlot && prevSlot.content && prevSlot.content.trim() !== '') {
@@ -1242,17 +1239,33 @@ h3 {
   min-width: 0;
   height: 100%;
   min-height: 0;
+  container-type: inline-size;
+  container-name: stage;
+  overflow: hidden;
 }
 
 .stage-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
 }
 
-.stage-head-left,
+.stage-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted-text);
+  line-height: 1;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
 .stage-head-right {
   display: flex;
   align-items: center;
@@ -1260,6 +1273,7 @@ h3 {
   font-size: 13px;
   color: var(--muted-text);
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .stage-head button {
@@ -1680,6 +1694,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .stage-actions-inline .copy-session-btn {
@@ -1717,14 +1732,49 @@ button:disabled {
 .more-actions-wrapper {
   display: none;
   position: relative;
+  flex-shrink: 0;
 }
 
-/* When congested (narrow viewports or small container screens), hide inline actions and show the overflow ... menu */
-@media (max-width: 1320px) {
+/* Container query: collapse inline actions when stage width <= 980px */
+@container stage (max-width: 980px) {
   .stage-actions-inline {
     display: none;
   }
   .more-actions-wrapper {
+    display: block;
+  }
+}
+
+/* Hide 'Reading Window:' prefix on compact stages, leaving 'Pages X-Y' */
+@container stage (max-width: 680px) {
+  .reading-window-label {
+    display: none;
+  }
+}
+
+/* Fallback media query when viewport is <= 1520px (e.g. split view on standard laptops) */
+@media (max-width: 1520px) {
+  .stage-actions-inline {
+    display: none;
+  }
+  .more-actions-wrapper {
+    display: block;
+  }
+}
+
+/* When the chat panel is collapsed, stage takes full width */
+.layout.collapsed .stage-actions-inline {
+  display: flex;
+}
+.layout.collapsed .more-actions-wrapper {
+  display: none;
+}
+
+@media (max-width: 1080px) {
+  .layout.collapsed .stage-actions-inline {
+    display: none;
+  }
+  .layout.collapsed .more-actions-wrapper {
     display: block;
   }
 }
