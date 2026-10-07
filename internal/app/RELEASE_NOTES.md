@@ -1,36 +1,48 @@
 ## ✨ Features
 
-- **Pet Companion Revamp** – The new fox pet “Rusty” replaces the dragon, and additional unlockable pets and skins are now available. Access the Pet Sanctuary, view and toggle your current pet and skin from the Rewards overview, and enjoy fresh pet visuals with the new Pet Avatar component.  
-- **Bi‑directional Study Loop** – Seamlessly move between Flashcards, Study Notes, and the Reader. New “View Notes” button on Flashcards, contextual back buttons in Notes and Reader, and preserved navigation context for a smoother study flow.  
-- **Structured Study Notes** – Study notes are now stored as Markdown files with YAML front‑matter, supporting page‑range generation, persistent storage, and easy offline access. A dedicated Notes page view, API client, and milestone triggers enhance note management.  
-- **Rate‑Limit Banner & Settings** – A visible banner informs you when LLM requests are throttled. New settings let you choose between “Standard” and “Paced” rate‑limit strategies.  
-- **Tabbed Sidebar for Chat & Notes** – The reader sidebar now has tabs to switch between the AI chat assistant and the Chapter Study Note view, replacing the old modal drawer.  
-- **Overflow Menu in Reader** – Quick actions (copy, audio, simplify, add note) are now available from an overflow menu in the Reader.  
-- **Enhanced Icons & Toasts** – New SVG icons (message square, send, chevron, sidebar) and a unified BaseIcon component improve visual consistency, including toast notifications.  
+- **Previous‑Session Recap Control**  
+  - New toggle in **Notes → Settings** to enable or disable the recap modal that appears before a reading session.  
+  - “Don’t show again” checkbox in the recap modal lets users suppress it permanently with a single click.
+
+- **Recap Modal Before Reading**  
+  - A concise summary of notes from the last session is now displayed automatically (if enabled) before you start a new reading session.
+
+- **Customizable Auto‑Generated Study Notes**  
+  - Choose the **detail level** and **LLM performance tier** for AI‑generated notes.  
+  - Select from several note styles: *Executive Summary, Concept Card, Cheatsheet, Feynman, Detailed*.  
+  - New **Auto‑Notes** card on the Notes page shows progress and lets you fine‑tune generation settings.  
+  - AI note generation now runs both at the start **and** the end of a reading session, with optional page‑range statistics.
+
+- **Preserve Your Own Annotations**  
+  - When AI regenerates a study note, any “My Notes” section you added (manual annotations, diagrams, etc.) is automatically retained.
+
+- **Paste Images Directly into Study Notes**  
+  - In the ReaderChat editor you can paste screenshots or other images; they are saved and displayed inline.  
+  - New **Add Note** and **AI Generate** buttons streamline note creation.
+
+- **Enhanced Quiz Generation**  
+  - Updated prompt logic produces higher‑quality, mechanism‑focused questions and reduces answer‑length bias.
 
 ## 🚀 Improvements
 
-- **UI Consistency** – Refreshed border styles, box‑shadows, and component styling across RateLimitBanner, ReaderChat, Notes, and other UI elements.  
-- **Compression Feedback** – Real‑time compression status badge with batch progress, plus performance‑focused batching and callbacks for faster note generation.  
-- **Pacing Precision** – More accurate daily session calculations and pacing logic for smoother study sessions.  
-- **Notebook Filtering** – Topics now show only those with existing notes or active progress, decluttering the notebook view.  
-- **Flashcards Enhancements** – Added button to view associated notes directly from Flashcards.  
-- **Navigation Context** – Reader now retains `fromOrigin` and `taskId` when returning to notes, ensuring continuity.  
-- **Pet UI** – Updated layout and styling for pet selection, skin display, and sanctuary navigation.  
-- **Settings UI** – New controls for rate‑limit strategy and other preferences.  
+- **UI Refresh**  
+  - Updated wording in the auto‑notes dialog for clearer guidance.  
+  - Refined styling of status badges for better visual hierarchy.
+
+- **Compression & Progress Visualization**  
+  - Real‑time progress bar and detailed statistics for note compression, including page‑range bounds.
+
+- **Robust Image Rendering**  
+  - Relative asset paths are now resolved correctly, ensuring images load reliably even in nested folders or with special characters.
+
+- **Backend Asset Handling**  
+  - Streamlined request handling for asset routes improves overall performance when loading note assets.
 
 ## 🐛 Bug Fixes & Issue Resolutions
 
-- Fixed missing or broken toast notifications in chat components.  
-- Resolved navigation bugs that lost context when moving between Reader, Notes, and Flashcards.  
-- Corrected unused CSS and style inconsistencies.  
-- Patched issues with pet skin unlocking and display.  
-- Fixed per‑session range indexing for study notes.  
-- Addressed errors in the compression pipeline and status tracking.  
-- Fixed overflow‑menu actions and related UI glitches.  
-- Removed legacy note‑drawer remnants and backdrop issues.  
-- Fixed pagination and data retrieval for review‑session cards.  
-- Resolved various minor UI glitches across the app.  
+- Fixed styling inconsistencies in status badges that could cause readability issues.  
+- Resolved edge‑case failures when displaying the auto‑notes dialog, ensuring it appears correctly for all users.
 
----  
+---
+
 *Thanks for using Studyloop!*
