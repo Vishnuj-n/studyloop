@@ -238,23 +238,7 @@
               title="Skip this session — pages marked as read, no quiz generated"
               @click="skipSession"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="trash-icon"
-              >
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
+              <BaseIcon name="trash" size="16" />
             </button>
           </div>
         </div>
@@ -1254,15 +1238,15 @@ h3 {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 14px;
   flex: 1;
   min-height: 0;
   height: 100%;
 }
 
 .layout.collapsed {
-  grid-template-columns: minmax(0, 1fr) 78px;
+  grid-template-columns: minmax(0, 1fr) 68px;
 }
 
 .stage {
@@ -1288,6 +1272,7 @@ h3 {
   width: 100%;
   position: relative;
   z-index: 20;
+  min-height: 32px;
 }
 
 .stage-head-left {
@@ -1329,18 +1314,20 @@ h3 {
   align-items: center;
   justify-content: center;
   height: 32px;
-  padding: 0 9px;
+  width: 34px;
+  padding: 0;
   box-sizing: border-box;
   color: #ef4444;
-  background: color-mix(in srgb, #ef4444 12%, var(--surface-container-low));
+  background: color-mix(in srgb, #ef4444 10%, var(--surface-container-low));
   border: 1px solid var(--outline-variant);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .skip-session-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, #ef4444 24%, var(--surface-container-low));
+  background: color-mix(in srgb, #ef4444 20%, var(--surface-container-low));
   color: #dc2626;
   border-color: color-mix(in srgb, #ef4444 45%, transparent);
   transform: translateY(-1px);
@@ -1348,12 +1335,6 @@ h3 {
 
 .skip-session-btn:active:not(:disabled) {
   transform: translateY(0);
-}
-
-.skip-session-btn .trash-icon {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
 }
 
 .reading-window-info,
@@ -1367,6 +1348,7 @@ h3 {
 
 .page-indicator {
   font-weight: 600;
+  font-size: 12.5px;
 }
 
 
@@ -1470,20 +1452,20 @@ button:disabled {
 .pdf-edge-controls {
   position: absolute;
   top: 50%;
-  right: 10px;
+  right: 14px;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  background: color-mix(in srgb, var(--surface-bright) 72%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  padding: 10px 8px;
-  border-radius: 20px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
+  gap: 4px;
+  background: color-mix(in srgb, var(--surface-container-highest) 75%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 6px 4px;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--outline-variant);
-  z-index: 10;
+  z-index: 15;
   transition: opacity 0.25s ease;
 }
 
@@ -1491,8 +1473,8 @@ button:disabled {
   background: transparent;
   color: var(--on-surface);
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1502,22 +1484,31 @@ button:disabled {
     background 0.18s ease,
     transform 0.12s ease;
   padding: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
 }
 
+.edge-zoom-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-text);
+  padding: 2px 0;
+  user-select: none;
+}
+
 .edge-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--surface-container-low) 70%, transparent);
+  background: var(--surface-bright);
+  color: var(--primary);
   transform: scale(1.08);
 }
 
 .edge-btn:active:not(:disabled) {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 
 .edge-btn:disabled {
-  opacity: 0.38;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 

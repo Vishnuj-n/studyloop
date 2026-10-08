@@ -72,8 +72,8 @@
             title="Open in Knowledge Base"
             @click="goToNotesPage"
           >
-            <span>Knowledge Base</span>
-            <BaseIcon name="external-link" size="11" />
+            <BaseIcon name="external-link" size="12" />
+            <span>KB</span>
           </button>
         </template>
 
@@ -82,11 +82,10 @@
           class="ghost collapse-btn"
           :aria-expanded="!chatCollapsed"
           aria-controls="reader-chat-panel"
-          title="Collapse panel"
+          title="Collapse companion panel"
           @click="toggleChat"
         >
           <BaseIcon name="chevron-right" size="13" />
-          <span>Collapse</span>
         </button>
       </div>
     </div>
@@ -914,16 +913,17 @@ function handleEnterKey(event) {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  min-height: 32px;
 }
 
 /* Companion Top Tab Switcher */
 .companion-tabs-group {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   background: var(--surface-container-low);
   padding: 3px;
-  border-radius: 10px;
+  border-radius: 9px;
   border: 1px solid var(--outline-variant);
 }
 
@@ -931,15 +931,18 @@ function handleEnterKey(event) {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px;
-  border-radius: 7px;
+  padding: 4px 9px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   color: var(--muted-text);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  height: 24px;
+  box-sizing: border-box;
   transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
 .companion-tab-btn:hover:not(.active) {
@@ -957,6 +960,7 @@ function handleEnterKey(event) {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .clear-chat-btn,
@@ -965,22 +969,49 @@ function handleEnterKey(event) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  border-radius: 6px;
-  padding: 3px 7px;
+  border-radius: 8px;
+  padding: 0 8px;
+  height: 28px;
+  box-sizing: border-box;
   transition: all 0.15s ease;
   white-space: nowrap;
+}
+
+.collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.collapse-btn:hover {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  border-color: var(--outline);
 }
 
 .clear-chat-btn,
 .kb-link-btn {
   color: var(--on-surface-variant);
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
 }
 
 .clear-chat-btn:hover,
 .kb-link-btn:hover {
   color: var(--primary);
+  border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-low));
 }
 
