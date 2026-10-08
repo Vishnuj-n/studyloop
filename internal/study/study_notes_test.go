@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ai-tutor/internal/db"
+	"ai-tutor/internal/models"
 )
 
 type mockNotesLLM struct {
@@ -308,5 +309,71 @@ func TestExtractUserNotesSection(t *testing.T) {
 				t.Errorf("ExtractUserNotesSection() = %q, want %q", result, tc.expected)
 			}
 		})
+	}
+}
+
+func TestReorderTopicStudyNotes(t *testing.T) {
+	tempDir := t.TempDir()
+	notesDir := filepath.Join(tempDir, "notes")
+	t.Setenv("STUDYLOOP_NOTES_DIR", notesDir)
+
+	dbPath := filepath.Join(tempDir, "test_reorder.db")
+	repo, err := db.Init(dbPath, "")
+	if err != nil {
+		t.Fatalf("failed to init test db: %v", err)
+	}
+	defer repo.Close()
+
+	topicID := "topic-reorder-test"
+	_ = repo.EnsureTopicWithStatus(topicID, "Reorder Chapter", "reading")
+	_ = repo.CreateNotebook("nb-reorder", "Reorder Book", "/tmp/reorder.pdf", "pdf", topicID, "hash_reorder", 100, "")
+
+	svc := &StudyService{
+		repo: repo,
+	}
+
+	// Create 3 notes: (0,0), (1, 10), (11, 20)
+	if err := svc.UpdateTopicStudyNote(topicID, 0, 0, "# Chapter Summary"); err != nil {
+		t.Fatalf("failed creating note 0-0: %v", err)
+	}
+	if err := svc.UpdateTopicStudyNote(topicID, 1, 10, "Pages 1 to 10 notes"); err != nil {
+		t.Fatalf("failed creating note 1-10: %v", err)
+	}
+	if err := svc.UpdateTopicStudyNote(topicID, 11, 20, "Pages 11 to 20 notes"); err != nil {
+		t.Fatalf("failed creating note 11-20: %v", err)
+	}
+
+	// Initial order should be: (0,0), (1,10), (11,20)
+	slots, err := svc.GetTopicStudyNoteSlots(topicID)
+	if err != nil || len(slots) != 3 {
+		t.Fatalf("expected 3 slots, got %d, err: %v", len(slots), err)
+	}
+	if slots[0].StartPage != 0 || slots[1].StartPage != 1 || slots[2].StartPage != 11 {
+		t.Errorf("unexpected initial slot ordering: %d, %d, %d", slots[0].StartPage, slots[1].StartPage, slots[2].StartPage)
+	}
+
+	// Reorder: Move (11,20) first, then (0,0), then (1,10)
+	reordered := []models.NoteSlotRange{
+		{StartPage: 11, EndPage: 20},
+		{StartPage: 0, EndPage: 0},
+		{StartPage: 1, EndPage: 10},
+	}
+	if err := svc.ReorderTopicStudyNotes(topicID, reordered); err != nil {
+		t.Fatalf("ReorderTopicStudyNotes failed: %v", err)
+	}
+
+	// Fetch again and verify new order
+	afterSlots, err := svc.GetTopicStudyNoteSlots(topicID)
+	if err != nil || len(afterSlots) != 3 {
+		t.Fatalf("expected 3 slots after reorder, got %d, err: %v", len(afterSlots), err)
+	}
+	if afterSlots[0].StartPage != 11 || afterSlots[0].EndPage != 20 {
+		t.Errorf("expected first slot to be 11-20, got %d-%d", afterSlots[0].StartPage, afterSlots[0].EndPage)
+	}
+	if afterSlots[1].StartPage != 0 || afterSlots[1].EndPage != 0 {
+		t.Errorf("expected second slot to be 0-0, got %d-%d", afterSlots[1].StartPage, afterSlots[1].EndPage)
+	}
+	if afterSlots[2].StartPage != 1 || afterSlots[2].EndPage != 10 {
+		t.Errorf("expected third slot to be 1-10, got %d-%d", afterSlots[2].StartPage, afterSlots[2].EndPage)
 	}
 }

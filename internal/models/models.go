@@ -701,12 +701,19 @@ type TopicStudyNote struct {
 	NotebookTitle      string `json:"notebook_title,omitempty"`
 	StartPage          int    `json:"start_page"`
 	EndPage            int    `json:"end_page"`
+	Order              int    `json:"order,omitempty"`
 	FilePath           string `json:"file_path,omitempty"`
 	RelativeFolderPath string `json:"relative_folder_path,omitempty"`
 	Content            string `json:"content"`
 	LastReviewedAt     int64  `json:"last_reviewed_at"`
 	CreatedAt          string `json:"created_at,omitempty"`
 	UpdatedAt          string `json:"updated_at,omitempty"`
+}
+
+// NoteSlotRange represents start and end page identifying a note slot for reordering.
+type NoteSlotRange struct {
+	StartPage int `json:"start_page"`
+	EndPage   int `json:"end_page"`
 }
 
 type AnalyticsEventSync struct {

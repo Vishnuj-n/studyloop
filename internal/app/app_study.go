@@ -902,6 +902,19 @@ func (a *App) UpdateTopicStudyNote(topicID string, startPage, endPage int, conte
 	}
 }
 
+// ReorderTopicStudyNotes updates the display order of note slots for a topic.
+func (a *App) ReorderTopicStudyNotes(topicID string, slots []models.NoteSlotRange) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	if err := a.studyService.ReorderTopicStudyNotes(topicID, slots); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+	}
+}
+
 // SaveNoteImage saves a pasted image into the topic's assets folder for markdown embedding.
 func (a *App) SaveNoteImage(topicID, notebookID, fileName string, fileData []byte) map[string]interface{} {
 	if a.studyService == nil {

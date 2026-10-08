@@ -618,6 +618,19 @@ export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, conten
   }
 }
 
+export function reorderTopicStudyNotes(topicID, slots = []) {
+  try {
+    const payload = slots.map((s) => ({
+      start_page: Number(s.start_page) || 0,
+      end_page: Number(s.end_page) || 0,
+    }))
+    return appBridge().ReorderTopicStudyNotes(topicID, payload)
+  } catch (err) {
+    console.error('Failed reordering topic study notes:', err)
+    throw err
+  }
+}
+
 export function getNotesByNotebook(notebookID = '') {
   try {
     return appBridge().GetNotesByNotebook(notebookID)

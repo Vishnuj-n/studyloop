@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import MysteryChestModal from './components/MysteryChestModal.vue'
+import MilestoneCelebrationModal from './components/MilestoneCelebrationModal.vue'
 import RewardToast from './components/RewardToast.vue'
 import AppToast from './components/AppToast.vue'
 import ReleaseNotesModal from './components/ReleaseNotesModal.vue'
@@ -247,6 +248,7 @@ const updateModalStatus = ref('')
 const pendingReward = ref(null)
 const activeChest = ref(null)
 const activeChestTitle = ref('')
+const activeMilestoneAscension = ref(null)
 
 function handleStudyReward(event) {
   const rewards = event?.detail?.rewards
@@ -254,6 +256,18 @@ function handleStudyReward(event) {
 
   pendingReward.value = rewards
   window.dispatchEvent(new Event('gamification-updated'))
+
+  // Check if a new scholar rank title was unlocked and trigger celebration fanfare once
+  if (rewards.new_title_unlocked) {
+    const titleKey = `milestone_celebrated_${rewards.new_title_unlocked.toLowerCase().replace(/\s+/g, '_')}`
+    if (localStorage.getItem(titleKey) !== 'true') {
+      localStorage.setItem(titleKey, 'true')
+      activeMilestoneAscension.value = {
+        title: rewards.new_title_unlocked,
+        xp: rewards.xp_earned || 0,
+      }
+    }
+  }
 }
 
 function openRewardChest(box) {
@@ -518,6 +532,12 @@ onUnmounted(() => {
         :box="activeChest"
         :new-title="activeChestTitle"
         @close="closeActiveChest"
+      />
+      <MilestoneCelebrationModal
+        v-if="activeMilestoneAscension"
+        :title="activeMilestoneAscension.title"
+        :xp="activeMilestoneAscension.xp"
+        @close="activeMilestoneAscension = null"
       />
 
       <!-- One-time Update Release Notes Modal -->

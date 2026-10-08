@@ -371,13 +371,13 @@
                 <div class="session-card-badge-row">
                   <span class="session-index-pill new-badge">New Note</span>
                   <div class="page-range-inputs">
-                    <label>Pages:</label>
+                    <label>Pages (optional):</label>
                     <input
                       v-model.number="newNoteStartPage"
                       type="number"
                       min="0"
                       class="page-input"
-                      placeholder="Start"
+                      placeholder="0"
                     />
                     <span>–</span>
                     <input
@@ -385,7 +385,7 @@
                       type="number"
                       min="0"
                       class="page-input"
-                      placeholder="End"
+                      placeholder="0"
                     />
                   </div>
                 </div>
@@ -452,8 +452,10 @@
               <!-- Card Header -->
               <div class="session-card-header">
                 <div class="session-card-badge-row">
-                  <span class="session-index-pill">Session {{ sessionNumber }}</span>
-                  <span class="session-range-pill">
+                  <span class="session-index-pill" :class="{ 'chapter-badge': isChapterSlot(slot) }">
+                    {{ isChapterSlot(slot) ? 'Chapter Note' : `Session ${sessionNumber}` }}
+                  </span>
+                  <span v-if="!isChapterSlot(slot)" class="session-range-pill">
                     <BaseIcon :name="isCurrentTopicYouTube ? 'video' : 'book-open'" size="12" />
                     <span>{{ formatPageRange(slot.start_page, slot.end_page) }}</span>
                   </span>
@@ -467,11 +469,11 @@
                     v-if="canJumpToSource(slot)"
                     type="button"
                     class="jump-source-pill-btn"
-                    :title="isCurrentTopicYouTube ? 'Jump to video segment in Reader' : `Open Reader at page ${slot.start_page || 1}`"
+                    :title="isCurrentTopicYouTube ? 'Jump to video segment in Reader' : `Open Reader at page ${slot.start_page || activeTopic?.start_page || 1}`"
                     @click="jumpToReader(slot)"
                   >
                     <BaseIcon :name="isCurrentTopicYouTube ? 'play' : 'external-link'" size="11" />
-                    <span>{{ isCurrentTopicYouTube ? 'Watch ↗' : `Jump to p. ${slot.start_page || 1} ↗` }}</span>
+                    <span>{{ isCurrentTopicYouTube ? 'Watch ↗' : `Jump to p. ${slot.start_page || activeTopic?.start_page || 1} ↗` }}</span>
                   </button>
                   <span v-if="slot.last_reviewed_at" class="session-review-pill">
                     <BaseIcon name="check-circle" size="12" />
@@ -502,6 +504,28 @@
 
                   <!-- Actions when viewing this slot -->
                   <template v-else>
+                    <!-- Move Up / Down Reorder Buttons -->
+                    <button
+                      v-if="sessionSlots.length > 1 && !isFromFlashcards"
+                      type="button"
+                      class="icon-btn-pill reorder-btn"
+                      title="Move note up"
+                      :disabled="isReordering || isFirstSlot(slot)"
+                      @click="moveSlot(slot, -1)"
+                    >
+                      <BaseIcon name="chevron-up" size="13" />
+                    </button>
+                    <button
+                      v-if="sessionSlots.length > 1 && !isFromFlashcards"
+                      type="button"
+                      class="icon-btn-pill reorder-btn"
+                      title="Move note down"
+                      :disabled="isReordering || isLastSlot(slot)"
+                      @click="moveSlot(slot, 1)"
+                    >
+                      <BaseIcon name="chevron-down" size="13" />
+                    </button>
+
                     <button
                       v-if="slot.content"
                       type="button"
@@ -609,6 +633,7 @@ import {
   getTopicStudyNoteSlots,
   generateTopicStudyNoteForRange,
   updateTopicStudyNote,
+  reorderTopicStudyNotes,
   saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
   openNotesFolder,
@@ -1355,15 +1380,54 @@ function formatPageRange(startPage, endPage) {
   return `Pages ${startPage}–${endPage}`
 }
 
+const isReordering = ref(false)
+
+function isChapterSlot(slot) {
+  return !slot || ((!slot.start_page && !slot.end_page) || (slot.start_page === 0 && slot.end_page === 0))
+}
+
+function isFirstSlot(slot) {
+  return sessionSlots.value.length > 0 && sessionSlots.value[0]?.start_page === slot.start_page && sessionSlots.value[0]?.end_page === slot.end_page
+}
+
+function isLastSlot(slot) {
+  const len = sessionSlots.value.length
+  return len > 0 && sessionSlots.value[len - 1]?.start_page === slot.start_page && sessionSlots.value[len - 1]?.end_page === slot.end_page
+}
+
+async function moveSlot(slot, delta) {
+  if (!selectedTopicID.value || isReordering.value) return
+  const currentIdx = sessionSlots.value.findIndex(
+    (s) => s.start_page === slot.start_page && s.end_page === slot.end_page
+  )
+  if (currentIdx === -1) return
+  const targetIdx = currentIdx + delta
+  if (targetIdx < 0 || targetIdx >= sessionSlots.value.length) return
+
+  const updated = [...sessionSlots.value]
+  const temp = updated[currentIdx]
+  updated[currentIdx] = updated[targetIdx]
+  updated[targetIdx] = temp
+  sessionSlots.value = updated
+
+  isReordering.value = true
+  try {
+    const res = await reorderTopicStudyNotes(selectedTopicID.value, updated)
+    if (res && res.error) {
+      errorMsg.value = res.error
+    }
+  } catch (err) {
+    console.error('[NOTES] Failed to reorder notes:', err)
+    errorMsg.value = 'Failed to save note order.'
+  } finally {
+    isReordering.value = false
+  }
+}
+
 function openAddNoteCard() {
   showAddNoteCard.value = true
-  if (activeTopic.value) {
-    newNoteStartPage.value = activeTopic.value.start_page || 0
-    newNoteEndPage.value = activeTopic.value.end_page || 0
-  } else {
-    newNoteStartPage.value = 0
-    newNoteEndPage.value = 0
-  }
+  newNoteStartPage.value = 0
+  newNoteEndPage.value = 0
   newNoteBuffer.value = ''
   errorMsg.value = ''
 }
@@ -2101,6 +2165,12 @@ onUnmounted(() => {
   border-color: var(--outline-variant);
 }
 
+.session-index-pill.chapter-badge {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border-color: var(--outline-variant);
+}
+
 .session-range-pill {
   display: inline-flex;
   align-items: center;
@@ -2182,6 +2252,21 @@ onUnmounted(() => {
 .icon-btn-pill:hover:not(:disabled) {
   background: var(--surface-container-highest);
   border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.icon-btn-pill.reorder-btn {
+  padding: 5px 7px;
+  color: var(--muted-text);
+}
+
+.icon-btn-pill.reorder-btn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.icon-btn-pill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .icon-btn-pill.highlight {

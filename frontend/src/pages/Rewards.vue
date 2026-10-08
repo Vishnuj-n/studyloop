@@ -162,6 +162,11 @@ import {
   getGamificationStore,
   claimAchievement,
 } from '../services/appApi'
+import { useToast } from '../composables/useToast'
+import { playCorrectChime } from '../utils/audioJuice'
+import { triggerConfettiCelebration } from '../utils/confettiCelebration'
+
+const { showNotice, showError } = useToast()
 
 const loading = ref(true)
 const buying = ref(false)
@@ -221,6 +226,7 @@ async function handleClaimAchievement(ach) {
     const res = await claimAchievement(ach.id)
     if (res && res.error) {
       console.error('Failed to claim achievement:', res.error)
+      showError(res.error, 'Claim Failed')
       return
     }
     if (res && res.store) {
@@ -229,9 +235,20 @@ async function handleClaimAchievement(ach) {
     } else {
       await loadData()
     }
+
+    // Celebratory toast, audio chime, and confetti on achievement unlock
+    const coins = res?.coins_earned || ach.reward_coins || 0
+    showNotice(
+      `Achievement unlocked: "${ach.title}"! +${coins} Coins added to your vault.`,
+      'Trophy Claimed 🏆'
+    )
+    playCorrectChime()
+    triggerConfettiCelebration({ tier: 'gold', particleCount: 80 })
+
     window.dispatchEvent(new Event('gamification-updated'))
   } catch (err) {
     console.error('Error claiming achievement:', err)
+    showError(err?.message || 'Failed to claim achievement.', 'Error')
   } finally {
     claimingAchievementId.value = ''
   }

@@ -250,6 +250,10 @@ func ParseMarkdownNote(raw string, fallback models.TopicStudyNote) models.TopicS
 					if p, err := strconv.Atoi(val); err == nil {
 						note.EndPage = p
 					}
+				case "order":
+					if ord, err := strconv.Atoi(val); err == nil {
+						note.Order = ord
+					}
 				case "last_reviewed_at":
 					if t, err := strconv.ParseInt(val, 10, 64); err == nil {
 						note.LastReviewedAt = t
@@ -289,6 +293,9 @@ func FormatMarkdownNote(note models.TopicStudyNote) string {
 	}
 	fmt.Fprintf(&sb, "start_page: %d\n", note.StartPage)
 	fmt.Fprintf(&sb, "end_page: %d\n", note.EndPage)
+	if note.Order > 0 {
+		fmt.Fprintf(&sb, "order: %d\n", note.Order)
+	}
 	fmt.Fprintf(&sb, "last_reviewed_at: %d\n", note.LastReviewedAt)
 	if note.CreatedAt != "" {
 		fmt.Fprintf(&sb, "created_at: %q\n", note.CreatedAt)
@@ -873,7 +880,18 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 	}
 
 	sort.Slice(notes, func(i, j int) bool {
-		// (0,0) / chapter_summary always first
+		// 1. If explicit order is set on both, compare order
+		if notes[i].Order != 0 && notes[j].Order != 0 {
+			if notes[i].Order != notes[j].Order {
+				return notes[i].Order < notes[j].Order
+			}
+		} else if notes[i].Order != 0 {
+			return true
+		} else if notes[j].Order != 0 {
+			return false
+		}
+
+		// 2. (0,0) / chapter_summary always first if no explicit order
 		if notes[i].StartPage == 0 && notes[i].EndPage == 0 && (notes[j].StartPage != 0 || notes[j].EndPage != 0) {
 			return true
 		}
@@ -889,6 +907,40 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 	return notes, nil
 }
 
+// ReorderTopicStudyNotes updates the order frontmatter of a list of note slots in a topic.
+func (s *StudyService) ReorderTopicStudyNotes(topicID string, slots []models.NoteSlotRange) error {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return fmt.Errorf("topic ID is required")
+	}
+	nbID, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, "")
+
+	for idx, slot := range slots {
+		newOrder := idx + 1
+		existingNote, err := s.GetTopicStudyNoteForRange(topicID, slot.StartPage, slot.EndPage)
+		if err != nil || existingNote == nil {
+			continue
+		}
+		existingNote.Order = newOrder
+		if existingNote.NotebookID == "" {
+			existingNote.NotebookID = nbID
+		}
+		if existingNote.NotebookTitle == "" {
+			existingNote.NotebookTitle = nbTitle
+		}
+		if existingNote.TopicID == "" {
+			existingNote.TopicID = tID
+		}
+		if existingNote.TopicTitle == "" {
+			existingNote.TopicTitle = tTitle
+		}
+		if _, saveErr := s.SaveNoteToDisk(*existingNote); saveErr != nil {
+			utils.Warnf("[STUDY_NOTES] Failed saving reordered note %d-%d: %v", slot.StartPage, slot.EndPage, saveErr)
+		}
+	}
+	return nil
+}
+
 // UpdateTopicStudyNote updates the markdown text of a specific (topic, page range) note directly on disk.
 func (s *StudyService) UpdateTopicStudyNote(topicID string, startPage, endPage int, content string) error {
 	topicID = strings.TrimSpace(topicID)
@@ -898,7 +950,7 @@ func (s *StudyService) UpdateTopicStudyNote(topicID string, startPage, endPage i
 
 	nbID, nbTitle, tID, tTitle := s.resolveNotebookAndTopicTitles(topicID, "")
 
-	// Check if file already exists to preserve created_at & last_reviewed_at
+	// Check if file already exists to preserve created_at, last_reviewed_at & order
 	existingNote, _ := s.GetTopicStudyNoteForRange(topicID, startPage, endPage)
 	note := models.TopicStudyNote{
 		ID:            fmt.Sprintf("note-%s-%d-%d", utils.MD5Hex(tID), startPage, endPage),
@@ -915,6 +967,7 @@ func (s *StudyService) UpdateTopicStudyNote(topicID string, startPage, endPage i
 		note.ID = existingNote.ID
 		note.CreatedAt = existingNote.CreatedAt
 		note.LastReviewedAt = existingNote.LastReviewedAt
+		note.Order = existingNote.Order
 	}
 
 	_, err := s.SaveNoteToDisk(note)
