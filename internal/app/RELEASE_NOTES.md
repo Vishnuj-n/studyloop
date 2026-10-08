@@ -1,18 +1,11 @@
 ## ✨ Features
-- **Briefing‑style notes** – Choose a new “briefing” detail level for study notes, delivering concise summaries that are quicker to review.  
-- **Resilient session restoration** – Your study session is now saved both locally and in the database, so it automatically recovers after app updates, installer clean‑ups, or accidental deletion of the local session file.  
-- **Enhanced gamification insights** – New documentation sections introduce clearer gamification goals and progress tracking, helping you stay motivated.
+- **Reorder Study Notes** – Easily change the order of notes inside a topic using new up/down controls. Your custom sequence is saved instantly.
+- **Milestone Celebration** – Unlock ranks and achievements and get a fun celebration: confetti, sound effects, and a dedicated modal view.
+- **More Reliable AI Responses** – A transparent fallback LLM provider now steps in automatically if the primary model fails, reducing interruptions during study sessions.
 
 ## 🚀 Improvements
-- **Responsive reading experience** – The reader layout now adapts smoothly to different screen sizes and devices, with improved CSS media‑query handling.  
-- **Refined session recap modal** – Updated layout and loading states make reviewing past sessions faster and more visually clear.  
-- **Reading window UI upgrades** – Better display of content and smoother navigation within the reading pane.  
-- **Faster topic compression** – Batch processing with automatic retries speeds up compression of large study topics and reduces failures.  
-- **More reliable compression stats** – Polling and error handling have been hardened, giving you accurate progress feedback.
-
-## 🐛 Bug Fixes & Issue Resolutions
-- Fixed intermittent errors when fetching compression statistics, ensuring stable progress updates.  
-- Resolved session‑loss issues by adding a database fallback for session data, preventing loss after unexpected file deletions.  
+- **Enhanced UI Layout & Accessibility** – Refined component spacing, clearer typography, and improved keyboard navigation to make the app easier to use for everyone.
+- **Smoother Session Recap & Reading Experience** – Minor tweaks improve the flow of session summaries and reading interactions.
 
 ---
 
