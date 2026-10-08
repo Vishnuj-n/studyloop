@@ -39,8 +39,6 @@ Organize into 2–3 logical thematic sections with subheadings. For each theme:
 1–2 concise paragraphs or bullet points highlighting key boundary conditions, limitations, or practical implications.
 `
 
-const studyNoteSystemPrompt = briefingNoteSystemPrompt
-
 func getStudyNoteSystemPrompt(detailLevel string) string {
 	switch strings.ToLower(strings.TrimSpace(detailLevel)) {
 	case "briefing":
