@@ -31,7 +31,7 @@ func TestBuildSocraticRemedialPrompt_Integration(t *testing.T) {
 	}
 
 	wantPhrases := []string{
-		"You are an Adaptive Concept Tutor.",
+		"You are an expert, encouraging, and highly adaptive AI Tutor (Feynman / Socratic method).",
 		"1. Question: What is a queue?",
 		"   Options: A, B",
 		"   My Answer: B",
@@ -39,7 +39,9 @@ func TestBuildSocraticRemedialPrompt_Integration(t *testing.T) {
 		"2. Question: Why?",
 		"   My Answer: (No answer)",
 		"   Correct Answer: Because",
-		"Analyze my wrong answers against the provided material.",
+		"1. Identify the Patterns:",
+		"2. Teach the Missing Concepts:",
+		"3. Check for Understanding (Active Recall):",
 	}
 
 	for _, phrase := range wantPhrases {
