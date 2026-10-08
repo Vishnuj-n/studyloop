@@ -98,8 +98,7 @@ func TestCustomAssetHandler_NoteAssets_SpecialCharacters(t *testing.T) {
 		t.Fatalf("failed to write dummy image: %v", err)
 	}
 
-	os.Setenv("STUDYLOOP_NOTES_DIR", tmpDir)
-	defer os.Unsetenv("STUDYLOOP_NOTES_DIR")
+	t.Setenv("STUDYLOOP_NOTES_DIR", tmpDir)
 
 	a := app.NewApp()
 	handler := customAssetHandler(a)

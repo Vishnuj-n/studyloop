@@ -277,7 +277,7 @@ func TestRestoreSession_DatabaseFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
-	defer repo.Close()
+	t.Cleanup(func() { _ = repo.Close() })
 
 	a := &App{
 		repo: repo,

@@ -322,7 +322,7 @@ func TestReorderTopicStudyNotes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to init test db: %v", err)
 	}
-	defer repo.Close()
+	t.Cleanup(func() { _ = repo.Close() })
 
 	topicID := "topic-reorder-test"
 	_ = repo.EnsureTopicWithStatus(topicID, "Reorder Chapter", "reading")
