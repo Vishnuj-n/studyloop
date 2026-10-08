@@ -32,6 +32,52 @@ func (p *pacedProvider) GenerateAnswer(prompt string) (string, error) {
 	return p.LLMProvider.GenerateAnswer(prompt)
 }
 
+// fallbackProvider wraps an LLMProvider and transparently falls back to HeavyLLMProvider
+// on in-flight errors (truncation, HTTP 429 rate limit, timeouts, or API errors) when heavy tier is available.
+type fallbackProvider struct {
+	primary LLMProvider
+	tier    string
+	service *StudyService
+}
+
+func (f *fallbackProvider) GenerateAnswer(prompt string) (string, error) {
+	raw, err := f.primary.GenerateAnswer(prompt)
+	if err == nil {
+		return raw, nil
+	}
+
+	if (f.tier == "fast" || f.tier == "") && f.service.heavyLLMProvider != nil {
+		if f.service.fastLLMProvider == nil || f.service.heavyLLMProvider.ModelName() != f.primary.ModelName() {
+			if llmpkg.IsRateLimitError(err) {
+				f.service.MarkFastRateLimited(45 * time.Second)
+			}
+			fastModel := f.primary.ModelName()
+			heavyModel := f.service.heavyLLMProvider.ModelName()
+			utils.Warnf("[STUDY_SERVICE] Fast LLM tier failed (model=%s err=%v). Retrying automatically on Heavy tier (%s)...",
+				fastModel, err, heavyModel)
+
+			heavyRaw, heavyErr := f.service.heavyLLMProvider.GenerateAnswer(prompt)
+			if heavyErr == nil {
+				utils.Infof("[STUDY_SERVICE] Heavy tier fallback succeeded (model=%s)", heavyModel)
+				return heavyRaw, nil
+			}
+			utils.Warnf("[STUDY_SERVICE] Heavy tier fallback also failed (model=%s err=%v)", heavyModel, heavyErr)
+			return "", fmt.Errorf("both Fast (%s) and Heavy (%s) LLM tiers failed: fast err: %v; heavy fallback err: %w",
+				fastModel, heavyModel, err, heavyErr)
+		}
+	}
+
+	return "", f.service.FormatLLMError(err, f.tier)
+}
+
+func (f *fallbackProvider) ModelName() string {
+	return f.primary.ModelName()
+}
+
+func (f *fallbackProvider) GetLimits() llmpkg.ModelLimits {
+	return f.primary.GetLimits()
+}
+
 // Config wires all dependencies into StudyService via constructor injection.
 type Config struct {
 	Repo             *db.Repository
@@ -74,9 +120,13 @@ func NewStudyService(cfg Config) *StudyService {
 		inFlightNotes:    make(map[string]bool),
 	}
 	if cfg.FastLLMProvider != nil {
-		s.fastLLMProvider = &pacedProvider{
-			LLMProvider: cfg.FastLLMProvider,
-			onCalled:    s.markFastCalled,
+		s.fastLLMProvider = &fallbackProvider{
+			primary: &pacedProvider{
+				LLMProvider: cfg.FastLLMProvider,
+				onCalled:    s.markFastCalled,
+			},
+			tier:    "fast",
+			service: s,
 		}
 	}
 	return s

@@ -134,7 +134,7 @@
                       class="secondary split-chevron-btn audio-chevron-btn"
                       :disabled="reader.loadingBundle.value || reader.loadingText.value || !reader.selectedTopicID.value"
                       title="Audio Overview page range options"
-                      @click.stop="showAudioMenu = !showAudioMenu"
+                      @click.stop="toggleAudioMenu"
                     >
                       <BaseIcon name="chevron-down" size="12" />
                     </button>
@@ -574,6 +574,10 @@ const splitStartPage = computed(() => {
 
 function toggleDeferMenu() {
   showDeferMenu.value = !showDeferMenu.value
+  if (showDeferMenu.value) {
+    showAudioMenu.value = false
+    showMoreMenu.value = false
+  }
 }
 
 function onDeferQuizClick() {
@@ -594,6 +598,14 @@ const audioEndPage = ref(0)
 
 const defaultAudioStart = computed(() => reader.effectiveMinPage.value)
 const defaultAudioEnd = computed(() => reader.effectiveMaxPage.value)
+
+function toggleAudioMenu() {
+  showAudioMenu.value = !showAudioMenu.value
+  if (showAudioMenu.value) {
+    showDeferMenu.value = false
+    showMoreMenu.value = false
+  }
+}
 
 function startAudio(mode = 'session') {
   if (mode === 'toggle') {
@@ -620,6 +632,10 @@ const showMoreMenu = ref(false)
 
 function toggleMoreMenu() {
   showMoreMenu.value = !showMoreMenu.value
+  if (showMoreMenu.value) {
+    showDeferMenu.value = false
+    showAudioMenu.value = false
+  }
 }
 
 function onCopyClick() {
@@ -1270,6 +1286,8 @@ h3 {
   flex-shrink: 0;
   min-width: 0;
   width: 100%;
+  position: relative;
+  z-index: 20;
 }
 
 .stage-head-left {
@@ -1281,7 +1299,7 @@ h3 {
   line-height: 1;
   min-width: 0;
   flex: 1 1 auto;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .stage-head-right {

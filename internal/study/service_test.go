@@ -12,11 +12,21 @@ import (
 )
 
 type dummyLLM struct {
-	model  string
-	limits llmpkg.ModelLimits
+	model         string
+	limits        llmpkg.ModelLimits
+	errToReturn   error
+	answer        string
+	generateCalls int
 }
 
 func (d *dummyLLM) GenerateAnswer(prompt string) (string, error) {
+	d.generateCalls++
+	if d.errToReturn != nil {
+		return "", d.errToReturn
+	}
+	if d.answer != "" {
+		return d.answer, nil
+	}
 	return "dummy answer", nil
 }
 
@@ -192,4 +202,100 @@ func TestPacedRateLimitStrategy(t *testing.T) {
 		t.Fatalf("expected STANDARD strategy to route to fast even when called recently, got tier=%s model=%s", tier, provider.ModelName())
 	}
 }
+
+func TestFallbackProviderTransparentRetry(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	repo, err := db.Init(dbPath, "")
+	if err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// 1. Fast provider fails with truncation (finish_reason=length) -> Heavy succeeds
+	fastTruncated := &dummyLLM{
+		model:       "gpt-4.1-mini",
+		errToReturn: fmt.Errorf("LLM output truncated: max output tokens reached (finish_reason=length)"),
+	}
+	heavyOK := &dummyLLM{
+		model:  "gemini-2.5-flash",
+		answer: `{"questions": []}`,
+	}
+
+	svcA := NewStudyService(Config{
+		Repo:             repo,
+		FastLLMProvider:  fastTruncated,
+		HeavyLLMProvider: heavyOK,
+	})
+
+	res, err := svcA.fastLLMProvider.GenerateAnswer("generate quiz prompt")
+	if err != nil {
+		t.Fatalf("expected fallback to heavy provider to succeed, got err: %v", err)
+	}
+	if res != `{"questions": []}` {
+		t.Fatalf("expected heavy answer, got: %s", res)
+	}
+	if fastTruncated.generateCalls != 1 || heavyOK.generateCalls != 1 {
+		t.Fatalf("expected 1 call each to fast and heavy, got fast=%d heavy=%d", fastTruncated.generateCalls, heavyOK.generateCalls)
+	}
+
+	// 2. Fast provider fails with 429 rate limit -> Marks fast rate limited and falls back to Heavy
+	fastRateLimited := &dummyLLM{
+		model:       "gpt-4.1-mini",
+		errToReturn: &llmpkg.RateLimitError{StatusCode: 429, Message: "TPM exceeded"},
+	}
+	heavyOK2 := &dummyLLM{
+		model:  "gemini-2.5-flash",
+		answer: "recovered from 429",
+	}
+
+	svcB := NewStudyService(Config{
+		Repo:             repo,
+		FastLLMProvider:  fastRateLimited,
+		HeavyLLMProvider: heavyOK2,
+	})
+
+	resB, errB := svcB.fastLLMProvider.GenerateAnswer("another prompt")
+	if errB != nil {
+		t.Fatalf("expected fallback on 429 to succeed, got: %v", errB)
+	}
+	if resB != "recovered from 429" {
+		t.Fatalf("expected heavy response, got: %s", resB)
+	}
+	if !svcB.IsFastRateLimited() {
+		t.Fatalf("expected fast provider to be marked rate-limited after 429 error")
+	}
+
+	// 3. Fast provider fails and Heavy is nil -> returns formatted error
+	svcC := NewStudyService(Config{
+		Repo:            repo,
+		FastLLMProvider: fastTruncated,
+	})
+	_, errC := svcC.fastLLMProvider.GenerateAnswer("prompt")
+	if errC == nil {
+		t.Fatalf("expected error when heavy provider is nil, got nil")
+	}
+
+	// 4. Fast succeeds -> Heavy is never called
+	fastSuccess := &dummyLLM{
+		model:  "gpt-4.1-mini",
+		answer: "fast answer",
+	}
+	heavyUntouched := &dummyLLM{
+		model: "gemini-2.5-flash",
+	}
+	svcD := NewStudyService(Config{
+		Repo:             repo,
+		FastLLMProvider:  fastSuccess,
+		HeavyLLMProvider: heavyUntouched,
+	})
+	resD, errD := svcD.fastLLMProvider.GenerateAnswer("prompt")
+	if errD != nil || resD != "fast answer" {
+		t.Fatalf("expected fast answer, got: %s (err: %v)", resD, errD)
+	}
+	if heavyUntouched.generateCalls != 0 {
+		t.Fatalf("expected 0 calls to heavy provider on fast success, got %d", heavyUntouched.generateCalls)
+	}
+}
+
 
