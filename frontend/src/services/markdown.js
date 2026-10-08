@@ -113,6 +113,38 @@ export function resolveNoteAssetSrc(src, noteRelativeFolder = '') {
   return raw
 }
 
+export function parseImageSize(rawAlt) {
+  if (!rawAlt || !rawAlt.includes('|')) {
+    return { alt: rawAlt, width: null, height: null, style: null }
+  }
+  const lastPipe = rawAlt.lastIndexOf('|')
+  const alt = rawAlt.slice(0, lastPipe).trim()
+  const sizePart = rawAlt.slice(lastPipe + 1).trim()
+
+  const match = sizePart.match(/^(\d+(?:\.\d+)?%?)(?:x(\d+(?:\.\d+)?%?))?$/i)
+  if (!match) {
+    return { alt: rawAlt, width: null, height: null, style: null }
+  }
+
+  const rawWidth = match[1]
+  const rawHeight = match[2]
+
+  const width = rawWidth.endsWith('%') ? rawWidth : `${rawWidth}px`
+  const height = rawHeight ? (rawHeight.endsWith('%') ? rawHeight : `${rawHeight}px`) : null
+
+  let style = 'max-width: 100%;'
+  if (width) {
+    style += ` width: ${width};`
+  }
+  if (height) {
+    style += ` height: ${height}; object-fit: contain;`
+  } else {
+    style += ' height: auto;'
+  }
+
+  return { alt, width: rawWidth, height: rawHeight, style }
+}
+
 md.renderer.rules.image = function (tokens, idx, options, env, self) {
   const token = tokens[idx]
   const srcIndex = token.attrIndex('src')
@@ -121,6 +153,22 @@ md.renderer.rules.image = function (tokens, idx, options, env, self) {
     const noteFolder = env && env.noteRelativeFolder ? env.noteRelativeFolder : ''
     token.attrs[srcIndex][1] = resolveNoteAssetSrc(src, noteFolder)
   }
+
+  const rawAlt = token.content || ''
+  const parsedSize = parseImageSize(rawAlt)
+  if (parsedSize.style) {
+    token.attrSet('style', parsedSize.style)
+    token.content = parsedSize.alt
+    if (token.children && token.children.length > 0) {
+      token.children.forEach((child) => {
+        if (child.type === 'text') {
+          const childParsed = parseImageSize(child.content)
+          child.content = childParsed.alt
+        }
+      })
+    }
+  }
+
   return defaultImageRender(tokens, idx, options, env, self)
 }
 
@@ -149,7 +197,7 @@ const SANITIZE_CONFIG = {
     'figure',
     'figcaption',
   ],
-  ADD_ATTR: ['aria-hidden', 'type', 'checked', 'disabled', 'src', 'alt', 'title', 'width', 'height', 'controls', 'poster'],
+  ADD_ATTR: ['aria-hidden', 'type', 'checked', 'disabled', 'src', 'alt', 'title', 'width', 'height', 'style', 'controls', 'poster'],
 }
 
 export function renderMarkdown(input, options = {}) {

@@ -300,6 +300,15 @@
               </button>
               <button
                 type="button"
+                class="secondary-btn btn-sm image-help-btn"
+                title="Image Sizing & Markdown Guide"
+                @click="showImageHelpModal = true"
+              >
+                <BaseIcon name="help-circle" size="14" />
+                <span>Image Sizing</span>
+              </button>
+              <button
+                type="button"
                 class="secondary-btn btn-sm open-folder-btn"
                 title="Open notes folder in File Explorer (Obsidian / Logseq compatible)"
                 @click="handleOpenNotesFolder"
@@ -348,7 +357,8 @@
           <div v-else class="notes-obsidian-tip">
             <BaseIcon name="info" size="14" class="tip-icon" />
             <span>
-              <strong>Obsidian & Logseq Compatible:</strong> Notes are synced to local markdown files. Use <em>Open Folder</em> to add images (<code>![alt](./assets/pic.png)</code>) or edit notes in external markdown tools.
+              <strong>Obsidian & Logseq Compatible:</strong> Paste images with <kbd>Ctrl</kbd>+<kbd>V</kbd> (defaults to 75% width). Resize using <code>![alt|400](path)</code>, <code>![alt|400x250](path)</code>, or <code>![alt|60%](path)</code>.
+              <button type="button" class="tip-guide-link" @click="showImageHelpModal = true">View Syntax Guide</button>
             </span>
           </div>
 
@@ -619,6 +629,59 @@
         </template>
       </main>
     </div>
+
+    <!-- Image Sizing Help Modal -->
+    <div v-if="showImageHelpModal" class="modal-backdrop" @click.self="showImageHelpModal = false">
+      <div class="modal-card image-help-card">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <BaseIcon name="image" size="18" class="modal-icon" />
+            <h2 class="modal-title-text">Markdown Image Sizing Guide</h2>
+          </div>
+          <button type="button" class="modal-close-btn" @click="showImageHelpModal = false">
+            <BaseIcon name="x" size="16" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Studyloop supports Obsidian-style Markdown image resizing. When you paste an image with <kbd>Ctrl</kbd>+<kbd>V</kbd>, it automatically defaults to <strong>75%</strong> width. You can edit the size parameter anytime:
+          </p>
+
+          <div class="syntax-table">
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|400](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>400px</strong> (responsive <code>max-width: 100%</code>)</div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|400x250](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>400px</strong> & height to <strong>250px</strong> (contained)</div>
+            </div>
+            <div class="syntax-row highlight-row">
+              <div class="syntax-code"><code>![alt|75%](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>75%</strong> container width <em>(Default on paste)</em></div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|60%](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>60%</strong> container width</div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Full / natural image size clamped to container</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="primary-btn btn-sm" @click="showImageHelpModal = false">
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -651,6 +714,7 @@ const loading = ref(true)
 const loadingSlots = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const showImageHelpModal = ref(false)
 
 const notebooks = ref([])
 const notebookTree = ref([])
@@ -1236,7 +1300,7 @@ async function handleNewNotePaste(e) {
           return
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
         newNoteBuffer.value += imageMarkdown
       } catch (err) {
         console.error('[NOTES Paste] Failed to process image paste:', err)
@@ -1279,7 +1343,7 @@ async function handleSlotPaste(e, slot) {
           slot.relative_folder_path = res.relative_folder_path
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
         editSlotBuffer.value += imageMarkdown
       } catch (err) {
         console.error('[NOTES Slot Paste] Failed to process image paste:', err)
@@ -2765,5 +2829,133 @@ onUnmounted(() => {
 
 .popover-select:focus {
   border-color: var(--primary);
+}
+
+/* Image Sizing Guide Modal */
+.image-help-card {
+  max-width: 540px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-icon {
+  color: var(--primary);
+}
+
+.modal-title-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.modal-close-btn:hover {
+  color: var(--on-surface);
+  background: var(--surface-container-high);
+}
+
+.modal-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+  margin: 0 0 14px 0;
+}
+
+.modal-desc kbd {
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 11.5px;
+  font-family: inherit;
+}
+
+.syntax-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.syntax-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.syntax-row.highlight-row {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.syntax-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+  min-width: 170px;
+}
+
+.syntax-code code {
+  background: var(--surface-container-high);
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--primary);
+}
+
+.syntax-arrow {
+  color: var(--muted-text);
+  font-weight: bold;
+}
+
+.syntax-effect {
+  color: var(--on-surface);
+  line-height: 1.35;
+}
+
+.tip-guide-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.tip-guide-link:hover {
+  opacity: 0.85;
 }
 </style>

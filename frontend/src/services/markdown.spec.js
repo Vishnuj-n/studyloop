@@ -72,4 +72,28 @@ describe('renderMarkdown', () => {
     expect(html).toContain('src="https://example.com/pic.png"')
     expect(html).toContain('src="data:image/png;base64,AAAA"')
   })
+
+  it('supports Obsidian-style image sizing syntax in pixels and percentages', () => {
+    const folder = 'Book/Chapter'
+
+    // Pixel width
+    const htmlPx = renderMarkdown('![Diagram|400](assets/pic.png)', { noteRelativeFolder: folder })
+    expect(htmlPx).toContain('alt="Diagram"')
+    expect(htmlPx).toContain('style="max-width: 100%; width: 400px; height: auto;"')
+
+    // Width x Height
+    const htmlDims = renderMarkdown('![Diagram|400x250](assets/pic.png)', { noteRelativeFolder: folder })
+    expect(htmlDims).toContain('alt="Diagram"')
+    expect(htmlDims).toContain('style="max-width: 100%; width: 400px; height: 250px; object-fit: contain;"')
+
+    // Percentage width
+    const htmlPct = renderMarkdown('![Pasted Diagram|75%](assets/pic.png)', { noteRelativeFolder: folder })
+    expect(htmlPct).toContain('alt="Pasted Diagram"')
+    expect(htmlPct).toContain('style="max-width: 100%; width: 75%; height: auto;"')
+
+    // 60% relative width
+    const html60 = renderMarkdown('![Diagram|60%](assets/pic.png)', { noteRelativeFolder: folder })
+    expect(html60).toContain('alt="Diagram"')
+    expect(html60).toContain('style="max-width: 100%; width: 60%; height: auto;"')
+  })
 })

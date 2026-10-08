@@ -577,7 +577,7 @@ async function handleNotePaste(e) {
           currentNoteRelativeFolder.value = res.relative_folder_path
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
         const textarea = noteTextareaRef.value
         if (textarea) {
           const start = textarea.selectionStart || noteEditContent.value.length
