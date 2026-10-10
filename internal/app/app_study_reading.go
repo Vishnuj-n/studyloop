@@ -412,4 +412,59 @@ func (a *App) RevertReadingTaskSession(taskID string) map[string]interface{} {
 	}
 }
 
+// RevertTopicToReadingFromQuiz is the user-facing "Restart Reading Session" action available on the
+// quiz result screen after a final rescue-quiz failure. Given the quiz task ID it:
+//  1. Looks up the quiz task to obtain topic_id and start_page.
+//  2. Finds the most recently completed READING / REREAD task for that topic range.
+//  3. Atomically reverts that reading task back to ACTIVE (resetting the topic cursor, purging the
+//     failed quiz / tutor / flashcard tasks, and deleting any quiz attempts for this range).
+//  4. Returns the reverted reading task ID so the frontend can navigate directly to /reader.
+func (a *App) RevertTopicToReadingFromQuiz(quizTaskID string) map[string]interface{} {
+	repo, errMap := requireRepo(a)
+	if errMap != nil {
+		return errMap
+	}
+
+	quizTaskID = strings.TrimSpace(quizTaskID)
+	if quizTaskID == "" {
+		return map[string]interface{}{"error": "quiz task ID is required", "code": 400}
+	}
+
+	// 1. Load the quiz task to get topic_id and start_page.
+	qTask, err := repo.GetTaskByID(quizTaskID)
+	if err != nil {
+		utils.Warnf("[REVERT_TO_READING] failed to load quiz task %s: %v", quizTaskID, err)
+		return map[string]interface{}{"error": "failed to load quiz task: " + err.Error(), "code": 404}
+	}
+	if qTask.TopicID == "" {
+		return map[string]interface{}{"error": "quiz task has no associated topic; cannot revert", "code": 422}
+	}
+	if qTask.StartPage <= 0 {
+		return map[string]interface{}{"error": "quiz task has no valid start page; cannot revert", "code": 422}
+	}
+
+	// 2. Find the most recently completed reading task for this topic + page range.
+	readingTaskID, findErr := repo.FindCompletedReadingTaskForTopic(qTask.TopicID, qTask.StartPage)
+	if findErr != nil {
+		utils.Warnf("[REVERT_TO_READING] no completed reading task found for topicID=%s startPage=%d: %v", qTask.TopicID, qTask.StartPage, findErr)
+		return map[string]interface{}{"error": "no completed reading session found for this topic range", "code": 404}
+	}
+
+	// 3. Revert the reading task atomically.
+	if revertErr := repo.RevertReadingTaskSession(readingTaskID); revertErr != nil {
+		utils.QueueLogger.Error("RevertTopicToReadingFromQuiz revert failed", "readingTaskID", readingTaskID, "err", revertErr)
+		return map[string]interface{}{"error": revertErr.Error(), "code": 500}
+	}
+
+	utils.Infof("[REVERT_TO_READING] Reverted reading task %s for quizTaskID=%s topicID=%s startPage=%d",
+		readingTaskID, quizTaskID, qTask.TopicID, qTask.StartPage)
+
+	return map[string]interface{}{
+		"ok":               true,
+		"reading_task_id":  readingTaskID,
+		"topic_id":         qTask.TopicID,
+		"start_page":       qTask.StartPage,
+		"message":          "Reading session restarted. You can now re-read from the beginning of this topic.",
+	}
+}
 

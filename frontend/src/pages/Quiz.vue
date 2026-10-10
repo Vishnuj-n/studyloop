@@ -249,6 +249,17 @@
           {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
         </button>
 
+        <!-- Restart Reading Session (final rescue failure only) -->
+        <button
+          v-if="!result.passed && result.manual_review_recommended"
+          class="secondary-btn restart-reading-btn"
+          :disabled="generatingFlashcards || restartingReading"
+          @click="handleRestartReading"
+        >
+          <BaseIcon name="rotate-ccw" size="13" />
+          <span>Restart Reading Session</span>
+        </button>
+
         <button
           class="primary-btn continue-btn"
           :disabled="generatingFlashcards"
@@ -371,6 +382,62 @@
     :notebook-id="taskMeta?.notebook_id || ''"
     @start-exam="onMilestonePreReviewComplete"
   />
+
+  <!-- Restart Reading Session Confirmation Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showRestartReadingModal"
+      class="restart-reading-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="restart-reading-title"
+    >
+      <div class="restart-reading-dialog">
+        <div class="restart-reading-dialog__header">
+          <BaseIcon name="alert-triangle" size="18" class="restart-reading-dialog__icon" />
+          <h3 id="restart-reading-title" class="restart-reading-dialog__title">
+            Restart Reading Session?
+          </h3>
+        </div>
+
+        <div class="restart-reading-dialog__body">
+          <p class="restart-reading-dialog__desc">
+            This will reset your reading progress for this topic section back to the beginning.
+          </p>
+          <ul class="restart-reading-dialog__list">
+            <li>Your reading task will be reset to <strong>Active</strong> from page {{ taskMeta?.start_page || '?' }}</li>
+            <li>All pending quiz, tutor, and flashcard tasks for this section will be cancelled</li>
+            <li>Quiz attempt records for this section will be cleared</li>
+          </ul>
+          <p class="restart-reading-dialog__warning">
+            ⚠️ <strong>Be careful:</strong> any task for this section currently in Quiz stage or higher
+            will also be reverted. This cannot be undone.
+          </p>
+          <p v-if="restartReadingError" class="restart-reading-dialog__error">
+            {{ restartReadingError }}
+          </p>
+        </div>
+
+        <div class="restart-reading-dialog__footer">
+          <button
+            class="secondary-btn"
+            :disabled="restartingReading"
+            @click="showRestartReadingModal = false; restartReadingError = ''"
+          >
+            Cancel
+          </button>
+          <button
+            class="danger-btn"
+            :disabled="restartingReading"
+            @click="confirmRestartReading"
+          >
+            <span v-if="restartingReading">Restarting…</span>
+            <span v-else>Yes, Restart Reading</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -387,6 +454,7 @@ import {
   completeMilestoneExam,
   trackAnalyticsEvent,
   getUserSettings,
+  revertTopicToReadingFromQuiz,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import MilestoneNoteReviewModal from '../components/MilestoneNoteReviewModal.vue'
@@ -407,6 +475,11 @@ const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const result = ref(null)
 const generatingFlashcards = ref(false)
+
+// Restart Reading Session modal state
+const showRestartReadingModal = ref(false)
+const restartingReading = ref(false)
+const restartReadingError = ref('')
 
 const isMilestoneExam = ref(false)
 const milestonePayload = ref(null)
@@ -895,6 +968,40 @@ function handleGoToDetailedAnalysis() {
       taskId: analysisPayload.taskId || undefined,
     },
   })
+}
+
+function handleRestartReading() {
+  restartReadingError.value = ''
+  showRestartReadingModal.value = true
+}
+
+async function confirmRestartReading() {
+  const quizTaskId = result.value?.task_id || taskID.value || ''
+  if (!quizTaskId) {
+    restartReadingError.value = 'Quiz task ID not found. Cannot restart reading session.'
+    return
+  }
+
+  restartingReading.value = true
+  restartReadingError.value = ''
+  try {
+    const res = await revertTopicToReadingFromQuiz(quizTaskId)
+    if (res?.error) {
+      restartReadingError.value = res.error
+      return
+    }
+    const readingTaskId = res?.reading_task_id || ''
+    showRestartReadingModal.value = false
+    if (readingTaskId) {
+      router.push(`/reader?taskId=${readingTaskId}`)
+    } else {
+      router.push('/dashboard')
+    }
+  } catch (err) {
+    restartReadingError.value = err?.message || 'Failed to restart reading session.'
+  } finally {
+    restartingReading.value = false
+  }
 }
 </script>
 
@@ -1534,5 +1641,147 @@ function handleGoToDetailedAnalysis() {
 .analysis-svg,
 .analysis-arrow-svg {
   flex-shrink: 0;
+}
+
+/* ── Restart Reading Button ───────────────────── */
+.restart-reading-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--on-surface);
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.restart-reading-btn:hover:not(:disabled) {
+  border-color: var(--error, #dc2626);
+  color: var(--error, #dc2626);
+  background: color-mix(in srgb, var(--error, #dc2626) 6%, transparent);
+}
+
+.restart-reading-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Restart Reading Modal ────────────────────── */
+.restart-reading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  padding: 16px;
+}
+
+.restart-reading-dialog {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.restart-reading-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px 0;
+}
+
+.restart-reading-dialog__icon {
+  color: var(--error, #dc2626);
+  flex-shrink: 0;
+}
+
+.restart-reading-dialog__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.restart-reading-dialog__body {
+  padding: 16px 24px;
+}
+
+.restart-reading-dialog__desc {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  color: var(--on-surface);
+  line-height: 1.5;
+}
+
+.restart-reading-dialog__list {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 0.8125rem;
+  color: var(--muted-text);
+  line-height: 1.7;
+}
+
+.restart-reading-dialog__warning {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--error, #dc2626) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error, #dc2626) 25%, transparent);
+  font-size: 0.8125rem;
+  color: var(--on-surface);
+  line-height: 1.5;
+}
+
+.restart-reading-dialog__error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--error, #dc2626) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error, #dc2626) 30%, transparent);
+  font-size: 0.8125rem;
+  color: var(--error, #dc2626);
+}
+
+.restart-reading-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--error, #dc2626);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.danger-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

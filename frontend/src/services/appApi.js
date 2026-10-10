@@ -65,6 +65,10 @@ export function revertReadingTaskSession(taskID) {
   return appBridge().RevertReadingTaskSession(taskID)
 }
 
+export function revertTopicToReadingFromQuiz(quizTaskID) {
+  return appBridge().RevertTopicToReadingFromQuiz(quizTaskID)
+}
+
 
 
 export async function completeReading(taskID, splitPage = 0) {

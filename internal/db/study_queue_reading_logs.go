@@ -220,3 +220,31 @@ func (r *Repository) RevertReadingTaskSessionTx(tx *sql.Tx, taskID string) error
 	return nil
 }
 
+// FindCompletedReadingTaskForTopic returns the ID of the most recently completed READING or REREAD
+// task for the given topic_id and start_page. Used by RevertTopicToReadingFromQuiz to locate the
+// parent reading task when a user wants to restart from the quiz result screen.
+func (r *Repository) FindCompletedReadingTaskForTopic(topicID string, startPage int) (string, error) {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return "", fmt.Errorf("topic ID is required")
+	}
+	if startPage <= 0 {
+		return "", fmt.Errorf("start page must be positive")
+	}
+
+	var taskID string
+	err := r.db.QueryRow(`
+		SELECT id FROM study_queue
+		WHERE topic_id = ? AND start_page = ? AND task_type IN ('READING', 'REREAD') AND status = 'COMPLETED'
+		ORDER BY completed_at DESC
+		LIMIT 1
+	`, topicID, startPage).Scan(&taskID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrTaskNotFound
+		}
+		return "", fmt.Errorf("failed to find completed reading task: %w", err)
+	}
+	return taskID, nil
+}
+
