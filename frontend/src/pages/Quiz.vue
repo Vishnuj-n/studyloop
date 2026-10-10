@@ -152,6 +152,17 @@
         Attempt {{ result.reread_attempt_count }} of {{ result.max_reread_attempts }}
       </p>
 
+      <!-- Socratic Rescue message (when rescue task created) -->
+      <div
+        v-if="!result.passed && result.socratic_task_id"
+        class="result-panel__rescue-notice"
+      >
+        <p class="rescue-notice-title">Concept Rescue Active</p>
+        <p class="rescue-notice-desc">
+          Complete the Adaptive Tutor Concept Rescue session to review tricky areas before retrying your quiz.
+        </p>
+      </div>
+
       <!-- External help notice (when failed re-quiz) -->
       <div
         v-if="!result.passed && !result.reread_task_id && result.manual_review_recommended"
@@ -266,6 +277,7 @@
           @click="handleContinue"
         >
           <span v-if="generatingFlashcards">Generating flashcards for spaced repetition...</span>
+          <span v-else-if="!result.passed && result.socratic_task_id">Start Concept Rescue →</span>
           <span v-else>Continue →</span>
         </button>
       </div>
@@ -844,6 +856,15 @@ async function handleContinue() {
     }
   }
 
+  // Route to Socratic Rescue if rescue task is pending
+  if (!result.value?.passed && result.value?.socratic_task_id) {
+    router.push({
+      path: '/socratic-rescue',
+      query: { taskId: result.value.socratic_task_id },
+    })
+    return
+  }
+
   // Route to dashboard after quiz completion
   const query = {}
   if (result.value?.passed && result.value?.flashcards_generated > 0) {
@@ -1372,6 +1393,29 @@ async function confirmRestartReading() {
   background: var(--surface-container-low);
   padding: 4px 8px;
   border-radius: 6px;
+}
+
+.result-panel__rescue-notice {
+  background: color-mix(in srgb, var(--primary, #3b82f6) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary, #3b82f6) 30%, transparent);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.rescue-notice-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary, #3b82f6);
+}
+
+.rescue-notice-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--on-surface);
 }
 
 .result-panel__external-help-notice {

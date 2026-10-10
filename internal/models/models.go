@@ -161,6 +161,7 @@ type QuizResult struct {
 	RereadAttemptCount      int    `json:"reread_attempt_count"`
 	MaxRereadAttempts       int    `json:"max_reread_attempts"`
 	RereadTaskID            string `json:"reread_task_id,omitempty"`
+	SocraticTaskID          string `json:"socratic_task_id,omitempty"`
 	FlashcardTaskID         string `json:"flashcard_task_id,omitempty"`
 	AttemptRecord           string `json:"attempt_id,omitempty"`
 	// Flashcard generation results (populated when quiz is passed and flashcards are generated)

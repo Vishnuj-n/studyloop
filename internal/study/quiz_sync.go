@@ -428,7 +428,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 ) (string, string, bool, models.StudyQueueTask) {
 	feedback := "Concept rescue activated. Complete the Socratic session to retry."
 	attempt.Feedback = feedback
-	manualReviewRecommended := true
+	manualReviewRecommended := false
 
 	// Safety transaction: Delete FSRS cards to protect purity from rote clutter
 	if err := s.repo.DeleteFSRSCardsByTopicIDTx(tx, task.TopicID); err != nil {
@@ -617,6 +617,7 @@ func buildQuizResultPayload(
 	manualReviewRecommended bool,
 	rereadAttemptCount int,
 	rereadTaskID string,
+	socraticTaskID string,
 	attemptID string,
 	flashcardsPending bool,
 ) models.QuizResult {
@@ -632,6 +633,7 @@ func buildQuizResultPayload(
 		RereadAttemptCount:      rereadAttemptCount,
 		MaxRereadAttempts:       maxAutomaticRereadAttempts,
 		RereadTaskID:            rereadTaskID,
+		SocraticTaskID:          socraticTaskID,
 		AttemptRecord:           attemptID,
 		FlashcardsPending:       flashcardsPending,
 	}
@@ -781,6 +783,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		remediation.manualReviewRecommended,
 		remediation.rereadAttemptCount,
 		remediation.rereadTaskID,
+		remediation.socraticTaskID,
 		attemptID,
 		flashcardsPending,
 	), nil

@@ -97,8 +97,11 @@ func TestSubmitQuizAttemptAfterMaxReturnsManualReviewWithoutReread(t *testing.T)
 	if result.RereadTaskID != "" {
 		t.Fatalf("expected no reread task id after max automatic rereads, got %q", result.RereadTaskID)
 	}
-	if !result.ManualReviewRecommended {
-		t.Fatalf("expected manual_review_recommended=true after max automatic rereads")
+	if result.ManualReviewRecommended {
+		t.Fatalf("expected manual_review_recommended=false during socratic rescue handoff")
+	}
+	if result.SocraticTaskID == "" {
+		t.Fatalf("expected socratic_task_id to be populated after max automatic rereads")
 	}
 	if result.RereadAttemptCount != 2 || result.MaxRereadAttempts != 1 {
 		t.Fatalf("unexpected reread metadata: %#v", result)
@@ -763,6 +766,12 @@ func TestRequizFailMarksExternalHelp(t *testing.T) {
 	}
 	if result.Passed {
 		t.Fatalf("expected failed quiz result")
+	}
+	if !result.ManualReviewRecommended {
+		t.Fatalf("expected ManualReviewRecommended to be true on failing rescue re-quiz")
+	}
+	if result.SocraticTaskID != "" {
+		t.Fatalf("expected SocraticTaskID to be empty on terminal rescue re-quiz failure, got %q", result.SocraticTaskID)
 	}
 	if result.FlashcardsPending {
 		t.Fatalf("expected FlashcardsPending to be false on failing re-quiz")
