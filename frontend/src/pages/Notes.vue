@@ -551,7 +551,7 @@
                     <button
                       type="button"
                       class="icon-btn-pill highlight"
-                      :disabled="generatingSlotKey === getSlotKey(slot)"
+                      :disabled="isSlotGenerating(slot)"
                       :title="slot.content ? 'Regenerate session note' : 'Generate session note with AI'"
                       @click="generateSlot(slot)"
                     >
@@ -564,7 +564,7 @@
                       type="button"
                       class="icon-btn-pill success"
                       title="Mark as reviewed"
-                      :disabled="markingSlotKey === getSlotKey(slot)"
+                      :disabled="markingSlotKey === getSlotKey(slot) || isSlotGenerating(slot)"
                       @click="markSlotReviewed(slot)"
                     >
                       <BaseIcon name="check" size="14" />
@@ -577,7 +577,7 @@
               <!-- Card Body -->
               <div class="session-card-body">
                 <!-- Generating Spinner -->
-                <div v-if="generatingSlotKey === getSlotKey(slot)" class="generating-slot-state">
+                <div v-if="isSlotGenerating(slot)" class="generating-slot-state">
                   <div class="spinner"></div>
                   <p>Synthesizing high-yield summary for {{ formatPageRange(slot.start_page, slot.end_page) }}...</p>
                 </div>
@@ -607,7 +607,7 @@
                     <button
                       type="button"
                       class="primary-btn btn-sm"
-                      :disabled="generatingSlotKey === getSlotKey(slot)"
+                      :disabled="isSlotGenerating(slot)"
                       @click="generateSlot(slot)"
                     >
                       <BaseIcon name="sparkles" size="13" />
@@ -844,13 +844,26 @@ const editSlotBuffer = ref('')
 const savingSlotKey = ref(null)
 const generatingSlotKey = ref(null)
 const markingSlotKey = ref(null)
+let notesPollTimer = null
+
+function clearNotesPolling() {
+  if (notesPollTimer) {
+    clearTimeout(notesPollTimer)
+    notesPollTimer = null
+  }
+}
 
 function getSlotKey(slot) {
   return `${slot.start_page}_${slot.end_page}`
 }
 
+function isSlotGenerating(slot) {
+  if (!slot) return false
+  return generatingSlotKey.value === getSlotKey(slot) || Boolean(slot.is_generating)
+}
+
 function getSlotGenerateButtonText(slot) {
-  if (generatingSlotKey.value === getSlotKey(slot)) {
+  if (isSlotGenerating(slot)) {
     return 'Generating...'
   }
   return slot.content ? 'Regenerate' : 'Generate Note'
@@ -1234,14 +1247,25 @@ async function selectTopic(topic) {
   await loadTopicSlots(topic.topic_id)
 }
 
-async function loadTopicSlots(topicID) {
-  loadingSlots.value = true
+async function loadTopicSlots(topicID, isBackgroundPoll = false) {
+  if (!isBackgroundPoll) {
+    loadingSlots.value = true
+  }
   try {
     const res = await getTopicStudyNoteSlots(topicID)
     const dbSlots = (res && Array.isArray(res.slots)) ? res.slots : []
     sessionSlots.value = dbSlots
 
-    if (targetPageFromRoute.value && dbSlots.length > 0) {
+    // If any slot is currently generating in the background, poll periodically until complete
+    const hasGeneratingSlot = dbSlots.some((s) => s && s.is_generating)
+    clearNotesPolling()
+    if (hasGeneratingSlot && selectedTopicID.value === topicID) {
+      notesPollTimer = setTimeout(() => {
+        loadTopicSlots(topicID, true)
+      }, 2500)
+    }
+
+    if (!isBackgroundPoll && targetPageFromRoute.value && dbSlots.length > 0) {
       nextTick(() => {
         const targetSlot = dbSlots.find((s) => isTargetSlot(s))
         if (targetSlot) {
@@ -1254,9 +1278,13 @@ async function loadTopicSlots(topicID) {
     }
   } catch (err) {
     console.warn('[NOTES] Failed to fetch topic slots:', err)
-    sessionSlots.value = []
+    if (!isBackgroundPoll) {
+      sessionSlots.value = []
+    }
   } finally {
-    loadingSlots.value = false
+    if (!isBackgroundPoll) {
+      loadingSlots.value = false
+    }
   }
 }
 
@@ -1577,6 +1605,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearNotesPolling()
   window.removeEventListener('settings-updated', handleExternalSettingsUpdated)
 })
 </script>

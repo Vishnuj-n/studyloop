@@ -110,9 +110,7 @@ func TestGenerateAnswerMaxTokensAndTruncation(t *testing.T) {
 		t.Fatalf("expected max_tokens in payload to be 0 (omitted for free-flow output), got %d", capturedPayload.MaxTokens)
 	}
 
-	// Test truncation error when finish_reason == "length"
-	req, _ := http.NewRequest("GET", server.URL, nil)
-	_ = req
+	// Test partial content return when finish_reason == "length"
 	serverLength := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
@@ -134,12 +132,42 @@ func TestGenerateAnswerMaxTokensAndTruncation(t *testing.T) {
 	}
 	providerLength := NewProvider(cfgLength)
 
-	_, errLength := providerLength.GenerateAnswer("Test prompt")
-	if errLength == nil {
-		t.Fatalf("expected truncation error for finish_reason=length, got nil")
+	respLength, errLength := providerLength.GenerateAnswer("Test prompt")
+	if errLength != nil {
+		t.Fatalf("expected nil error so partial content can be recovered, got: %v", errLength)
 	}
-	if !strings.Contains(errLength.Error(), "finish_reason=length") {
-		t.Fatalf("expected error mentioning finish_reason=length, got: %v", errLength)
+	if respLength != "Truncated content" {
+		t.Fatalf("expected 'Truncated content', got: %q", respLength)
+	}
+
+	// Test truncation error when finish_reason == "length" and content is empty
+	serverEmptyLength := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [
+				{
+					"message": {"content": ""},
+					"finish_reason": "length"
+				}
+			]
+		}`))
+	}))
+	defer serverEmptyLength.Close()
+
+	cfgEmptyLength := &Config{
+		BaseURL: serverEmptyLength.URL,
+		APIKey:  "sk-test",
+		Model:   "test-model",
+		Limits:  ModelLimits{MaxInputTokens: 4000, MaxOutputTokens: 2500},
+	}
+	providerEmptyLength := NewProvider(cfgEmptyLength)
+
+	_, errEmptyLength := providerEmptyLength.GenerateAnswer("Test prompt")
+	if errEmptyLength == nil {
+		t.Fatalf("expected error when finish_reason=length and content is empty, got nil")
+	}
+	if !strings.Contains(errEmptyLength.Error(), "finish_reason=length") {
+		t.Fatalf("expected error mentioning finish_reason=length, got: %v", errEmptyLength)
 	}
 }
 

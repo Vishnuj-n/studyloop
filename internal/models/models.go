@@ -705,6 +705,7 @@ type TopicStudyNote struct {
 	FilePath           string `json:"file_path,omitempty"`
 	RelativeFolderPath string `json:"relative_folder_path,omitempty"`
 	Content            string `json:"content"`
+	IsGenerating       bool   `json:"is_generating,omitempty"`
 	LastReviewedAt     int64  `json:"last_reviewed_at"`
 	CreatedAt          string `json:"created_at,omitempty"`
 	UpdatedAt          string `json:"updated_at,omitempty"`

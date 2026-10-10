@@ -428,8 +428,12 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		return "", fmt.Errorf("no response from LLM")
 	}
 
+	content := apiResp.Choices[0].Message.Content
 	if apiResp.Choices[0].FinishReason == "length" {
-		return "", fmt.Errorf("LLM output truncated: max output tokens reached (finish_reason=length)")
+		if strings.TrimSpace(content) == "" {
+			return "", fmt.Errorf("LLM output truncated: max output tokens reached with empty response (finish_reason=length)")
+		}
+		utils.Warnf("[LLM_WARNING] model=%s finish_reason=length (output truncated, returning partial content for downstream recovery)", p.config.Model)
 	}
 
 	if apiResp.Usage.TotalTokens > 0 {
