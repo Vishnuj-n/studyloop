@@ -375,7 +375,6 @@ func (s *StudyService) CompressTopicChunksWithPriorityRange(ctx context.Context,
 
 	if !rangeCallbackFired && onRangeComplete != nil {
 		onRangeComplete()
-		rangeCallbackFired = true
 	}
 
 	utils.Infof("[COMPRESSION] topic %s compression complete: %d persisted, %d failed out of %d uncompressed chunks", topicID, succeededCount, failedCount, len(uncompressedChunks))

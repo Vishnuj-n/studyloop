@@ -93,9 +93,11 @@ func TestCompressTopicChunksPrioritizingRange(t *testing.T) {
 	_ = repo.UpdateUserSettings(*settings)
 
 	rangeDone := false
-	service.CompressTopicChunksWithPriorityRange(context.Background(), topicID, 1, 5, func() {
+	if err := service.CompressTopicChunksWithPriorityRange(context.Background(), topicID, 1, 5, func() {
 		rangeDone = true
-	})
+	}); err != nil {
+		t.Fatalf("unexpected error when compression is disabled: %v", err)
+	}
 
 	if !rangeDone {
 		t.Errorf("expected onRangeComplete to be invoked when compression is disabled")
