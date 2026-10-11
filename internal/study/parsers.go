@@ -215,10 +215,11 @@ func parseCompactQuizResponse(raw string) []quizLLMQuestion {
 
 	var currentPrompt string
 	var currentCorrect string
+	var currentCorrectCount int
 	var currentOptions []string
 
 	flush := func() {
-		if strings.TrimSpace(currentPrompt) != "" && strings.TrimSpace(currentCorrect) != "" && len(currentOptions) == 4 {
+		if strings.TrimSpace(currentPrompt) != "" && strings.TrimSpace(currentCorrect) != "" && currentCorrectCount == 1 && len(currentOptions) == 4 {
 			questions = append(questions, quizLLMQuestion{
 				Prompt:        strings.TrimSpace(currentPrompt),
 				Options:       currentOptions,
@@ -227,6 +228,7 @@ func parseCompactQuizResponse(raw string) []quizLLMQuestion {
 		}
 		currentPrompt = ""
 		currentCorrect = ""
+		currentCorrectCount = 0
 		currentOptions = nil
 	}
 
@@ -237,11 +239,27 @@ func parseCompactQuizResponse(raw string) []quizLLMQuestion {
 		}
 
 		// Check for Question start: "Q:", "Q1:", "Q 1:", "1.", "1)"
-		if strings.HasPrefix(strings.ToUpper(trimmed), "Q:") || strings.HasPrefix(strings.ToUpper(trimmed), "QUESTION") || (len(trimmed) > 2 && (trimmed[0] >= '1' && trimmed[0] <= '9') && (trimmed[1] == '.' || trimmed[1] == ')' || trimmed[1] == ':')) {
-			// If we were already building a question, flush it
-			if currentPrompt != "" && len(currentOptions) >= 2 {
-				flush()
-			}
+		upper := strings.ToUpper(trimmed)
+		isQuestionStart := strings.HasPrefix(upper, "Q:") ||
+			strings.HasPrefix(upper, "QUESTION") ||
+			(len(trimmed) > 2 && (trimmed[0] >= '1' && trimmed[0] <= '9') && (trimmed[1] == '.' || trimmed[1] == ')' || trimmed[1] == ':')) ||
+			(strings.HasPrefix(upper, "Q") && strings.Contains(upper, ":") && func() bool {
+				idx := strings.Index(upper, ":")
+				mid := strings.TrimSpace(upper[1:idx])
+				if len(mid) == 0 {
+					return false
+				}
+				for _, r := range mid {
+					if r < '0' || r > '9' {
+						return false
+					}
+				}
+				return true
+			}())
+
+		if isQuestionStart {
+			// Flush previous question if complete, otherwise discard incomplete state
+			flush()
 			idx := strings.IndexAny(trimmed, ":.)")
 			if idx != -1 && idx < len(trimmed)-1 {
 				currentPrompt = strings.TrimSpace(trimmed[idx+1:])
@@ -255,6 +273,7 @@ func parseCompactQuizResponse(raw string) []quizLLMQuestion {
 		if strings.HasPrefix(trimmed, "+") {
 			opt := strings.TrimSpace(strings.TrimPrefix(trimmed, "+"))
 			if opt != "" {
+				currentCorrectCount++
 				currentCorrect = opt
 				currentOptions = append(currentOptions, opt)
 			}

@@ -160,12 +160,12 @@ md.renderer.rules.image = function (tokens, idx, options, env, self) {
     token.attrSet('style', parsedSize.style)
     token.content = parsedSize.alt
     if (token.children && token.children.length > 0) {
-      token.children.forEach((child) => {
-        if (child.type === 'text') {
-          const childParsed = parseImageSize(child.content)
-          child.content = childParsed.alt
-        }
-      })
+      const textChildren = token.children.filter((child) => child.type === 'text')
+      const lastTextChild = textChildren[textChildren.length - 1]
+      if (lastTextChild) {
+        const childParsed = parseImageSize(lastTextChild.content)
+        lastTextChild.content = childParsed.alt
+      }
     }
   }
 

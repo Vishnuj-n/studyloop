@@ -146,3 +146,35 @@ Q: Why are weights reused in convolutional kernels?
 	}
 }
 
+func TestParseQuizLLMResponse_CompactFormatEdgeCases(t *testing.T) {
+	// Q1:, Q 1:, incomplete question reset, and multiple '+' rejected
+	raw := `Q1: Incomplete Question without enough options
++ Only Option
+
+Q 2: Valid Question with Numbered Prefix?
++ Correct Option
+- Wrong 1
+- Wrong 2
+- Wrong 3
+
+Q3: Question with multiple correct answers
++ Correct 1
++ Correct 2
+- Wrong 1
+- Wrong 2`
+
+	parsed, err := parseQuizLLMResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parsed.Questions) != 1 {
+		t.Fatalf("expected exactly 1 valid question, got %d", len(parsed.Questions))
+	}
+	if parsed.Questions[0].Prompt != "Valid Question with Numbered Prefix?" {
+		t.Errorf("expected prompt 'Valid Question with Numbered Prefix?', got %q", parsed.Questions[0].Prompt)
+	}
+	if parsed.Questions[0].CorrectAnswer != "Correct Option" {
+		t.Errorf("expected correct answer 'Correct Option', got %q", parsed.Questions[0].CorrectAnswer)
+	}
+}
+

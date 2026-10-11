@@ -88,9 +88,14 @@ func TestCompressTopicChunksPrioritizingRange(t *testing.T) {
 	topicID := "os-scheduling"
 
 	// When disabled, onRangeComplete and onAllComplete should be invoked immediately
-	settings, _ := repo.GetUserSettings()
+	settings, err := repo.GetUserSettings()
+	if err != nil {
+		t.Fatalf("failed to get user settings: %v", err)
+	}
 	settings.PromptCompressionMode = "DISABLED"
-	_ = repo.UpdateUserSettings(*settings)
+	if err := repo.UpdateUserSettings(*settings); err != nil {
+		t.Fatalf("failed to update user settings: %v", err)
+	}
 
 	rangeDone := false
 	if err := service.CompressTopicChunksWithPriorityRange(context.Background(), topicID, 1, 5, func() {

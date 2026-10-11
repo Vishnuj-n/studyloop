@@ -95,5 +95,10 @@ describe('renderMarkdown', () => {
     const html60 = renderMarkdown('![Diagram|60%](assets/pic.png)', { noteRelativeFolder: folder })
     expect(html60).toContain('alt="Diagram"')
     expect(html60).toContain('style="max-width: 100%; width: 60%; height: auto;"')
+
+    // Preserves earlier child text and pipes in alt text
+    const htmlPipes = renderMarkdown('![Dataset |2024, Fig 1|500](assets/pic.png)', { noteRelativeFolder: folder })
+    expect(htmlPipes).toContain('alt="Dataset |2024, Fig 1"')
+    expect(htmlPipes).toContain('style="max-width: 100%; width: 500px; height: auto;"')
   })
 })

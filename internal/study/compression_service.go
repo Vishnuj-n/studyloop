@@ -66,9 +66,18 @@ func (s *StudyService) CompressTopicChunksPrioritizingRangeAsync(ctx context.Con
 	}
 	if s.inFlightCompress[topicID] {
 		s.inFlightCompressMu.Unlock()
-		if onRangeComplete != nil {
-			onRangeComplete()
-		}
+		// ponytail: wait for active compression to finish instead of immediate callback
+		go func() {
+			for s.IsTopicCompressing(topicID) {
+				time.Sleep(50 * time.Millisecond)
+			}
+			if onRangeComplete != nil {
+				onRangeComplete()
+			}
+			if onAllComplete != nil {
+				onAllComplete()
+			}
+		}()
 		return
 	}
 	s.inFlightCompress[topicID] = true

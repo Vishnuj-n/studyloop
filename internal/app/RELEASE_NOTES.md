@@ -1,6 +1,6 @@
 ## ✨ Features
 - **Restart Reading Session** – Users can now restart a quiz/reading session from the beginning, with a confirmation modal to prevent accidental resets.  
-- **Obsidian‑style image sizing** – Add image size specifications directly in notes (e.g., `![[image.png|200x150]]`) and access a sizing guide modal for quick reference.  
+- **Obsidian‑style image sizing** – Add image size specifications directly in notes (e.g., `![alt|200x150](image.png)`) and access a sizing guide modal for quick reference.  
 - **Enhanced Socratic AI prompts** – The Socratic mode now leverages an adaptive “Feynman” interactive framework, delivering clearer, step‑by‑step explanations.  
 
 ## 🚀 Improvements

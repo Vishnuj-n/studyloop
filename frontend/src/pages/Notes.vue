@@ -838,12 +838,15 @@ const savingSlotKey = ref(null)
 const generatingSlotKey = ref(null)
 const markingSlotKey = ref(null)
 let notesPollTimer = null
+let notesPollAttempts = 0
+const MAX_NOTES_POLL_ATTEMPTS = 15
 
 function clearNotesPolling() {
   if (notesPollTimer) {
     clearTimeout(notesPollTimer)
     notesPollTimer = null
   }
+  notesPollAttempts = 0
 }
 
 function getSlotKey(slot) {
@@ -1251,11 +1254,17 @@ async function loadTopicSlots(topicID, isBackgroundPoll = false) {
 
     // If any slot is currently generating in the background, poll periodically until complete
     const hasGeneratingSlot = dbSlots.some((s) => s && s.is_generating)
-    clearNotesPolling()
-    if (hasGeneratingSlot && selectedTopicID.value === topicID) {
+    if (notesPollTimer) {
+      clearTimeout(notesPollTimer)
+      notesPollTimer = null
+    }
+    if (hasGeneratingSlot && selectedTopicID.value === topicID && notesPollAttempts < MAX_NOTES_POLL_ATTEMPTS) {
       notesPollTimer = setTimeout(() => {
+        notesPollAttempts++
         loadTopicSlots(topicID, true)
       }, 2500)
+    } else if (!hasGeneratingSlot) {
+      notesPollAttempts = 0
     }
 
     if (!isBackgroundPoll && targetPageFromRoute.value && dbSlots.length > 0) {
@@ -1273,6 +1282,16 @@ async function loadTopicSlots(topicID, isBackgroundPoll = false) {
     console.warn('[NOTES] Failed to fetch topic slots:', err)
     if (!isBackgroundPoll) {
       sessionSlots.value = []
+    } else if (selectedTopicID.value === topicID && notesPollAttempts < MAX_NOTES_POLL_ATTEMPTS) {
+      // Background poll failure: preserve existing slots and retry bounded times
+      if (notesPollTimer) {
+        clearTimeout(notesPollTimer)
+        notesPollTimer = null
+      }
+      notesPollTimer = setTimeout(() => {
+        notesPollAttempts++
+        loadTopicSlots(topicID, true)
+      }, 2500)
     }
   } finally {
     if (!isBackgroundPoll) {

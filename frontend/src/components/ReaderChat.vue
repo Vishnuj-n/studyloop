@@ -496,6 +496,7 @@ const renderedNoteMarkdown = computed(() => {
 let notePollTimer = null
 let notePollAttempts = 0
 const MAX_NOTE_POLL_ATTEMPTS = 15 // 15 * 2.5s = ~37.5s max polling duration
+let noteRequestToken = 0
 
 function clearNotePolling() {
   if (notePollTimer) {
@@ -507,6 +508,7 @@ function clearNotePolling() {
 
 async function fetchTopicNote(topicId, isBackgroundPoll = false) {
   if (!topicId) {
+    noteRequestToken++
     clearNotePolling()
     currentNoteContent.value = ''
     currentNoteRelativeFolder.value = ''
@@ -515,9 +517,11 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     return
   }
   if (!isBackgroundPoll) {
+    noteRequestToken++
     noteLoading.value = true
     clearNotePolling()
   }
+  const token = noteRequestToken
   if (noteEditing.value) {
     if (!isBackgroundPoll) {
       noteLoading.value = false
@@ -531,10 +535,12 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     let res = null
     if (startPage > 0 && endPage >= startPage) {
       res = await getTopicStudyNoteForRange(topicId, startPage, endPage)
+      if (token !== noteRequestToken) return
     }
     // PDF Context Bridge Fallback: if user is on page-1 view (e.g. 166 vs 167), try startPage + 1
     if ((!res || !res.note || !res.note.content) && startPage > 0 && endPage >= startPage + 1) {
       const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage + 1, endPage)
+      if (token !== noteRequestToken) return
       if (bridgeRes?.note?.content) {
         console.log('[ReaderChat Note] Found note using +1 PDF context bridge fallback:', startPage + 1, 'to', endPage)
         res = bridgeRes
@@ -543,6 +549,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     // If startPage was > 1 and note was generated at startPage - 1, check startPage - 1
     if ((!res || !res.note || !res.note.content) && startPage > 1 && endPage >= startPage) {
       const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage - 1, endPage)
+      if (token !== noteRequestToken) return
       if (bridgeRes?.note?.content) {
         console.log('[ReaderChat Note] Found note using -1 PDF context bridge fallback:', startPage - 1, 'to', endPage)
         res = bridgeRes
@@ -550,6 +557,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     }
     if (!res || !res.note || !res.note.content) {
       res = await getTopicStudyNote(topicId)
+      if (token !== noteRequestToken) return
     }
     console.log('[ReaderChat Note] fetchTopicNote result:', { found: Boolean(res?.note?.content), is_generating: res?.is_generating })
     if (res && res.note && res.note.content) {
@@ -568,6 +576,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
       if (!inFlight) {
         try {
           inFlight = Boolean(await isTopicNoteGenerating(topicId, props.selectedNotebookID || '', startPage, endPage))
+          if (token !== noteRequestToken) return
         } catch {
           inFlight = false
         }
@@ -584,6 +593,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
         }
         clearTimeout(notePollTimer)
         notePollTimer = setTimeout(() => {
+          if (token !== noteRequestToken) return
           notePollAttempts++
           fetchTopicNote(topicId, true)
         }, 2500)
@@ -594,13 +604,14 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     }
     loadedTopicID.value = topicId
   } catch (err) {
+    if (token !== noteRequestToken) return
     console.warn('[ReaderChat Note] Failed to fetch note:', err)
     currentNoteContent.value = ''
     noteGenerating.value = false
     clearNotePolling()
     loadedTopicID.value = topicId
   } finally {
-    if (!isBackgroundPoll) {
+    if (!isBackgroundPoll && token === noteRequestToken) {
       noteLoading.value = false
     }
   }
