@@ -184,8 +184,8 @@ func (r *Repository) UpdateFlashcardReviewTx(tx *sql.Tx, cardID string, dueAt in
 	result, err := tx.Exec(`
 		UPDATE fsrs_cards
 		SET state_json = ?, due_at = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND due_at = ? AND state_json = ?
-	`, string(stateJSON), dueAt, cardID, expectedDueAt, expectedStateJSON)
+		WHERE id = ? AND due_at = ?
+	`, string(stateJSON), dueAt, cardID, expectedDueAt)
 	if err != nil {
 		return err
 	}

@@ -72,6 +72,53 @@ func TestUpdateFlashcardReviewTransactionalSave(t *testing.T) {
 	assertCountEquals(t, `SELECT COUNT(*) FROM fsrs_review_log WHERE reference_id = ?`, cardID, 1)
 }
 
+func TestUpdateFlashcardReviewToleratesJSONFormattingDifferences(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	cardID := "card-review-json-spacing"
+	topicID := "topic-review-json-spacing"
+	if err := testRepo.EnsureTopic(topicID, "JSON Spacing Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+
+	// Insert card with spaced JSON representation (e.g. from Python generator)
+	spacedJSON := `{"stability": 1.0, "difficulty": 5.0, "elapsed_days": 0, "scheduled_days": 0, "reps": 0, "lapses": 0, "state_code": 2}`
+	if _, err := testRepo.db.Exec(`
+		INSERT INTO fsrs_cards (id, topic_id, prompt, answer, due_at, suspended, state_json)
+		VALUES (?, ?, 'Q', 'A', 500, 0, ?)
+	`, cardID, topicID, spacedJSON); err != nil {
+		t.Fatalf("failed to insert test card: %v", err)
+	}
+
+	nextState := models.FlashcardState{
+		Stability:     2.0,
+		Difficulty:    4.5,
+		ElapsedDays:   1,
+		ScheduledDays: 3,
+		Reps:          1,
+		Lapses:        0,
+		StateCode:     2,
+	}
+
+	// Review session marshals Go struct into compact JSON (no spaces)
+	compactExpectedJSON := `{"stability":1,"difficulty":5,"elapsed_days":0,"scheduled_days":0,"reps":0,"lapses":0,"state_code":2}`
+	logRow := models.FSRSReviewLog{
+		ID:              "log-review-json-spacing",
+		TopicID:         topicID,
+		ActivityType:    "flashcard",
+		ReferenceID:     cardID,
+		ReviewedAt:      600,
+		Rating:          3,
+		ScheduledDays:   3,
+		StateBeforeJSON: compactExpectedJSON,
+		StateAfterJSON:  `{"stability":2,"difficulty":4.5}`,
+	}
+
+	if err := testRepo.UpdateFlashcardReview(cardID, 600+3*86400, 500, compactExpectedJSON, nextState, logRow); err != nil {
+		t.Fatalf("UpdateFlashcardReview should succeed despite whitespace difference: %v", err)
+	}
+}
+
 func TestUpdateFlashcardReviewRollsBackCardOnLogInsertFailure(t *testing.T) {
 	initDBForTest(t, false, 0)
 
