@@ -153,9 +153,6 @@ func (a *App) Startup(ctx context.Context) {
 }
 
 func (a *App) startup(ctx context.Context) {
-	if a.readyChan != nil {
-		defer close(a.readyChan)
-	}
 	a.ctx = ctx
 
 	// Initialize the structured logging pipeline first using the resolved app data directory
@@ -165,6 +162,13 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		a.aiInitError = err.Error()
 		a.aiReady = false
+		if a.readyChan != nil {
+			select {
+			case <-a.readyChan:
+			default:
+				close(a.readyChan)
+			}
+		}
 		return
 	}
 
@@ -172,6 +176,14 @@ func (a *App) startup(ctx context.Context) {
 	a.repoMutex.Lock()
 	a.repo = boot.Repo
 	a.repoMutex.Unlock()
+
+	if a.readyChan != nil {
+		select {
+		case <-a.readyChan:
+		default:
+			close(a.readyChan)
+		}
+	}
 
 	a.fastLLMProvider = boot.FastLLMProvider
 	a.heavyLLMProvider = boot.HeavyLLMProvider

@@ -37,3 +37,15 @@ func TestAppTestLLMConnectionAndLimits(t *testing.T) {
 		t.Fatalf("unexpected status output from TestLLMLimits: %s", statusStr)
 	}
 }
+
+func TestIsOnboardedUninitialized(t *testing.T) {
+	app := &App{}
+	res := app.IsOnboarded()
+	if res["error"] == nil {
+		t.Fatalf("expected error for uninitialized repo, got: %v", res)
+	}
+	if res["onboarded"] != false {
+		t.Fatalf("expected onboarded: false when repo is uninitialized, got: %v", res["onboarded"])
+	}
+}
+

@@ -453,6 +453,73 @@
       </div>
     </div>
   </Teleport>
+
+  <!-- External Help / Terminal Failure Move Forward Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showMoveForwardModal"
+      class="restart-reading-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="move-forward-title"
+    >
+      <div class="restart-reading-dialog">
+        <div class="restart-reading-dialog__header">
+          <BaseIcon name="help-circle" size="18" class="move-forward-dialog__icon" />
+          <h3 id="move-forward-title" class="restart-reading-dialog__title">
+            How would you like to proceed?
+          </h3>
+        </div>
+
+        <div class="restart-reading-dialog__body">
+          <p class="restart-reading-dialog__desc">
+            This topic section has been flagged for external review. Choose how you want to move forward:
+          </p>
+          <div class="move-forward-options">
+            <div class="move-forward-card">
+              <div class="move-forward-card__title">
+                <BaseIcon name="layers" size="15" />
+                <span>Create Flashcards & Move Forward</span>
+              </div>
+              <p class="move-forward-card__desc">
+                Generates spaced repetition cards for pages {{ taskMeta?.start_page || '?' }}–{{ taskMeta?.end_page || '?' }} so you can retain and reinforce key concepts in daily FSRS reviews while advancing to the next topic.
+              </p>
+            </div>
+            <div class="move-forward-card">
+              <div class="move-forward-card__title">
+                <BaseIcon name="skip-forward" size="15" />
+                <span>Skip to Next Topic</span>
+              </div>
+              <p class="move-forward-card__desc">
+                Leaves the topic flagged for external help and advances to your next queued reading task without adding any review cards.
+              </p>
+            </div>
+          </div>
+          <p v-if="moveForwardError" class="restart-reading-dialog__error">
+            {{ moveForwardError }}
+          </p>
+        </div>
+
+        <div class="restart-reading-dialog__footer move-forward-footer">
+          <button
+            class="secondary-btn skip-btn"
+            :disabled="generatingFlashcards"
+            @click="confirmSkipToNextTopic"
+          >
+            Skip Without Cards
+          </button>
+          <button
+            class="primary-btn"
+            :disabled="generatingFlashcards"
+            @click="confirmCreateFlashcardsAndMove"
+          >
+            <span v-if="generatingFlashcards">Generating Flashcards…</span>
+            <span v-else>Create Flashcards & Move</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -495,6 +562,10 @@ const generatingFlashcards = ref(false)
 const showRestartReadingModal = ref(false)
 const restartingReading = ref(false)
 const restartReadingError = ref('')
+
+// Terminal Failure / External Help Move Forward modal state
+const showMoveForwardModal = ref(false)
+const moveForwardError = ref('')
 
 const isMilestoneExam = ref(false)
 const milestonePayload = ref(null)
@@ -868,6 +939,14 @@ async function handleContinue() {
     return
   }
 
+  // If failed re-quiz reached terminal manual review (external help required),
+  // prompt user with clean choices: Create flashcards & move forward OR skip to next topic
+  if (!result.value?.passed && !result.value?.reread_task_id && result.value?.manual_review_recommended) {
+    moveForwardError.value = ''
+    showMoveForwardModal.value = true
+    return
+  }
+
   // Route to dashboard after quiz completion
   const query = {}
   if (result.value?.passed && result.value?.flashcards_generated > 0) {
@@ -876,6 +955,48 @@ async function handleContinue() {
     query.highlight = result.value.reread_task_id
   }
   router.push({ path: '/dashboard', query })
+}
+
+function confirmSkipToNextTopic() {
+  showMoveForwardModal.value = false
+  moveForwardError.value = ''
+  router.push({ path: '/dashboard' })
+}
+
+async function confirmCreateFlashcardsAndMove() {
+  const quizTaskId = result.value?.task_id || taskID.value || ''
+  if (!quizTaskId) {
+    moveForwardError.value = 'Quiz task ID not found. Cannot generate flashcards.'
+    return
+  }
+
+  generatingFlashcards.value = true
+  moveForwardError.value = ''
+  try {
+    const genResult = await generateFlashcardsForQuizTask(quizTaskId)
+    if (genResult?.error) {
+      console.warn('[FLASHCARD_PIPELINE] Terminal move-forward flashcard generation failed:', genResult.error)
+      moveForwardError.value = genResult.error
+      return
+    }
+    if (genResult?.rewards) {
+      window.dispatchEvent(
+        new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+      )
+    }
+    showMoveForwardModal.value = false
+    const cardsScheduled = genResult?.cards_scheduled || 0
+    const query = {}
+    if (cardsScheduled > 0) {
+      query.flashcardsCreated = cardsScheduled
+    }
+    router.push({ path: '/dashboard', query })
+  } catch (err) {
+    console.warn('[FLASHCARD_PIPELINE] Error generating flashcards on move forward:', err)
+    moveForwardError.value = err?.message || 'Failed to generate flashcards.'
+  } finally {
+    generatingFlashcards.value = false
+  }
 }
 
 async function handleGoToExaminer() {
@@ -1839,5 +1960,59 @@ async function confirmRestartReading() {
 .danger-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ── Move Forward Modal Styles ─────────────────── */
+.move-forward-dialog__icon {
+  color: var(--primary, #3b82f6);
+  flex-shrink: 0;
+}
+
+.move-forward-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.move-forward-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface-container-high, rgba(255, 255, 255, 0.04));
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.move-forward-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.move-forward-card__desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted-text);
+  line-height: 1.45;
+}
+
+.move-forward-footer {
+  gap: 12px;
+}
+
+.skip-btn {
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.08));
+  border: none;
+  color: var(--on-surface);
+}
+
+.skip-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 </style>
