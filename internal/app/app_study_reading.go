@@ -93,7 +93,9 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 	}
 
 	// Trigger sequential background processing on topic opening:
-	// Compression runs first so study note generation consumes pre-compressed chunks (~20% smaller prompt).
+	// Prioritizes compressing the reading session's page range first (~2 seconds),
+	// fires noteGenCallback as soon as those session chunks are ready,
+	// then continues compressing the remainder of the topic in the background.
 	if (task.TopicID != "" || task.NotebookID != "") && a.studyService != nil {
 		noteGenCallback := func() {
 			if settings, sErr := repo.GetUserSettings(); sErr == nil && settings != nil && settings.AutoGenerateStudyNotes {
@@ -105,7 +107,7 @@ func (a *App) InitializeReadingSession(taskID, notebookID, topicID string, start
 		}
 
 		if task.TopicID != "" {
-			a.studyService.CompressTopicChunksAsync(context.Background(), task.TopicID, noteGenCallback)
+			a.studyService.CompressTopicChunksPrioritizingRangeAsync(context.Background(), task.TopicID, task.StartPage, task.EndPage, noteGenCallback, nil)
 		} else {
 			go noteGenCallback()
 		}

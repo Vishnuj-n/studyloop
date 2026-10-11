@@ -607,6 +607,15 @@ export function getTopicStudyNoteSlots(topicID) {
   }
 }
 
+export function isTopicNoteGenerating(topicID, notebookID = '', startPage = 0, endPage = 0) {
+  try {
+    return appBridge().IsTopicNoteGenerating(topicID, notebookID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed checking if topic note is generating:', err)
+    return false
+  }
+}
+
 export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, content = '') {
   try {
     // If called with (topicID, content) backward-compatibility

@@ -362,7 +362,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseIcon from './BaseIcon.vue'
 import { useToast } from '../composables/useToast'
@@ -374,6 +374,7 @@ import {
   generateTopicStudyNoteForRange,
   updateTopicStudyNote,
   saveNoteImage,
+  isTopicNoteGenerating,
 } from '../services/appApi'
 
 const props = defineProps({
@@ -386,6 +387,8 @@ const props = defineProps({
   currentPage: { type: Number, required: true },
   topicStartPage: { type: Number, required: true },
   topicEndPage: { type: Number, required: true },
+  sessionStartPage: { type: Number, default: 0 },
+  sessionEndPage: { type: Number, default: 0 },
   navigationMinPage: { type: Number, default: 0 },
   navigationMaxPage: { type: Number, default: 0 },
   ragEnabled: { type: Boolean, required: true },
@@ -455,6 +458,9 @@ const currentNoteContent = ref('')
 const loadedTopicID = ref('')
 
 const effectiveStartPage = computed(() => {
+  if (props.sessionStartPage > 0) {
+    return props.sessionStartPage
+  }
   if (props.navigationMinPage > 0 && props.navigationMaxPage >= props.navigationMinPage) {
     return props.navigationMinPage
   }
@@ -462,6 +468,9 @@ const effectiveStartPage = computed(() => {
 })
 
 const effectiveEndPage = computed(() => {
+  if (props.sessionEndPage > 0) {
+    return props.sessionEndPage
+  }
   if (props.navigationMinPage > 0 && props.navigationMaxPage >= props.navigationMinPage) {
     return props.navigationMaxPage
   }
@@ -484,41 +493,116 @@ const renderedNoteMarkdown = computed(() => {
   })
 })
 
-async function fetchTopicNote(topicId) {
+let notePollTimer = null
+let notePollAttempts = 0
+const MAX_NOTE_POLL_ATTEMPTS = 15 // 15 * 2.5s = ~37.5s max polling duration
+
+function clearNotePolling() {
+  if (notePollTimer) {
+    clearTimeout(notePollTimer)
+    notePollTimer = null
+  }
+  notePollAttempts = 0
+}
+
+async function fetchTopicNote(topicId, isBackgroundPoll = false) {
   if (!topicId) {
+    clearNotePolling()
     currentNoteContent.value = ''
     currentNoteRelativeFolder.value = ''
     loadedTopicID.value = ''
+    noteGenerating.value = false
     return
   }
-  noteLoading.value = true
-  noteEditing.value = false
+  if (!isBackgroundPoll) {
+    noteLoading.value = true
+    clearNotePolling()
+  }
+  if (noteEditing.value) {
+    if (!isBackgroundPoll) {
+      noteLoading.value = false
+    }
+    return
+  }
   try {
     const startPage = effectiveStartPage.value
     const endPage = effectiveEndPage.value
+    console.log('[ReaderChat Note] fetchTopicNote called for topic:', topicId, 'pages:', startPage, 'to', endPage)
     let res = null
     if (startPage > 0 && endPage >= startPage) {
       res = await getTopicStudyNoteForRange(topicId, startPage, endPage)
     }
+    // PDF Context Bridge Fallback: if user is on page-1 view (e.g. 166 vs 167), try startPage + 1
+    if ((!res || !res.note || !res.note.content) && startPage > 0 && endPage >= startPage + 1) {
+      const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage + 1, endPage)
+      if (bridgeRes?.note?.content) {
+        console.log('[ReaderChat Note] Found note using +1 PDF context bridge fallback:', startPage + 1, 'to', endPage)
+        res = bridgeRes
+      }
+    }
+    // If startPage was > 1 and note was generated at startPage - 1, check startPage - 1
+    if ((!res || !res.note || !res.note.content) && startPage > 1 && endPage >= startPage) {
+      const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage - 1, endPage)
+      if (bridgeRes?.note?.content) {
+        console.log('[ReaderChat Note] Found note using -1 PDF context bridge fallback:', startPage - 1, 'to', endPage)
+        res = bridgeRes
+      }
+    }
     if (!res || !res.note || !res.note.content) {
       res = await getTopicStudyNote(topicId)
     }
+    console.log('[ReaderChat Note] fetchTopicNote result:', { found: Boolean(res?.note?.content), is_generating: res?.is_generating })
     if (res && res.note && res.note.content) {
       currentNoteContent.value = res.note.content
       currentNoteRelativeFolder.value = res.note.relative_folder_path || ''
+      noteGenerating.value = false
+      clearNotePolling()
     } else {
       currentNoteContent.value = ''
       if (res && res.note && res.note.relative_folder_path) {
         currentNoteRelativeFolder.value = res.note.relative_folder_path
+      }
+
+      // Check if note is actively being generated in the background
+      let inFlight = Boolean(res?.is_generating || res?.note?.is_generating)
+      if (!inFlight) {
+        try {
+          inFlight = Boolean(await isTopicNoteGenerating(topicId, props.selectedNotebookID || '', startPage, endPage))
+        } catch {
+          inFlight = false
+        }
+      }
+
+      if (inFlight) {
+        noteGenerating.value = true
+      }
+
+      // If note generation is in-flight or if checking during initial session load (up to 8 attempts ~20s), poll periodically
+      if ((inFlight || noteGenerating.value || notePollAttempts < 8) && notePollAttempts < MAX_NOTE_POLL_ATTEMPTS) {
+        if (inFlight) {
+          noteGenerating.value = true
+        }
+        clearTimeout(notePollTimer)
+        notePollTimer = setTimeout(() => {
+          notePollAttempts++
+          fetchTopicNote(topicId, true)
+        }, 2500)
+      } else {
+        noteGenerating.value = false
+        clearNotePolling()
       }
     }
     loadedTopicID.value = topicId
   } catch (err) {
     console.warn('[ReaderChat Note] Failed to fetch note:', err)
     currentNoteContent.value = ''
+    noteGenerating.value = false
+    clearNotePolling()
     loadedTopicID.value = topicId
   } finally {
-    noteLoading.value = false
+    if (!isBackgroundPoll) {
+      noteLoading.value = false
+    }
   }
 }
 
@@ -652,6 +736,7 @@ async function generateNote() {
   const tid = props.selectedTopicID
   const nbid = props.selectedNotebookID
   if (!tid) return
+  clearNotePolling()
   noteGenerating.value = true
   try {
     const startPage = effectiveStartPage.value
@@ -736,6 +821,10 @@ onMounted(() => {
   if (currentTab.value === 'note' && props.selectedTopicID) {
     void fetchTopicNote(props.selectedTopicID)
   }
+})
+
+onUnmounted(() => {
+  clearNotePolling()
 })
 
 const displayContextTitle = computed(() => props.selectedTopicTitle || props.selectedNotebookTitle || '')

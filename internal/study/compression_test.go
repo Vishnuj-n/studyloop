@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"ai-tutor/internal/db"
 )
@@ -69,3 +70,58 @@ func TestDynamicCompressionThreshold(t *testing.T) {
 		t.Errorf("expected empty compressed text when under limit, got %q", chunks[0].CompressedText)
 	}
 }
+
+func TestCompressTopicChunksPrioritizingRange(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+	repo, err := db.Init(dbPath, "")
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	if err := repo.SeedDemoDataForTests(); err != nil {
+		t.Fatalf("failed to seed demo data: %v", err)
+	}
+
+	service := NewStudyService(Config{Repo: repo})
+	topicID := "os-scheduling"
+
+	// When disabled, onRangeComplete and onAllComplete should be invoked immediately
+	settings, _ := repo.GetUserSettings()
+	settings.PromptCompressionMode = "DISABLED"
+	_ = repo.UpdateUserSettings(*settings)
+
+	rangeDone := false
+	service.CompressTopicChunksWithPriorityRange(context.Background(), topicID, 1, 5, func() {
+		rangeDone = true
+	})
+
+	if !rangeDone {
+		t.Errorf("expected onRangeComplete to be invoked when compression is disabled")
+	}
+
+	// Test async method
+	rangeAsyncDone := make(chan bool, 1)
+	allAsyncDone := make(chan bool, 1)
+	service.CompressTopicChunksPrioritizingRangeAsync(context.Background(), topicID, 1, 5, func() {
+		rangeAsyncDone <- true
+	}, func() {
+		allAsyncDone <- true
+	})
+
+	select {
+	case <-rangeAsyncDone:
+		// success
+	case <-time.After(3 * time.Second):
+		t.Errorf("timed out waiting for range callback")
+	}
+
+	select {
+	case <-allAsyncDone:
+		// success
+	case <-time.After(3 * time.Second):
+		t.Errorf("timed out waiting for all complete callback")
+	}
+}
+

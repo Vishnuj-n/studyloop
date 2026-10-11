@@ -91,6 +91,8 @@ export function useReaderBase(taskID) {
   const bundleNotebookTitle = ref('')
 
   // Navigation bounds for task-flow sessions.
+  const sessionStartPage = ref(0)
+  const sessionEndPage = ref(0)
   const navigationMinPage = ref(0)
   const navigationMaxPage = ref(0)
   const navigationState = ref(null)
@@ -328,6 +330,8 @@ export function useReaderBase(taskID) {
       const isPdfFormat = isPdf.value || fileType.value === 'pdf'
       const minPage = validStart > 1 && isPdfFormat ? validStart - 1 : validStart
 
+      sessionStartPage.value = validStart
+      sessionEndPage.value = validEnd
       navigationMinPage.value = minPage
       navigationMaxPage.value = validEnd
 
@@ -492,6 +496,8 @@ export function useReaderBase(taskID) {
     activeSection,
     navigationMinPage,
     navigationMaxPage,
+    sessionStartPage,
+    sessionEndPage,
     navigationState,
 
     // Computed
