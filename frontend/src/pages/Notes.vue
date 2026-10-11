@@ -300,6 +300,15 @@
               </button>
               <button
                 type="button"
+                class="secondary-btn btn-sm image-help-btn"
+                title="Image Sizing & Markdown Guide"
+                @click="showImageHelpModal = true"
+              >
+                <BaseIcon name="help-circle" size="14" />
+                <span>Image Sizing</span>
+              </button>
+              <button
+                type="button"
                 class="secondary-btn btn-sm open-folder-btn"
                 title="Open notes folder in File Explorer (Obsidian / Logseq compatible)"
                 @click="handleOpenNotesFolder"
@@ -344,13 +353,7 @@
             </button>
           </div>
 
-          <!-- Interop Tip Callout -->
-          <div v-else class="notes-obsidian-tip">
-            <BaseIcon name="info" size="14" class="tip-icon" />
-            <span>
-              <strong>Obsidian & Logseq Compatible:</strong> Notes are synced to local markdown files. Use <em>Open Folder</em> to add images (<code>![alt](./assets/pic.png)</code>) or edit notes in external markdown tools.
-            </span>
-          </div>
+
 
           <!-- Banner messages -->
           <div v-if="errorMsg" class="note-banner error-banner">
@@ -541,7 +544,7 @@
                     <button
                       type="button"
                       class="icon-btn-pill highlight"
-                      :disabled="generatingSlotKey === getSlotKey(slot)"
+                      :disabled="isSlotGenerating(slot)"
                       :title="slot.content ? 'Regenerate session note' : 'Generate session note with AI'"
                       @click="generateSlot(slot)"
                     >
@@ -554,7 +557,7 @@
                       type="button"
                       class="icon-btn-pill success"
                       title="Mark as reviewed"
-                      :disabled="markingSlotKey === getSlotKey(slot)"
+                      :disabled="markingSlotKey === getSlotKey(slot) || isSlotGenerating(slot)"
                       @click="markSlotReviewed(slot)"
                     >
                       <BaseIcon name="check" size="14" />
@@ -567,7 +570,7 @@
               <!-- Card Body -->
               <div class="session-card-body">
                 <!-- Generating Spinner -->
-                <div v-if="generatingSlotKey === getSlotKey(slot)" class="generating-slot-state">
+                <div v-if="isSlotGenerating(slot)" class="generating-slot-state">
                   <div class="spinner"></div>
                   <p>Synthesizing high-yield summary for {{ formatPageRange(slot.start_page, slot.end_page) }}...</p>
                 </div>
@@ -597,7 +600,7 @@
                     <button
                       type="button"
                       class="primary-btn btn-sm"
-                      :disabled="generatingSlotKey === getSlotKey(slot)"
+                      :disabled="isSlotGenerating(slot)"
                       @click="generateSlot(slot)"
                     >
                       <BaseIcon name="sparkles" size="13" />
@@ -618,6 +621,59 @@
           </div>
         </template>
       </main>
+    </div>
+
+    <!-- Image Sizing Help Modal -->
+    <div v-if="showImageHelpModal" class="modal-backdrop" @click.self="showImageHelpModal = false">
+      <div class="modal-card image-help-card">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <BaseIcon name="image" size="18" class="modal-icon" />
+            <h2 class="modal-title-text">Markdown Image Sizing Guide</h2>
+          </div>
+          <button type="button" class="modal-close-btn" @click="showImageHelpModal = false">
+            <BaseIcon name="x" size="16" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Studyloop supports Obsidian-style Markdown image resizing. When you paste an image with <kbd>Ctrl</kbd>+<kbd>V</kbd>, it automatically defaults to <strong>75%</strong> width. You can edit the size parameter anytime:
+          </p>
+
+          <div class="syntax-table">
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|400](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>400px</strong> (responsive <code>max-width: 100%</code>)</div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|400x250](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>400px</strong> & height to <strong>250px</strong> (contained)</div>
+            </div>
+            <div class="syntax-row highlight-row">
+              <div class="syntax-code"><code>![alt|75%](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>75%</strong> container width <em>(Default on paste)</em></div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt|60%](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Sets width to <strong>60%</strong> container width</div>
+            </div>
+            <div class="syntax-row">
+              <div class="syntax-code"><code>![alt](path)</code></div>
+              <div class="syntax-arrow">→</div>
+              <div class="syntax-effect">Full / natural image size clamped to container</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="primary-btn btn-sm" @click="showImageHelpModal = false">
+            Got it
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -651,6 +707,7 @@ const loading = ref(true)
 const loadingSlots = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const showImageHelpModal = ref(false)
 
 const notebooks = ref([])
 const notebookTree = ref([])
@@ -780,13 +837,29 @@ const editSlotBuffer = ref('')
 const savingSlotKey = ref(null)
 const generatingSlotKey = ref(null)
 const markingSlotKey = ref(null)
+let notesPollTimer = null
+let notesPollAttempts = 0
+const MAX_NOTES_POLL_ATTEMPTS = 15
+
+function clearNotesPolling() {
+  if (notesPollTimer) {
+    clearTimeout(notesPollTimer)
+    notesPollTimer = null
+  }
+  notesPollAttempts = 0
+}
 
 function getSlotKey(slot) {
   return `${slot.start_page}_${slot.end_page}`
 }
 
+function isSlotGenerating(slot) {
+  if (!slot) return false
+  return generatingSlotKey.value === getSlotKey(slot) || Boolean(slot.is_generating)
+}
+
 function getSlotGenerateButtonText(slot) {
-  if (generatingSlotKey.value === getSlotKey(slot)) {
+  if (isSlotGenerating(slot)) {
     return 'Generating...'
   }
   return slot.content ? 'Regenerate' : 'Generate Note'
@@ -1170,14 +1243,31 @@ async function selectTopic(topic) {
   await loadTopicSlots(topic.topic_id)
 }
 
-async function loadTopicSlots(topicID) {
-  loadingSlots.value = true
+async function loadTopicSlots(topicID, isBackgroundPoll = false) {
+  if (!isBackgroundPoll) {
+    loadingSlots.value = true
+  }
   try {
     const res = await getTopicStudyNoteSlots(topicID)
     const dbSlots = (res && Array.isArray(res.slots)) ? res.slots : []
     sessionSlots.value = dbSlots
 
-    if (targetPageFromRoute.value && dbSlots.length > 0) {
+    // If any slot is currently generating in the background, poll periodically until complete
+    const hasGeneratingSlot = dbSlots.some((s) => s && s.is_generating)
+    if (notesPollTimer) {
+      clearTimeout(notesPollTimer)
+      notesPollTimer = null
+    }
+    if (hasGeneratingSlot && selectedTopicID.value === topicID && notesPollAttempts < MAX_NOTES_POLL_ATTEMPTS) {
+      notesPollTimer = setTimeout(() => {
+        notesPollAttempts++
+        loadTopicSlots(topicID, true)
+      }, 2500)
+    } else if (!hasGeneratingSlot) {
+      notesPollAttempts = 0
+    }
+
+    if (!isBackgroundPoll && targetPageFromRoute.value && dbSlots.length > 0) {
       nextTick(() => {
         const targetSlot = dbSlots.find((s) => isTargetSlot(s))
         if (targetSlot) {
@@ -1190,9 +1280,23 @@ async function loadTopicSlots(topicID) {
     }
   } catch (err) {
     console.warn('[NOTES] Failed to fetch topic slots:', err)
-    sessionSlots.value = []
+    if (!isBackgroundPoll) {
+      sessionSlots.value = []
+    } else if (selectedTopicID.value === topicID && notesPollAttempts < MAX_NOTES_POLL_ATTEMPTS) {
+      // Background poll failure: preserve existing slots and retry bounded times
+      if (notesPollTimer) {
+        clearTimeout(notesPollTimer)
+        notesPollTimer = null
+      }
+      notesPollTimer = setTimeout(() => {
+        notesPollAttempts++
+        loadTopicSlots(topicID, true)
+      }, 2500)
+    }
   } finally {
-    loadingSlots.value = false
+    if (!isBackgroundPoll) {
+      loadingSlots.value = false
+    }
   }
 }
 
@@ -1236,7 +1340,7 @@ async function handleNewNotePaste(e) {
           return
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
         newNoteBuffer.value += imageMarkdown
       } catch (err) {
         console.error('[NOTES Paste] Failed to process image paste:', err)
@@ -1279,7 +1383,7 @@ async function handleSlotPaste(e, slot) {
           slot.relative_folder_path = res.relative_folder_path
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram](${res.path || fileName})\n\n`
+        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
         editSlotBuffer.value += imageMarkdown
       } catch (err) {
         console.error('[NOTES Slot Paste] Failed to process image paste:', err)
@@ -1513,6 +1617,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearNotesPolling()
   window.removeEventListener('settings-updated', handleExternalSettingsUpdated)
 })
 </script>
@@ -2020,32 +2125,7 @@ onUnmounted(() => {
   border-color: var(--primary);
 }
 
-.notes-obsidian-tip {
-  margin: 16px 32px 0;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface-variant);
-  font-size: 12.5px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  line-height: 1.4;
-}
 
-.tip-icon {
-  color: var(--primary);
-  flex-shrink: 0;
-}
-
-.notes-obsidian-tip code {
-  background: var(--surface-container-high);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 11.5px;
-}
 
 /* Banner notifications */
 .note-banner {
@@ -2766,4 +2846,118 @@ onUnmounted(() => {
 .popover-select:focus {
   border-color: var(--primary);
 }
+
+/* Image Sizing Guide Modal */
+.image-help-card {
+  max-width: 540px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-icon {
+  color: var(--primary);
+}
+
+.modal-title-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.modal-close-btn:hover {
+  color: var(--on-surface);
+  background: var(--surface-container-high);
+}
+
+.modal-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+  margin: 0 0 14px 0;
+}
+
+.modal-desc kbd {
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 11.5px;
+  font-family: inherit;
+}
+
+.syntax-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.syntax-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+
+.syntax-row.highlight-row {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border: 1px solid var(--outline-variant);
+}
+
+.syntax-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+  min-width: 170px;
+}
+
+.syntax-code code {
+  background: var(--surface-container-high);
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--primary);
+}
+
+.syntax-arrow {
+  color: var(--muted-text);
+  font-weight: bold;
+}
+
+.syntax-effect {
+  color: var(--on-surface);
+  line-height: 1.35;
+}
+
 </style>

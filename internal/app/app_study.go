@@ -861,10 +861,23 @@ func (a *App) GetTopicStudyNoteForRange(topicID string, startPage, endPage int) 
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
-	return map[string]interface{}{
-		"success": true,
-		"note":    note,
+	isGen := a.studyService.IsTopicNoteGenerating(topicID, "", startPage, endPage)
+	if note != nil {
+		note.IsGenerating = isGen
 	}
+	return map[string]interface{}{
+		"success":       true,
+		"note":          note,
+		"is_generating": isGen,
+	}
+}
+
+// IsTopicNoteGenerating checks if study note generation is currently in-flight for a topic/range.
+func (a *App) IsTopicNoteGenerating(topicID, notebookID string, startPage, endPage int) bool {
+	if a.studyService == nil {
+		return false
+	}
+	return a.studyService.IsTopicNoteGenerating(topicID, notebookID, startPage, endPage)
 }
 
 // GetTopicStudyNoteSlots returns all per-session notes for a topic ordered by start_page.

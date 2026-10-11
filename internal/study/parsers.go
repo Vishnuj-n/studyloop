@@ -209,7 +209,100 @@ func recoverTruncatedQuizJSON(raw string) string {
 	return sb.String()
 }
 
+func parseCompactQuizResponse(raw string) []quizLLMQuestion {
+	var questions []quizLLMQuestion
+	lines := strings.Split(raw, "\n")
+
+	var currentPrompt string
+	var currentCorrect string
+	var currentCorrectCount int
+	var currentOptions []string
+
+	flush := func() {
+		if strings.TrimSpace(currentPrompt) != "" && strings.TrimSpace(currentCorrect) != "" && currentCorrectCount == 1 && len(currentOptions) == 4 {
+			questions = append(questions, quizLLMQuestion{
+				Prompt:        strings.TrimSpace(currentPrompt),
+				Options:       currentOptions,
+				CorrectAnswer: strings.TrimSpace(currentCorrect),
+			})
+		}
+		currentPrompt = ""
+		currentCorrect = ""
+		currentCorrectCount = 0
+		currentOptions = nil
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Check for Question start: "Q:", "Q1:", "Q 1:", "1.", "1)"
+		upper := strings.ToUpper(trimmed)
+		isQuestionStart := strings.HasPrefix(upper, "Q:") ||
+			strings.HasPrefix(upper, "QUESTION") ||
+			(len(trimmed) > 2 && (trimmed[0] >= '1' && trimmed[0] <= '9') && (trimmed[1] == '.' || trimmed[1] == ')' || trimmed[1] == ':')) ||
+			(strings.HasPrefix(upper, "Q") && strings.Contains(upper, ":") && func() bool {
+				idx := strings.Index(upper, ":")
+				mid := strings.TrimSpace(upper[1:idx])
+				if len(mid) == 0 {
+					return false
+				}
+				for _, r := range mid {
+					if r < '0' || r > '9' {
+						return false
+					}
+				}
+				return true
+			}())
+
+		if isQuestionStart {
+			// Flush previous question if complete, otherwise discard incomplete state
+			flush()
+			idx := strings.IndexAny(trimmed, ":.)")
+			if idx != -1 && idx < len(trimmed)-1 {
+				currentPrompt = strings.TrimSpace(trimmed[idx+1:])
+			} else {
+				currentPrompt = trimmed
+			}
+			continue
+		}
+
+		// Correct option: starts with "+"
+		if strings.HasPrefix(trimmed, "+") {
+			opt := strings.TrimSpace(strings.TrimPrefix(trimmed, "+"))
+			if opt != "" {
+				currentCorrectCount++
+				currentCorrect = opt
+				currentOptions = append(currentOptions, opt)
+			}
+			continue
+		}
+
+		// Incorrect option: starts with "-"
+		if strings.HasPrefix(trimmed, "-") {
+			opt := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
+			if opt != "" {
+				currentOptions = append(currentOptions, opt)
+			}
+			continue
+		}
+	}
+	flush()
+	return questions
+}
+
 func parseQuizLLMResponse(raw string) (*quizLLMResponse, error) {
+	trimmed := strings.TrimSpace(raw)
+	// If raw response looks like compact text format (starts with Q: or does not start with JSON brace '{'), try compact parser first
+	if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") && !strings.HasPrefix(trimmed, "```json") {
+		if compactQuestions := parseCompactQuizResponse(raw); len(compactQuestions) > 0 {
+			utils.Infof("[QUIZ_PARSER] successfully parsed %d questions from compact format", len(compactQuestions))
+			return &quizLLMResponse{Questions: compactQuestions}, nil
+		}
+	}
+
 	out, err := parseLLMJSON[quizLLMResponse](raw)
 	if err == nil && len(out.Questions) > 0 {
 		return out, nil
@@ -235,6 +328,12 @@ func parseQuizLLMResponse(raw string) (*quizLLMResponse, error) {
 	if extracted := extractValidQuizQuestions(raw); len(extracted) > 0 {
 		utils.Warnf("[QUIZ_RECOVERY] extracted %d valid question objects from malformed LLM response", len(extracted))
 		return &quizLLMResponse{Questions: extracted}, nil
+	}
+
+	// Final fallback: try compact parser on raw in case JSON wrapping contained compact lines
+	if compactQuestions := parseCompactQuizResponse(raw); len(compactQuestions) > 0 {
+		utils.Infof("[QUIZ_PARSER] successfully parsed %d questions from compact fallback", len(compactQuestions))
+		return &quizLLMResponse{Questions: compactQuestions}, nil
 	}
 
 	if err != nil {

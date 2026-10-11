@@ -65,6 +65,10 @@ export function revertReadingTaskSession(taskID) {
   return appBridge().RevertReadingTaskSession(taskID)
 }
 
+export function revertTopicToReadingFromQuiz(quizTaskID) {
+  return appBridge().RevertTopicToReadingFromQuiz(quizTaskID)
+}
+
 
 
 export async function completeReading(taskID, splitPage = 0) {
@@ -600,6 +604,15 @@ export function getTopicStudyNoteSlots(topicID) {
   } catch (err) {
     console.error('Failed fetching topic study note slots:', err)
     throw err
+  }
+}
+
+export async function isTopicNoteGenerating(topicID, notebookID = '', startPage = 0, endPage = 0) {
+  try {
+    return await appBridge().IsTopicNoteGenerating(topicID, notebookID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed checking if topic note is generating:', err)
+    return false
   }
 }
 

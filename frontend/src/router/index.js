@@ -67,7 +67,15 @@ router.beforeEach(async (to, from, next) => {
   }
   try {
     const res = await isOnboarded()
-    if (res && res.onboarded === false) {
+    if (res && res.error) {
+      logFrontendEvent(
+        'warn',
+        'Router',
+        'onboarding_check_backend_error',
+        JSON.stringify({ target: to.path, error: res.error })
+      )
+      next()
+    } else if (res && res.onboarded === false) {
       logFrontendEvent(
         'info',
         'Router',

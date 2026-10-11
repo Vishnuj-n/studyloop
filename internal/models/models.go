@@ -161,6 +161,7 @@ type QuizResult struct {
 	RereadAttemptCount      int    `json:"reread_attempt_count"`
 	MaxRereadAttempts       int    `json:"max_reread_attempts"`
 	RereadTaskID            string `json:"reread_task_id,omitempty"`
+	SocraticTaskID          string `json:"socratic_task_id,omitempty"`
 	FlashcardTaskID         string `json:"flashcard_task_id,omitempty"`
 	AttemptRecord           string `json:"attempt_id,omitempty"`
 	// Flashcard generation results (populated when quiz is passed and flashcards are generated)
@@ -705,6 +706,7 @@ type TopicStudyNote struct {
 	FilePath           string `json:"file_path,omitempty"`
 	RelativeFolderPath string `json:"relative_folder_path,omitempty"`
 	Content            string `json:"content"`
+	IsGenerating       bool   `json:"is_generating,omitempty"`
 	LastReviewedAt     int64  `json:"last_reviewed_at"`
 	CreatedAt          string `json:"created_at,omitempty"`
 	UpdatedAt          string `json:"updated_at,omitempty"`

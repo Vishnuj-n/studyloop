@@ -227,9 +227,9 @@
             </span>
           </div>
           <div v-if="isTaskFlow" class="stage-head-right">
-            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info" :title="`Reading Window: Pages ${reader.navigationMinPage.value}-${reader.navigationMaxPage.value}`">
-              <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ reader.navigationMinPage.value }}-{{
-                reader.navigationMaxPage.value
+            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info" :title="`Reading Window: Pages ${reader.sessionStartPage.value || reader.navigationMinPage.value}-${reader.sessionEndPage.value || reader.navigationMaxPage.value}`">
+              <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ reader.sessionStartPage.value || reader.navigationMinPage.value }}-{{
+                reader.sessionEndPage.value || reader.navigationMaxPage.value
               }}
             </span>
             <button
@@ -334,6 +334,8 @@
         :current-page="reader.currentPage.value"
         :topic-start-page="reader.topicStartPage.value"
         :topic-end-page="reader.topicEndPage.value"
+        :session-start-page="reader.sessionStartPage.value"
+        :session-end-page="reader.sessionEndPage.value"
         :navigation-min-page="reader.navigationMinPage.value"
         :navigation-max-page="reader.navigationMaxPage.value"
         :rag-enabled="ragEnabled"

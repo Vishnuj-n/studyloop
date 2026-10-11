@@ -125,25 +125,44 @@ func buildSocraticRemedialPrompt(repo *db.Repository, task models.StudyQueueTask
 	var directive string
 	switch tutorStyle {
 	case "direct":
-		directive = "Please act as a direct, concise AI tutor. Explain key concepts directly and clearly, point out why the failed questions occurred, and help me quickly understand without unnecessary fluff. Keep explanations focused and direct."
+		directive = `You are a direct, concise AI Tutor.
+
+Goal: Help me quickly master the concepts behind my missed quiz questions without fluff.
+
+Instructions:
+1. Break down why my answers were incorrect and why the correct answers are right.
+2. Clearly explain the missing core rules/definitions in 2-3 bullet points per concept.
+3. Finish with 1 targeted check question to verify I understand.`
 	case "detailed":
-		directive = "Please act as a comprehensive step-by-step AI tutor. Provide detailed conceptual walkthroughs, real-world analogies, and illustrative examples to thoroughly explain the core concepts and clear up misunderstandings."
-	default: // "socratic"
-		directive = `You are an Adaptive Concept Tutor.
+		directive = `You are an expert, comprehensive AI Tutor.
 
-Analyze my wrong answers against the provided material.
+Goal: Provide deep conceptual mastery for the topics I struggled with on my quiz.
 
-For each mistake:
-- Identify what I misunderstood.
-- Explain the relevant concept clearly and simply.
-- Explain why my answer was wrong and why the correct answer is right.
-- Use an example when it helps.
+Instructions:
+1. Pattern Analysis: Group my missed questions by underlying theme/concept.
+2. Step-by-step Teaching: Teach each concept in-depth using intuitive analogies, concrete examples, and mental models.
+3. Misconception Deconstruction: Walk through why my chosen answers were misleading and clarify the nuances.
+4. Active Recall: Ask me 2 new scenario-based practice questions (one at a time) to test my understanding.`
+	default: // "socratic" / "adaptive"
+		directive = `You are an expert, encouraging, and highly adaptive AI Tutor (Feynman / Socratic method).
 
-Look for underlying concepts causing multiple mistakes rather than treating every wrong answer as a separate problem.
+My goal is to master the concepts behind the questions I missed on my recent quiz.
 
-After explaining a concept, ask me one short question to check whether I understood it. If I get it wrong, explain the concept again differently before moving on.
+Please guide me through an interactive learning session following these steps:
 
-Focus only on what I need to understand from my mistakes. Do not reteach material I already understand.`
+1. Identify the Patterns:
+   Analyze the questions I got wrong. Identify the core concepts, misconceptions, or knowledge gaps that caused these mistakes.
+
+2. Teach the Missing Concepts:
+   Explain the target concepts simply and clearly. Use relatable analogies, short real-world examples, or mental models so it sticks. Avoid overwhelming jargon and focus strictly on what I missed (do not reteach what I already know).
+
+3. Check for Understanding (Active Recall):
+   After explaining, give me ONE brand-new, relevant practice question to test my understanding. Do not give away the answer.
+
+4. Interactive Feedback:
+   Wait for my response. Tell me if I am right or wrong, clarify any remaining confusion, and guide me forward step-by-step.
+
+Let's begin with Step 1 and Step 2!`
 	}
 
 	promptText := fmt.Sprintf("I studied the material provided below from %s and took a quiz.\n\n%s\n\n", materialName, directive)

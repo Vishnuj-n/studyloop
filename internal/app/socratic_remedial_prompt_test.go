@@ -49,21 +49,18 @@ func TestBuildSocraticRemedialPrompt_AdaptiveFormat(t *testing.T) {
 		t.Fatalf("buildSocraticRemedialPrompt failed: %v", err)
 	}
 
-	// Verify key prompt structure and persona
 	expectedPhrases := []string{
-		"You are an Adaptive Concept Tutor.",
+		"You are an expert, encouraging, and highly adaptive AI Tutor (Feynman / Socratic method).",
 		"I studied the material provided below",
 		"Here are the questions I got wrong:",
 		"What is photosynethsis?",
 		"My Answer: A) Process A",
 		"Correct Answer: B) Process B",
-		"Analyze my wrong answers against the provided material.",
-		"For each mistake:",
-		"Identify what I misunderstood.",
-		"Explain the relevant concept clearly and simply.",
-		"Explain why my answer was wrong and why the correct answer is right.",
-		"After explaining a concept, ask me one short question to check whether I understood it.",
-		"Focus only on what I need to understand from my mistakes.",
+		"1. Identify the Patterns:",
+		"2. Teach the Missing Concepts:",
+		"3. Check for Understanding (Active Recall):",
+		"4. Interactive Feedback:",
+		"Let's begin with Step 1 and Step 2!",
 	}
 
 	for _, phrase := range expectedPhrases {

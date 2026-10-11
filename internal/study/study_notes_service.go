@@ -673,7 +673,9 @@ func (s *StudyService) GenerateTopicStudyNoteAsync(ctx context.Context, topicID,
 		return
 	}
 
-	key := fmt.Sprintf("%s:%s:%d:%d", topicID, notebookID, startPage, endPage)
+	// Normalize topic and notebook IDs to ensure consistent keying across caller sites
+	nbID, _, tID, _ := s.resolveNotebookAndTopicTitles(topicID, notebookID)
+	key := fmt.Sprintf("%s:%s:%d:%d", tID, nbID, startPage, endPage)
 	s.inFlightNotesMu.Lock()
 	if s.inFlightNotes == nil {
 		s.inFlightNotes = make(map[string]bool)
@@ -705,6 +707,15 @@ func (s *StudyService) GenerateTopicStudyNoteAsync(ctx context.Context, topicID,
 			utils.Warnf("[STUDY_NOTES] async note generation failed for topic %s notebook %s (pages %d-%d): %v", topicID, notebookID, startPage, endPage, err)
 		}
 	}()
+}
+
+// IsTopicNoteGenerating checks if study note generation is currently in-flight for a topic/range.
+func (s *StudyService) IsTopicNoteGenerating(topicID, notebookID string, startPage, endPage int) bool {
+	nbID, _, tID, _ := s.resolveNotebookAndTopicTitles(topicID, notebookID)
+	key := fmt.Sprintf("%s:%s:%d:%d", tID, nbID, startPage, endPage)
+	s.inFlightNotesMu.Lock()
+	defer s.inFlightNotesMu.Unlock()
+	return s.inFlightNotes != nil && s.inFlightNotes[key]
 }
 
 // GetTopicStudyNote retrieves the whole-chapter (0,0) study note for a given topic ID from disk.
@@ -871,9 +882,10 @@ func (s *StudyService) GetTopicStudyNoteSlots(topicID string) ([]models.TopicStu
 		}
 	}
 
-	// 3. Flatten and sort slots
+	// 3. Flatten, populate in-flight generation status, and sort slots
 	notes := make([]models.TopicStudyNote, 0, len(slotsMap))
 	for _, n := range slotsMap {
+		n.IsGenerating = s.IsTopicNoteGenerating(n.TopicID, n.NotebookID, n.StartPage, n.EndPage)
 		notes = append(notes, n)
 	}
 

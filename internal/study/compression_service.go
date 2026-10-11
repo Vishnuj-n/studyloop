@@ -41,11 +41,24 @@ type CompressionOutput struct {
 // without blocking the caller. It accepts an optional onComplete callback that is executed
 // strictly after compression finishes, guaranteeing sequential execution for dependent tasks like note generation.
 func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID string, onComplete func()) {
+	s.CompressTopicChunksPrioritizingRangeAsync(ctx, topicID, 0, 0, nil, onComplete)
+}
+
+// CompressTopicChunksPrioritizingRangeAsync triggers background compression, prioritizing chunks in [startPage, endPage].
+// onRangeComplete is fired as soon as the priority page range finishes compressing (~2s), unblocking
+// session-scoped note generation without waiting for the full topic to complete.
+// onAllComplete is fired when all chunks across the entire topic finish.
+func (s *StudyService) CompressTopicChunksPrioritizingRangeAsync(ctx context.Context, topicID string, startPage, endPage int, onRangeComplete func(), onAllComplete func()) {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
+		if onAllComplete != nil {
+			onAllComplete()
+		}
 		return
 	}
-
 
 	s.inFlightCompressMu.Lock()
 	if s.inFlightCompress == nil {
@@ -53,6 +66,18 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 	}
 	if s.inFlightCompress[topicID] {
 		s.inFlightCompressMu.Unlock()
+		// ponytail: wait for active compression to finish instead of immediate callback
+		go func() {
+			for s.IsTopicCompressing(topicID) {
+				time.Sleep(50 * time.Millisecond)
+			}
+			if onRangeComplete != nil {
+				onRangeComplete()
+			}
+			if onAllComplete != nil {
+				onAllComplete()
+			}
+		}()
 		return
 	}
 	s.inFlightCompress[topicID] = true
@@ -65,19 +90,25 @@ func (s *StudyService) CompressTopicChunksAsync(ctx context.Context, topicID str
 			s.inFlightCompressMu.Unlock()
 
 			if r := recover(); r != nil {
-				utils.Errorf("[COMPRESSION] panic in CompressTopicChunksAsync: %v", r)
+				utils.Errorf("[COMPRESSION] panic in CompressTopicChunksPrioritizingRangeAsync: %v", r)
+				if onRangeComplete != nil {
+					onRangeComplete()
+				}
+				if onAllComplete != nil {
+					onAllComplete()
+				}
 			}
 		}()
 
 		bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		if err := s.CompressTopicChunks(bgCtx, topicID); err != nil {
+		if err := s.CompressTopicChunksWithPriorityRange(bgCtx, topicID, startPage, endPage, onRangeComplete); err != nil {
 			utils.Warnf("[COMPRESSION] CompressTopicChunks failed for topic %s: %v", topicID, err)
 		}
 
-		if onComplete != nil {
-			onComplete()
+		if onAllComplete != nil {
+			onAllComplete()
 		}
 	}()
 }
@@ -95,8 +126,17 @@ func (s *StudyService) IsTopicCompressing(topicID string) bool {
 
 // CompressTopicChunks evaluates whether compression is needed and executes it for the topic.
 func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) error {
+	return s.CompressTopicChunksWithPriorityRange(ctx, topicID, 0, 0, nil)
+}
+
+// CompressTopicChunksWithPriorityRange evaluates whether compression is needed and executes it for the topic,
+// processing chunks in the range [startPage, endPage] first and invoking onRangeComplete as soon as that range finishes.
+func (s *StudyService) CompressTopicChunksWithPriorityRange(ctx context.Context, topicID string, startPage, endPage int, onRangeComplete func()) error {
 	topicID = strings.TrimSpace(topicID)
 	if topicID == "" {
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return fmt.Errorf("topic ID is required")
 	}
 
@@ -108,15 +148,24 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	mode := strings.ToUpper(strings.TrimSpace(userSettings.PromptCompressionMode))
 	if mode == "DISABLED" {
 		utils.Infof("[COMPRESSION] compression disabled by user setting")
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return nil
 	}
 
 	// Fetch all chunks for this topic
 	chunks, err := s.repo.GetChunksForTopic(topicID)
 	if err != nil {
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return fmt.Errorf("failed to load topic chunks: %w", err)
 	}
 	if len(chunks) == 0 {
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return nil
 	}
 
@@ -133,6 +182,9 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 
 	if len(uncompressedChunks) == 0 {
 		utils.Debugf("[COMPRESSION] topic %s already fully compressed", topicID)
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return nil
 	}
 
@@ -161,6 +213,9 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 
 		if totalTokens <= dynamicThreshold {
 			utils.Infof("[COMPRESSION] total tokens %d <= dynamic threshold %d, skipping compression under %s mode", totalTokens, dynamicThreshold, mode)
+			if onRangeComplete != nil {
+				onRangeComplete()
+			}
 			return nil
 		}
 	}
@@ -181,6 +236,9 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	pythonPath, err := extension.FindExtensionPython(compressExt)
 	if err != nil {
 		// If python is not installed / ready yet, fail gracefully
+		if onRangeComplete != nil {
+			onRangeComplete()
+		}
 		return fmt.Errorf("python runtime not ready for prompt_compressor: %w", err)
 	}
 
@@ -206,9 +264,32 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 		scriptPath = filepath.Join("extensions", "prompt_compressor", "compress.py")
 	}
 
+	// Partition uncompressed chunks: priority page range chunks first
+	var priorityChunks []models.Chunk
+	var remainingChunks []models.Chunk
+	if startPage > 0 && endPage >= startPage {
+		for _, c := range uncompressedChunks {
+			if c.PageNum >= startPage && c.PageNum <= endPage {
+				priorityChunks = append(priorityChunks, c)
+			} else {
+				remainingChunks = append(remainingChunks, c)
+			}
+		}
+	} else {
+		remainingChunks = uncompressedChunks
+	}
+
+	orderedChunks := append(priorityChunks, remainingChunks...)
+	priorityCount := len(priorityChunks)
+	rangeCallbackFired := false
+	if priorityCount == 0 && onRangeComplete != nil {
+		onRangeComplete()
+		rangeCallbackFired = true
+	}
+
 	runner := extension.NewRunner()
 	var chunkInputs []CompressionChunkInput
-	for _, c := range uncompressedChunks {
+	for _, c := range orderedChunks {
 		chunkInputs = append(chunkInputs, CompressionChunkInput{
 			ID:   c.ID,
 			Text: c.Text,
@@ -219,6 +300,7 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 	var chunksToRetry []CompressionChunkInput
 	succeededCount := 0
 	failedCount := 0
+	processedInputs := 0
 
 	// Process chunks in progressive mini-batches of batchSize
 	for i := 0; i < len(chunkInputs); i += batchSize {
@@ -232,6 +314,11 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 		if err != nil {
 			utils.Warnf("[COMPRESSION] batch execution failed for %d chunks in topic %s: %v (scheduling single-chunk retry)", len(batch), topicID, err)
 			chunksToRetry = append(chunksToRetry, batch...)
+			processedInputs += len(batch)
+			if !rangeCallbackFired && processedInputs >= priorityCount && onRangeComplete != nil {
+				onRangeComplete()
+				rangeCallbackFired = true
+			}
 			continue
 		}
 
@@ -260,6 +347,12 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 				succeededCount++
 			}
 		}
+
+		processedInputs += len(batch)
+		if !rangeCallbackFired && processedInputs >= priorityCount && onRangeComplete != nil {
+			onRangeComplete()
+			rangeCallbackFired = true
+		}
 	}
 
 	// Single-chunk retry degradation for failed chunks
@@ -287,6 +380,10 @@ func (s *StudyService) CompressTopicChunks(ctx context.Context, topicID string) 
 				succeededCount++
 			}
 		}
+	}
+
+	if !rangeCallbackFired && onRangeComplete != nil {
+		onRangeComplete()
 	}
 
 	utils.Infof("[COMPRESSION] topic %s compression complete: %d persisted, %d failed out of %d uncompressed chunks", topicID, succeededCount, failedCount, len(uncompressedChunks))

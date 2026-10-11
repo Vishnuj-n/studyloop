@@ -152,6 +152,17 @@
         Attempt {{ result.reread_attempt_count }} of {{ result.max_reread_attempts }}
       </p>
 
+      <!-- Socratic Rescue message (when rescue task created) -->
+      <div
+        v-if="!result.passed && result.socratic_task_id"
+        class="result-panel__rescue-notice"
+      >
+        <p class="rescue-notice-title">Concept Rescue Active</p>
+        <p class="rescue-notice-desc">
+          Complete the Adaptive Tutor Concept Rescue session to review tricky areas before retrying your quiz.
+        </p>
+      </div>
+
       <!-- External help notice (when failed re-quiz) -->
       <div
         v-if="!result.passed && !result.reread_task_id && result.manual_review_recommended"
@@ -249,12 +260,24 @@
           {{ generatingFlashcards ? 'Retrying...' : 'Retry Generation' }}
         </button>
 
+        <!-- Restart Reading Session (final rescue failure only) -->
+        <button
+          v-if="!result.passed && result.manual_review_recommended"
+          class="secondary-btn restart-reading-btn"
+          :disabled="generatingFlashcards || restartingReading"
+          @click="handleRestartReading"
+        >
+          <BaseIcon name="rotate-ccw" size="13" />
+          <span>Restart Reading Session</span>
+        </button>
+
         <button
           class="primary-btn continue-btn"
           :disabled="generatingFlashcards"
           @click="handleContinue"
         >
           <span v-if="generatingFlashcards">Generating flashcards for spaced repetition...</span>
+          <span v-else-if="!result.passed && result.socratic_task_id">Start Concept Rescue →</span>
           <span v-else>Continue →</span>
         </button>
       </div>
@@ -371,6 +394,132 @@
     :notebook-id="taskMeta?.notebook_id || ''"
     @start-exam="onMilestonePreReviewComplete"
   />
+
+  <!-- Restart Reading Session Confirmation Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showRestartReadingModal"
+      class="restart-reading-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="restart-reading-title"
+    >
+      <div class="restart-reading-dialog">
+        <div class="restart-reading-dialog__header">
+          <BaseIcon name="alert-triangle" size="18" class="restart-reading-dialog__icon" />
+          <h3 id="restart-reading-title" class="restart-reading-dialog__title">
+            Restart Reading Session?
+          </h3>
+        </div>
+
+        <div class="restart-reading-dialog__body">
+          <p class="restart-reading-dialog__desc">
+            This will reset your reading progress for this topic section back to the beginning.
+          </p>
+          <ul class="restart-reading-dialog__list">
+            <li>Your reading task will be reset to <strong>Active</strong> from page {{ taskMeta?.start_page || '?' }}</li>
+            <li>All pending quiz, tutor, and flashcard tasks for this section will be cancelled</li>
+            <li>Quiz attempt records for this section will be cleared</li>
+          </ul>
+          <div class="restart-reading-dialog__warning">
+            <BaseIcon name="alert-triangle" size="16" class="restart-reading-dialog__warning-icon" />
+            <div>
+              <strong>Be careful:</strong> any task for this section currently in Quiz stage or higher
+              will also be reverted. This cannot be undone.
+            </div>
+          </div>
+          <p v-if="restartReadingError" class="restart-reading-dialog__error">
+            {{ restartReadingError }}
+          </p>
+        </div>
+
+        <div class="restart-reading-dialog__footer">
+          <button
+            class="secondary-btn"
+            :disabled="restartingReading"
+            @click="showRestartReadingModal = false; restartReadingError = ''"
+          >
+            Cancel
+          </button>
+          <button
+            class="danger-btn"
+            :disabled="restartingReading"
+            @click="confirmRestartReading"
+          >
+            <span v-if="restartingReading">Restarting…</span>
+            <span v-else>Yes, Restart Reading</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- External Help / Terminal Failure Move Forward Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showMoveForwardModal"
+      class="restart-reading-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="move-forward-title"
+    >
+      <div class="restart-reading-dialog">
+        <div class="restart-reading-dialog__header">
+          <BaseIcon name="help-circle" size="18" class="move-forward-dialog__icon" />
+          <h3 id="move-forward-title" class="restart-reading-dialog__title">
+            How would you like to proceed?
+          </h3>
+        </div>
+
+        <div class="restart-reading-dialog__body">
+          <p class="restart-reading-dialog__desc">
+            This topic section has been flagged for external review. Choose how you want to move forward:
+          </p>
+          <div class="move-forward-options">
+            <div class="move-forward-card">
+              <div class="move-forward-card__title">
+                <BaseIcon name="layers" size="15" />
+                <span>Create Flashcards & Move Forward</span>
+              </div>
+              <p class="move-forward-card__desc">
+                Generates spaced repetition cards for pages {{ taskMeta?.start_page || '?' }}–{{ taskMeta?.end_page || '?' }} so you can retain and reinforce key concepts in daily FSRS reviews while advancing to the next topic.
+              </p>
+            </div>
+            <div class="move-forward-card">
+              <div class="move-forward-card__title">
+                <BaseIcon name="skip-forward" size="15" />
+                <span>Skip to Next Topic</span>
+              </div>
+              <p class="move-forward-card__desc">
+                Leaves the topic flagged for external help and advances to your next queued reading task without adding any review cards.
+              </p>
+            </div>
+          </div>
+          <p v-if="moveForwardError" class="restart-reading-dialog__error">
+            {{ moveForwardError }}
+          </p>
+        </div>
+
+        <div class="restart-reading-dialog__footer move-forward-footer">
+          <button
+            class="secondary-btn skip-btn"
+            :disabled="generatingFlashcards"
+            @click="confirmSkipToNextTopic"
+          >
+            Skip Without Cards
+          </button>
+          <button
+            class="primary-btn"
+            :disabled="generatingFlashcards"
+            @click="confirmCreateFlashcardsAndMove"
+          >
+            <span v-if="generatingFlashcards">Generating Flashcards…</span>
+            <span v-else>Create Flashcards & Move</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -387,6 +536,7 @@ import {
   completeMilestoneExam,
   trackAnalyticsEvent,
   getUserSettings,
+  revertTopicToReadingFromQuiz,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import MilestoneNoteReviewModal from '../components/MilestoneNoteReviewModal.vue'
@@ -407,6 +557,15 @@ const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const result = ref(null)
 const generatingFlashcards = ref(false)
+
+// Restart Reading Session modal state
+const showRestartReadingModal = ref(false)
+const restartingReading = ref(false)
+const restartReadingError = ref('')
+
+// Terminal Failure / External Help Move Forward modal state
+const showMoveForwardModal = ref(false)
+const moveForwardError = ref('')
 
 const isMilestoneExam = ref(false)
 const milestonePayload = ref(null)
@@ -771,6 +930,23 @@ async function handleContinue() {
     }
   }
 
+  // Route to Socratic Rescue if rescue task is pending
+  if (!result.value?.passed && result.value?.socratic_task_id) {
+    router.push({
+      path: '/socratic-rescue',
+      query: { taskId: result.value.socratic_task_id },
+    })
+    return
+  }
+
+  // If failed re-quiz reached terminal manual review (external help required),
+  // prompt user with clean choices: Create flashcards & move forward OR skip to next topic
+  if (!result.value?.passed && !result.value?.reread_task_id && result.value?.manual_review_recommended) {
+    moveForwardError.value = ''
+    showMoveForwardModal.value = true
+    return
+  }
+
   // Route to dashboard after quiz completion
   const query = {}
   if (result.value?.passed && result.value?.flashcards_generated > 0) {
@@ -779,6 +955,48 @@ async function handleContinue() {
     query.highlight = result.value.reread_task_id
   }
   router.push({ path: '/dashboard', query })
+}
+
+function confirmSkipToNextTopic() {
+  showMoveForwardModal.value = false
+  moveForwardError.value = ''
+  router.push({ path: '/dashboard' })
+}
+
+async function confirmCreateFlashcardsAndMove() {
+  const quizTaskId = result.value?.task_id || taskID.value || ''
+  if (!quizTaskId) {
+    moveForwardError.value = 'Quiz task ID not found. Cannot generate flashcards.'
+    return
+  }
+
+  generatingFlashcards.value = true
+  moveForwardError.value = ''
+  try {
+    const genResult = await generateFlashcardsForQuizTask(quizTaskId)
+    if (genResult?.error) {
+      console.warn('[FLASHCARD_PIPELINE] Terminal move-forward flashcard generation failed:', genResult.error)
+      moveForwardError.value = genResult.error
+      return
+    }
+    if (genResult?.rewards) {
+      window.dispatchEvent(
+        new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })
+      )
+    }
+    showMoveForwardModal.value = false
+    const cardsScheduled = genResult?.cards_scheduled || 0
+    const query = {}
+    if (cardsScheduled > 0) {
+      query.flashcardsCreated = cardsScheduled
+    }
+    router.push({ path: '/dashboard', query })
+  } catch (err) {
+    console.warn('[FLASHCARD_PIPELINE] Error generating flashcards on move forward:', err)
+    moveForwardError.value = err?.message || 'Failed to generate flashcards.'
+  } finally {
+    generatingFlashcards.value = false
+  }
 }
 
 async function handleGoToExaminer() {
@@ -895,6 +1113,40 @@ function handleGoToDetailedAnalysis() {
       taskId: analysisPayload.taskId || undefined,
     },
   })
+}
+
+function handleRestartReading() {
+  restartReadingError.value = ''
+  showRestartReadingModal.value = true
+}
+
+async function confirmRestartReading() {
+  const quizTaskId = result.value?.task_id || taskID.value || ''
+  if (!quizTaskId) {
+    restartReadingError.value = 'Quiz task ID not found. Cannot restart reading session.'
+    return
+  }
+
+  restartingReading.value = true
+  restartReadingError.value = ''
+  try {
+    const res = await revertTopicToReadingFromQuiz(quizTaskId)
+    if (res?.error) {
+      restartReadingError.value = res.error
+      return
+    }
+    const readingTaskId = res?.reading_task_id || ''
+    showRestartReadingModal.value = false
+    if (readingTaskId) {
+      router.push(`/reader?taskId=${readingTaskId}`)
+    } else {
+      router.push('/dashboard')
+    }
+  } catch (err) {
+    restartReadingError.value = err?.message || 'Failed to restart reading session.'
+  } finally {
+    restartingReading.value = false
+  }
 }
 </script>
 
@@ -1267,6 +1519,29 @@ function handleGoToDetailedAnalysis() {
   border-radius: 6px;
 }
 
+.result-panel__rescue-notice {
+  background: color-mix(in srgb, var(--primary, #3b82f6) 10%, transparent);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.rescue-notice-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary, #3b82f6);
+}
+
+.rescue-notice-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--on-surface);
+}
+
 .result-panel__external-help-notice {
   background: rgba(192, 41, 43, 0.1);
   border: 1px solid var(--outline-variant);
@@ -1534,5 +1809,210 @@ function handleGoToDetailedAnalysis() {
 .analysis-svg,
 .analysis-arrow-svg {
   flex-shrink: 0;
+}
+
+/* ── Restart Reading Button ───────────────────── */
+.restart-reading-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--on-surface);
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.restart-reading-btn:hover:not(:disabled) {
+  border-color: var(--error, #dc2626);
+  color: var(--error, #dc2626);
+  background: color-mix(in srgb, var(--error, #dc2626) 6%, transparent);
+}
+
+.restart-reading-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Restart Reading Modal ────────────────────── */
+.restart-reading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  padding: 16px;
+}
+
+.restart-reading-dialog {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.restart-reading-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px 0;
+}
+
+.restart-reading-dialog__icon {
+  color: var(--error, #dc2626);
+  flex-shrink: 0;
+}
+
+.restart-reading-dialog__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.restart-reading-dialog__body {
+  padding: 16px 24px;
+}
+
+.restart-reading-dialog__desc {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  color: var(--on-surface);
+  line-height: 1.5;
+}
+
+.restart-reading-dialog__list {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 0.8125rem;
+  color: var(--muted-text);
+  line-height: 1.7;
+}
+
+.restart-reading-dialog__warning {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--error, #dc2626) 8%, transparent);
+  border: 1px solid var(--outline-variant);
+  font-size: 0.8125rem;
+  color: var(--on-surface);
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.restart-reading-dialog__warning-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--error, #dc2626);
+}
+
+.restart-reading-dialog__error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--error, #dc2626) 10%, transparent);
+  border: 1px solid var(--outline-variant);
+  font-size: 0.8125rem;
+  color: var(--error, #dc2626);
+}
+
+.restart-reading-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--error, #dc2626);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.danger-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Move Forward Modal Styles ─────────────────── */
+.move-forward-dialog__icon {
+  color: var(--primary, #3b82f6);
+  flex-shrink: 0;
+}
+
+.move-forward-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.move-forward-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface-container-high, rgba(255, 255, 255, 0.04));
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.move-forward-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.move-forward-card__desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted-text);
+  line-height: 1.45;
+}
+
+.move-forward-footer {
+  gap: 12px;
+}
+
+.skip-btn {
+  background: var(--surface-container-highest, rgba(255, 255, 255, 0.08));
+  border: none;
+  color: var(--on-surface);
+}
+
+.skip-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 </style>

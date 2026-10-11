@@ -72,7 +72,7 @@
 
         <div class="lane-content">
           <p class="option-desc">
-            Prefer using a model like ChatGPT, Claude, or w? Copy our pre-engineered Adaptive Tutor prompt containing all question context and notebook source material.
+            Prefer using an external AI like ChatGPT, Claude, or Gemini? Copy our pre-engineered Adaptive Tutor prompt containing your quiz mistakes and notebook source material.
           </p>
 
           <div class="summary-package-box">

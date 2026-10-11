@@ -17,6 +17,10 @@
 
 ## Development Stage Rules
 - **No Hardcoded Fallbacks (Fail Fast)**: Always use user-configured or database-persisted settings dynamically. Do not hardcode limits, credentials, model parameters, or configuration values. If a required setting, dependency, or configuration is missing or invalid, fail fast and return an explicit error ("if it breaks, let it break") rather than silently falling back to magic hardcoded defaults.
+- **Scope-Specific Testing (Do Not Run Unrelated Tests)**:
+  - When working on frontend/UI changes (Vue, CSS, static assets), run **only `npm run test`** (inside `frontend/`). Do not run design scripts or backend Go tests locally as these are handled by the CI/CD pipeline.
+  - Similarly, when working purely on backend code (Go), run only backend tests and compilation checks.
+  - Only run both when a task intentionally spans across both frontend and backend (full-stack tasks).
 - **Code Integrity & Fast Test Workflow**:
   - Windows builds use `extension_nocgo.go` (no CGO).
   - Use `go test -run=^$ ./internal/...` for instant compilation & type-checking without test execution.

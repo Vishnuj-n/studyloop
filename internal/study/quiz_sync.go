@@ -152,7 +152,7 @@ func SelectChunkText(chunk models.Chunk, mode string) string {
 	switch cleanMode {
 	case "DISABLED":
 		return strings.TrimSpace(chunk.Text)
-	case "AUTO", "DYNAMIC", "EXTRACTIVE", "COMPRESSED", "":
+	case "AUTO", "DYNAMIC", "EXTRACTIVE", "COMPRESSED", "OVER_LIMIT", "ALWAYS", "":
 		if text := strings.TrimSpace(chunk.CompressedText); text != "" {
 			return text
 		}
@@ -269,17 +269,22 @@ func buildQuizContext(
 
 func buildQuizPrompt(notebookTitle string, targetCount int, contextParts []string) string {
 	return strings.Join([]string{
-		"Generate a multiple-choice comprehension quiz in STRICT JSON only.",
+		"Generate a multiple-choice comprehension quiz.",
 		fmt.Sprintf("Notebook: \"%s\"", notebookTitle),
 		fmt.Sprintf("Generate exactly %d questions grounded in the context.", targetCount),
 		"",
-		"Rules:",
-		"1. Each question must have 4 options. All options must be concise (4-10 words).",
-		"2. Anti-guessing: Never make the correct answer the longest option. Include 1 close/subtle distractor, and occasionally make a WRONG option the longest or most detailed one.",
-		"3. Focus on mechanisms ('why', 'how', cause-and-effect), not trivia.",
-		"4. The correct_answer must match one option exactly.",
+		"Format each question using this token-efficient syntax (no markdown, no extra commentary):",
+		"Q: <concise question focusing on mechanisms, why/how, under 25 words>",
+		"+ <exact correct answer (4-10 words)>",
+		"- <plausible incorrect distractor 1 (4-10 words)>",
+		"- <plausible incorrect distractor 2 (4-10 words)>",
+		"- <plausible incorrect distractor 3 (4-10 words)>",
 		"",
-		"JSON schema: {\"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correct_answer\":string}]}",
+		"Rules:",
+		"1. Exactly 1 correct answer marked with '+' and 3 distractors marked with '-'.",
+		"2. Anti-guessing: Keep all 4 options roughly equal length. Never make the correct answer the only detailed option.",
+		"3. Focus on mechanisms ('why', 'how', cause-and-effect), not trivia.",
+		"",
 		"Context:",
 		strings.Join(contextParts, "\n"),
 	}, "\n")
@@ -428,7 +433,7 @@ func (s *StudyService) triggerSocraticRescueHandoffTx(
 ) (string, string, bool, models.StudyQueueTask) {
 	feedback := "Concept rescue activated. Complete the Socratic session to retry."
 	attempt.Feedback = feedback
-	manualReviewRecommended := true
+	manualReviewRecommended := false
 
 	// Safety transaction: Delete FSRS cards to protect purity from rote clutter
 	if err := s.repo.DeleteFSRSCardsByTopicIDTx(tx, task.TopicID); err != nil {
@@ -617,6 +622,7 @@ func buildQuizResultPayload(
 	manualReviewRecommended bool,
 	rereadAttemptCount int,
 	rereadTaskID string,
+	socraticTaskID string,
 	attemptID string,
 	flashcardsPending bool,
 ) models.QuizResult {
@@ -632,6 +638,7 @@ func buildQuizResultPayload(
 		RereadAttemptCount:      rereadAttemptCount,
 		MaxRereadAttempts:       maxAutomaticRereadAttempts,
 		RereadTaskID:            rereadTaskID,
+		SocraticTaskID:          socraticTaskID,
 		AttemptRecord:           attemptID,
 		FlashcardsPending:       flashcardsPending,
 	}
@@ -781,6 +788,7 @@ func (s *StudyService) SubmitQuizAttempt(taskID string, answers []models.QuizAns
 		remediation.manualReviewRecommended,
 		remediation.rereadAttemptCount,
 		remediation.rereadTaskID,
+		remediation.socraticTaskID,
 		attemptID,
 		flashcardsPending,
 	), nil
