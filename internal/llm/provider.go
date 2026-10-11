@@ -344,7 +344,8 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 		p.config.Model, p.config.BaseURL, limits.MaxInputTokens, estPromptTokens, len(prompt), words)
 
 	requestBody := openAIRequest{
-		Model: p.config.Model,
+		Model:     p.config.Model,
+		MaxTokens: limits.MaxOutputTokens,
 		Messages: []openAIMessage{
 			{
 				Role:    "user",

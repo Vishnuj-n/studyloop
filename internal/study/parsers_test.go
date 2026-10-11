@@ -115,3 +115,34 @@ func TestParseQuizLLMResponse_InvalidCharacterAfterArrayElement(t *testing.T) {
 	}
 }
 
+func TestParseQuizLLMResponse_CompactFormat(t *testing.T) {
+	raw := `Q: What is the main role of the convolutional layer?
++ Extract spatial features by reusing weights across locations
+- Memorize fixed pixel values in the first layer
+- Compute the global loss function across batches
+- Scale the learning rate dynamically
+
+Q: Why are weights reused in convolutional kernels?
++ To increase generalization and learn from more samples
+- To avoid computing backpropagation derivatives
+- To prevent gradient descent from converging too quickly
+- To reduce the total training data required to zero`
+
+	parsed, err := parseQuizLLMResponse(raw)
+	if err != nil {
+		t.Fatalf("expected successful parsing of compact format, got error: %v", err)
+	}
+	if len(parsed.Questions) != 2 {
+		t.Fatalf("expected 2 questions from compact format, got %d", len(parsed.Questions))
+	}
+	if parsed.Questions[0].Prompt != "What is the main role of the convolutional layer?" {
+		t.Errorf("unexpected prompt: %s", parsed.Questions[0].Prompt)
+	}
+	if parsed.Questions[0].CorrectAnswer != "Extract spatial features by reusing weights across locations" {
+		t.Errorf("unexpected correct answer: %s", parsed.Questions[0].CorrectAnswer)
+	}
+	if len(parsed.Questions[0].Options) != 4 {
+		t.Fatalf("expected 4 options, got %d", len(parsed.Questions[0].Options))
+	}
+}
+
