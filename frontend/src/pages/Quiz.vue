@@ -421,10 +421,13 @@
             <li>All pending quiz, tutor, and flashcard tasks for this section will be cancelled</li>
             <li>Quiz attempt records for this section will be cleared</li>
           </ul>
-          <p class="restart-reading-dialog__warning">
-            ⚠️ <strong>Be careful:</strong> any task for this section currently in Quiz stage or higher
-            will also be reverted. This cannot be undone.
-          </p>
+          <div class="restart-reading-dialog__warning">
+            <BaseIcon name="alert-triangle" size="16" class="restart-reading-dialog__warning-icon" />
+            <div>
+              <strong>Be careful:</strong> any task for this section currently in Quiz stage or higher
+              will also be reverted. This cannot be undone.
+            </div>
+          </div>
           <p v-if="restartReadingError" class="restart-reading-dialog__error">
             {{ restartReadingError }}
           </p>
@@ -1397,7 +1400,7 @@ async function confirmRestartReading() {
 
 .result-panel__rescue-notice {
   background: color-mix(in srgb, var(--primary, #3b82f6) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary, #3b82f6) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 8px;
@@ -1733,7 +1736,7 @@ async function confirmRestartReading() {
   border-radius: 12px;
   width: 100%;
   max-width: 460px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 
@@ -1780,10 +1783,19 @@ async function confirmRestartReading() {
   padding: 10px 14px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--error, #dc2626) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--error, #dc2626) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 0.8125rem;
   color: var(--on-surface);
   line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.restart-reading-dialog__warning-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--error, #dc2626);
 }
 
 .restart-reading-dialog__error {
@@ -1791,7 +1803,7 @@ async function confirmRestartReading() {
   padding: 8px 12px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--error, #dc2626) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--error, #dc2626) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   font-size: 0.8125rem;
   color: var(--error, #dc2626);
 }

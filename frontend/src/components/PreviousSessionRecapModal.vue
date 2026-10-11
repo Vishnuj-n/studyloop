@@ -152,7 +152,7 @@ function handleDismiss() {
   max-height: 88vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--outline-variant, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.14), 0 0 0 1px var(--outline-variant, rgba(255, 255, 255, 0.08));
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }

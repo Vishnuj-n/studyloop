@@ -353,14 +353,7 @@
             </button>
           </div>
 
-          <!-- Interop Tip Callout -->
-          <div v-else class="notes-obsidian-tip">
-            <BaseIcon name="info" size="14" class="tip-icon" />
-            <span>
-              <strong>Obsidian & Logseq Compatible:</strong> Paste images with <kbd>Ctrl</kbd>+<kbd>V</kbd> (defaults to 75% width). Resize using <code>![alt|400](path)</code>, <code>![alt|400x250](path)</code>, or <code>![alt|60%](path)</code>.
-              <button type="button" class="tip-guide-link" @click="showImageHelpModal = true">View Syntax Guide</button>
-            </span>
-          </div>
+
 
           <!-- Banner messages -->
           <div v-if="errorMsg" class="note-banner error-banner">
@@ -2113,32 +2106,7 @@ onUnmounted(() => {
   border-color: var(--primary);
 }
 
-.notes-obsidian-tip {
-  margin: 16px 32px 0;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface-variant);
-  font-size: 12.5px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  line-height: 1.4;
-}
 
-.tip-icon {
-  color: var(--primary);
-  flex-shrink: 0;
-}
-
-.notes-obsidian-tip code {
-  background: var(--surface-container-high);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 11.5px;
-}
 
 /* Banner notifications */
 .note-banner {
@@ -2946,7 +2914,7 @@ onUnmounted(() => {
 
 .syntax-row.highlight-row {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .syntax-code {
@@ -2973,18 +2941,4 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 
-.tip-guide-link {
-  background: none;
-  border: none;
-  color: var(--primary);
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0 4px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.tip-guide-link:hover {
-  opacity: 0.85;
-}
 </style>
