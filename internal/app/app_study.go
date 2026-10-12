@@ -374,10 +374,21 @@ func queueTaskToScheduledTask(task models.StudyQueueTask, repo *db.Repository) m
 	case task.TaskType == models.StudyTaskTypeFlashcardGenerate:
 		estimateMinutes = 0
 	case task.TaskType == models.StudyTaskTypeFlashcardReview:
-		var payload models.ReviewSessionPayload
-		if err := json.Unmarshal([]byte(task.PayloadJSON), &payload); err == nil && payload.CardCount > 0 {
-			estimateMinutes = int(math.Ceil(float64(payload.CardCount) * scheduler.ReviewMinutesPerCard))
-			meta = fmt.Sprintf("Spaced repetition review (%d cards)", payload.CardCount)
+		cardCount := 0
+		if repo != nil {
+			if remaining, err := repo.RemainingReviewTaskCards(task.ID); err == nil && remaining > 0 {
+				cardCount = remaining
+			}
+		}
+		if cardCount == 0 {
+			var payload models.ReviewSessionPayload
+			if err := json.Unmarshal([]byte(task.PayloadJSON), &payload); err == nil && payload.CardCount > 0 {
+				cardCount = payload.CardCount
+			}
+		}
+		if cardCount > 0 {
+			estimateMinutes = int(math.Ceil(float64(cardCount) * scheduler.ReviewMinutesPerCard))
+			meta = fmt.Sprintf("Spaced repetition review (%d cards)", cardCount)
 		}
 	case task.StartPage > 0 && task.EndPage >= task.StartPage && task.TopicID != "" && repo != nil:
 		// Word-count based estimation (words / 200 WPM).

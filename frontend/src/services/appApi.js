@@ -132,7 +132,10 @@ export async function analyzeQuizFailure(
   )
 }
 
-export function getTodayPlan() {
+export function getTodayPlan(timezoneOffsetMinutes) {
+  if (typeof timezoneOffsetMinutes === 'number') {
+    return appBridge().GetTodayPlan(timezoneOffsetMinutes)
+  }
   return appBridge().GetTodayPlan()
 }
 

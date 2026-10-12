@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +93,65 @@ func TestDayBoundaryReviewScheduling(t *testing.T) {
 	dueCards, _ := planRes["due_review_cards"].(int)
 	if dueCards < 1 {
 		t.Fatalf("expected at least 1 due card under day-boundary, got %d (plan: %#v)", dueCards, planRes)
+	}
+}
+
+func TestTodayPlanReflectsRemainingReviewCardsAfterPartialReview(t *testing.T) {
+	app := newTestApp(t)
+
+	if err := app.repo.EnsureTopic("topic-partial", "Topic Partial"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := app.repo.CreateNotebook("nb-partial", "Notebook Partial", "/path", "pdf", "", "", 1, ""); err != nil {
+		t.Fatalf("CreateNotebook failed: %v", err)
+	}
+	if err := app.repo.EnsureNotebookTopic("nb-partial", "topic-partial"); err != nil {
+		t.Fatalf("EnsureNotebookTopic failed: %v", err)
+	}
+
+	nowUnix := time.Now().Unix()
+	cards := []string{"card-p1", "card-p2", "card-p3"}
+	for i, cid := range cards {
+		_, err := testRepo.ExecForTest(`
+			INSERT INTO fsrs_cards (id, topic_id, prompt, answer, due_at, state_json)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, cid, "topic-partial", fmt.Sprintf("Q%d", i+1), "A", nowUnix-10, `{"state_code":2,"stability":1,"difficulty":5}`)
+		if err != nil {
+			t.Fatalf("insert card failed: %v", err)
+		}
+	}
+
+	// 1. Initial plan creates the review task with 3 cards
+	plan1 := app.GetTodayPlan(0)
+	if dueCards, _ := plan1["due_review_cards"].(int); dueCards != 3 {
+		t.Fatalf("expected 3 due cards initially, got %d", dueCards)
+	}
+
+	taskID := ""
+	tasks, ok := plan1["tasks"].([]models.ScheduledTask)
+	if !ok || len(tasks) == 0 {
+		t.Fatalf("expected tasks in plan: %#v", plan1)
+	}
+	for _, tk := range tasks {
+		if tk.ActionType == "flashcard_review" {
+			taskID = tk.ID
+			break
+		}
+	}
+	if taskID == "" {
+		t.Fatalf("expected flashcard_review task in plan")
+	}
+
+	// 2. User reviews 1 card out of 3
+	revRes := app.RecordCardReview(taskID, "card-p1", 3)
+	if revRes["error"] != nil {
+		t.Fatalf("RecordCardReview failed: %v", revRes["error"])
+	}
+
+	// 3. Re-querying GetTodayPlan should immediately reflect 2 cards remaining
+	plan2 := app.GetTodayPlan(0)
+	if dueCards, _ := plan2["due_review_cards"].(int); dueCards != 2 {
+		t.Fatalf("expected 2 due cards after reviewing 1 card, got %d", dueCards)
 	}
 }
 

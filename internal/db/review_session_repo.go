@@ -462,6 +462,16 @@ func (r *Repository) RemainingReviewTaskCardsTx(tx *sql.Tx, taskID string) (int,
 	return remaining, err
 }
 
+func (r *Repository) RemainingReviewTaskCards(taskID string) (int, error) {
+	var remaining int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM review_task_cards
+		WHERE task_id = ? AND status = 'pending'
+	`, taskID).Scan(&remaining)
+	return remaining, err
+}
+
 func (r *Repository) CompleteReviewSession(taskID string) error {
 	return r.withTx(func(tx *sql.Tx) error {
 		task, err := r.GetTaskByIDTx(tx, taskID)

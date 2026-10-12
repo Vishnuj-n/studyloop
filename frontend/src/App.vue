@@ -140,29 +140,48 @@ async function fireEvent(type, slotName = 'Study Window') {
     }
   } else if (type === 'end') {
     let unfinishedCount = 0
+    let readingCount = 0
+    let fetchSuccess = false
     try {
-      const plan = await getTodayPlan()
-      if (plan && plan.tasks) {
+      const tzOffset = new Date().getTimezoneOffset()
+      const plan = await getTodayPlan(tzOffset)
+      if (plan && !plan.error && Array.isArray(plan.tasks)) {
+        fetchSuccess = true
         unfinishedCount = plan.tasks.length
+        readingCount = plan.tasks.filter((t) => (t.action_type || '').toLowerCase() === 'reading').length
+      } else if (plan?.error) {
+        console.error('Failed to retrieve today plan at study end time:', plan.error)
       }
     } catch (err) {
       console.error('Failed to check tasks at end time:', err)
     }
 
-    if (unfinishedCount > 0) {
+    if (fetchSuccess && unfinishedCount > 0) {
+      const desc = readingCount > 0
+        ? `You still have ${readingCount} unfinished reading session${readingCount > 1 ? 's' : ''} (${unfinishedCount} total task${unfinishedCount > 1 ? 's' : ''}) remaining today.`
+        : `You still have ${unfinishedCount} unfinished study task${unfinishedCount > 1 ? 's' : ''} remaining today.`
       banner.value = {
         show: true,
         type: 'end',
         title: `${slotName} is Up!`,
-        desc: `You still have ${unfinishedCount} unfinished study tasks remaining today.`,
+        desc,
         unfinishedCount,
       }
-    } else {
+    } else if (fetchSuccess && unfinishedCount === 0) {
       banner.value = {
         show: true,
         type: 'end',
         title: `${slotName} is Up!`,
         desc: 'Great job! You finished all your study tasks for this session.',
+        unfinishedCount: 0,
+      }
+    } else {
+      // If unable to verify tasks, notify window has ended without false "all completed" congratulations
+      banner.value = {
+        show: true,
+        type: 'end',
+        title: `${slotName} is Up!`,
+        desc: 'Your scheduled study window has ended.',
         unfinishedCount: 0,
       }
     }
