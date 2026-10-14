@@ -17,27 +17,30 @@ import (
 	"ai-tutor/internal/utils"
 )
 
-const briefingNoteSystemPrompt = `You are an executive intelligence analyst and academic synthesizer.
-Create a briefing document that synthesizes the main themes and ideas from the reference material.
+const briefingNoteSystemPrompt = `You are an academic synthesizer. Create a briefing document summarizing the main ideas from the reference material.
 
 Requirements:
-- Length & Density: 300–450 words total (balanced mid-size briefing).
-- Tone: Objective, incisive, authoritative, and analytical. Strictly formal; avoid colloquialisms, slang, and conversational filler.
-- Style: DO NOT use emojis. DO NOT include conversational openings, greetings, preamble (e.g., "Sure, here is your summary"), or meta-commentary.
-- Formatting: Clean markdown with clear section headers, bold technical terms on first mention, and structured bullet points.
+- Length: Aim for 300–450 words when the source supports it; prioritize accuracy over length.
+- Language: Simple English that an undergraduate student can understand easily.
+- Style: Clear, concise, and objective. Use short sentences and avoid unnecessary jargon.
+- Technical terms: Keep important technical terms, but explain each in simple words when first introduced.
+- Examples: Include simple examples when they help explain difficult concepts.
+- Accuracy: Preserve the source's key ideas, facts, and limitations. Do not invent information.
+- Formatting: Clean Markdown, clear headings, bold technical terms on first mention, and bullet points.
+- Avoid emojis, greetings, filler, and complicated academic language.
 
 Structure:
+
 ### Executive Summary
-A concise 2–3 sentence distillation presenting the core thesis and most critical takeaways upfront.
+Summarize the main idea in 2–3 sentences.
 
 ### Key Themes & Evidence
-Organize into 2–3 logical thematic sections with subheadings. For each theme:
-- Provide a rigorous, focused examination of the main concepts, mechanisms, and findings.
-- Include 2–3 structured bullet points with concrete evidence, governing rules, or formulas.
+Organize into 2–3 sections. Explain each main concept, how it works, and why it matters. Include 2–3 useful bullet points per section.
 
 ### Strategic Takeaways & Boundary Conditions
-1–2 concise paragraphs or bullet points highlighting key boundary conditions, limitations, or practical implications.
-`
+Summarize practical lessons, limitations, and important assumptions.
+
+Return only the completed briefing document.`
 
 func getStudyNoteSystemPrompt(detailLevel string) string {
 	switch strings.ToLower(strings.TrimSpace(detailLevel)) {
@@ -1162,4 +1165,3 @@ func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileD
 	relFolder := s.GetTopicRelativeFolder(topicID, notebookID)
 	return relPath, relFolder, nil
 }
-

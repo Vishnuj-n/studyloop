@@ -215,6 +215,16 @@
                   <BaseIcon name="book-open" size="13" />
                   <span>View Note</span>
                 </button>
+                <button
+                  v-if="cardPageNumber"
+                  type="button"
+                  class="view-pdf-btn"
+                  :title="`Open textbook at page ${cardPageNumber}`"
+                  @click.stop="goToCardPageInReader"
+                >
+                  <BaseIcon name="file-text" size="13" />
+                  <span>p. {{ cardPageNumber }} ↗</span>
+                </button>
               </div>
               <div class="rating-row">
                 <button
@@ -316,7 +326,8 @@ import {
   activateTask,
   completeReviewSession,
   getNotebooks,
-  getAvailableTopics,
+  getNotebookTopicTree,
+  getTopicStudyNoteSlots,
   generateManualFlashcards,
   getReviewSession,
   recordCardReview,
@@ -392,30 +403,44 @@ const progressPercent = computed(() => {
 })
 
 const availableTopics = ref([])
-const currentCardTopicID = computed(() => {
+const currentCardTopic = computed(() => {
   const card = currentCard.value
-  if (!card) return ''
-  if (card.topic_id) return card.topic_id
-  if (card.topicId) return card.topicId
-  // Fallback: match by page range in availableTopics if available
+  if (!card) return null
+  const tid = card.topic_id || card.topicId
+  if (tid && availableTopics.value.length > 0) {
+    const match = availableTopics.value.find((t) => t.topic_id === tid)
+    if (match) return match
+  }
   if (card.page && availableTopics.value.length > 0) {
     const pageNum = Number(card.page)
     const match = availableTopics.value.find(
       (t) => (!selectedNotebookID.value || t.notebook_id === selectedNotebookID.value) &&
              t.start_page <= pageNum && t.end_page >= pageNum
     )
-    if (match?.topic_id) return match.topic_id
+    if (match) return match
   }
-  // If the notebook has topics, default to first topic of the notebook
   if (selectedNotebookID.value && availableTopics.value.length > 0) {
     const firstMatch = availableTopics.value.find((t) => t.notebook_id === selectedNotebookID.value)
-    if (firstMatch?.topic_id) return firstMatch.topic_id
+    if (firstMatch) return firstMatch
   }
-  return ''
+  return null
+})
+
+const currentCardTopicID = computed(() => {
+  const card = currentCard.value
+  if (card?.topic_id) return card.topic_id
+  if (card?.topicId) return card.topicId
+  return currentCardTopic.value?.topic_id || ''
 })
 
 const canViewCardNote = computed(() => {
   return Boolean(currentCardTopicID.value || selectedNotebookID.value)
+})
+
+// ponytail: extract page number if valid int > 0
+const cardPageNumber = computed(() => {
+  const p = Number(currentCard.value?.page)
+  return Number.isFinite(p) && p > 0 ? p : null
 })
 
 function goToTopicNotes() {
@@ -430,6 +455,51 @@ function goToTopicNotes() {
       page: cardPage || undefined,
       from: 'flashcards',
       taskId: route.query.taskId || undefined,
+    },
+  })
+}
+
+const topicSlotsCache = new Map()
+
+async function goToCardPageInReader() {
+  if (!cardPageNumber.value) return
+  const topic = currentCardTopic.value
+  const topicId = currentCardTopicID.value
+  const nbId = selectedNotebookID.value || topic?.notebook_id || undefined
+  const targetPage = cardPageNumber.value
+
+  let sessionStart = topic?.start_page || targetPage
+  let sessionEnd = topic?.end_page || targetPage
+
+  // ponytail: match against actual bounded reading sessions for the topic if available
+  if (topicId) {
+    try {
+      let slots = topicSlotsCache.get(topicId)
+      if (!slots) {
+        const res = await getTopicStudyNoteSlots(topicId)
+        slots = (res && Array.isArray(res.slots)) ? res.slots : []
+        topicSlotsCache.set(topicId, slots)
+      }
+      const matched = slots.find((s) => s.start_page && s.end_page && s.start_page <= targetPage && s.end_page >= targetPage)
+      if (matched) {
+        sessionStart = matched.start_page
+        sessionEnd = matched.end_page
+      }
+    } catch (err) {
+      console.warn('Failed to fetch reading session slots for flashcard jump:', err)
+    }
+  }
+
+  router.push({
+    path: '/reader',
+    query: {
+      notebookId: nbId,
+      topicId: topicId || undefined,
+      page: targetPage,
+      sessionStart,
+      sessionEnd,
+      from: 'flashcards',
+      flashcardTaskId: route.query.taskId || undefined,
     },
   })
 }
@@ -456,10 +526,27 @@ onMounted(async () => {
     error.value = 'Failed to load notebooks.'
   }
   try {
-    const topicsRes = await getAvailableTopics()
-    availableTopics.value = Array.isArray(topicsRes) ? topicsRes.filter((t) => !t.error) : []
+    const tree = await getNotebookTopicTree()
+    const flattened = []
+    if (Array.isArray(tree)) {
+      for (const nb of tree) {
+        const nid = nb.notebook_id || nb.id || ''
+        if (Array.isArray(nb.topics)) {
+          for (const t of nb.topics) {
+            flattened.push({
+              topic_id: t.topic_id || t.id,
+              notebook_id: nid,
+              title: t.title,
+              start_page: Number(t.start_page) || 0,
+              end_page: Number(t.end_page) || 0,
+            })
+          }
+        }
+      }
+    }
+    availableTopics.value = flattened
   } catch (err) {
-    console.error('Failed to load topics in Flashcards:', err)
+    console.error('Failed to load topic tree in Flashcards:', err)
   }
   try {
     const settings = await getUserSettings()
@@ -542,6 +629,14 @@ async function rate(ratingKey) {
   isSubmittingReview.value = true
   try {
     if (queueMode.value) {
+      // Optimistic transition: shift card immediately so the UX is instantaneous
+      const wasLastCard = sessionRemaining.value <= 1
+      flipped.value = false
+      if (!wasLastCard) {
+        sessionRemaining.value = Math.max(0, sessionRemaining.value - 1)
+        reviewIndex.value++
+      }
+
       const res = await recordCardReview(reviewTaskID.value, targetCardID, validRating.value)
       if (res?.error) {
         error.value = `Failed to save review: ${res.error}`
@@ -549,7 +644,10 @@ async function rate(ratingKey) {
         return
       }
 
-      await loadQueueSession(reviewTaskID.value)
+      if (wasLastCard) {
+        await handleQueueCompletion()
+        return
+      }
       return
     }
     flipped.value = false
@@ -1121,7 +1219,8 @@ async function loadQueueSession(taskID, notebookID = '') {
   transform: scale(0.97);
 }
 
-.view-note-btn {
+.view-note-btn,
+.view-pdf-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1136,12 +1235,14 @@ async function loadQueueSession(taskID, notebookID = '') {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.view-note-btn:hover {
+.view-note-btn:hover,
+.view-pdf-btn:hover {
   background: var(--surface-container);
   border-color: var(--primary);
   color: var(--primary);
 }
-.view-note-btn:active {
+.view-note-btn:active,
+.view-pdf-btn:active {
   transform: scale(0.97);
 }
 

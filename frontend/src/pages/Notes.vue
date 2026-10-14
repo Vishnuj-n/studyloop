@@ -1131,6 +1131,8 @@ function jumpToReader(slot) {
   const nbId = slot?.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value
   const topicId = slot?.topic_id || activeTopic.value?.topic_id || selectedTopicID.value
   const targetPage = slot?.start_page || activeTopic.value?.start_page || 1
+  const endPage = slot?.end_page || activeTopic.value?.end_page || targetPage
+  const flashcardTaskId = route.query.taskId || route.query.task_id || undefined
 
   router.push({
     path: '/reader',
@@ -1138,9 +1140,11 @@ function jumpToReader(slot) {
       notebookId: nbId || undefined,
       topicId: topicId || undefined,
       page: targetPage,
+      sessionStart: targetPage,
+      sessionEnd: endPage,
       from: 'notes',
       fromOrigin: route.query.fromOrigin || route.query.from || undefined,
-      taskId: route.query.taskId || route.query.task_id || undefined,
+      flashcardTaskId: flashcardTaskId,
     },
   })
 }

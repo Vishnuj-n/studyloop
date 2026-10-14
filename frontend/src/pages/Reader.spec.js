@@ -425,5 +425,77 @@ describe('Reader.vue Integration', () => {
       },
     })
   })
+
+  it('navigates back to flashcards when opened directly from flashcards', async () => {
+    appApi.getReaderTopicBundle.mockResolvedValueOnce({
+      topic_id: 'topic-1',
+      topic_title: 'Chapter 1',
+      file_type: 'pdf',
+      page_count: 50,
+      topic_start_page: 1,
+      topic_end_page: 50,
+      notebook_url: 'http://localhost/browse.pdf',
+    })
+
+    routeQuery.value = {
+      notebookId: 'nb-1',
+      topicId: 'topic-1',
+      from: 'flashcards',
+      flashcardTaskId: 'task-fc-999',
+      page: 42,
+    }
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    const backBtn = wrapper.findAll('button.secondary').find((b) => b.text().includes('Back to Flashcards'))
+    expect(backBtn).toBeDefined()
+    expect(backBtn.exists()).toBe(true)
+
+    await backBtn.trigger('click')
+    await flushPromises()
+
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/flashcards',
+      query: {
+        notebookId: 'nb-1',
+        taskId: 'task-fc-999',
+      },
+    })
+  })
+
+  it('renders study tools (copy session, simplify) but hides complete session in reference session mode', async () => {
+    appApi.getReaderTopicBundle.mockResolvedValueOnce({
+      topic_id: 'topic-1',
+      topic_title: 'Chapter 1',
+      file_type: 'pdf',
+      page_count: 20,
+      topic_start_page: 5,
+      topic_end_page: 10,
+      notebook_url: 'http://localhost/browse.pdf',
+    })
+
+    routeQuery.value = {
+      notebookId: 'nb-1',
+      topicId: 'topic-1',
+      from: 'notes',
+      sessionStart: 5,
+      sessionEnd: 8,
+      page: 5,
+    }
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    // Study tools should be present
+    expect(wrapper.find('.copy-session-btn').exists()).toBe(true)
+    expect(wrapper.find('.simplify-btn').exists()).toBe(true)
+    expect(wrapper.find('.reading-window-info').exists()).toBe(true)
+    expect(wrapper.find('.reading-window-info').text()).toContain('Pages 5-8')
+
+    // Task progression buttons must NOT exist
+    expect(wrapper.find('.split-main-btn').exists()).toBe(false)
+    expect(wrapper.find('.skip-session-btn').exists()).toBe(false)
+  })
 })
 

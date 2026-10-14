@@ -157,9 +157,12 @@ async function fireEvent(type, slotName = 'Study Window') {
     }
 
     if (fetchSuccess && unfinishedCount > 0) {
-      const desc = readingCount > 0
-        ? `You still have ${readingCount} unfinished reading session${readingCount > 1 ? 's' : ''} (${unfinishedCount} total task${unfinishedCount > 1 ? 's' : ''}) remaining today.`
-        : `You still have ${unfinishedCount} unfinished study task${unfinishedCount > 1 ? 's' : ''} remaining today.`
+      const taskPlural = unfinishedCount > 1 ? 's' : ''
+      let desc = `You still have ${unfinishedCount} unfinished study task${taskPlural} remaining today.`
+      if (readingCount > 0) {
+        const readingPlural = readingCount > 1 ? 's' : ''
+        desc = `You still have ${readingCount} unfinished reading session${readingPlural} (${unfinishedCount} total task${taskPlural}) remaining today.`
+      }
       banner.value = {
         show: true,
         type: 'end',
