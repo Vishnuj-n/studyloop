@@ -699,17 +699,30 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			COALESCE(c.due_at, 0) AS due_at, 
 			c.suspended, 
 			COALESCE(c.created_at, '') AS created_at,
-			COALESCE(c.state_json, '') AS state_json
+			COALESCE(c.state_json, '') AS state_json,
+			COALESCE(n.profile_id, '') AS profile_id,
+			COALESCE(sp.name, '') AS profile_name
 		FROM fsrs_cards c
 		JOIN topics t ON c.topic_id = t.id
 		LEFT JOIN notebook_topic_links ntl ON t.id = ntl.topic_id
 		LEFT JOIN notebooks n ON ntl.notebook_id = n.id
+		LEFT JOIN study_profiles sp ON n.profile_id = sp.id
 	`
 	var args []interface{}
 	profileID = strings.TrimSpace(profileID)
+	var allowedProfiles []string
 	if profileID != "" {
-		query += ` WHERE n.profile_id = ? `
-		args = append(args, profileID)
+		var err error
+		allowedProfiles, err = r.GetAllowedFlashcardProfileIDs(profileID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed profile IDs: %w", err)
+		}
+		if len(allowedProfiles) > 0 {
+			query += fmt.Sprintf(` WHERE n.profile_id IN (%s) `, buildInPlaceholders(len(allowedProfiles)))
+			for _, p := range allowedProfiles {
+				args = append(args, p)
+			}
+		}
 	}
 	query += ` ORDER BY notebook_title ASC, topic_title ASC, c.due_at ASC, c.created_at ASC `
 
@@ -733,6 +746,7 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			&card.NotebookID, &card.NotebookTitle,
 			&card.Prompt, &card.Answer,
 			&card.DueAt, &card.Suspended, &card.CreatedAt, &stateJSON,
+			&card.ProfileID, &card.ProfileName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan flashcard detail: %w", err)
 		}
@@ -778,6 +792,8 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			notebookMap[nbID] = &models.NotebookDeckGroup{
 				NotebookID:    card.NotebookID,
 				NotebookTitle: card.NotebookTitle,
+				ProfileID:     card.ProfileID,
+				ProfileName:   card.ProfileName,
 				Topics:        make([]models.DeckTopicGroup, 0),
 			}
 			notebookOrder = append(notebookOrder, nbID)
@@ -824,9 +840,52 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 		notebooks = append(notebooks, *nbGroup)
 	}
 
+	// Calculate profile breakdown
+	profileSummaries := make([]models.ProfileDeckSummary, 0)
+	inheritedMap := make(map[string]bool)
+	for _, p := range allowedProfiles {
+		if p != profileID {
+			inheritedMap[p] = true
+		}
+	}
+
+	pRows, pErr := r.db.Query(`
+		WITH notebook_topic_links AS (
+			SELECT notebook_id, topic_id FROM notebook_topics
+			UNION
+			SELECT id AS notebook_id, topic_id FROM notebooks WHERE topic_id IS NOT NULL AND topic_id != ''
+		)
+		SELECT
+			sp.id,
+			sp.name,
+			COUNT(c.id) AS total_cards,
+			COUNT(CASE WHEN c.suspended = 0 AND c.due_at <= ? THEN c.id END) AS due_cards
+		FROM study_profiles sp
+		LEFT JOIN notebooks n ON n.profile_id = sp.id
+		LEFT JOIN notebook_topic_links ntl ON ntl.notebook_id = n.id
+		LEFT JOIN fsrs_cards c ON c.topic_id = ntl.topic_id
+		GROUP BY sp.id, sp.name
+		ORDER BY sp.name ASC
+	`, nowUnix)
+	if pErr == nil {
+		defer func() { _ = pRows.Close() }()
+		for pRows.Next() {
+			var ps models.ProfileDeckSummary
+			if scanErr := pRows.Scan(&ps.ProfileID, &ps.ProfileName, &ps.TotalCards, &ps.DueCards); scanErr == nil {
+				ps.IsActive = (ps.ProfileID == profileID)
+				ps.IsInherited = inheritedMap[ps.ProfileID]
+				profileSummaries = append(profileSummaries, ps)
+			}
+		}
+		if pRowsErr := pRows.Err(); pRowsErr != nil {
+			return nil, pRowsErr
+		}
+	}
+
 	return &models.DeckOverviewResponse{
 		Metrics:   metrics,
 		Notebooks: notebooks,
+		Profiles:  profileSummaries,
 	}, nil
 }
 

@@ -33,7 +33,8 @@ func InitSchema(tx *sql.Tx) error {
 			default_remedial_strategy TEXT DEFAULT '',
 			quiz_question_count INTEGER DEFAULT NULL,
 			quiz_passing_score INTEGER DEFAULT NULL,
-			tutor_style TEXT DEFAULT ''
+			tutor_style TEXT DEFAULT '',
+			inherited_flashcard_profile_ids_json TEXT DEFAULT '[]'
 		)`,
 
 		// Core tables

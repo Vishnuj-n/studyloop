@@ -430,4 +430,185 @@ func TestProfileScopedSettingsPersistence(t *testing.T) {
 	}
 }
 
+func TestMultiProfileFlashcardInheritance(t *testing.T) {
+	tempDB := "test_profile_inheritance.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	now := time.Now().Unix()
+
+	// 1. Create profiles: November (active), October, Kannada
+	profNov := models.StudyProfile{ID: "prof-nov", Name: "November Placement", DeadlineAt: now + 3600*24*30}
+	profOct := models.StudyProfile{ID: "prof-oct", Name: "October Midterms", DeadlineAt: now + 3600*24*60}
+	profKan := models.StudyProfile{ID: "prof-kan", Name: "Kannada Language", DeadlineAt: now + 3600*24*90}
+
+	for _, p := range []models.StudyProfile{profNov, profOct, profKan} {
+		if err := repo.CreateProfile(p); err != nil {
+			t.Fatalf("CreateProfile %s failed: %v", p.ID, err)
+		}
+	}
+
+	// 2. Set active profile to November
+	if err := repo.UpdateUserSettings(models.UserSettings{ActiveProfileID: "prof-nov", MaxFlashcardsPerSession: 30}); err != nil {
+		t.Fatalf("UpdateUserSettings failed: %v", err)
+	}
+
+	// 3. Create notebooks and topics for each profile
+	topNov, topOct, topKan := "top-nov", "top-oct", "top-kan"
+	for _, top := range []string{topNov, topOct, topKan} {
+		if err := repo.EnsureTopic(top, top+" Title"); err != nil {
+			t.Fatalf("EnsureTopic %s failed: %v", top, err)
+		}
+	}
+
+	if err := repo.CreateNotebook("nb-nov", "Nov Book", "/path/nov.pdf", "pdf", topNov, "", 10, "prof-nov"); err != nil {
+		t.Fatalf("CreateNotebook Nov failed: %v", err)
+	}
+	_ = repo.EnsureNotebookTopic("nb-nov", topNov)
+	if err := repo.CreateNotebook("nb-oct", "Oct Book", "/path/oct.pdf", "pdf", topOct, "", 8, "prof-oct"); err != nil {
+		t.Fatalf("CreateNotebook Oct failed: %v", err)
+	}
+	_ = repo.EnsureNotebookTopic("nb-oct", topOct)
+	if err := repo.CreateNotebook("nb-kan", "Kan Book", "/path/kan.pdf", "pdf", topKan, "", 5, "prof-kan"); err != nil {
+		t.Fatalf("CreateNotebook Kan failed: %v", err)
+	}
+	_ = repo.EnsureNotebookTopic("nb-kan", topKan)
+
+	// 4. Create due flashcards: 10 Nov cards, 12 Oct cards, 5 Kan cards
+	var novCards, octCards, kanCards []models.Flashcard
+	stateMap := make(map[string]models.FlashcardState)
+	for i := 1; i <= 10; i++ {
+		cid := fmt.Sprintf("c-nov-%d", i)
+		novCards = append(novCards, models.Flashcard{ID: cid, TopicID: topNov, Prompt: cid, Answer: "ans", DueAt: now - 100})
+		stateMap[cid] = models.FlashcardState{StateCode: 1}
+	}
+	for i := 1; i <= 12; i++ {
+		cid := fmt.Sprintf("c-oct-%d", i)
+		octCards = append(octCards, models.Flashcard{ID: cid, TopicID: topOct, Prompt: cid, Answer: "ans", DueAt: now - 200})
+		stateMap[cid] = models.FlashcardState{StateCode: 1}
+	}
+	for i := 1; i <= 5; i++ {
+		cid := fmt.Sprintf("c-kan-%d", i)
+		kanCards = append(kanCards, models.Flashcard{ID: cid, TopicID: topKan, Prompt: cid, Answer: "ans", DueAt: now - 300})
+		stateMap[cid] = models.FlashcardState{StateCode: 1}
+	}
+
+	if err := repo.CreateFlashcards(topNov, novCards, stateMap); err != nil {
+		t.Fatalf("CreateFlashcards nov failed: %v", err)
+	}
+	if err := repo.CreateFlashcards(topOct, octCards, stateMap); err != nil {
+		t.Fatalf("CreateFlashcards oct failed: %v", err)
+	}
+	if err := repo.CreateFlashcards(topKan, kanCards, stateMap); err != nil {
+		t.Fatalf("CreateFlashcards kan failed: %v", err)
+	}
+
+	// 5. Without inheritance: only Nov cards (10) are due for active profile
+	dueInitial, err := repo.QueryDueReviewCards(now)
+	if err != nil {
+		t.Fatalf("QueryDueReviewCards initial failed: %v", err)
+	}
+	if dueInitial != 10 {
+		t.Fatalf("expected 10 due cards without inheritance, got %d", dueInitial)
+	}
+
+	// 6. Inherit October into November
+	if err := repo.SetProfileFlashcardInheritance("prof-nov", []string{"prof-oct"}); err != nil {
+		t.Fatalf("SetProfileFlashcardInheritance failed: %v", err)
+	}
+
+	// 7. Verify allowed profile IDs helper
+	allowed, err := repo.GetAllowedFlashcardProfileIDs("prof-nov")
+	if err != nil {
+		t.Fatalf("GetAllowedFlashcardProfileIDs failed: %v", err)
+	}
+	if len(allowed) != 2 || allowed[0] != "prof-nov" || allowed[1] != "prof-oct" {
+		t.Fatalf("unexpected allowed profiles: %+v", allowed)
+	}
+
+	// 8. With October inherited: due cards = 10 (Nov) + 12 (Oct) = 22 cards. Never Kannada (5)!
+	dueWithInheritance, err := repo.QueryDueReviewCards(now)
+	if err != nil {
+		t.Fatalf("QueryDueReviewCards with inheritance failed: %v", err)
+	}
+	if dueWithInheritance != 22 {
+		t.Fatalf("expected 22 due cards with October inherited (10 Nov + 12 Oct, excluding Kan), got %d", dueWithInheritance)
+	}
+
+	// 9. Verify next due notebook selects from the inherited set (October has 12 due vs Nov 10)
+	nextNB, dueCount, err := repo.GetNextDueReviewNotebook(now)
+	if err != nil {
+		t.Fatalf("GetNextDueReviewNotebook failed: %v", err)
+	}
+	if nextNB != "nb-oct" || dueCount != 12 {
+		t.Fatalf("expected next notebook nb-oct with 12 cards, got notebook=%s dueCount=%d", nextNB, dueCount)
+	}
+
+	// 10. Verify Deck Overview with inheritance
+	overview, err := repo.GetAllFlashcardsDeckOverview("prof-nov")
+	if err != nil {
+		t.Fatalf("GetAllFlashcardsDeckOverview failed: %v", err)
+	}
+	if overview.Metrics.TotalCards != 22 {
+		t.Fatalf("expected 22 total cards in overview, got %d", overview.Metrics.TotalCards)
+	}
+	if len(overview.Profiles) != 3 {
+		t.Fatalf("expected 3 profiles in summary breakdown, got %d", len(overview.Profiles))
+	}
+
+	// Verify profile summary flags
+	var foundNov, foundOct, foundKan bool
+	for _, ps := range overview.Profiles {
+		if ps.ProfileID == "prof-nov" {
+			foundNov = true
+			if !ps.IsActive {
+				t.Errorf("expected prof-nov to be active")
+			}
+			if ps.DueCards != 10 {
+				t.Errorf("expected prof-nov due cards 10, got %d", ps.DueCards)
+			}
+		}
+		if ps.ProfileID == "prof-oct" {
+			foundOct = true
+			if !ps.IsInherited {
+				t.Errorf("expected prof-oct to be marked inherited")
+			}
+			if ps.DueCards != 12 {
+				t.Errorf("expected prof-oct due cards 12, got %d", ps.DueCards)
+			}
+		}
+		if ps.ProfileID == "prof-kan" {
+			foundKan = true
+			if ps.IsInherited {
+				t.Errorf("expected prof-kan to NOT be marked inherited")
+			}
+			if ps.DueCards != 5 {
+				t.Errorf("expected prof-kan due cards 5, got %d", ps.DueCards)
+			}
+		}
+	}
+	if !foundNov || !foundOct || !foundKan {
+		t.Fatalf("missing profile in overview summary")
+	}
+
+	// 11. Disable inheritance (toggle off October)
+	if err := repo.SetProfileFlashcardInheritance("prof-nov", []string{}); err != nil {
+		t.Fatalf("SetProfileFlashcardInheritance clear failed: %v", err)
+	}
+	dueAfterRemoval, err := repo.QueryDueReviewCards(now)
+	if err != nil {
+		t.Fatalf("QueryDueReviewCards after removal failed: %v", err)
+	}
+	if dueAfterRemoval != 10 {
+		t.Fatalf("expected 10 due cards after clearing inheritance, got %d", dueAfterRemoval)
+	}
+}
+
+
 

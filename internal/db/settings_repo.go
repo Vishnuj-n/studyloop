@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -629,7 +631,8 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
 		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
 		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
-		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, '')
+		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
+		       COALESCE(inherited_flashcard_profile_ids_json, '[]')
 		FROM study_profiles
 		ORDER BY created_at DESC
 	`)
@@ -647,11 +650,13 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 		var p models.StudyProfile
 		var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
 		var skipRead sql.NullBool
+		var inheritedJSON sql.NullString
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
 			&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
 			&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
 			&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+			&inheritedJSON,
 		); err != nil {
 			return nil, err
 		}
@@ -683,6 +688,11 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 			v := int(quizScore.Int64)
 			p.QuizPassingScore = &v
 		}
+		p.InheritedFlashcardProfileIDs = make([]string, 0)
+		if inheritedJSON.Valid && strings.TrimSpace(inheritedJSON.String) != "" {
+			p.InheritedFlashcardProfileIDsJSON = inheritedJSON.String
+			_ = json.Unmarshal([]byte(inheritedJSON.String), &p.InheritedFlashcardProfileIDs)
+		}
 		profiles = append(profiles, p)
 	}
 	if err := rows.Err(); err != nil {
@@ -696,11 +706,13 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	var p models.StudyProfile
 	var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
 	var skipRead sql.NullBool
+	var inheritedJSON sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
 		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
 		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
-		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, '')
+		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
+		       COALESCE(inherited_flashcard_profile_ids_json, '[]')
 		FROM study_profiles
 		WHERE id = ?
 	`, id).Scan(
@@ -708,6 +720,7 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 		&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
 		&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
 		&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+		&inheritedJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -743,6 +756,11 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 		v := int(quizScore.Int64)
 		p.QuizPassingScore = &v
 	}
+	p.InheritedFlashcardProfileIDs = make([]string, 0)
+	if inheritedJSON.Valid && strings.TrimSpace(inheritedJSON.String) != "" {
+		p.InheritedFlashcardProfileIDsJSON = inheritedJSON.String
+		_ = json.Unmarshal([]byte(inheritedJSON.String), &p.InheritedFlashcardProfileIDs)
+	}
 	return &p, nil
 }
 
@@ -756,25 +774,45 @@ func (r *Repository) CreateProfile(p models.StudyProfile) error {
 	if brk < 0 {
 		brk = 300
 	}
+	inheritedJSON := p.InheritedFlashcardProfileIDsJSON
+	if inheritedJSON == "" && len(p.InheritedFlashcardProfileIDs) > 0 {
+		if bytes, err := json.Marshal(p.InheritedFlashcardProfileIDs); err == nil {
+			inheritedJSON = string(bytes)
+		}
+	}
+	if inheritedJSON == "" {
+		inheritedJSON = "[]"
+	}
+
 	_, err := r.db.Exec(`
 		INSERT INTO study_profiles (
 			id, name, deadline_at, classroom_code, student_username, cloud_api_token,
 			pomo_duration_sec, pomo_break_sec, pomo_music_path, pomo_shuffle,
 			target_session_words, min_session_words, theme, max_flashcards_per_session,
 			max_active_notebooks, skip_to_reading_active, default_remedial_strategy,
-			quiz_question_count, quiz_passing_score, tutor_style
+			quiz_question_count, quiz_passing_score, tutor_style, inherited_flashcard_profile_ids_json
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken,
 		dur, brk, p.PomoMusicPath, p.PomoShuffle,
 		p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
 		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
-		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle)
+		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, inheritedJSON)
 	return err
 }
 
 // UpdateProfile updates an existing profile metadata and settings.
 func (r *Repository) UpdateProfile(p models.StudyProfile) error {
+	inheritedJSON := p.InheritedFlashcardProfileIDsJSON
+	if inheritedJSON == "" && len(p.InheritedFlashcardProfileIDs) > 0 {
+		if bytes, err := json.Marshal(p.InheritedFlashcardProfileIDs); err == nil {
+			inheritedJSON = string(bytes)
+		}
+	}
+	if inheritedJSON == "" {
+		inheritedJSON = "[]"
+	}
+
 	_, err := r.db.Exec(`
 		UPDATE study_profiles
 		SET name = ?,
@@ -788,12 +826,80 @@ func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 		    default_remedial_strategy = ?,
 		    quiz_question_count = ?,
 		    quiz_passing_score = ?,
-		    tutor_style = ?
+		    tutor_style = ?,
+		    inherited_flashcard_profile_ids_json = ?
 		WHERE id = ?
 	`, p.Name, p.DeadlineAt, p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
 		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
-		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, p.ID)
+		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, inheritedJSON, p.ID)
 	return err
+}
+
+// SetProfileFlashcardInheritance updates the list of profile IDs whose due flashcards are inherited into profileID's daily queue.
+func (r *Repository) SetProfileFlashcardInheritance(profileID string, inheritedIDs []string) error {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return fmt.Errorf("profileID cannot be empty")
+	}
+	clean := make([]string, 0, len(inheritedIDs))
+	seen := make(map[string]bool)
+	for _, id := range inheritedIDs {
+		id = strings.TrimSpace(id)
+		if id != "" && id != profileID && !seen[id] {
+			seen[id] = true
+			clean = append(clean, id)
+		}
+	}
+	bytes, err := json.Marshal(clean)
+	if err != nil {
+		return fmt.Errorf("failed to marshal inherited profile IDs: %w", err)
+	}
+	_, err = r.db.Exec(`
+		UPDATE study_profiles
+		SET inherited_flashcard_profile_ids_json = ?
+		WHERE id = ?
+	`, string(bytes), profileID)
+	return err
+}
+
+// GetAllowedFlashcardProfileIDs returns the list of profile IDs allowed for flashcard reviews
+// for activeProfileID: [activeProfileID] + any inherited profile IDs.
+// If activeProfileID is empty, it returns nil.
+func (r *Repository) GetAllowedFlashcardProfileIDs(activeProfileID string) ([]string, error) {
+	activeProfileID = strings.TrimSpace(activeProfileID)
+	if activeProfileID == "" {
+		return nil, nil
+	}
+	var rawJSON sql.NullString
+	err := r.db.QueryRow(`
+		SELECT COALESCE(inherited_flashcard_profile_ids_json, '[]')
+		FROM study_profiles
+		WHERE id = ?
+	`, activeProfileID).Scan(&rawJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return []string{activeProfileID}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	allowedMap := make(map[string]bool)
+	allowedMap[activeProfileID] = true
+	allowedList := []string{activeProfileID}
+
+	if rawJSON.Valid && strings.TrimSpace(rawJSON.String) != "" {
+		var inherited []string
+		if err := json.Unmarshal([]byte(rawJSON.String), &inherited); err == nil {
+			for _, id := range inherited {
+				id = strings.TrimSpace(id)
+				if id != "" && !allowedMap[id] {
+					allowedMap[id] = true
+					allowedList = append(allowedList, id)
+				}
+			}
+		}
+	}
+	return allowedList, nil
 }
 
 // UpdateProfilePomoSettings updates the Pomodoro focus and audio settings for a profile.

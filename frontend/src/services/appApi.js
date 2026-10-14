@@ -323,6 +323,18 @@ export function updateProfile(id, name, deadlineStr) {
   return appBridge().UpdateProfile(id, name, deadlineStr)
 }
 
+export function updateProfileWithInheritance(id, name, deadlineStr, inheritedIDs) {
+  return appBridge().UpdateProfileWithInheritance(id, name, deadlineStr, inheritedIDs || [])
+}
+
+export function updateProfileFlashcardInheritance(profileID, inheritedIDs) {
+  return appBridge().UpdateProfileFlashcardInheritance(profileID, inheritedIDs || [])
+}
+
+export function getProfileFlashcardDueBreakdown() {
+  return appBridge().GetProfileFlashcardDueBreakdown()
+}
+
 export function deleteProfile(id) {
   return appBridge().DeleteProfile(id)
 }

@@ -239,8 +239,11 @@
     <SettingsProfileModal
       v-if="showEditModal"
       is-edit
+      :current-profile-id="editProfileId"
+      :all-profiles="profiles"
       :initial-name="editProfileName"
       :initial-deadline="editProfileDeadline"
+      :initial-inherited="editProfileInherited"
       @close="closeEditModal"
       @save="handleUpdateProfile"
     />
@@ -400,8 +403,10 @@ const {
   notebooks,
   showAddModal,
   showEditModal,
+  editProfileId,
   editProfileName,
   editProfileDeadline,
+  editProfileInherited,
   openEditModal,
   closeEditModal,
   handleAddProfile,

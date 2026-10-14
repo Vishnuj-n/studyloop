@@ -107,6 +107,40 @@
               </div>
             </div>
 
+            <!-- Profile Breakdown & Inheritance Toggles Strip -->
+            <div v-if="profiles.length > 1" class="profile-inheritance-strip">
+              <div class="profile-strip-header">
+                <span class="strip-label">
+                  <BaseIcon name="layers" size="13" />
+                  <span>Profile Retention &amp; Inheritance:</span>
+                </span>
+                <span class="strip-hint">One-click toggle to include/quarantine due flashcards in your daily review:</span>
+              </div>
+              <div class="profile-pills-row">
+                <button
+                  v-for="p in profiles"
+                  :key="p.profile_id"
+                  type="button"
+                  class="profile-toggle-pill"
+                  :class="{
+                    'pill-active': p.is_active,
+                    'pill-inherited': p.is_inherited,
+                    'pill-excluded': !p.is_active && !p.is_inherited
+                  }"
+                  :title="p.is_active ? 'Active Profile (Always included in daily queue)' : (p.is_inherited ? 'Inherited in daily queue — click to exclude' : 'Quarantined — click to include in daily queue')"
+                  @click="toggleProfileInheritance(p)"
+                >
+                  <span v-if="p.is_active" class="pill-status-dot dot-active"></span>
+                  <span v-else-if="p.is_inherited" class="pill-check">✓</span>
+                  <span v-else class="pill-plus">+</span>
+                  <span class="pill-name">{{ p.profile_name }}</span>
+                  <span class="pill-count" :class="{ 'has-due': p.due_cards > 0 }">
+                    {{ p.due_cards }} due
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <!-- Filter & Search Controls -->
             <div class="filter-toolbar">
               <div class="search-box">
@@ -450,6 +484,7 @@ import {
   toggleNotebookCardsSuspension,
   deleteFlashcard,
   updateFlashcardContent,
+  updateProfileFlashcardInheritance,
 } from '../services/appApi.js'
 import { copyTextToClipboard } from '../utils/clipboard'
 import { useDialog } from '../composables/useDialog'
@@ -472,6 +507,7 @@ const { confirm: showConfirm } = useDialog()
 const { showNotice, showError } = useToast()
 
 const loading = ref(false)
+const profiles = ref([])
 const pendingCardIds = ref(new Set())
 const pendingNotebookIds = ref(new Set())
 const searchQuery = ref('')
@@ -844,6 +880,7 @@ async function loadOverview() {
     if (res && res.metrics) {
       metrics.value = res.metrics
       notebooks.value = res.notebooks || []
+      profiles.value = res.profiles || []
       // Auto-expand first 2 notebooks on first load only
       if (!hasAutoExpanded.value && notebooks.value.length > 0) {
         const initialSet = new Set()
@@ -858,6 +895,42 @@ async function loadOverview() {
     showError(err?.message || 'Failed to load flashcard decks')
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleProfileInheritance(p) {
+  if (p.is_active) {
+    showNotice('Active profile is always included in daily reviews.')
+    return
+  }
+  const activeProf = profiles.value.find((pr) => pr.is_active)
+  if (!activeProf) {
+    showError('No active profile identified.')
+    return
+  }
+  const currentInherited = profiles.value.filter((pr) => pr.is_inherited).map((pr) => pr.profile_id)
+  let nextInherited
+  if (p.is_inherited) {
+    nextInherited = currentInherited.filter((id) => id !== p.profile_id)
+  } else {
+    nextInherited = [...currentInherited, p.profile_id]
+  }
+
+  try {
+    const res = await updateProfileFlashcardInheritance(activeProf.profile_id, nextInherited)
+    if (res && res.error) {
+      showError(res.error)
+      return
+    }
+    showNotice(
+      p.is_inherited
+        ? `Quarantined flashcards from "${p.profile_name}".`
+        : `Inherited due flashcards from "${p.profile_name}" into daily queue!`
+    )
+    await loadOverview()
+    emit('updated')
+  } catch (err) {
+    showError(err?.message || 'Failed to update inheritance')
   }
 }
 
@@ -1256,6 +1329,124 @@ onUnmounted(() => {
 .dot-learning { background: #f59e0b; }
 .dot-young { background: #3b82f6; }
 .dot-mature { background: #10b981; }
+
+/* Profile Retention & Inheritance Strip */
+.profile-inheritance-strip {
+  background: var(--surface-container-low, #1b1b1b);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.strip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary, #818cf8);
+}
+
+.strip-hint {
+  font-size: 11px;
+  color: var(--muted-text);
+}
+
+.profile-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-lowest, #141617);
+  color: var(--on-surface);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.profile-toggle-pill:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--outline-variant));
+}
+
+.profile-toggle-pill.pill-active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  cursor: default;
+}
+
+.profile-toggle-pill.pill-inherited {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.profile-toggle-pill.pill-excluded {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.profile-toggle-pill.pill-excluded:hover {
+  opacity: 1;
+  border-style: solid;
+}
+
+.pill-status-dot.dot-active {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.pill-check {
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.pill-plus {
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.pill-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--surface-container);
+  color: var(--muted-text);
+}
+
+.pill-count.has-due {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
 
 /* Filter & Search Toolbar */
 .filter-toolbar {

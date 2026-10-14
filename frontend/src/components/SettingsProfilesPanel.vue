@@ -1,8 +1,37 @@
 <template>
   <article class="panel profiles-panel">
     <div class="panel-header">
-      <h2>Profiles & Targets</h2>
+      <div class="panel-header-left">
+        <h2>Profiles &amp; Targets</h2>
+        <button
+          type="button"
+          class="info-popover-trigger"
+          :class="{ active: showPanelInfo }"
+          :title="showPanelInfo ? 'Hide explanation' : 'How study profiles & shared retention work'"
+          @click="showPanelInfo = !showPanelInfo"
+        >
+          <BaseIcon name="info" size="13" />
+          <span>Info</span>
+        </button>
+      </div>
       <button class="add-profile-btn" @click="$emit('add')">+ Create Profile</button>
+    </div>
+
+    <!-- Explanatory Banner -->
+    <div v-if="showPanelInfo" class="panel-info-banner">
+      <BaseIcon name="info" size="16" class="banner-icon" />
+      <div class="banner-text">
+        <strong>Cross-Profile Retention:</strong> Each profile strictly isolates textbooks, reading progress, and quizzes. To prevent memory decay across exams, you can configure any profile to inherit due flashcards from other profiles into your daily queue.
+      </div>
+      <button
+        type="button"
+        class="banner-close-btn"
+        aria-label="Dismiss banner"
+        title="Dismiss"
+        @click="showPanelInfo = false"
+      >
+        <BaseIcon name="x" size="13" />
+      </button>
     </div>
 
     <div v-if="profiles.length === 0" class="empty-state">
@@ -31,6 +60,35 @@
           <p class="deadline">
             Deadline: <strong>{{ formatUnixDate(profile.deadline_at) }}</strong>
           </p>
+
+          <!-- Retention Inheritance Indicator -->
+          <div
+            v-if="getInheritedProfileNames(profile).length > 0"
+            class="profile-inherited-box"
+            title="Due flashcards from these profiles appear in daily reviews"
+          >
+            <BaseIcon name="layers" size="13" class="inherited-box-icon" />
+            <span class="inherited-box-label">Reviews linked:</span>
+            <div class="inherited-box-tags">
+              <span
+                v-for="name in getInheritedProfileNames(profile)"
+                :key="name"
+                class="inherited-tag-hash"
+              >
+                #{{ name }}
+              </span>
+            </div>
+          </div>
+          <button
+            v-else-if="profiles.length > 1"
+            type="button"
+            class="link-inheritance-btn"
+            title="Configure shared flashcard reviews with other profiles"
+            @click="$emit('edit', profile)"
+          >
+            <BaseIcon name="plus" size="11" />
+            <span>Link other profiles' flashcards</span>
+          </button>
         </div>
         <div class="profile-actions">
           <button
@@ -59,15 +117,25 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import BaseIcon from './BaseIcon.vue'
 
-defineProps({
+const props = defineProps({
   profiles: { type: Array, required: true },
   activeProfileId: { type: String, default: '' },
   formatUnixDate: { type: Function, required: true },
 })
 
 defineEmits(['add', 'select', 'edit', 'delete'])
+
+const showPanelInfo = ref(false)
+
+function getInheritedProfileNames(profile) {
+  if (!profile || !profile.inherited_flashcard_profile_ids) return []
+  return profile.inherited_flashcard_profile_ids
+    .map((id) => props.profiles.find((p) => p.id === id)?.name)
+    .filter(Boolean)
+}
 </script>
 
 <style scoped>
@@ -84,6 +152,143 @@ defineEmits(['add', 'select', 'edit', 'delete'])
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-popover-trigger {
+  background: var(--surface-container-high, #e2e8f0);
+  border: 1px solid var(--outline-variant, rgba(0, 0, 0, 0.08));
+  color: var(--on-surface-variant, #64748b);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.info-popover-trigger:hover,
+.info-popover-trigger.active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.panel-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-container-low, #f8fafc);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--on-surface);
+}
+
+.banner-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-close-btn {
+  background: none;
+  border: none;
+  color: var(--muted-text, #64748b);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-close-btn:hover {
+  color: var(--on-surface);
+}
+
+.profile-inherited-box {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  font-size: 11px;
+}
+
+.inherited-box-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.inherited-box-label {
+  color: var(--muted-text, #64748b);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.inherited-box-tags {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inherited-tag-hash {
+  display: inline-flex;
+  align-items: center;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--primary, #4f46e5);
+  background: color-mix(in srgb, var(--primary, #4f46e5) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 20%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: -0.01em;
+}
+
+.link-inheritance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px dashed var(--outline-variant, #cbd5e1);
+  border-radius: 8px;
+  color: var(--muted-text, #64748b);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.link-inheritance-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .panel-header h2 {

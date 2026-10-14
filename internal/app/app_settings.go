@@ -599,6 +599,7 @@ type ProfileWithSummary struct {
 	QuizQuestionCount       *int                   `json:"quiz_question_count,omitempty"`
 	QuizPassingScore        *int                   `json:"quiz_passing_score,omitempty"`
 	TutorStyle              string                 `json:"tutor_style,omitempty"`
+	InheritedFlashcardProfileIDs []string          `json:"inherited_flashcard_profile_ids,omitempty"`
 	Pace                    map[string]interface{} `json:"pace,omitempty"`
 	PendingTasks            *int                   `json:"pending_tasks"`
 }
@@ -619,6 +620,10 @@ func (a *App) GetProfiles() map[string]interface{} {
 		var pendingTasks *int
 		if count, countErr := repo.GetProfilePendingTaskCount(p.ID); countErr == nil {
 			pendingTasks = &count
+		}
+		inheritedIDs := p.InheritedFlashcardProfileIDs
+		if inheritedIDs == nil {
+			inheritedIDs = []string{}
 		}
 		enriched = append(enriched, ProfileWithSummary{
 			ID:                      p.ID,
@@ -641,6 +646,7 @@ func (a *App) GetProfiles() map[string]interface{} {
 			QuizQuestionCount:       p.QuizQuestionCount,
 			QuizPassingScore:        p.QuizPassingScore,
 			TutorStyle:              p.TutorStyle,
+			InheritedFlashcardProfileIDs: inheritedIDs,
 			Pace:                    pace,
 			PendingTasks:            pendingTasks,
 		})
@@ -792,6 +798,52 @@ func (a *App) UpdateProfile(id string, name string, deadlineStr string) map[stri
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}
+}
+
+// UpdateProfileWithInheritance updates profile name, deadline, and inherited flashcard profile IDs.
+func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr string, inheritedIDs []string) map[string]interface{} {
+	res := a.UpdateProfile(id, name, deadlineStr)
+	if res["error"] != nil {
+		return res
+	}
+	repo := a.getRepo()
+	if err := repo.SetProfileFlashcardInheritance(id, inheritedIDs); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
+// UpdateProfileFlashcardInheritance toggles or sets inherited flashcard profiles for a profile.
+func (a *App) UpdateProfileFlashcardInheritance(profileID string, inheritedIDs []string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return map[string]interface{}{"error": "profileID is required"}
+	}
+	if err := repo.SetProfileFlashcardInheritance(profileID, inheritedIDs); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true}
+}
+
+// GetProfileFlashcardDueBreakdown returns due and total card breakdown for all profiles.
+func (a *App) GetProfileFlashcardDueBreakdown() map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	profileID := a.resolveExplicitActiveProfileID()
+	overview, err := repo.GetAllFlashcardsDeckOverview(profileID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"ok":       true,
+		"profiles": overview.Profiles,
+	}
 }
 
 func (a *App) UpdateProfileFull(profile models.StudyProfile) map[string]interface{} {

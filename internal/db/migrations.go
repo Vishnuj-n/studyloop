@@ -72,6 +72,7 @@ var alterStatements = []struct {
 	{"study_profiles", "quiz_question_count", "ALTER TABLE study_profiles ADD COLUMN quiz_question_count INTEGER DEFAULT NULL"},
 	{"study_profiles", "quiz_passing_score", "ALTER TABLE study_profiles ADD COLUMN quiz_passing_score INTEGER DEFAULT NULL"},
 	{"study_profiles", "tutor_style", "ALTER TABLE study_profiles ADD COLUMN tutor_style TEXT DEFAULT ''"},
+	{"study_profiles", "inherited_flashcard_profile_ids_json", "ALTER TABLE study_profiles ADD COLUMN inherited_flashcard_profile_ids_json TEXT DEFAULT '[]'"},
 
 	// topics
 	{"topics", "external_help_required", "ALTER TABLE topics ADD COLUMN external_help_required BOOLEAN DEFAULT 0"},

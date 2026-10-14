@@ -391,6 +391,19 @@ type Flashcard struct {
 	Answer        string `json:"answer"`
 	DueAt         int64  `json:"due_at,omitempty"`
 	Suspended     bool   `json:"suspended"`
+	NotebookTitle string `json:"notebook_title,omitempty"`
+	ProfileName   string `json:"profile_name,omitempty"`
+	TopicTitle    string `json:"topic_title,omitempty"`
+}
+
+// ProfileDeckSummary summarizes card counts for a study profile.
+type ProfileDeckSummary struct {
+	ProfileID   string `json:"profile_id"`
+	ProfileName string `json:"profile_name"`
+	TotalCards  int    `json:"total_cards"`
+	DueCards    int    `json:"due_cards"`
+	IsActive    bool   `json:"is_active"`
+	IsInherited bool   `json:"is_inherited"`
 }
 
 // DeckCardDetail represents a rich flashcard item with notebook and topic context for deck management.
@@ -398,6 +411,8 @@ type DeckCardDetail struct {
 	ID            string  `json:"id"`
 	NotebookID    string  `json:"notebook_id"`
 	NotebookTitle string  `json:"notebook_title"`
+	ProfileID     string  `json:"profile_id,omitempty"`
+	ProfileName   string  `json:"profile_name,omitempty"`
 	TopicID       string  `json:"topic_id"`
 	TopicTitle    string  `json:"topic_title"`
 	Prompt        string  `json:"prompt"`
@@ -425,6 +440,8 @@ type DeckTopicGroup struct {
 type NotebookDeckGroup struct {
 	NotebookID     string           `json:"notebook_id"`
 	NotebookTitle  string           `json:"notebook_title"`
+	ProfileID      string           `json:"profile_id,omitempty"`
+	ProfileName    string           `json:"profile_name,omitempty"`
 	TotalCards     int              `json:"total_cards"`
 	DueCards       int              `json:"due_cards"`
 	SuspendedCards int              `json:"suspended_cards"`
@@ -446,8 +463,9 @@ type DeckMetrics struct {
 
 // DeckOverviewResponse encapsulates all decks and overall metrics.
 type DeckOverviewResponse struct {
-	Metrics   DeckMetrics         `json:"metrics"`
-	Notebooks []NotebookDeckGroup `json:"notebooks"`
+	Metrics   DeckMetrics          `json:"metrics"`
+	Notebooks []NotebookDeckGroup  `json:"notebooks"`
+	Profiles  []ProfileDeckSummary `json:"profiles,omitempty"`
 }
 
 // FlashcardState stores the local review scheduler state in fsrs_cards.state_json.
@@ -486,6 +504,9 @@ type ReviewSessionCard struct {
 	Status        ReviewTaskCardStatus `json:"status"`
 	Position      int                  `json:"position"`
 	TopicID       string               `json:"topic_id"`
+	TopicTitle    string               `json:"topic_title,omitempty"`
+	NotebookTitle string               `json:"notebook_title,omitempty"`
+	ProfileName   string               `json:"profile_name,omitempty"`
 	SourceChunkID string               `json:"source_chunk_id,omitempty"`
 	Page          int                  `json:"page,omitempty"`
 	Prompt        string               `json:"prompt"`
@@ -648,8 +669,10 @@ type StudyProfile struct {
 	SkipToReadingActive    *bool  `json:"skip_to_reading_active,omitempty"`
 	DefaultRemedialStrategy string `json:"default_remedial_strategy,omitempty"`
 	QuizQuestionCount      *int   `json:"quiz_question_count,omitempty"`
-	QuizPassingScore       *int   `json:"quiz_passing_score,omitempty"`
-	TutorStyle             string `json:"tutor_style,omitempty"`
+	QuizPassingScore       *int     `json:"quiz_passing_score,omitempty"`
+	TutorStyle             string   `json:"tutor_style,omitempty"`
+	InheritedFlashcardProfileIDs []string `json:"inherited_flashcard_profile_ids,omitempty"`
+	InheritedFlashcardProfileIDsJSON string `json:"inherited_flashcard_profile_ids_json,omitempty"`
 }
 
 // UserSettings represents the application settings.

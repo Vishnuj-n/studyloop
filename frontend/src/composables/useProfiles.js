@@ -3,6 +3,7 @@ import {
   getProfiles,
   createProfile,
   updateProfile,
+  updateProfileWithInheritance,
   deleteProfile,
   getNotebooks,
   assignNotebookToProfile,
@@ -20,10 +21,12 @@ export function useProfiles(errorRef) {
   const editProfileId = ref('')
   const editProfileName = ref('')
   const editProfileDeadline = ref('')
+  const editProfileInherited = ref([])
 
   function openEditModal(profile) {
     editProfileId.value = profile.id
     editProfileName.value = profile.name
+    editProfileInherited.value = profile.inherited_flashcard_profile_ids || []
     const dateObj = new Date(profile.deadline_at * 1000)
     editProfileDeadline.value = dateObj.toISOString().split('T')[0]
     showEditModal.value = true
@@ -34,6 +37,7 @@ export function useProfiles(errorRef) {
     editProfileId.value = ''
     editProfileName.value = ''
     editProfileDeadline.value = ''
+    editProfileInherited.value = []
   }
 
   async function handleAddProfile({ name, deadline }) {
@@ -52,9 +56,14 @@ export function useProfiles(errorRef) {
     }
   }
 
-  async function handleUpdateProfile({ name, deadline }) {
+  async function handleUpdateProfile({ name, deadline, inheritedProfileIds }) {
     try {
-      const res = await updateProfile(editProfileId.value, name, deadline)
+      const res = await updateProfileWithInheritance(
+        editProfileId.value,
+        name,
+        deadline,
+        inheritedProfileIds !== undefined ? inheritedProfileIds : editProfileInherited.value
+      )
       if (res.error) {
         await alert('Profile Error', res.error)
         return
@@ -137,8 +146,10 @@ export function useProfiles(errorRef) {
     notebooks,
     showAddModal,
     showEditModal,
+    editProfileId,
     editProfileName,
     editProfileDeadline,
+    editProfileInherited,
     openEditModal,
     closeEditModal,
     handleAddProfile,
