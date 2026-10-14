@@ -459,6 +459,8 @@ function goToTopicNotes() {
   })
 }
 
+const topicSlotsCache = new Map()
+
 async function goToCardPageInReader() {
   if (!cardPageNumber.value) return
   const topic = currentCardTopic.value
@@ -472,8 +474,12 @@ async function goToCardPageInReader() {
   // ponytail: match against actual bounded reading sessions for the topic if available
   if (topicId) {
     try {
-      const res = await getTopicStudyNoteSlots(topicId)
-      const slots = (res && Array.isArray(res.slots)) ? res.slots : []
+      let slots = topicSlotsCache.get(topicId)
+      if (!slots) {
+        const res = await getTopicStudyNoteSlots(topicId)
+        slots = (res && Array.isArray(res.slots)) ? res.slots : []
+        topicSlotsCache.set(topicId, slots)
+      }
       const matched = slots.find((s) => s.start_page && s.end_page && s.start_page <= targetPage && s.end_page >= targetPage)
       if (matched) {
         sessionStart = matched.start_page
@@ -623,6 +629,14 @@ async function rate(ratingKey) {
   isSubmittingReview.value = true
   try {
     if (queueMode.value) {
+      // Optimistic transition: shift card immediately so the UX is instantaneous
+      const wasLastCard = sessionRemaining.value <= 1
+      flipped.value = false
+      if (!wasLastCard) {
+        sessionRemaining.value = Math.max(0, sessionRemaining.value - 1)
+        reviewIndex.value++
+      }
+
       const res = await recordCardReview(reviewTaskID.value, targetCardID, validRating.value)
       if (res?.error) {
         error.value = `Failed to save review: ${res.error}`
@@ -630,7 +644,10 @@ async function rate(ratingKey) {
         return
       }
 
-      await loadQueueSession(reviewTaskID.value)
+      if (wasLastCard) {
+        await handleQueueCompletion()
+        return
+      }
       return
     }
     flipped.value = false
