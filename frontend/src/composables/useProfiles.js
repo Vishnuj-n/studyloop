@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import {
   getProfiles,
   createProfile,
-  updateProfile,
   updateProfileWithInheritance,
   deleteProfile,
   getNotebooks,

@@ -390,10 +390,11 @@ function handleDismissPrivacyNotice() {
 }
 
 // Startup / Session Profile Picker
+const cachedAskStartup = localStorage.getItem('studyloop_ask_profile_on_startup')
 const showProfileLauncher = ref(false)
 const launcherProfiles = ref([])
-const activeProfileId = ref('')
-const askProfileOnStartup = ref(true)
+const activeProfileId = ref(localStorage.getItem('studyloop_cached_active_profile_id') || '')
+const askProfileOnStartup = ref(cachedAskStartup !== 'false')
 const launcherCanDismiss = ref(false)
 
 async function checkStartupProfilePicker() {
@@ -402,6 +403,9 @@ async function checkStartupProfilePicker() {
 
   // Check if launcher already shown in this browser/app session
   if (sessionStorage.getItem('studyloop_profile_picker_shown')) return
+
+  // Fast check: if user explicitly disabled startup profile picking in localStorage, skip immediately
+  if (localStorage.getItem('studyloop_ask_profile_on_startup') === 'false') return
 
   try {
     const [settingsRes, profilesRes] = await Promise.all([
@@ -415,6 +419,10 @@ async function checkStartupProfilePicker() {
 
     activeProfileId.value = settingsRes.active_profile_id || ''
     askProfileOnStartup.value = settingsRes.ask_profile_on_startup !== false
+    localStorage.setItem('studyloop_ask_profile_on_startup', String(askProfileOnStartup.value))
+    if (settingsRes.active_profile_id) {
+      localStorage.setItem('studyloop_cached_active_profile_id', settingsRes.active_profile_id)
+    }
     launcherProfiles.value = profiles
 
     if (askProfileOnStartup.value) {
@@ -435,6 +443,7 @@ async function handleSelectLauncherProfile(profileId) {
       return
     }
     activeProfileId.value = profileId
+    localStorage.setItem('studyloop_cached_active_profile_id', profileId)
     showProfileLauncher.value = false
     sessionStorage.setItem('studyloop_profile_picker_shown', 'true')
     window.dispatchEvent(new CustomEvent('settings-updated'))
@@ -446,6 +455,7 @@ async function handleSelectLauncherProfile(profileId) {
 
 async function handleUpdateStartupPreference(enabled) {
   askProfileOnStartup.value = enabled
+  localStorage.setItem('studyloop_ask_profile_on_startup', String(enabled))
   try {
     const current = await getUserSettings()
     if (current && !current.error) {

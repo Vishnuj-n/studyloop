@@ -131,7 +131,7 @@
                   @click="toggleProfileInheritance(p)"
                 >
                   <span v-if="p.is_active" class="pill-status-dot dot-active"></span>
-                  <span v-else-if="p.is_inherited" class="pill-check">✓</span>
+                  <span v-else-if="p.is_inherited" class="pill-check"><BaseIcon name="check" size="12" /></span>
                   <span v-else class="pill-plus">+</span>
                   <span class="pill-name">{{ p.profile_name }}</span>
                   <span class="pill-count" :class="{ 'has-due': p.due_cards > 0 }">
@@ -1357,7 +1357,7 @@ onUnmounted(() => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--primary, #818cf8);
+  color: var(--primary);
 }
 
 .strip-hint {

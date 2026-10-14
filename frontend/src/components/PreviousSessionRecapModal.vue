@@ -27,10 +27,8 @@
           </div>
 
           <div v-else-if="noteContent" class="recap-content-box">
-            <div
-              class="shared-markdown-content recap-markdown"
-              v-html="renderedMarkdown"
-            ></div>
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div class="shared-markdown-content recap-markdown" v-html="renderedMarkdown"></div>
           </div>
 
           <div v-else class="recap-empty-box">

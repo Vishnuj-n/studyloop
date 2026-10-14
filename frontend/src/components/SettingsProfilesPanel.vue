@@ -324,7 +324,7 @@ function getInheritedProfileNames(profile) {
   font-size: 11px;
   color: var(--primary, #4f46e5);
   background: color-mix(in srgb, var(--primary, #4f46e5) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 20%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 2px 7px;
   border-radius: 4px;
   white-space: nowrap;

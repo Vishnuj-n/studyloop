@@ -64,6 +64,7 @@
                 <div v-if="slot.start_page > 0 || slot.end_page > 0" class="slot-badge">
                   Pages {{ slot.start_page }}–{{ slot.end_page }}
                 </div>
+                <!-- eslint-disable-next-line vue/no-v-html -->
                 <div class="shared-markdown-content" v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"></div>
               </div>
             </div>

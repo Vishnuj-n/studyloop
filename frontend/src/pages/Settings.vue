@@ -386,6 +386,7 @@ const {
   studyDuration,
   applyDurationPreset,
   loadSettings,
+  saveUserSettings,
   cleanup: cleanupSettings,
 } = useSettings(error, success)
 
@@ -502,7 +503,7 @@ async function updateStartupPreference(enabled) {
   const prev = settings.value.ask_profile_on_startup
   settings.value.ask_profile_on_startup = enabled
   try {
-    const res = await updateUserSettings({ ...settings.value, ask_profile_on_startup: enabled })
+    const res = await saveUserSettings({ ...settings.value, ask_profile_on_startup: enabled })
     if (res?.error) {
       settings.value.ask_profile_on_startup = prev
       error.value = res.error

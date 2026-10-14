@@ -587,11 +587,8 @@
                 </div>
 
                 <!-- Rendered Note -->
-                <div
-                  v-else-if="slot.content"
-                  class="slot-markdown-content shared-markdown-content"
-                  v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"
-                ></div>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div v-else-if="slot.content" class="slot-markdown-content shared-markdown-content" v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"></div>
 
                 <!-- Empty State within Card -->
                 <div v-else class="slot-empty-state">
@@ -724,7 +721,6 @@ const showAllSessions = ref(false)
 // Auto-notes & sidebar settings state (persisted to SQLite user_settings)
 const autoNotesEnabled = ref(false)
 const noteDetailLevel = ref('briefing')
-const noteModelTier = ref('fast')
 const showRecapEnabled = ref(true)
 const showNotesSettingsPopover = ref(false)
 
@@ -746,11 +742,6 @@ function getDetailLevelLabel(val) {
     default:
       return 'Briefing Document'
   }
-}
-
-function navigateToSettings() {
-  showNotesSettingsPopover.value = false
-  router.push('/settings')
 }
 
 async function handleToggleAutoNotes(targetVal) {
