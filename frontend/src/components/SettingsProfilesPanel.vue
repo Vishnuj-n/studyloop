@@ -226,14 +226,16 @@ function getInheritedProfileNames(profile) {
 .profile-inherited-box {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
-  padding: 6px 10px;
+  margin-top: 10px;
+  padding: 6px 12px;
   border-radius: 8px;
   background: var(--surface-container-lowest, #ffffff);
   border: 1px solid var(--outline-variant, #e2e8f0);
   font-size: 11px;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 .inherited-box-icon {
@@ -244,14 +246,17 @@ function getInheritedProfileNames(profile) {
 .inherited-box-label {
   color: var(--muted-text, #64748b);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .inherited-box-tags {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .inherited-tag-hash {
@@ -263,17 +268,20 @@ function getInheritedProfileNames(profile) {
   color: var(--primary, #4f46e5);
   background: color-mix(in srgb, var(--primary, #4f46e5) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary, #4f46e5) 20%, transparent);
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
 
 .link-inheritance-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
-  padding: 5px 10px;
+  margin-top: 10px;
+  padding: 5px 12px;
   background: var(--surface-container-lowest, #ffffff);
   border: 1px dashed var(--outline-variant, #cbd5e1);
   border-radius: 8px;
@@ -281,6 +289,9 @@ function getInheritedProfileNames(profile) {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -317,11 +328,19 @@ function getInheritedProfileNames(profile) {
 .profile-card {
   border: 1px solid var(--outline-variant);
   border-radius: 12px;
-  padding: 16px;
+  padding: 18px;
   background: var(--surface-container-low);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-card.active {
@@ -364,6 +383,7 @@ function getInheritedProfileNames(profile) {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .select-btn {
