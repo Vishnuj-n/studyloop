@@ -142,11 +142,13 @@
             <SettingsProfilesPanel
               :profiles="profiles"
               :active-profile-id="settings.active_profile_id"
+              :ask-profile-on-startup="settings.ask_profile_on_startup !== false"
               :format-unix-date="formatUnixDate"
               @add="showAddModal = true"
               @select="setActiveProfile"
               @edit="openEditModal"
               @delete="handleDeleteProfile"
+              @update-startup-preference="updateStartupPreference"
             />
 
             <SettingsTextbooksPanel
@@ -493,6 +495,23 @@ async function setActiveProfile(profileID) {
   } catch (err) {
     settings.value.active_profile_id = prev
     error.value = 'Failed to switch profile'
+  }
+}
+
+async function updateStartupPreference(enabled) {
+  const prev = settings.value.ask_profile_on_startup
+  settings.value.ask_profile_on_startup = enabled
+  try {
+    const res = await updateUserSettings({ ...settings.value, ask_profile_on_startup: enabled })
+    if (res?.error) {
+      settings.value.ask_profile_on_startup = prev
+      error.value = res.error
+      return
+    }
+    success.value = enabled ? 'Startup profile picker enabled' : 'Startup profile picker disabled'
+  } catch (err) {
+    settings.value.ask_profile_on_startup = prev
+    error.value = 'Failed to update startup profile preference'
   }
 }
 

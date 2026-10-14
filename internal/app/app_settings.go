@@ -62,6 +62,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"study_slots_json":           s.StudySlotsJSON,
 		"reminders_enabled":          s.RemindersEnabled,
 		"show_reward_notifications":  s.ShowRewardNotifications,
+		"ask_profile_on_startup":     s.AskProfileOnStartup,
 		"active_profile_id":          s.ActiveProfileID,
 		"skip_to_reading_active":     s.SkipToReadingActive,
 		"cloud_sync_url":             s.CloudSyncURL,

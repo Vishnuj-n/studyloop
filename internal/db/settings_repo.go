@@ -66,10 +66,10 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(rate_limit_strategy, 'STANDARD')
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(ask_profile_on_startup, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(rate_limit_strategy, 'STANDARD')
 		FROM user_settings
 		WHERE id = 1
-	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.ShowRecapBeforeReading, &s.RateLimitStrategy)
+	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &s.AskProfileOnStartup, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.ShowRecapBeforeReading, &s.RateLimitStrategy)
 	if err == sql.ErrNoRows {
 		s = models.UserSettings{
 			MaxFlashcardsPerSession: 30,
@@ -78,6 +78,7 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 			StudySlotsJSON:          "[]",
 			RemindersEnabled:        true,
 			ShowRewardNotifications: true,
+			AskProfileOnStartup:     true,
 			Theme:                   "dark-gruvbox",
 			RAGEnabled:              false,
 			RAGNotebookChapter:      true,
@@ -299,8 +300,8 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, auto_generate_study_notes, notes_detail_level, notes_model_tier, show_recap_before_reading, rate_limit_strategy)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, ask_profile_on_startup, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, auto_generate_study_notes, notes_detail_level, notes_model_tier, show_recap_before_reading, rate_limit_strategy)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			max_flashcards_per_session = excluded.max_flashcards_per_session,
 			study_start_time = excluded.study_start_time,
@@ -308,6 +309,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			study_slots_json = excluded.study_slots_json,
 			reminders_enabled = excluded.reminders_enabled,
 			show_reward_notifications = excluded.show_reward_notifications,
+			ask_profile_on_startup = excluded.ask_profile_on_startup,
 			active_profile_id = excluded.active_profile_id,
 			skip_to_reading_active = excluded.skip_to_reading_active,
 			cloud_sync_url = excluded.cloud_sync_url,
@@ -338,7 +340,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			show_recap_before_reading = excluded.show_recap_before_reading,
 			rate_limit_strategy = excluded.rate_limit_strategy,
 			updated_at = CURRENT_TIMESTAMP
-	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, s.AutoGenerateStudyNotes, detailLevel, modelTier, s.ShowRecapBeforeReading, rateLimitStrategy)
+	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, s.AskProfileOnStartup, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, s.AutoGenerateStudyNotes, detailLevel, modelTier, s.ShowRecapBeforeReading, rateLimitStrategy)
 	if err != nil {
 		return err
 	}

@@ -34,6 +34,22 @@
       </button>
     </div>
 
+    <!-- Startup Profile Picker Preference -->
+    <div class="startup-picker-preference">
+      <label class="preference-switch-row">
+        <input
+          type="checkbox"
+          :checked="askProfileOnStartup"
+          class="switch-checkbox"
+          @change="$emit('update-startup-preference', $event.target.checked)"
+        />
+        <div class="preference-text">
+          <span class="preference-title">Show "Who is studying?" launcher on startup</span>
+          <span class="preference-desc">Prompt to choose a study profile upon launch when multiple profiles exist.</span>
+        </div>
+      </label>
+    </div>
+
     <div v-if="profiles.length === 0" class="empty-state">
       No profiles defined. Create one to organize textbooks.
     </div>
@@ -124,9 +140,10 @@ const props = defineProps({
   profiles: { type: Array, required: true },
   activeProfileId: { type: String, default: '' },
   formatUnixDate: { type: Function, required: true },
+  askProfileOnStartup: { type: Boolean, default: true },
 })
 
-defineEmits(['add', 'select', 'edit', 'delete'])
+defineEmits(['add', 'select', 'edit', 'delete', 'update-startup-preference'])
 
 const showPanelInfo = ref(false)
 
@@ -152,6 +169,46 @@ function getInheritedProfileNames(profile) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.startup-picker-preference {
+  background: var(--surface-container, #181b22);
+  border: 1px solid var(--outline-variant, #2a2f3d);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.preference-switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.switch-checkbox {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary, #88c0d0);
+  cursor: pointer;
+}
+
+.preference-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preference-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--on-surface, #eceff4);
+}
+
+.preference-desc {
+  font-size: 0.8rem;
+  color: var(--on-surface-variant, #94a3b8);
 }
 
 .panel-header-left {

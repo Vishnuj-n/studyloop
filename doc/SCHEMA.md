@@ -359,6 +359,7 @@ Singleton table for global preferences.
 | `study_slots_json` | TEXT DEFAULT '[]' | JSON list of custom scheduled study time slots |
 | `reminders_enabled` | BOOLEAN DEFAULT 1 | Whether study reminders enabled |
 | `show_reward_notifications` | BOOLEAN DEFAULT 1 | Whether reward popups & toasts are shown upon task completion |
+| `ask_profile_on_startup` | BOOLEAN DEFAULT 1 | Whether "Who is studying?" profile picker prompt appears on app launch when $\ge 2$ profiles exist |
 | `active_profile_id` | TEXT | Active study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
 | `skip_to_reading_active` | BOOLEAN DEFAULT 0 | Skip dashboard to active reading |
 | `cloud_sync_url` | TEXT DEFAULT '' | Remote sync endpoint URL |

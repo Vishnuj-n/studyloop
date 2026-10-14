@@ -131,6 +131,7 @@ func InitSchema(tx *sql.Tx) error {
 			study_slots_json TEXT DEFAULT '[]',
 			reminders_enabled BOOLEAN DEFAULT 1,
 			show_reward_notifications BOOLEAN DEFAULT 1,
+			ask_profile_on_startup BOOLEAN DEFAULT 1,
 			active_profile_id TEXT,
 			skip_to_reading_active BOOLEAN DEFAULT 0,
 			cloud_sync_url TEXT DEFAULT '',

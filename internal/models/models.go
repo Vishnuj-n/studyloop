@@ -683,6 +683,7 @@ type UserSettings struct {
 	StudySlotsJSON          string `json:"study_slots_json"`
 	RemindersEnabled        bool   `json:"reminders_enabled"`
 	ShowRewardNotifications bool   `json:"show_reward_notifications"`
+	AskProfileOnStartup     bool   `json:"ask_profile_on_startup"`
 	ActiveProfileID         string `json:"active_profile_id"`
 	SkipToReadingActive     bool   `json:"skip_to_reading_active"`
 	CloudSyncURL            string `json:"cloud_sync_url"`
