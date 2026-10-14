@@ -20,7 +20,7 @@ import (
 const briefingNoteSystemPrompt = `You are an academic synthesizer. Create a briefing document summarizing the main ideas from the reference material.
 
 Requirements:
-- Length: 300–450 words.
+- Length: Aim for 300–450 words when the source supports it; prioritize accuracy over length.
 - Language: Simple English that an undergraduate student can understand easily.
 - Style: Clear, concise, and objective. Use short sentences and avoid unnecessary jargon.
 - Technical terms: Keep important technical terms, but explain each in simple words when first introduced.
