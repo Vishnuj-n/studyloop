@@ -650,12 +650,13 @@ function onSimplifyClick() {
 
 
 function goBackToSource() {
+  const returnTaskId = route.query.flashcardTaskId || route.query.taskId || undefined
   if (route.query.from === 'flashcards') {
     router.push({
       path: '/flashcards',
       query: {
         notebookId: reader.selectedNotebookID.value || undefined,
-        taskId: route.query.flashcardTaskId || route.query.taskId || route.query.task_id || undefined,
+        taskId: returnTaskId,
       },
     })
     return
@@ -666,7 +667,7 @@ function goBackToSource() {
       notebookId: reader.selectedNotebookID.value || undefined,
       topicId: reader.selectedTopicID.value || undefined,
       from: route.query.fromOrigin || undefined,
-      taskId: route.query.flashcardTaskId || route.query.taskId || route.query.task_id || undefined,
+      taskId: returnTaskId,
       page: reader.currentPage.value || route.query.page || undefined,
     },
   })
@@ -853,7 +854,8 @@ const referenceStartPage = computed(() => {
 const referenceEndPage = computed(() => {
   const qEnd = Number.parseInt(route.query.sessionEnd || route.query.endPage)
   if (Number.isFinite(qEnd) && qEnd > 0) return qEnd
-  return reader.topicEndPage.value || referenceStartPage.value || reader.pageCount.value || 1
+  const fallback = reader.pageCount.value > 0 ? reader.pageCount.value : 1
+  return reader.topicEndPage.value || referenceStartPage.value || fallback
 })
 
 const hasReferenceBounds = computed(() => {
