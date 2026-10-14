@@ -15,12 +15,15 @@ vi.mock('../services/appApi', () => ({
   getReviewSession: vi.fn(),
   recordCardReview: vi.fn(),
   getUserSettings: vi.fn(),
-  getAvailableTopics: vi.fn(),
+  getNotebookTopicTree: vi.fn().mockResolvedValue([]),
+  getTopicStudyNoteSlots: vi.fn().mockResolvedValue({ slots: [] }),
   getFlashcardsDeckOverview: vi.fn().mockResolvedValue({ metrics: {}, notebooks: [] }),
   toggleCardSuspension: vi.fn().mockResolvedValue({ ok: true }),
   toggleNotebookCardsSuspension: vi.fn().mockResolvedValue({ ok: true }),
   deleteFlashcard: vi.fn().mockResolvedValue({ ok: true }),
 }))
+
+const pushMock = vi.fn()
 
 // Mock vue-router hooks
 vi.mock('vue-router', () => ({
@@ -28,7 +31,7 @@ vi.mock('vue-router', () => ({
     query: routeQuery.value,
   }),
   useRouter: () => ({
-    push: vi.fn(),
+    push: pushMock,
   }),
 }))
 
@@ -122,6 +125,106 @@ describe('Flashcards.vue Integration', () => {
     await flushPromises()
 
     expect(wrapper.find('.done-panel').exists()).toBe(true)
+  })
+
+  it('renders View in PDF button on back face when card.page exists and navigates to reader', async () => {
+    appApi.getNotebooks.mockResolvedValue([{ id: 'nb-1', title: 'Calculus 101' }])
+    appApi.getNotebookTopicTree.mockResolvedValue([
+      {
+        notebook_id: 'nb-1',
+        title: 'Calculus 101',
+        topics: [
+          { topic_id: 'top-1', title: 'Derivatives', start_page: 30, end_page: 55 },
+        ],
+      },
+    ])
+    appApi.generateManualFlashcards.mockResolvedValue({
+      cards: [{ id: 'fc-1', prompt: 'Derivative of sin(x)?', answer: 'cos(x)', page: 42, topic_id: 'top-1' }],
+    })
+    routeQuery.value = { taskId: 'task-review-99', notebookId: 'nb-1' }
+
+    const wrapper = mount(Flashcards)
+    await flushPromises()
+
+    await wrapper.find('#fc-notebook-select').setValue('nb-1')
+    await wrapper.find('#fc-generate-btn').trigger('click')
+    await flushPromises()
+
+    // Flip to answer
+    await wrapper.find('#fc-reveal-btn').trigger('click')
+    expect(wrapper.find('.flashcard').classes()).toContain('flipped')
+
+    // PDF button should exist on the back face
+    const pdfBtn = wrapper.find('.view-pdf-btn')
+    expect(pdfBtn.exists()).toBe(true)
+    expect(pdfBtn.text()).toContain('p. 42 ↗')
+
+    // Click it and verify navigation includes reading session bounds
+    await pdfBtn.trigger('click')
+    await flushPromises()
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/reader',
+      query: {
+        notebookId: 'nb-1',
+        topicId: 'top-1',
+        page: 42,
+        sessionStart: 30,
+        sessionEnd: 55,
+        from: 'flashcards',
+        flashcardTaskId: 'task-review-99',
+      },
+    })
+  })
+
+  it('matches bounded reading session slot (e.g. 84 to 90) rather than whole chapter (84 to 100)', async () => {
+    appApi.getNotebooks.mockResolvedValue([{ id: 'nb-1', title: 'Calculus 101' }])
+    appApi.getNotebookTopicTree.mockResolvedValue([
+      {
+        notebook_id: 'nb-1',
+        title: 'Calculus 101',
+        topics: [
+          { topic_id: 'top-1', title: 'Chapter 4', start_page: 84, end_page: 100 },
+        ],
+      },
+    ])
+    appApi.getTopicStudyNoteSlots.mockResolvedValue({
+      slots: [
+        { start_page: 84, end_page: 90 },
+        { start_page: 91, end_page: 100 },
+      ],
+    })
+    appApi.generateManualFlashcards.mockResolvedValue({
+      cards: [{ id: 'fc-1', prompt: 'Q', answer: 'A', page: 85, topic_id: 'top-1' }],
+    })
+    routeQuery.value = { taskId: 'task-review-99', notebookId: 'nb-1' }
+
+    const wrapper = mount(Flashcards)
+    await flushPromises()
+
+    await wrapper.find('#fc-notebook-select').setValue('nb-1')
+    await wrapper.find('#fc-generate-btn').trigger('click')
+    await flushPromises()
+
+    // Flip to answer
+    await wrapper.find('#fc-reveal-btn').trigger('click')
+    const pdfBtn = wrapper.find('.view-pdf-btn')
+    expect(pdfBtn.text()).toContain('p. 85 ↗')
+
+    await pdfBtn.trigger('click')
+    await flushPromises()
+
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/reader',
+      query: {
+        notebookId: 'nb-1',
+        topicId: 'top-1',
+        page: 85,
+        sessionStart: 84,
+        sessionEnd: 90,
+        from: 'flashcards',
+        flashcardTaskId: 'task-review-99',
+      },
+    })
   })
 })
 

@@ -93,19 +93,19 @@
             </div>
             <!-- Action Toolbar: Visible inline on wide screens, collapses to overflow menu on narrow/congested screens -->
             <div class="stage-actions-inline">
-              <!-- Back to Notes Button (when navigated from Notes) -->
+              <!-- Back to Notes / Flashcards Button (when navigated from Notes or Flashcards) -->
               <button
-                v-if="route.query.from === 'notes'"
+                v-if="route.query.from === 'notes' || route.query.from === 'flashcards'"
                 class="secondary"
-                title="Return to Study Notes"
-                @click="goBackToNotes"
+                :title="route.query.from === 'flashcards' ? 'Return to Flashcards' : 'Return to Study Notes'"
+                @click="goBackToSource"
               >
                 <BaseIcon name="arrow-left" size="14" />
-                <span>Back to Notes</span>
+                <span>{{ route.query.from === 'flashcards' ? 'Back to Flashcards' : 'Back to Notes' }}</span>
               </button>
 
-              <!-- Session Bounded Actions: Only available during bounded reading tasks -->
-              <template v-if="isTaskFlow">
+              <!-- Session Bounded Actions: Available during task flow and reference sessions -->
+              <template v-if="isStudySession">
                 <!-- Copy Session -->
                 <button
                   class="secondary copy-session-btn"
@@ -166,7 +166,7 @@
             </div>
 
             <!-- Responsive Overflow Menu: Only displays when toolbar is congested (<1280px or mobile) -->
-            <div v-if="isTaskFlow" class="split-dropdown-wrapper more-actions-wrapper">
+            <div v-if="isStudySession" class="split-dropdown-wrapper more-actions-wrapper">
               <button
                 class="secondary more-actions-btn"
                 :class="{ active: showMoreMenu || showAudioOverview }"
@@ -226,13 +226,17 @@
               {{ copyError }}
             </span>
           </div>
-          <div v-if="isTaskFlow" class="stage-head-right">
-            <span v-if="reader.hasNavigationBounds.value" class="reading-window-info" :title="`Reading Window: Pages ${reader.sessionStartPage.value || reader.navigationMinPage.value}-${reader.sessionEndPage.value || reader.navigationMaxPage.value}`">
+          <div v-if="isStudySession" class="stage-head-right">
+            <span v-if="isTaskFlow && reader.hasNavigationBounds.value" class="reading-window-info" :title="`Reading Window: Pages ${reader.sessionStartPage.value || reader.navigationMinPage.value}-${reader.sessionEndPage.value || reader.navigationMaxPage.value}`">
               <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ reader.sessionStartPage.value || reader.navigationMinPage.value }}-{{
                 reader.sessionEndPage.value || reader.navigationMaxPage.value
               }}
             </span>
+            <span v-else-if="isReferenceSession && hasReferenceBounds" class="reading-window-info" :title="`Reference Window: Pages ${referenceStartPage}-${referenceEndPage}`">
+              <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ referenceStartPage }}-{{ referenceEndPage }}
+            </span>
             <button
+              v-if="isTaskFlow"
               class="secondary skip-session-btn"
               :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
               title="Skip this session — pages marked as read, no quiz generated"
@@ -454,8 +458,8 @@ async function handleSimplify() {
   if (simplifying.value) return
   simplifying.value = true
   try {
-    const startPage = reader.effectiveMinPage.value
-    const endPage = reader.effectiveMaxPage.value
+    const startPage = isReferenceSession.value ? referenceStartPage.value : reader.effectiveMinPage.value
+    const endPage = isReferenceSession.value ? referenceEndPage.value : reader.effectiveMaxPage.value
     const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
     const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
     const topicTitle = cleanTopicTitle(rawTopic)
@@ -582,8 +586,14 @@ const showAudioMenu = ref(false)
 const audioStartPage = ref(0)
 const audioEndPage = ref(0)
 
-const defaultAudioStart = computed(() => reader.effectiveMinPage.value)
-const defaultAudioEnd = computed(() => reader.effectiveMaxPage.value)
+const defaultAudioStart = computed(() => {
+  if (isReferenceSession.value) return referenceStartPage.value
+  return reader.effectiveMinPage.value
+})
+const defaultAudioEnd = computed(() => {
+  if (isReferenceSession.value) return referenceEndPage.value
+  return reader.effectiveMaxPage.value
+})
 
 function toggleAudioMenu() {
   showAudioMenu.value = !showAudioMenu.value
@@ -639,14 +649,24 @@ function onSimplifyClick() {
 }
 
 
-function goBackToNotes() {
+function goBackToSource() {
+  if (route.query.from === 'flashcards') {
+    router.push({
+      path: '/flashcards',
+      query: {
+        notebookId: reader.selectedNotebookID.value || undefined,
+        taskId: route.query.flashcardTaskId || route.query.taskId || route.query.task_id || undefined,
+      },
+    })
+    return
+  }
   router.push({
     path: '/notes',
     query: {
       notebookId: reader.selectedNotebookID.value || undefined,
       topicId: reader.selectedTopicID.value || undefined,
       from: route.query.fromOrigin || undefined,
-      taskId: route.query.taskId || route.query.task_id || undefined,
+      taskId: route.query.flashcardTaskId || route.query.taskId || route.query.task_id || undefined,
       page: reader.currentPage.value || route.query.page || undefined,
     },
   })
@@ -814,6 +834,30 @@ const isTaskFlow = computed(() => {
   const settled = reader.readerContext.value
   if (settled) return settled.mode === 'task'
   return !!routeTaskID.value
+})
+
+const isReferenceSession = computed(() => {
+  return !isTaskFlow.value && (route.query.from === 'notes' || !!route.query.sessionStart)
+})
+
+const isStudySession = computed(() => {
+  return isTaskFlow.value || isReferenceSession.value
+})
+
+const referenceStartPage = computed(() => {
+  const qStart = Number.parseInt(route.query.sessionStart || route.query.startPage || route.query.page)
+  if (Number.isFinite(qStart) && qStart > 0) return qStart
+  return reader.topicStartPage.value || reader.currentPage.value || 1
+})
+
+const referenceEndPage = computed(() => {
+  const qEnd = Number.parseInt(route.query.sessionEnd || route.query.endPage)
+  if (Number.isFinite(qEnd) && qEnd > 0) return qEnd
+  return reader.topicEndPage.value || referenceStartPage.value || reader.pageCount.value || 1
+})
+
+const hasReferenceBounds = computed(() => {
+  return isReferenceSession.value && referenceStartPage.value > 0 && referenceEndPage.value >= referenceStartPage.value
 })
 
 // Trust-based completion: user decides when reading is complete.
@@ -1090,8 +1134,8 @@ const copiedSession = ref(false)
 const copyError = ref('')
 
 async function copySessionContent() {
-  const startPage = reader.effectiveMinPage.value
-  const endPage = reader.effectiveMaxPage.value
+  const startPage = isReferenceSession.value ? referenceStartPage.value : reader.effectiveMinPage.value
+  const endPage = isReferenceSession.value ? referenceEndPage.value : reader.effectiveMaxPage.value
   const bookTitle = reader.selectedNotebookTitle.value || 'Notebook'
   const rawTopic = reader.topicTitle.value || reader.selectedTopicTitle.value || 'Reading Session'
   const topicTitle = cleanTopicTitle(rawTopic)
