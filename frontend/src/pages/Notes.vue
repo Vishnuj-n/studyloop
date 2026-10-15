@@ -222,8 +222,8 @@
                   <div class="chapter-item-header">
                     <span
                       class="status-dot"
-                      :class="!topic.has_note ? 'dot-missing-note' : (topic.last_reviewed_at > 0 ? 'dot-reviewed' : 'dot-unreviewed')"
-                      :title="!topic.has_note ? 'No Study Note Yet' : (topic.last_reviewed_at > 0 ? ('Reviewed ' + topic.last_reviewed_text) : 'Notes Ready (Unreviewed)')"
+                      :class="getTopicDotClass(topic)"
+                      :title="getTopicDotTitle(topic)"
                     ></span>
                     <span class="chapter-item-title" :title="topic.title">{{ topic.title }}</span>
                   </div>
@@ -588,13 +588,13 @@
                       type="button"
                       class="icon-btn-pill"
                       :class="slot.last_reviewed_at ? 'success reviewed-active' : 'mark-review-btn'"
-                      :title="slot.last_reviewed_at ? 'Reviewed — click to mark reviewed again' : 'Mark session as reviewed'"
+                      :title="slot.last_reviewed_at ? 'Reviewed — click to unmark' : 'Mark session as reviewed'"
                       :disabled="markingSlotKey === getSlotKey(slot) || isSlotGenerating(slot)"
                       @click="markSlotReviewed(slot)"
                     >
                       <BaseIcon :name="slot.last_reviewed_at ? 'check-circle' : 'check'" size="14" />
                       <span>
-                        {{ markingSlotKey === getSlotKey(slot) ? 'Marking...' : (slot.last_reviewed_at ? 'Reviewed' : 'Mark as Reviewed') }}
+                        {{ getMarkReviewBtnText(slot) }}
                       </span>
                     </button>
                   </template>
@@ -723,6 +723,7 @@ import {
   reorderTopicStudyNotes,
   saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
+  unmarkTopicReviewed as apiUnmarkTopicReviewed,
   openNotesFolder,
   getStudyNotesSettings,
   setStudyNotesSettings,
@@ -1608,36 +1609,59 @@ async function markSlotReviewed(slot) {
   const key = getSlotKey(slot)
   markingSlotKey.value = key
   errorMsg.value = ''
+  const isCurrentlyReviewed = Boolean(slot.last_reviewed_at)
   try {
-    const res = await apiMarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+    const res = isCurrentlyReviewed
+      ? await apiUnmarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+      : await apiMarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+
     if (res && res.error) {
       errorMsg.value = res.error
       return
     }
-    const nowSec = Math.floor(Date.now() / 1000)
-    slot.last_reviewed_at = nowSec
 
-    // Also update notesMap entry so sidebar topic dot dynamically updates to green
+    const nextReviewedAt = isCurrentlyReviewed ? 0 : Math.floor(Date.now() / 1000)
+    slot.last_reviewed_at = nextReviewedAt
+
+    // Also update notesMap entry so sidebar topic dot dynamically updates
     if (slot.topic_id && notesMap.value[slot.topic_id]) {
       const topicNotes = notesMap.value[slot.topic_id]
       const noteEntry = topicNotes.find(
         (n) => n.start_page === slot.start_page && n.end_page === slot.end_page
       )
       if (noteEntry) {
-        noteEntry.last_reviewed_at = nowSec
+        noteEntry.last_reviewed_at = nextReviewedAt
       } else if (topicNotes.length > 0) {
-        topicNotes[0].last_reviewed_at = nowSec
+        topicNotes[0].last_reviewed_at = nextReviewedAt
       }
     }
 
-    successMsg.value = 'Marked as reviewed.'
+    successMsg.value = isCurrentlyReviewed ? 'Marked as unreviewed.' : 'Marked as reviewed.'
     setTimeout(() => { successMsg.value = '' }, 3000)
   } catch (err) {
-    console.error('[NOTES] Failed to mark reviewed:', err)
-    errorMsg.value = 'Failed to mark reviewed.'
+    console.error('[NOTES] Failed to toggle reviewed status:', err)
+    errorMsg.value = isCurrentlyReviewed ? 'Failed to unmark reviewed.' : 'Failed to mark reviewed.'
   } finally {
     markingSlotKey.value = null
   }
+}
+
+function getTopicDotClass(topic) {
+  if (!topic.has_note) return 'dot-missing-note'
+  if (topic.last_reviewed_at > 0) return 'dot-reviewed'
+  return 'dot-unreviewed'
+}
+
+function getTopicDotTitle(topic) {
+  if (!topic.has_note) return 'No Study Note Yet'
+  if (topic.last_reviewed_at > 0) return `Reviewed ${topic.last_reviewed_text}`
+  return 'Notes Ready (Unreviewed)'
+}
+
+function getMarkReviewBtnText(slot) {
+  if (markingSlotKey.value === getSlotKey(slot)) return 'Marking...'
+  if (slot.last_reviewed_at) return 'Reviewed'
+  return 'Mark as Reviewed'
 }
 
 watch(
@@ -1955,8 +1979,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.dot-reviewed,
-.dot-has-note {
+.dot-reviewed {
   background: #10b981;
   box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
 }

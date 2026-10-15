@@ -243,6 +243,18 @@ func TestGenerateTopicStudyNoteForRange_SessionSlots(t *testing.T) {
 		t.Errorf("expected last_reviewed_at >= %d, got %d", beforeReview, afterReview.LastReviewedAt)
 	}
 
+	// 5b. Unmark reviewed (revert to 0)
+	if err := svc.UnmarkTopicReviewed(topicID, 1, 10); err != nil {
+		t.Fatalf("failed to unmark reviewed: %v", err)
+	}
+	afterUnmark, err := svc.GetTopicStudyNoteForRange(topicID, 1, 10)
+	if err != nil {
+		t.Fatalf("failed to refetch note after unmark: %v", err)
+	}
+	if afterUnmark.LastReviewedAt != 0 {
+		t.Errorf("expected last_reviewed_at == 0 after unmark, got %d", afterUnmark.LastReviewedAt)
+	}
+
 	// 6. Test User Notes Preservation on AI Regeneration
 	userNoteContent := "**Basics**: Multi-layer perceptrons.\n\n### My Notes\n- Remember to review Figure 9.1\n- ![Pasted Diagram](assets/screenshot_123.png)"
 	if err := svc.UpdateTopicStudyNote(topicID, 1, 10, userNoteContent); err != nil {

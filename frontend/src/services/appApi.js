@@ -677,6 +677,15 @@ export function markTopicReviewed(topicID, startPage = 0, endPage = 0) {
   }
 }
 
+export function unmarkTopicReviewed(topicID, startPage = 0, endPage = 0) {
+  try {
+    return appBridge().UnmarkTopicReviewed(topicID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed unmarking topic reviewed:', err)
+    throw err
+  }
+}
+
 export function openNotesFolder(notebookID = '', topicID = '') {
   try {
     return appBridge().OpenNotesFolder(notebookID || '', topicID || '')
