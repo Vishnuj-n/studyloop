@@ -324,7 +324,17 @@ export function updateProfile(id, name, deadlineStr) {
 }
 
 export function updateProfileWithInheritance(id, name, deadlineStr, inheritedIDs) {
-  return appBridge().UpdateProfileWithInheritance(id, name, deadlineStr, inheritedIDs || [])
+  const bridge = appBridge()
+  console.log('[appApi] updateProfileWithInheritance invoking bridge:', {
+    hasMethod: typeof bridge.UpdateProfileWithInheritance === 'function',
+    availableMethods: Object.keys(bridge).filter((k) => k.toLowerCase().includes('profile')),
+    args: { id, name, deadlineStr, inheritedIDs: inheritedIDs || [] },
+  })
+  if (typeof bridge.UpdateProfileWithInheritance !== 'function') {
+    console.error('[appApi] bridge.UpdateProfileWithInheritance is NOT A FUNCTION on window.go.app.App!')
+    throw new Error('UpdateProfileWithInheritance backend method not found on bridge')
+  }
+  return bridge.UpdateProfileWithInheritance(id, name, deadlineStr, inheritedIDs || [])
 }
 
 export function updateProfileFlashcardInheritance(profileID, inheritedIDs) {

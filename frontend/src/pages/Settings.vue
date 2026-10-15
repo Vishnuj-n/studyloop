@@ -588,7 +588,7 @@ onUnmounted(() => {
   display: flex;
   margin: -16px -20px;
   height: calc(100% + 32px);
-  min-height: calc(100vh);
+  min-height: 100%;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);

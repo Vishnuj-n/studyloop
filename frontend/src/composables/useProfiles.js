@@ -40,9 +40,12 @@ export function useProfiles(errorRef) {
   }
 
   async function handleAddProfile({ name, deadline }) {
+    console.log('[useProfiles] handleAddProfile called', { name, deadline })
     try {
       const res = await createProfile(name, deadline)
+      console.log('[useProfiles] createProfile response:', res)
       if (res.error) {
+        console.error('[useProfiles] createProfile error:', res.error)
         await alert('Profile Error', res.error)
         return
       }
@@ -50,12 +53,19 @@ export function useProfiles(errorRef) {
       await loadProfiles()
       return true
     } catch (err) {
+      console.error('[useProfiles] createProfile exception:', err)
       await alert('Error', err.message || 'Failed to create profile')
       return false
     }
   }
 
   async function handleUpdateProfile({ name, deadline, inheritedProfileIds }) {
+    console.log('[useProfiles] handleUpdateProfile called', {
+      editProfileId: editProfileId.value,
+      name,
+      deadline,
+      inheritedProfileIds,
+    })
     try {
       const res = await updateProfileWithInheritance(
         editProfileId.value,
@@ -63,7 +73,9 @@ export function useProfiles(errorRef) {
         deadline,
         inheritedProfileIds !== undefined ? inheritedProfileIds : editProfileInherited.value
       )
+      console.log('[useProfiles] updateProfileWithInheritance response:', res)
       if (res.error) {
+        console.error('[useProfiles] updateProfileWithInheritance error:', res.error)
         await alert('Profile Error', res.error)
         return
       }
@@ -71,6 +83,7 @@ export function useProfiles(errorRef) {
       await loadProfiles()
       return true
     } catch (err) {
+      console.error('[useProfiles] updateProfileWithInheritance exception:', err)
       await alert('Error', err.message || 'Failed to update profile')
       return false
     }

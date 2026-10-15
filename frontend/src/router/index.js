@@ -66,6 +66,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
+  console.log(`[Router Navigation] from "${from.fullPath || from.path}" -> to "${to.fullPath || to.path}"`)
   if (to.path === '/onboarding') {
     next()
     return
@@ -87,14 +88,15 @@ router.beforeEach(async (to, from, next) => {
         'onboarding_redirect',
         JSON.stringify({ target: to.path, res })
       )
+      console.log('[Router Navigation] Redirecting to /onboarding (not onboarded)')
       next('/onboarding')
     } else {
-      // Check if startup profile selection is needed
+      // Check if startup profile selection is needed on initial launch
       if (to.path !== '/select-profile') {
         const askStartup = localStorage.getItem('studyloop_ask_profile_on_startup')
         const alreadyShown = sessionStorage.getItem('studyloop_profile_picker_shown')
 
-        if (askStartup !== 'false' && !alreadyShown) {
+        if (askStartup !== 'false' && !alreadyShown && (!from.name || from.path === '/')) {
           try {
             const { getProfiles, getUserSettings } = await import('../services/appApi')
             const [profilesRes, settingsRes] = await Promise.all([
@@ -103,6 +105,8 @@ router.beforeEach(async (to, from, next) => {
             ])
             const profiles = Array.isArray(profilesRes?.profiles) ? profilesRes.profiles : []
             if (profiles.length > 1 && settingsRes?.ask_profile_on_startup !== false) {
+              sessionStorage.setItem('studyloop_profile_picker_shown', 'true')
+              console.log('[Router Navigation] Routing to /select-profile on startup')
               next('/select-profile')
               return
             }
@@ -110,7 +114,10 @@ router.beforeEach(async (to, from, next) => {
             // Fail open to standard navigation if profile check fails
           }
         }
+        // Mark as shown once user is actively navigating within app
+        sessionStorage.setItem('studyloop_profile_picker_shown', 'true')
       }
+      console.log(`[Router Navigation] Proceeding to ${to.path}`)
       next()
     }
   } catch (err) {
@@ -120,8 +127,21 @@ router.beforeEach(async (to, from, next) => {
       'onboarding_check_error',
       JSON.stringify({ target: to.path, error: String(err) })
     )
+    console.error('[Router Navigation] Error during route guard:', err)
     next()
   }
+})
+
+router.afterEach((to, from, failure) => {
+  if (failure) {
+    console.error('[Router afterEach] Navigation failed/aborted:', failure)
+  } else {
+    console.log(`[Router afterEach] Successfully navigated to: ${to.fullPath || to.path}`)
+  }
+})
+
+router.onError((error) => {
+  console.error('[Router onError] Uncaught navigation error:', error)
 })
 
 export default router

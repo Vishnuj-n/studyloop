@@ -39,6 +39,7 @@ vi.mock('../services/appApi', () => ({
   getTopicSectionsContent: vi.fn().mockResolvedValue({ sections: [] }),
   getTopicCompressionStats: vi.fn().mockResolvedValue({ is_compressed: false }),
   skipReadingTask: vi.fn(),
+  getTopicStudyNoteSlots: vi.fn().mockResolvedValue({ slots: [] }),
 }))
 
 // Mock VuePdfEmbed since we cannot load PDF canvas in JSDOM
@@ -497,5 +498,84 @@ describe('Reader.vue Integration', () => {
     expect(wrapper.find('.split-main-btn').exists()).toBe(false)
     expect(wrapper.find('.skip-session-btn').exists()).toBe(false)
   })
+
+  it('shows immediately preceding session notes in recap modal instead of chapter summary or first session', async () => {
+    appApi.getUserSettings.mockResolvedValue({
+      rag_enabled: true,
+      auto_generate_study_notes: true,
+      show_recap_before_reading: true,
+    })
+
+    // Active reading task for session 3 (pages 11 to 15)
+    appApi.initializeReadingSession.mockResolvedValueOnce({
+      ok: true,
+      task: {
+        id: 'task-read-session-3',
+        task_type: 'READING',
+        notebook_id: 'nb-1',
+        topic_id: 'topic-1',
+        start_page: 11,
+        end_page: 15,
+      },
+      page_bounds: {
+        start_page: 11,
+        end_page: 15,
+        current_page: 11,
+      },
+      navigation: { some_state: {} },
+      bundle: {
+        topic_title: 'Intro to AI',
+        notebook_url: 'http://localhost/test.pdf',
+        file_type: 'pdf',
+        page_count: 20,
+        topic_start_page: 1,
+        topic_end_page: 20,
+        sections: [],
+      },
+    })
+
+    // Available notes: chapter summary (0,0), session 1 (1,5), session 2 (6,10)
+    appApi.getTopicStudyNoteSlots.mockResolvedValueOnce({
+      slots: [
+        {
+          start_page: 0,
+          end_page: 0,
+          content: '# Whole Chapter Summary Overview',
+        },
+        {
+          start_page: 1,
+          end_page: 5,
+          content: '### Session 1 Notes: Basics',
+        },
+        {
+          start_page: 6,
+          end_page: 10,
+          content: '### Session 2 Notes: Intermediate Architecture',
+        },
+      ],
+    })
+
+    routeQuery.value = {
+      taskId: 'task-read-session-3',
+      notebookId: 'nb-1',
+      topicId: 'topic-1',
+    }
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    // Recap modal should pop up with Session 2 notes (pages 6-10), NOT Session 1 or Chapter summary
+    const recapModal = wrapper.findComponent({ name: 'PreviousSessionRecapModal' })
+    expect(recapModal.exists()).toBe(true)
+    expect(recapModal.props('show')).toBe(true)
+    expect(recapModal.props('previousSlot')).toEqual(
+      expect.objectContaining({
+        start_page: 6,
+        end_page: 10,
+        content: '### Session 2 Notes: Intermediate Architecture',
+      })
+    )
+  })
 })
+
 

@@ -47,11 +47,10 @@
               :class="{ selected: selectedInherited.includes(prof.id) }"
             >
               <input
+                v-model="selectedInherited"
                 type="checkbox"
                 class="inheritance-checkbox"
                 :value="prof.id"
-                :checked="selectedInherited.includes(prof.id)"
-                @change="toggleInherited(prof.id)"
               />
               <span class="profile-name-bold">{{ prof.name }}</span>
               <span class="due-count-pill" :class="{ 'has-due': getDueCount(prof.id) > 0 }">
@@ -63,13 +62,13 @@
       </div>
 
       <div class="modal-actions">
-        <button class="cancel-btn" @click="$emit('close')">Cancel</button>
+        <button class="cancel-btn" :disabled="isSaving" @click="$emit('close')">Cancel</button>
         <button
           class="save-btn"
-          :disabled="!localName || !localDeadline"
+          :disabled="!localName || !localDeadline || isSaving"
           @click="handleSave"
         >
-          {{ isEdit ? 'Save Changes' : 'Create Profile' }}
+          {{ isSaving ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Profile') }}
         </button>
       </div>
     </div>
@@ -96,6 +95,7 @@ const localName = ref(props.initialName)
 const localDeadline = ref(props.initialDeadline)
 const selectedInherited = ref([...(props.initialInherited || [])])
 const profileDueMap = ref({})
+const isSaving = ref(false)
 
 const otherProfiles = computed(() => {
   if (!props.allProfiles || !props.currentProfileId) return []
@@ -106,21 +106,28 @@ function getDueCount(profileId) {
   return profileDueMap.value[profileId] ?? 0
 }
 
-function toggleInherited(profileId) {
-  const idx = selectedInherited.value.indexOf(profileId)
-  if (idx > -1) {
-    selectedInherited.value.splice(idx, 1)
-  } else {
-    selectedInherited.value.push(profileId)
-  }
-}
-
-function handleSave() {
-  emit('save', {
+async function handleSave() {
+  if (isSaving.value) return
+  isSaving.value = true
+  console.log('[SettingsProfileModal] Save Changes button pressed', {
     name: localName.value,
     deadline: localDeadline.value,
     inheritedProfileIds: [...selectedInherited.value],
+    isEdit: props.isEdit,
+    currentProfileId: props.currentProfileId,
   })
+  try {
+    await emit('save', {
+      name: localName.value,
+      deadline: localDeadline.value,
+      inheritedProfileIds: [...selectedInherited.value],
+    })
+  } finally {
+    // If modal remains open on error, release saving state
+    setTimeout(() => {
+      isSaving.value = false
+    }, 500)
+  }
 }
 
 onMounted(async () => {

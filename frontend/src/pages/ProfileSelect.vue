@@ -350,13 +350,19 @@ function handleKeydown(e) {
   if (loading.value || profiles.value.length === 0) return
 
   // Digits 1..9 directly select profile (main keyboard or numpad)
-  const digitMatch = (typeof e.key === 'string' && e.key.match(/^[1-9]$/))
-    || (typeof e.code === 'string' && e.code.match(/^(?:Digit|Numpad)([1-9])$/))
-  if (digitMatch) {
-    const num = parseInt(digitMatch[1] || digitMatch[0], 10)
-    const idx = num - 1
+  let digit = null
+  if (/^[1-9]$/.test(e.key)) {
+    digit = parseInt(e.key, 10)
+  } else if (/^(?:Digit|Numpad)([1-9])$/.test(e.code)) {
+    const match = e.code.match(/^(?:Digit|Numpad)([1-9])$/)
+    digit = parseInt(match[1], 10)
+  }
+
+  if (digit !== null) {
+    const idx = digit - 1
     if (idx >= 0 && idx < profiles.value.length) {
       e.preventDefault()
+      e.stopPropagation()
       selectProfile(profiles.value[idx].id)
       return
     }

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	stdruntime "runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -782,8 +783,17 @@ func (a *App) UpdateProfile(id string, name string, deadlineStr string) map[stri
 	if id == "" || name == "" {
 		return map[string]interface{}{"error": "id and name are required"}
 	}
-	deadlineTime, err := time.Parse(dateFormatYYYYMMDD, deadlineStr)
-	if err != nil {
+	deadlineStr = strings.TrimSpace(deadlineStr)
+	var deadlineTime time.Time
+	if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
+		deadlineTime = t
+	} else if t, err := time.Parse("02-01-2006", deadlineStr); err == nil {
+		deadlineTime = t
+	} else if t, err := time.Parse(time.RFC3339, deadlineStr); err == nil {
+		deadlineTime = t
+	} else if unixSec, err := strconv.ParseInt(deadlineStr, 10, 64); err == nil && unixSec > 0 {
+		deadlineTime = time.Unix(unixSec, 0)
+	} else {
 		return map[string]interface{}{"error": "failed to parse deadline: " + err.Error()}
 	}
 	current, err := repo.GetProfileByID(id)
@@ -812,16 +822,19 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 	if id == "" || name == "" {
 		return map[string]interface{}{"error": "id and name are required"}
 	}
-	deadlineTime, err := time.Parse(dateFormatYYYYMMDD, deadlineStr)
-	if err != nil {
+	deadlineStr = strings.TrimSpace(deadlineStr)
+	var deadlineTime time.Time
+	if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
+		deadlineTime = t
+	} else if t, err := time.Parse("02-01-2006", deadlineStr); err == nil {
+		deadlineTime = t
+	} else if t, err := time.Parse(time.RFC3339, deadlineStr); err == nil {
+		deadlineTime = t
+	} else if unixSec, err := strconv.ParseInt(deadlineStr, 10, 64); err == nil && unixSec > 0 {
+		deadlineTime = time.Unix(unixSec, 0)
+	} else {
 		return map[string]interface{}{"error": "failed to parse deadline: " + err.Error()}
 	}
-
-	tx, err := repo.Begin()
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	current, err := repo.GetProfileByID(id)
 	if err != nil {
@@ -830,6 +843,12 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 	if current == nil {
 		return map[string]interface{}{"error": "profile not found"}
 	}
+
+	tx, err := repo.Begin()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	defer func() { _ = tx.Rollback() }()
 	current.Name = name
 	current.DeadlineAt = deadlineTime.Unix()
 
