@@ -289,6 +289,16 @@
             </div>
             <div class="note-header-actions">
               <button
+                v-if="isFromQuiz"
+                type="button"
+                class="secondary-btn btn-sm back-quiz-btn"
+                title="Return to Milestone Exam"
+                @click="goBackToQuiz"
+              >
+                <BaseIcon name="arrow-left" size="14" />
+                <span>Back to Exam</span>
+              </button>
+              <button
                 v-if="isFromFlashcards"
                 type="button"
                 class="secondary-btn btn-sm back-flashcards-btn"
@@ -327,6 +337,23 @@
               </button>
             </div>
           </header>
+
+          <!-- Quiz Navigation Context Banner -->
+          <div v-if="isFromQuiz" class="notes-flashcard-context-banner notes-quiz-context-banner">
+            <div class="banner-left">
+              <BaseIcon name="award" size="15" class="banner-icon" />
+              <span>Reviewing chapter notes before Milestone Exam</span>
+            </div>
+            <button
+              type="button"
+              class="banner-return-btn"
+              title="Return to Milestone Exam"
+              @click="goBackToQuiz"
+            >
+              <span>Ready for Exam</span>
+              <BaseIcon name="arrow-right" size="13" />
+            </button>
+          </div>
 
           <!-- Flashcard Navigation Context Banner -->
           <div v-if="isFromFlashcards" class="notes-flashcard-context-banner">
@@ -1002,6 +1029,10 @@ const isFromFlashcards = computed(() => {
   return route.query.from === 'flashcards'
 })
 
+const isFromQuiz = computed(() => {
+  return route.query.from === 'quiz'
+})
+
 const activeNotebook = computed(() => {
   const nbId = activeTopic.value?.notebook_id || selectedNotebookID.value
   if (!nbId) return null
@@ -1109,6 +1140,16 @@ function goBackToFlashcards() {
     query: {
       taskId: route.query.taskId || undefined,
       notebookId: activeTopic.value?.notebook_id || selectedNotebookID.value || undefined,
+    },
+  })
+}
+
+function goBackToQuiz() {
+  router.push({
+    path: '/quiz',
+    query: {
+      taskId: route.query.taskId || undefined,
+      reviewed: '1',
     },
   })
 }

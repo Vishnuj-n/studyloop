@@ -561,6 +561,11 @@ onMounted(async () => {
     activeCategory.value = route.query.tab
   }
 
+  if (route.query.action === 'add' || route.query.add === 'true') {
+    activeCategory.value = 'profiles'
+    showAddModal.value = true
+  }
+
   const [envRes, cfgRes] = await Promise.all([
     getAppEnv().catch(() => null),
     getCloudConfig().catch(() => null),

@@ -392,7 +392,9 @@
     :show="showMilestonePreReview"
     :topics="milestoneReviewTopics"
     :notebook-id="taskMeta?.notebook_id || ''"
+    :task-id="taskID"
     @start-exam="onMilestonePreReviewComplete"
+    @close="onMilestonePreReviewComplete"
   />
 
   <!-- Restart Reading Session Confirmation Modal -->
@@ -710,7 +712,8 @@ async function loadQuizTask() {
         topicList.push({ topic_id: task.topic_id, title })
       }
       milestoneReviewTopics.value = topicList
-      showMilestonePreReview.value = true
+      const skipReview = route.query.reviewed === '1' || route.query.skipReview === '1'
+      showMilestonePreReview.value = !skipReview
     } else {
       isMilestoneExam.value = false
       milestonePayload.value = null

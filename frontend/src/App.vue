@@ -1,6 +1,6 @@
 <script setup>
 import Sidebar from './components/Sidebar.vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import MysteryChestModal from './components/MysteryChestModal.vue'
@@ -13,7 +13,6 @@ import FloatingPet from './components/FloatingPet.vue'
 import RateLimitBanner from './components/RateLimitBanner.vue'
 import ExtensionSetupToast from './components/ExtensionSetupToast.vue'
 import ExtensionSetupModal from './components/ExtensionSetupModal.vue'
-import ProfileLauncherModal from './components/ProfileLauncherModal.vue'
 import { useExtensions } from './composables/useExtensions'
 import {
   getUserSettings,
@@ -35,6 +34,7 @@ const { showNotice, showError } = useToast()
 const { setupModalState, closeSetupModal } = useExtensions()
 
 const route = useRoute()
+const router = useRouter()
 
 const banner = ref({
   show: false,
@@ -389,98 +389,8 @@ function handleDismissPrivacyNotice() {
   showPrivacyNoticePopup.value = false
 }
 
-// Startup / Session Profile Picker
-const cachedAskStartup = localStorage.getItem('studyloop_ask_profile_on_startup')
-const showProfileLauncher = ref(false)
-const launcherProfiles = ref([])
-const activeProfileId = ref(localStorage.getItem('studyloop_cached_active_profile_id') || '')
-const askProfileOnStartup = ref(cachedAskStartup !== 'false')
-const launcherCanDismiss = ref(false)
-
-async function checkStartupProfilePicker() {
-  // If user is on /onboarding route, don't show launcher
-  if (route.path === '/onboarding') return
-
-  // Check if launcher already shown in this browser/app session
-  if (sessionStorage.getItem('studyloop_profile_picker_shown')) return
-
-  // Fast check: if user explicitly disabled startup profile picking in localStorage, skip immediately
-  if (localStorage.getItem('studyloop_ask_profile_on_startup') === 'false') return
-
-  try {
-    const [settingsRes, profilesRes] = await Promise.all([
-      getUserSettings(),
-      getProfiles(),
-    ])
-
-    if (!settingsRes || settingsRes.error) return
-    const profiles = Array.isArray(profilesRes?.profiles) ? profilesRes.profiles : []
-    if (profiles.length <= 1) return
-
-    activeProfileId.value = settingsRes.active_profile_id || ''
-    askProfileOnStartup.value = settingsRes.ask_profile_on_startup !== false
-    localStorage.setItem('studyloop_ask_profile_on_startup', String(askProfileOnStartup.value))
-    if (settingsRes.active_profile_id) {
-      localStorage.setItem('studyloop_cached_active_profile_id', settingsRes.active_profile_id)
-    }
-    launcherProfiles.value = profiles
-
-    if (askProfileOnStartup.value) {
-      launcherCanDismiss.value = false
-      showProfileLauncher.value = true
-      sessionStorage.setItem('studyloop_profile_picker_shown', 'true')
-    }
-  } catch (err) {
-    console.error('Failed to evaluate startup profile picker:', err)
-  }
-}
-
-async function handleSelectLauncherProfile(profileId) {
-  try {
-    const res = await setActiveProfileID(profileId)
-    if (res?.error) {
-      showError(res.error, 'Failed to switch profile')
-      return
-    }
-    activeProfileId.value = profileId
-    localStorage.setItem('studyloop_cached_active_profile_id', profileId)
-    showProfileLauncher.value = false
-    sessionStorage.setItem('studyloop_profile_picker_shown', 'true')
-    window.dispatchEvent(new CustomEvent('settings-updated'))
-    window.dispatchEvent(new CustomEvent('profile-switched', { detail: { profileId } }))
-  } catch (err) {
-    showError(err.message || 'Error switching profile', 'Profile Error')
-  }
-}
-
-async function handleUpdateStartupPreference(enabled) {
-  askProfileOnStartup.value = enabled
-  localStorage.setItem('studyloop_ask_profile_on_startup', String(enabled))
-  try {
-    const current = await getUserSettings()
-    if (current && !current.error) {
-      await updateUserSettings({ ...current, ask_profile_on_startup: enabled })
-    }
-  } catch (err) {
-    console.error('Failed to persist startup profile preference:', err)
-  }
-}
-
 function handleOpenLauncherFromEvent() {
-  getProfiles().then((res) => {
-    launcherProfiles.value = Array.isArray(res?.profiles) ? res.profiles : []
-    getUserSettings().then((s) => {
-      activeProfileId.value = s?.active_profile_id || ''
-      askProfileOnStartup.value = s?.ask_profile_on_startup !== false
-      launcherCanDismiss.value = true
-      showProfileLauncher.value = true
-    })
-  })
-}
-
-function handleManageProfilesFromLauncher() {
-  showProfileLauncher.value = false
-  window.location.hash = '#/settings?category=profiles'
+  router.push('/select-profile')
 }
 
 let cancelIngestionListener = null
@@ -491,7 +401,6 @@ onMounted(() => {
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
   window.addEventListener('open-profile-launcher', handleOpenLauncherFromEvent)
-  checkStartupProfilePicker()
   checkAppUpdates()
   checkOneTimeReleaseNotes()
   checkOneTimePrivacyNotice()
@@ -529,7 +438,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
-    <Sidebar v-if="route.path !== '/onboarding'" />
+    <Sidebar v-if="route.path !== '/onboarding' && route.path !== '/select-profile'" />
 
     <main class="content-shell">
       <!-- Update Alert Modal -->
@@ -642,17 +551,6 @@ onUnmounted(() => {
 
       <RouterView />
       <ConfirmModal />
-      <ProfileLauncherModal
-        :is-open="showProfileLauncher"
-        :profiles="launcherProfiles"
-        :active-profile-id="activeProfileId"
-        :ask-profile-on-startup="askProfileOnStartup"
-        :can-dismiss="launcherCanDismiss"
-        @select-profile="handleSelectLauncherProfile"
-        @manage-profiles="handleManageProfilesFromLauncher"
-        @update-startup-preference="handleUpdateStartupPreference"
-        @dismiss="showProfileLauncher = false"
-      />
 
       <RewardToast
         v-if="pendingReward"

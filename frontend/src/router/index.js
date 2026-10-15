@@ -53,6 +53,11 @@ const routes = [
   },
   { path: '/settings', name: 'settings', component: Settings },
   { path: '/onboarding', name: 'onboarding', component: Onboarding },
+  {
+    path: '/select-profile',
+    name: 'select-profile',
+    component: () => import('../pages/ProfileSelect.vue'),
+  },
 ]
 
 const router = createRouter({
@@ -84,6 +89,28 @@ router.beforeEach(async (to, from, next) => {
       )
       next('/onboarding')
     } else {
+      // Check if startup profile selection is needed
+      if (to.path !== '/select-profile') {
+        const askStartup = localStorage.getItem('studyloop_ask_profile_on_startup')
+        const alreadyShown = sessionStorage.getItem('studyloop_profile_picker_shown')
+
+        if (askStartup !== 'false' && !alreadyShown) {
+          try {
+            const { getProfiles, getUserSettings } = await import('../services/appApi')
+            const [profilesRes, settingsRes] = await Promise.all([
+              getProfiles(),
+              getUserSettings(),
+            ])
+            const profiles = Array.isArray(profilesRes?.profiles) ? profilesRes.profiles : []
+            if (profiles.length > 1 && settingsRes?.ask_profile_on_startup !== false) {
+              next('/select-profile')
+              return
+            }
+          } catch {
+            // Fail open to standard navigation if profile check fails
+          }
+        }
+      }
       next()
     }
   } catch (err) {
