@@ -451,6 +451,20 @@ func (p *Provider) GenerateAnswer(prompt string) (string, error) {
 
 func resolveLogsDir() string {
 	if os.Getenv("APP_ENV") == "dev" {
+		if dir, err := os.Getwd(); err == nil {
+			curr := dir
+			for {
+				if _, err := os.Stat(filepath.Join(curr, "go.mod")); err == nil {
+					return filepath.Join(curr, "dev_data", "logs")
+				}
+				parent := filepath.Dir(curr)
+				if parent == curr {
+					break
+				}
+				curr = parent
+			}
+			return filepath.Join(dir, "dev_data", "logs")
+		}
 		return filepath.Join("dev_data", "logs")
 	}
 	if cfgDir, err := os.UserConfigDir(); err == nil && cfgDir != "" {
@@ -461,4 +475,5 @@ func resolveLogsDir() string {
 	}
 	return filepath.Join("dev_data", "logs")
 }
+
 
