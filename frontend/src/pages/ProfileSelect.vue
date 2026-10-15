@@ -19,15 +19,17 @@
       </div>
 
       <div v-else class="profiles-grid" role="listbox" aria-label="Available Study Profiles">
-        <div
+        <button
           v-for="(profile, idx) in profiles"
           :key="profile.id"
+          type="button"
           class="profile-picker-card"
           :class="{
             'is-active': profile.id === activeProfileId,
             'is-focused': focusedIndex === idx,
+            'is-submitting': isSubmitting && selectedTargetId === profile.id,
           }"
-          role="option"
+          :aria-label="`Select profile ${profile.name}`"
           :aria-selected="profile.id === activeProfileId"
           tabindex="0"
           @click="selectProfile(profile.id)"
@@ -36,9 +38,13 @@
           @mouseenter="focusedIndex = idx"
         >
           <!-- Shortcut Key Pill -->
-          <div class="card-shortcut-badge" :title="`Press ${idx + 1} to select`">
+          <span
+            class="card-shortcut-badge"
+            :title="`Press ${idx + 1} to select ${profile.name}`"
+            :aria-label="`Shortcut ${idx + 1}`"
+          >
             <kbd>{{ idx + 1 }}</kbd>
-          </div>
+          </span>
 
           <!-- Chrome-style Large Avatar Circle -->
           <div
@@ -88,14 +94,15 @@
               </span>
             </div>
           </div>
-        </div>
+        </button>
 
         <!-- Add Profile Card (Chrome style "Add" slot) -->
-        <div
+        <button
+          type="button"
           class="profile-picker-card add-profile-card"
-          role="button"
           tabindex="0"
           title="Create a new study profile"
+          aria-label="Create a new study profile"
           @click="openAddProfile"
           @keydown.enter.prevent="openAddProfile"
         >
@@ -106,11 +113,11 @@
             <h2 class="profile-name add-label">Add profile</h2>
             <div class="profile-subtext">Set up another workspace</div>
           </div>
-        </div>
+        </button>
       </div>
     </main>
 
-    <!-- Chrome-style Clean Bottom Bar (Pinned to viewport corners) -->
+    <!-- Bottom Bar pinned cleanly at bottom -->
     <footer class="select-footer">
       <div class="footer-corner-left">
         <label class="remember-toggle">
@@ -125,6 +132,11 @@
             <span class="label-hint">(automatically open last active profile)</span>
           </span>
         </label>
+      </div>
+
+      <div class="footer-center-hint" title="You can also use number keys on your keyboard to switch workspace">
+        <BaseIcon name="info" size="13" />
+        <span>Press number keys to open quickly</span>
       </div>
 
       <div class="footer-corner-right">
@@ -171,6 +183,8 @@ const dontAskAgain = ref(!askProfileOnStartup.value)
 const focusedIndex = ref(0)
 const loading = ref(true)
 const canCancel = ref(false)
+const isSubmitting = ref(false)
+const selectedTargetId = ref('')
 
 // Distinctive, harmonious Google Chrome-like avatar gradients
 const AVATAR_PALETTES = [
@@ -225,10 +239,15 @@ async function loadData() {
 }
 
 async function selectProfile(profileId) {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  selectedTargetId.value = profileId
+
   try {
     const res = await setActiveProfileID(profileId)
     if (res?.error) {
       console.error('Failed to set active profile:', res.error)
+      isSubmitting.value = false
       return
     }
 
@@ -238,9 +257,11 @@ async function selectProfile(profileId) {
     window.dispatchEvent(new CustomEvent('settings-updated'))
     window.dispatchEvent(new CustomEvent('profile-switched', { detail: { profileId } }))
 
-    router.replace('/dashboard')
+    await router.replace('/dashboard')
   } catch (err) {
     console.error('Error selecting profile:', err)
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -328,9 +349,12 @@ function profileTaskSubtitle(profile) {
 function handleKeydown(e) {
   if (loading.value || profiles.value.length === 0) return
 
-  // Digits 1..9 directly select profile
-  if (e.key >= '1' && e.key <= '9') {
-    const idx = parseInt(e.key, 10) - 1
+  // Digits 1..9 directly select profile (main keyboard or numpad)
+  const digitMatch = (typeof e.key === 'string' && e.key.match(/^[1-9]$/))
+    || (typeof e.code === 'string' && e.code.match(/^(?:Digit|Numpad)([1-9])$/))
+  if (digitMatch) {
+    const num = parseInt(digitMatch[1] || digitMatch[0], 10)
+    const idx = num - 1
     if (idx >= 0 && idx < profiles.value.length) {
       e.preventDefault()
       selectProfile(profiles.value[idx].id)
@@ -376,11 +400,12 @@ onUnmounted(() => {
   inset: 0;
   z-index: 100;
   display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
   background-color: var(--background);
-  background-image: radial-gradient(circle at 50% 15%, color-mix(in srgb, var(--primary) 7%, transparent) 0%, transparent 60%);
-  padding: 40px 24px;
+  background-image: radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--primary) 7%, transparent) 0%, transparent 65%);
+  padding: 40px 36px 20px;
   box-sizing: border-box;
   overflow-y: auto;
   font-family: inherit;
@@ -393,7 +418,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 36px;
+  gap: 32px;
+  margin: auto 0;
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -496,6 +522,9 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  font-family: inherit;
+  color: inherit;
+  appearance: none;
   cursor: pointer;
   outline: none;
   box-sizing: border-box;
@@ -513,6 +542,13 @@ onUnmounted(() => {
     0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
+.profile-picker-card:active,
+.profile-picker-card.is-submitting {
+  transform: translateY(-1px) scale(0.98);
+  filter: brightness(0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .profile-picker-card.is-active {
   background: color-mix(in srgb, var(--primary) 4%, var(--surface-container-low));
   border-color: var(--primary);
@@ -521,11 +557,29 @@ onUnmounted(() => {
     0 0 0 1.5px var(--primary);
 }
 
-/* Keyboard Shortcut Badge */
+/* Keyboard Shortcut Badge Button */
 .card-shortcut-badge {
   position: absolute;
   top: 12px;
   left: 14px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  outline: none;
+  z-index: 2;
+  transition: transform 0.15s ease;
+}
+
+.card-shortcut-badge:hover kbd {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.card-shortcut-badge:active {
+  transform: scale(0.9);
 }
 
 .card-shortcut-badge kbd {
@@ -537,6 +591,8 @@ onUnmounted(() => {
   border: 1px solid color-mix(in srgb, var(--outline-variant) 50%, transparent);
   border-radius: 6px;
   padding: 2px 6px;
+  display: inline-block;
+  transition: all 0.15s ease;
 }
 
 /* Avatar Circle */
@@ -721,31 +777,46 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* Chrome Bottom Bar (Pinned to viewport corners) */
+/* Chrome Bottom Bar (pinned cleanly at the bottom) */
 .select-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  width: 100%;
+  max-width: 1100px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 32px;
-  background: linear-gradient(to top, color-mix(in srgb, var(--background) 90%, transparent), transparent);
-  pointer-events: none;
+  padding: 16px 0 0;
   box-sizing: border-box;
-  z-index: 10;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .footer-corner-left,
 .footer-corner-right {
   display: inline-flex;
   align-items: center;
-  pointer-events: auto;
+  white-space: nowrap;
 }
 
 .footer-corner-right {
   gap: 12px;
+  white-space: nowrap;
+}
+
+.footer-center-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-text);
+  opacity: 0.65;
+  user-select: none;
+  white-space: nowrap;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.footer-center-hint:hover {
+  opacity: 1;
+  color: var(--on-surface);
 }
 
 .remember-toggle {
@@ -754,6 +825,7 @@ onUnmounted(() => {
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
 }
 
 .chrome-checkbox {
@@ -767,6 +839,7 @@ onUnmounted(() => {
 .checkbox-label {
   font-size: 13px;
   color: var(--on-surface);
+  white-space: nowrap;
 }
 
 .label-hint {

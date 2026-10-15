@@ -313,40 +313,6 @@ input::placeholder {
   letter-spacing: 0.04em;
 }
 
-.info-badge-btn {
-  background: var(--surface-container-high, #e2e8f0);
-  border: 1px solid var(--outline-variant, rgba(0, 0, 0, 0.08));
-  color: var(--on-surface-variant, #64748b);
-  cursor: pointer;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.info-badge-btn:hover,
-.info-badge-btn.active {
-  color: var(--primary, #4f46e5);
-  background: color-mix(in srgb, var(--primary, #4f46e5) 12%, transparent);
-  border-color: color-mix(in srgb, var(--primary, #4f46e5) 30%, transparent);
-}
-
-.inheritance-info-box {
-  padding: 10px 12px;
-  background: var(--surface-container-lowest, #ffffff);
-  border: 1px solid var(--outline-variant, #e2e8f0);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--on-surface);
-  animation: fadeIn 0.2s ease;
-}
-
 .inheritance-desc {
   margin: 0;
   font-size: 12px;

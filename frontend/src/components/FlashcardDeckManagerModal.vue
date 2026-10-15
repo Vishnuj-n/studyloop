@@ -127,7 +127,7 @@
                     'pill-inherited': p.is_inherited,
                     'pill-excluded': !p.is_active && !p.is_inherited
                   }"
-                  :title="p.is_active ? 'Active Profile (Always included in daily queue)' : (p.is_inherited ? 'Inherited in daily queue — click to exclude' : 'Quarantined — click to include in daily queue')"
+                  :title="getProfileTooltip(p)"
                   @click="toggleProfileInheritance(p)"
                 >
                   <span v-if="p.is_active" class="pill-status-dot dot-active"></span>
@@ -620,6 +620,16 @@ function formatTopicTitle(rawTitle) {
       .join(' ')
   }
   return cleaned
+}
+
+function getProfileTooltip(p) {
+  if (p.is_active) {
+    return 'Active Profile (Always included in daily queue)'
+  }
+  if (p.is_inherited) {
+    return 'Inherited in daily queue — click to exclude'
+  }
+  return 'Quarantined — click to include in daily queue'
 }
 
 // Unified due date checker

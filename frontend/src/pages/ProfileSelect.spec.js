@@ -2,25 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ProfileSelect from './ProfileSelect.vue'
 
-const dummyProfiles = [
-  {
-    id: 'prof-1',
-    name: 'October Placement',
-    deadline_at: Math.floor(Date.now() / 1000) + 86400 * 17,
-    pending_tasks: 2,
-    pace: { feasibility_status: 'ON_TRACK' },
-  },
-  {
-    id: 'prof-2',
-    name: 'Kannada Basics',
-    deadline_at: 0,
-    pending_tasks: 5,
-    pace: null,
-  },
-]
-
-const mockPush = vi.fn()
-const mockReplace = vi.fn()
+const { dummyProfiles, mockPush, mockReplace } = vi.hoisted(() => {
+  return {
+    dummyProfiles: [
+      {
+        id: 'prof-1',
+        name: 'October Placement',
+        deadline_at: Math.floor(Date.now() / 1000) + 86400 * 17,
+        pending_tasks: 2,
+        pace: { feasibility_status: 'ON_TRACK' },
+      },
+      {
+        id: 'prof-2',
+        name: 'Kannada Basics',
+        deadline_at: 0,
+        pending_tasks: 5,
+        pace: null,
+      },
+    ],
+    mockPush: vi.fn(),
+    mockReplace: vi.fn(),
+  }
+})
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -59,11 +62,12 @@ describe('ProfileSelect.vue', () => {
     await new Promise((r) => setTimeout(r, 10))
 
     expect(wrapper.text()).toContain('Who is studying today?')
+    expect(wrapper.text()).toContain('Press number keys to open quickly')
     expect(wrapper.text()).toContain('October Placement')
     expect(wrapper.text()).toContain('Kannada Basics')
     expect(wrapper.text()).toContain('17d left')
     expect(wrapper.text()).toContain('No target exam')
-    expect(wrapper.text()).toContain('2 pending study tasks')
+    expect(wrapper.text()).toContain('Last active')
     expect(wrapper.text()).toContain('5 pending study tasks')
   })
 
