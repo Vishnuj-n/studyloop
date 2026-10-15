@@ -803,12 +803,75 @@ func (a *App) UpdateProfile(id string, name string, deadlineStr string) map[stri
 
 // UpdateProfileWithInheritance updates profile name, deadline, and inherited flashcard profile IDs.
 func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr string, inheritedIDs []string) map[string]interface{} {
-	res := a.UpdateProfile(id, name, deadlineStr)
-	if res["error"] != nil {
-		return res
-	}
 	repo := a.getRepo()
-	if err := repo.SetProfileFlashcardInheritance(id, inheritedIDs); err != nil {
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if id == "" || name == "" {
+		return map[string]interface{}{"error": "id and name are required"}
+	}
+	deadlineTime, err := time.Parse(dateFormatYYYYMMDD, deadlineStr)
+	if err != nil {
+		return map[string]interface{}{"error": "failed to parse deadline: " + err.Error()}
+	}
+
+	tx, err := repo.Begin()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	current, err := repo.GetProfileByID(id)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if current == nil {
+		return map[string]interface{}{"error": "profile not found"}
+	}
+	current.Name = name
+	current.DeadlineAt = deadlineTime.Unix()
+
+	clean := make([]string, 0, len(inheritedIDs))
+	seen := make(map[string]bool)
+	for _, inhID := range inheritedIDs {
+		inhID = strings.TrimSpace(inhID)
+		if inhID != "" && inhID != id && !seen[inhID] {
+			seen[inhID] = true
+			clean = append(clean, inhID)
+		}
+	}
+	inheritedJSONBytes, err := json.Marshal(clean)
+	if err != nil {
+		return map[string]interface{}{"error": "failed to marshal inherited profile IDs: " + err.Error()}
+	}
+	inheritedJSON := string(inheritedJSONBytes)
+
+	_, err = tx.Exec(`
+		UPDATE study_profiles
+		SET name = ?,
+		    deadline_at = ?,
+		    target_session_words = ?,
+		    min_session_words = ?,
+		    theme = ?,
+		    max_flashcards_per_session = ?,
+		    max_active_notebooks = ?,
+		    skip_to_reading_active = ?,
+		    default_remedial_strategy = ?,
+		    quiz_question_count = ?,
+		    quiz_passing_score = ?,
+		    tutor_style = ?,
+		    inherited_flashcard_profile_ids_json = ?
+		WHERE id = ?
+	`, current.Name, current.DeadlineAt, current.TargetSessionWords, current.MinSessionWords, current.Theme, current.MaxFlashcardsPerSession,
+		current.MaxActiveNotebooks, current.SkipToReadingActive, current.DefaultRemedialStrategy,
+		current.QuizQuestionCount, current.QuizPassingScore, current.TutorStyle, inheritedJSON, current.ID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+
+	if err := tx.Commit(); err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true}

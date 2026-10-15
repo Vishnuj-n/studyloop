@@ -83,7 +83,10 @@ func (r *Repository) GetAllPendingTasks() ([]models.StudyQueueTask, error) {
 	`
 	var args []interface{}
 	if activeProfileID != "" {
-		allowedProfiles, _ := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		if err != nil {
+			return nil, fmt.Errorf("GetAllPendingTasks: failed to get allowed profile IDs: %w", err)
+		}
 		if len(allowedProfiles) > 1 {
 			query += fmt.Sprintf(` AND ((n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')) OR (sq.task_type = 'FLASHCARD_REVIEW' AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '')))`, buildInPlaceholders(len(allowedProfiles)))
 			args = append(args, activeProfileID)
@@ -136,7 +139,10 @@ func (r *Repository) GetProfilePendingTaskCount(profileID string) (int, error) {
 	`
 	var args []interface{}
 	if profileID != "" {
-		allowedProfiles, _ := r.GetAllowedFlashcardProfileIDs(profileID)
+		allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(profileID)
+		if err != nil {
+			return 0, fmt.Errorf("GetProfilePendingTaskCount: failed to get allowed profile IDs: %w", err)
+		}
 		if len(allowedProfiles) > 1 {
 			query += fmt.Sprintf(` AND ((n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')) OR (sq.task_type = 'FLASHCARD_REVIEW' AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '')))`, buildInPlaceholders(len(allowedProfiles)))
 			args = append(args, profileID)
@@ -172,7 +178,10 @@ func (r *Repository) GetAllActiveTasks() ([]models.StudyQueueTask, error) {
 	`
 	var args []interface{}
 	if activeProfileID != "" {
-		allowedProfiles, _ := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		if err != nil {
+			return nil, fmt.Errorf("GetAllActiveTasks: failed to get allowed profile IDs: %w", err)
+		}
 		if len(allowedProfiles) > 1 {
 			query += fmt.Sprintf(` AND ((n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')) OR (sq.task_type = 'FLASHCARD_REVIEW' AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '')))`, buildInPlaceholders(len(allowedProfiles)))
 			args = append(args, activeProfileID)
@@ -214,17 +223,19 @@ func (r *Repository) GetNextTask(notebookID string) (models.StudyQueueTask, erro
 	`
 	var args []interface{}
 	if activeProfileID != "" {
-		allowedProfiles, _ := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(activeProfileID)
+		if err != nil {
+			return models.StudyQueueTask{}, fmt.Errorf("GetNextTask: failed to get allowed profile IDs: %w", err)
+		}
 		if len(allowedProfiles) > 1 {
 			if notebookID != "" {
 				query += ` AND sq.notebook_id = ?`
 				args = append(args, notebookID)
-			} else {
-				query += fmt.Sprintf(` AND ((n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')) OR (sq.task_type = 'FLASHCARD_REVIEW' AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '')))`, buildInPlaceholders(len(allowedProfiles)))
-				args = append(args, activeProfileID)
-				for _, p := range allowedProfiles {
-					args = append(args, p)
-				}
+			}
+			query += fmt.Sprintf(` AND ((n.profile_id = ? AND (sq.task_type IN ('FLASHCARD_GENERATE', 'SOCRATIC_REMEDIAL', 'REREAD', 'QUIZ', 'MILESTONE_EXAM') OR n.study_status = 'active')) OR (sq.task_type = 'FLASHCARD_REVIEW' AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '')))`, buildInPlaceholders(len(allowedProfiles)))
+			args = append(args, activeProfileID)
+			for _, p := range allowedProfiles {
+				args = append(args, p)
 			}
 		} else {
 			query += ` AND n.profile_id = ?`

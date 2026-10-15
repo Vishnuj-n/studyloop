@@ -718,7 +718,7 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			return nil, fmt.Errorf("failed to get allowed profile IDs: %w", err)
 		}
 		if len(allowedProfiles) > 0 {
-			query += fmt.Sprintf(` WHERE n.profile_id IN (%s) `, buildInPlaceholders(len(allowedProfiles)))
+			query += fmt.Sprintf(` WHERE (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '') `, buildInPlaceholders(len(allowedProfiles)))
 			for _, p := range allowedProfiles {
 				args = append(args, p)
 			}
@@ -858,8 +858,8 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 		SELECT
 			sp.id,
 			sp.name,
-			COUNT(c.id) AS total_cards,
-			COUNT(CASE WHEN c.suspended = 0 AND c.due_at <= ? THEN c.id END) AS due_cards
+			COUNT(DISTINCT c.id) AS total_cards,
+			COUNT(DISTINCT CASE WHEN c.suspended = 0 AND c.due_at <= ? THEN c.id END) AS due_cards
 		FROM study_profiles sp
 		LEFT JOIN notebooks n ON n.profile_id = sp.id
 		LEFT JOIN notebook_topic_links ntl ON ntl.notebook_id = n.id

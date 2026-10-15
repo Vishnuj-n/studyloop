@@ -1631,8 +1631,6 @@ async function markSlotReviewed(slot) {
       )
       if (noteEntry) {
         noteEntry.last_reviewed_at = nextReviewedAt
-      } else if (topicNotes.length > 0) {
-        topicNotes[0].last_reviewed_at = nextReviewedAt
       }
     }
 

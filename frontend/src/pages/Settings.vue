@@ -509,6 +509,7 @@ async function updateStartupPreference(enabled) {
       error.value = res.error
       return
     }
+    localStorage.setItem('studyloop_ask_profile_on_startup', String(enabled))
     success.value = enabled ? 'Startup profile picker enabled' : 'Startup profile picker disabled'
   } catch (err) {
     settings.value.ask_profile_on_startup = prev

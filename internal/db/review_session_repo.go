@@ -383,7 +383,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 		JOIN fsrs_cards fc ON fc.id = rtc.card_id
 		LEFT JOIN chunks ch ON ch.id = fc.source_chunk_id
 		LEFT JOIN topics t ON t.id = fc.topic_id
-		LEFT JOIN notebooks n ON (
+		LEFT JOIN notebooks n ON n.id = ? AND (
 			n.topic_id = t.id
 			OR EXISTS (
 				SELECT 1 FROM notebook_topics nt
@@ -398,7 +398,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 			fc.due_at ASC,
 			fc.created_at ASC,
 			fc.id ASC
-	`, taskID)
+	`, task.NotebookID, taskID)
 	if err != nil {
 		return nil, err
 	}

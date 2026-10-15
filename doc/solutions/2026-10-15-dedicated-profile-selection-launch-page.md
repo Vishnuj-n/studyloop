@@ -11,7 +11,7 @@ This solution documents the motivation, design decisions, and architectural impl
 ### 1. Eliminating Startup FOUC and Black-and-White Dashboard Flashing
 Previously, profile selection was implemented as an overlay modal (`ProfileLauncherModal.vue`) mounted on top of `App.vue` or `Dashboard.vue`.
 - **The Problem**: Before the modal rendered, the router had already navigated to `/dashboard`. This caused `Dashboard.vue` to mount prematurely, initiate queries for the active profile's study queue and analytics, and flash the dashboard shell on screen before the modal overlay appeared.
-- **The Fix**: Introducing a dedicated route [`/select-profile`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/router/index.js) intercepted at the router navigation guard level (`router.beforeEach`). When a user with multiple profiles launches the application, the app navigates directly to `/select-profile` before the dashboard or sidebar are ever mounted.
+- **The Fix**: Introducing a dedicated route [`/select-profile`](../../frontend/src/router/index.js) intercepted at the router navigation guard level (`router.beforeEach`). When a user with multiple profiles launches the application, the app navigates directly to `/select-profile` before the dashboard or sidebar are ever mounted.
 
 ### 2. Matching the Polished Google Chrome Experience
 Modal dialogs with heavy borders, dark backdrops, and boxed containers feel like disruptive popups rather than a welcoming launch gate.

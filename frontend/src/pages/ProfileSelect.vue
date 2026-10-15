@@ -374,8 +374,11 @@ function handleKeydown(e) {
     return
   }
 
-  // Enter triggers selected/focused card
+  // Enter triggers selected/focused card (skip when target is a button with its own action)
   if (e.key === 'Enter') {
+    if (e.target instanceof HTMLButtonElement) {
+      return
+    }
     const target = profiles.value[focusedIndex.value]
     if (target) {
       e.preventDefault()

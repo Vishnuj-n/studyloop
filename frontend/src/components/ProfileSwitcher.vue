@@ -42,7 +42,7 @@
 
       <div class="profile-menu-divider" aria-hidden="true"></div>
       <button type="button" class="profile-menu-action" @click="handleOpenLauncher">
-        <BaseIcon name="users" size="14" />
+        <BaseIcon name="user" size="14" />
         Choose profile (Launcher)
       </button>
       <button type="button" class="profile-menu-action" @click="handleManage">
