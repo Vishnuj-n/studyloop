@@ -1,5 +1,5 @@
 <template>
-  <div class="profile-select-page">
+  <div ref="pageRef" class="profile-select-page" tabindex="-1">
     <main class="profile-select-container">
       <!-- Title & Subtitle in Google Chrome style -->
       <header class="select-header">
@@ -164,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -175,6 +175,7 @@ import {
 } from '../services/appApi'
 
 const router = useRouter()
+const pageRef = ref(null)
 
 const profiles = ref([])
 const activeProfileId = ref(localStorage.getItem('studyloop_cached_active_profile_id') || '')
@@ -235,6 +236,10 @@ async function loadData() {
     console.error('Failed to load profile selection data:', err)
   } finally {
     loading.value = false
+    nextTick(() => {
+      window.focus()
+      pageRef.value?.focus()
+    })
   }
 }
 
@@ -394,12 +399,18 @@ function handleKeydown(e) {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keydown', handleKeydown, true)
+  document.addEventListener('keydown', handleKeydown, true)
+  window.focus()
+  nextTick(() => {
+    pageRef.value?.focus()
+  })
   loadData()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('keydown', handleKeydown, true)
+  document.removeEventListener('keydown', handleKeydown, true)
 })
 </script>
 
