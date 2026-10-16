@@ -68,7 +68,7 @@
           :disabled="!localName || !localDeadline || isSaving"
           @click="handleSave"
         >
-          {{ isSaving ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Profile') }}
+          {{ saveButtonLabel }}
         </button>
       </div>
     </div>
@@ -96,6 +96,11 @@ const localDeadline = ref(props.initialDeadline)
 const selectedInherited = ref([...(props.initialInherited || [])])
 const profileDueMap = ref({})
 const isSaving = ref(false)
+
+const saveButtonLabel = computed(() => {
+  if (isSaving.value) return 'Saving...'
+  return props.isEdit ? 'Save Changes' : 'Create Profile'
+})
 
 const otherProfiles = computed(() => {
   if (!props.allProfiles || !props.currentProfileId) return []
