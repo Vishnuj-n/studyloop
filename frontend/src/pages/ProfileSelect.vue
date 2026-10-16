@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRef" class="profile-select-page" tabindex="-1">
+  <div ref="pageRef" class="profile-select-page" tabindex="-1" @keydown="handleKeydown">
     <main class="profile-select-container">
       <!-- Title & Subtitle in Google Chrome style -->
       <header class="select-header">
@@ -189,13 +189,13 @@ const selectedTargetId = ref('')
 
 // Distinctive, harmonious Google Chrome-like avatar gradients
 const AVATAR_PALETTES = [
-  'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)', // Google Blue
-  'linear-gradient(135deg, #0F9D58 0%, #0B8043 100%)', // Google Green
-  'linear-gradient(135deg, #8E24AA 0%, #6A1B9A 100%)', // Purple
-  'linear-gradient(135deg, #FA7B17 0%, #E37400 100%)', // Warm Orange
-  'linear-gradient(135deg, #E91E63 0%, #C2185B 100%)', // Pink / Rose
-  'linear-gradient(135deg, #0097A7 0%, #00838F 100%)', // Teal / Cyan
-  'linear-gradient(135deg, #3F51B5 0%, #283593 100%)', // Indigo
+  'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)',
+  'linear-gradient(135deg, #0F9D58 0%, #0B8043 100%)',
+  'linear-gradient(135deg, #8E24AA 0%, #6A1B9A 100%)',
+  'linear-gradient(135deg, #FA7B17 0%, #E37400 100%)',
+  'linear-gradient(135deg, #E91E63 0%, #C2185B 100%)',
+  'linear-gradient(135deg, #0097A7 0%, #00838F 100%)',
+  'linear-gradient(135deg, #3F51B5 0%, #283593 100%)',
 ]
 
 function getAvatarBg(profile, idx) {
@@ -228,7 +228,6 @@ async function loadData() {
     const activeIdx = profs.findIndex((p) => p.id === activeProfileId.value)
     focusedIndex.value = activeIdx >= 0 ? activeIdx : 0
 
-    // If user arrived here while having an existing active profile session, allow cancel back to dashboard
     if (sessionStorage.getItem('studyloop_profile_picker_shown') && activeProfileId.value) {
       canCancel.value = true
     }
@@ -237,8 +236,15 @@ async function loadData() {
   } finally {
     loading.value = false
     nextTick(() => {
-      window.focus()
-      pageRef.value?.focus()
+      // FIX: Focus a real, focusable card button instead of the wrapper div.
+      // WebView2 reliably routes keyboard events when a <button> owns focus.
+      const cards = document.querySelectorAll('.profile-picker-card')
+      if (cards.length > 0) {
+        const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
+        target?.focus()
+      } else {
+        pageRef.value?.focus()
+      }
     })
   }
 }
@@ -324,22 +330,13 @@ function profilePaceBadge(profile) {
   const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
 
   if (status === 'BEHIND' && pace.days_gap !== undefined) {
-    return {
-      text: `${gapFormatted}d behind`,
-      class: 'pace-behind',
-    }
+    return { text: `${gapFormatted}d behind`, class: 'pace-behind' }
   }
   if (status === 'AHEAD' && pace.days_gap !== undefined) {
-    return {
-      text: `${gapFormatted}d ahead`,
-      class: 'pace-ahead',
-    }
+    return { text: `${gapFormatted}d ahead`, class: 'pace-ahead' }
   }
   if (status === 'ON_TRACK') {
-    return {
-      text: 'On track',
-      class: 'pace-ontrack',
-    }
+    return { text: 'On track', class: 'pace-ontrack' }
   }
   return null
 }
@@ -351,8 +348,30 @@ function profileTaskSubtitle(profile) {
   return `${count} pending study task${count === 1 ? '' : 's'}`
 }
 
+// FIX: Move focus to the card at focusedIndex so WebView2 keeps routing keys to us.
+function syncCardFocus() {
+  nextTick(() => {
+    const cards = document.querySelectorAll('.profile-picker-card')
+    const target = cards[focusedIndex.value]
+    target?.focus()
+  })
+}
+
 function handleKeydown(e) {
   if (loading.value || profiles.value.length === 0) return
+
+  // FIX: Guard against typing inside inputs / textareas / contentEditable.
+  if (
+    e.target &&
+    (e.target.tagName === 'INPUT' ||
+      e.target.tagName === 'TEXTAREA' ||
+      e.target.isContentEditable)
+  ) {
+    return
+  }
+
+  // FIX: Respect any modifier keys so we don't hijack browser/system shortcuts.
+  if (e.ctrlKey || e.metaKey || e.altKey) return
 
   // Digits 1..9 directly select profile (main keyboard or numpad)
   let digit = null
@@ -377,19 +396,20 @@ function handleKeydown(e) {
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
     focusedIndex.value = (focusedIndex.value + 1) % profiles.value.length
+    syncCardFocus()
     return
   }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
     focusedIndex.value = (focusedIndex.value - 1 + profiles.value.length) % profiles.value.length
+    syncCardFocus()
     return
   }
 
-  // Enter triggers selected/focused card (skip when target is a button with its own action)
+  // Enter triggers selected/focused card
   if (e.key === 'Enter') {
-    if (e.target instanceof HTMLButtonElement) {
-      return
-    }
+    // If the currently focused element is a button, let its own handler fire.
+    if (e.target instanceof HTMLButtonElement) return
     const target = profiles.value[focusedIndex.value]
     if (target) {
       e.preventDefault()
@@ -399,8 +419,10 @@ function handleKeydown(e) {
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown, true)
-  document.addEventListener('keydown', handleKeydown, true)
+  // FIX: Single listener, bubble phase, on window only.
+  // - No capture flag (avoids fighting WebView2 native key routing).
+  // - No duplicate document listener (avoids double-firing).
+  window.addEventListener('keydown', handleKeydown)
   window.focus()
   nextTick(() => {
     pageRef.value?.focus()
@@ -409,8 +431,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown, true)
-  document.removeEventListener('keydown', handleKeydown, true)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -430,6 +451,7 @@ onUnmounted(() => {
   overflow-y: auto;
   font-family: inherit;
   color: var(--on-surface);
+  outline: none;
 }
 
 .profile-select-container {
@@ -444,14 +466,8 @@ onUnmounted(() => {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Header */
@@ -513,11 +529,7 @@ onUnmounted(() => {
   animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Profiles Grid */
 .profiles-grid {
@@ -550,6 +562,11 @@ onUnmounted(() => {
   box-sizing: border-box;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+}
+
+.profile-picker-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .profile-picker-card:hover,
@@ -598,9 +615,7 @@ onUnmounted(() => {
   color: var(--primary);
 }
 
-.card-shortcut-badge:active {
-  transform: scale(0.9);
-}
+.card-shortcut-badge:active { transform: scale(0.9); }
 
 .card-shortcut-badge kbd {
   font-family: inherit;
@@ -629,7 +644,8 @@ onUnmounted(() => {
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.profile-picker-card:hover .profile-avatar-circle {
+.profile-picker-card:hover .profile-avatar-circle,
+.profile-picker-card:focus-visible .profile-avatar-circle {
   transform: scale(1.06);
 }
 
@@ -705,9 +721,7 @@ onUnmounted(() => {
   background: #10b981;
 }
 
-.task-count-label {
-  color: var(--muted-text);
-}
+.task-count-label { color: var(--muted-text); }
 
 /* Subtle Chrome Pills */
 .profile-pills {
@@ -772,7 +786,8 @@ onUnmounted(() => {
   border-color: color-mix(in srgb, var(--outline-variant) 70%, transparent);
 }
 
-.add-profile-card:hover {
+.add-profile-card:hover,
+.add-profile-card:focus-visible {
   background: var(--surface-container-low);
   border-style: solid;
   border-color: var(--primary);
@@ -785,7 +800,8 @@ onUnmounted(() => {
   border: 1px dashed color-mix(in srgb, var(--outline-variant) 70%, transparent);
 }
 
-.add-profile-card:hover .add-avatar {
+.add-profile-card:hover .add-avatar,
+.add-profile-card:focus-visible .add-avatar {
   background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-high)) !important;
   color: var(--primary);
   border-style: solid;
@@ -797,7 +813,7 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* Chrome Bottom Bar (pinned cleanly at the bottom) */
+/* Chrome Bottom Bar */
 .select-footer {
   width: 100%;
   max-width: 1100px;
@@ -817,10 +833,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.footer-corner-right {
-  gap: 12px;
-  white-space: nowrap;
-}
+.footer-corner-right { gap: 12px; }
 
 .footer-center-hint {
   display: inline-flex;
@@ -906,18 +919,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-  .profile-select-page {
-    padding-bottom: 90px;
-  }
-  .profile-select-container {
-    gap: 24px;
-  }
-  .select-header h1 {
-    font-size: 26px;
-  }
-  .profiles-grid {
-    gap: 16px;
-  }
+  .profile-select-page { padding-bottom: 90px; }
+  .profile-select-container { gap: 24px; }
+  .select-header h1 { font-size: 26px; }
+  .profiles-grid { gap: 16px; }
   .profile-picker-card {
     width: 100%;
     min-height: auto;
@@ -926,21 +931,15 @@ onUnmounted(() => {
     text-align: left;
     gap: 16px;
   }
-  .card-shortcut-badge {
-    position: static;
-  }
+  .card-shortcut-badge { position: static; }
   .profile-avatar-circle {
     width: 56px;
     height: 56px;
     margin-bottom: 0;
     flex-shrink: 0;
   }
-  .avatar-letter {
-    font-size: 24px;
-  }
-  .profile-info {
-    align-items: flex-start;
-  }
+  .avatar-letter { font-size: 24px; }
+  .profile-info { align-items: flex-start; }
   .profile-pills {
     flex-direction: row;
     flex-wrap: wrap;
