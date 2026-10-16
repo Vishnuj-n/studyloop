@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRef" class="profile-select-page" tabindex="-1" @keydown="handleKeydown">
+  <div ref="pageRef" class="profile-select-page">
     <main class="profile-select-container">
       <!-- Title & Subtitle in Google Chrome style -->
       <header class="select-header">
@@ -187,7 +187,6 @@ const canCancel = ref(false)
 const isSubmitting = ref(false)
 const selectedTargetId = ref('')
 
-// Distinctive, harmonious Google Chrome-like avatar gradients
 const AVATAR_PALETTES = [
   'linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)',
   'linear-gradient(135deg, #0F9D58 0%, #0B8043 100%)',
@@ -201,6 +200,22 @@ const AVATAR_PALETTES = [
 function getAvatarBg(profile, idx) {
   const seed = (profile.id || profile.name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
   return AVATAR_PALETTES[(seed + idx) % AVATAR_PALETTES.length]
+}
+
+// Helper: get all focusable cards (profile cards + add card)
+function getCards() {
+  return Array.from(document.querySelectorAll('.profile-picker-card'))
+}
+
+// Focus the card at focusedIndex, clamped to bounds
+function syncCardFocus() {
+  nextTick(() => {
+    const cards = getCards()
+    if (cards.length === 0) return
+    const idx = Math.max(0, Math.min(focusedIndex.value, cards.length - 1))
+    const target = cards[idx]
+    target?.focus({ preventScroll: true })
+  })
 }
 
 async function loadData() {
@@ -224,7 +239,6 @@ async function loadData() {
       localStorage.setItem('studyloop_ask_profile_on_startup', String(askProfileOnStartup.value))
     }
 
-    // Set initial focus to active profile index
     const activeIdx = profs.findIndex((p) => p.id === activeProfileId.value)
     focusedIndex.value = activeIdx >= 0 ? activeIdx : 0
 
@@ -235,17 +249,9 @@ async function loadData() {
     console.error('Failed to load profile selection data:', err)
   } finally {
     loading.value = false
-    nextTick(() => {
-      // FIX: Focus a real, focusable card button instead of the wrapper div.
-      // WebView2 reliably routes keyboard events when a <button> owns focus.
-      const cards = document.querySelectorAll('.profile-picker-card')
-      if (cards.length > 0) {
-        const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
-        target?.focus()
-      } else {
-        pageRef.value?.focus()
-      }
-    })
+    // Wait for the DOM to render the cards, then focus the correct one.
+    await nextTick()
+    syncCardFocus()
   }
 }
 
@@ -307,7 +313,6 @@ function cancelSelection() {
 function profileDeadlineLabel(profile) {
   const deadlineAt = Number(profile?.deadline_at)
   if (!Number.isFinite(deadlineAt) || deadlineAt <= 0) return 'No target exam'
-
   const daysLeft = Math.ceil((deadlineAt * 1000 - Date.now()) / 86400000)
   if (daysLeft < 0) return 'Exam passed'
   if (daysLeft === 0) return 'Exam is today'
@@ -324,11 +329,9 @@ function isDueSoon(profile) {
 function profilePaceBadge(profile) {
   const pace = profile?.pace
   if (!pace || pace.error) return null
-
   const status = pace.feasibility_status
   const gap = pace.days_gap
   const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
-
   if (status === 'BEHIND' && pace.days_gap !== undefined) {
     return { text: `${gapFormatted}d behind`, class: 'pace-behind' }
   }
@@ -348,38 +351,26 @@ function profileTaskSubtitle(profile) {
   return `${count} pending study task${count === 1 ? '' : 's'}`
 }
 
-// FIX: Move focus to the card at focusedIndex so WebView2 keeps routing keys to us.
-function syncCardFocus() {
-  nextTick(() => {
-    const cards = document.querySelectorAll('.profile-picker-card')
-    const target = cards[focusedIndex.value]
-    target?.focus()
-  })
-}
-
+// ---- Keyboard handler ----
 function handleKeydown(e) {
-  if (loading.value || profiles.value.length === 0) return
+  if (loading.value) return
 
-  // FIX: Guard against typing inside inputs / textareas / contentEditable.
-  if (
-    e.target &&
-    (e.target.tagName === 'INPUT' ||
-      e.target.tagName === 'TEXTAREA' ||
-      e.target.isContentEditable)
-  ) {
-    return
-  }
+  // Ignore typing in inputs / textareas / contentEditable
+  const tag = e.target?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
 
-  // FIX: Respect any modifier keys so we don't hijack browser/system shortcuts.
+  // Ignore modified keys (let browser/system shortcuts through)
   if (e.ctrlKey || e.metaKey || e.altKey) return
 
-  // Digits 1..9 directly select profile (main keyboard or numpad)
+  const cards = getCards()
+  if (cards.length === 0) return
+
+  // --- Digits 1..9 select a profile ---
   let digit = null
   if (/^[1-9]$/.test(e.key)) {
     digit = parseInt(e.key, 10)
-  } else if (/^(?:Digit|Numpad)([1-9])$/.test(e.code)) {
-    const match = e.code.match(/^(?:Digit|Numpad)([1-9])$/)
-    digit = parseInt(match[1], 10)
+  } else if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
+    digit = parseInt(e.code.replace(/^(?:Digit|Numpad)/, ''), 10)
   }
 
   if (digit !== null) {
@@ -387,47 +378,50 @@ function handleKeydown(e) {
     if (idx >= 0 && idx < profiles.value.length) {
       e.preventDefault()
       e.stopPropagation()
+      focusedIndex.value = idx
       selectProfile(profiles.value[idx].id)
       return
     }
   }
 
-  // Navigation
+  // --- Arrow navigation ---
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
+    e.stopPropagation()
     focusedIndex.value = (focusedIndex.value + 1) % profiles.value.length
     syncCardFocus()
     return
   }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
+    e.stopPropagation()
     focusedIndex.value = (focusedIndex.value - 1 + profiles.value.length) % profiles.value.length
     syncCardFocus()
     return
   }
 
-  // Enter triggers selected/focused card
-  if (e.key === 'Enter') {
-    // If the currently focused element is a button, let its own handler fire.
-    if (e.target instanceof HTMLButtonElement) return
+  // --- Enter activates the focused profile ---
+  // If the event already originated on a card button, let its own handler fire.
+  if (e.key === 'Enter' || e.key === ' ') {
+    if (e.target instanceof HTMLButtonElement && e.target.classList.contains('profile-picker-card')) {
+      // Card's own click/enter handler will fire; do nothing.
+      return
+    }
     const target = profiles.value[focusedIndex.value]
     if (target) {
       e.preventDefault()
+      e.stopPropagation()
       selectProfile(target.id)
     }
   }
 }
 
-onMounted(() => {
-  // FIX: Single listener, bubble phase, on window only.
-  // - No capture flag (avoids fighting WebView2 native key routing).
-  // - No duplicate document listener (avoids double-firing).
+onMounted(async () => {
+  // Single listener on window, bubble phase.
   window.addEventListener('keydown', handleKeydown)
+  // Ensure the window is focused so key events reach us in WebView2.
   window.focus()
-  nextTick(() => {
-    pageRef.value?.focus()
-  })
-  loadData()
+  await loadData()
 })
 
 onUnmounted(() => {
