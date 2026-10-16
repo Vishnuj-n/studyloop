@@ -184,7 +184,9 @@ function loadCachedProfiles() {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed) && parsed.length > 0) return parsed
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('Failed to load cached profiles from localStorage:', err)
+  }
   return []
 }
 
@@ -254,7 +256,9 @@ async function loadData() {
     profiles.value = profs
     try {
       localStorage.setItem('studyloop_cached_profiles', JSON.stringify(profs))
-    } catch (_) {}
+    } catch (err) {
+      console.warn('Failed to cache profiles to localStorage:', err)
+    }
 
     if (settingsRes && !settingsRes.error) {
       if (settingsRes.active_profile_id) {
