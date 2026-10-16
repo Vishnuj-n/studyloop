@@ -204,6 +204,9 @@ function getAvatarBg(profile, idx) {
 
 // Helper: get all focusable cards (profile cards + add card)
 function getCards() {
+  if (pageRef.value) {
+    return Array.from(pageRef.value.querySelectorAll('.profile-picker-card'))
+  }
   return Array.from(document.querySelectorAll('.profile-picker-card'))
 }
 
@@ -353,7 +356,7 @@ function profileTaskSubtitle(profile) {
 
 // ---- Keyboard handler ----
 function handleKeydown(e) {
-  if (loading.value) return
+  if (loading.value || profiles.value.length === 0) return
 
   // Ignore typing in inputs / textareas / contentEditable
   const tag = e.target?.tagName
@@ -361,9 +364,6 @@ function handleKeydown(e) {
 
   // Ignore modified keys (let browser/system shortcuts through)
   if (e.ctrlKey || e.metaKey || e.altKey) return
-
-  const cards = getCards()
-  if (cards.length === 0) return
 
   // --- Digits 1..9 select a profile ---
   let digit = null
@@ -558,19 +558,23 @@ onUnmounted(() => {
   user-select: none;
 }
 
-.profile-picker-card:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.profile-picker-card:hover,
+.profile-picker-card:focus-visible,
 .profile-picker-card.is-focused {
   background: var(--surface-container);
-  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
   transform: translateY(-4px);
   box-shadow:
     0 12px 30px -8px rgba(0, 0, 0, 0.16),
     0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.profile-picker-card:hover:not(.is-focused) {
+  background: var(--surface-container);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.14);
 }
 
 .profile-picker-card:active,
@@ -580,12 +584,14 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.profile-picker-card.is-active {
-  background: color-mix(in srgb, var(--primary) 4%, var(--surface-container-low));
-  border-color: var(--primary);
-  box-shadow:
-    0 10px 24px -6px color-mix(in srgb, var(--primary) 20%, transparent),
-    0 0 0 1.5px var(--primary);
+.profile-picker-card.is-active:not(.is-focused) {
+  background: color-mix(in srgb, var(--primary) 3%, var(--surface-container-low));
+  border-color: color-mix(in srgb, var(--outline-variant) 65%, transparent);
+  box-shadow: none;
+}
+
+.profile-picker-card.is-active.is-focused {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-container-low));
 }
 
 /* Keyboard Shortcut Badge Button */
