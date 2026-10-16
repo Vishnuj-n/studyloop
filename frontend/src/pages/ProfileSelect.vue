@@ -33,9 +33,6 @@
           :aria-selected="profile.id === activeProfileId"
           tabindex="0"
           @click="selectProfile(profile.id)"
-          @keydown.enter.prevent="selectProfile(profile.id)"
-          @keydown.space.prevent="selectProfile(profile.id)"
-          @mouseenter="focusedIndex = idx"
         >
           <!-- Shortcut Key Pill -->
           <span
@@ -98,13 +95,14 @@
 
         <!-- Add Profile Card (Chrome style "Add" slot) -->
         <button
+          ref="addCardRef"
           type="button"
           class="profile-picker-card add-profile-card"
+          :class="{ 'is-focused': focusedIndex === profiles.length }"
           tabindex="0"
           title="Create a new study profile"
           aria-label="Create a new study profile"
           @click="openAddProfile"
-          @keydown.enter.prevent="openAddProfile"
         >
           <div class="profile-avatar-circle add-avatar">
             <BaseIcon name="plus" size="26" />
@@ -176,13 +174,28 @@ import {
 
 const router = useRouter()
 const pageRef = ref(null)
+const addCardRef = ref(null)
 
-const profiles = ref([])
+// Initialize profiles from cached storage so cards render instantly on mount
+function loadCachedProfiles() {
+  try {
+    const raw = localStorage.getItem('studyloop_cached_profiles')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch (_) {}
+  return []
+}
+
+const profiles = ref(loadCachedProfiles())
 const activeProfileId = ref(localStorage.getItem('studyloop_cached_active_profile_id') || '')
 const askProfileOnStartup = ref(localStorage.getItem('studyloop_ask_profile_on_startup') !== 'false')
 const dontAskAgain = ref(!askProfileOnStartup.value)
-const focusedIndex = ref(0)
-const loading = ref(true)
+
+const initialIdx = profiles.value.findIndex((p) => p.id === activeProfileId.value)
+const focusedIndex = ref(initialIdx >= 0 ? initialIdx : 0)
+const loading = ref(profiles.value.length === 0)
 const canCancel = ref(false)
 const isSubmitting = ref(false)
 const selectedTargetId = ref('')
@@ -202,27 +215,35 @@ function getAvatarBg(profile, idx) {
   return AVATAR_PALETTES[(seed + idx) % AVATAR_PALETTES.length]
 }
 
-// Helper: get all focusable cards (profile cards + add card)
+// FIX #2: Include the "Add profile" card in the keyboard navigation loop.
+// getCards() now returns ALL picker cards (profiles + Add), and the wrap math
+// uses this full list so arrows can land on the Add card too.
 function getCards() {
-  if (pageRef.value) {
-    return Array.from(pageRef.value.querySelectorAll('.profile-picker-card'))
-  }
-  return Array.from(document.querySelectorAll('.profile-picker-card'))
+  const scope = pageRef.value || document
+  return Array.from(scope.querySelectorAll('.profile-picker-card'))
 }
 
-// Focus the card at focusedIndex, clamped to bounds
+// Total focusable cards (profiles + 1 for Add). Used by the wrap math.
+function totalCardCount() {
+  return profiles.value.length + 1
+}
+
+// FIX #6: Scroll the focused card into view. preventScroll:true was hiding
+// the active card when the list overflowed on small viewports.
 function syncCardFocus() {
-  nextTick(() => {
-    const cards = getCards()
-    if (cards.length === 0) return
-    const idx = Math.max(0, Math.min(focusedIndex.value, cards.length - 1))
-    const target = cards[idx]
-    target?.focus({ preventScroll: true })
-  })
+  const cards = getCards()
+  if (cards.length === 0) return
+  const idx = Math.max(0, Math.min(focusedIndex.value, cards.length - 1))
+  const target = cards[idx]
+  if (!target) return
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
 async function loadData() {
-  loading.value = true
+  if (profiles.value.length === 0) {
+    loading.value = true
+  }
   try {
     const [settingsRes, profilesRes] = await Promise.all([
       getUserSettings(),
@@ -231,6 +252,9 @@ async function loadData() {
 
     const profs = Array.isArray(profilesRes?.profiles) ? profilesRes.profiles : []
     profiles.value = profs
+    try {
+      localStorage.setItem('studyloop_cached_profiles', JSON.stringify(profs))
+    } catch (_) {}
 
     if (settingsRes && !settingsRes.error) {
       if (settingsRes.active_profile_id) {
@@ -242,6 +266,9 @@ async function loadData() {
       localStorage.setItem('studyloop_ask_profile_on_startup', String(askProfileOnStartup.value))
     }
 
+    // FIX #3: Always normalize focusedIndex against the fresh profile list.
+    // If the active profile was deleted on another device, fall back to 0
+    // instead of keeping a stale out-of-range index.
     const activeIdx = profs.findIndex((p) => p.id === activeProfileId.value)
     focusedIndex.value = activeIdx >= 0 ? activeIdx : 0
 
@@ -252,7 +279,6 @@ async function loadData() {
     console.error('Failed to load profile selection data:', err)
   } finally {
     loading.value = false
-    // Wait for the DOM to render the cards, then focus the correct one.
     await nextTick()
     syncCardFocus()
   }
@@ -356,7 +382,12 @@ function profileTaskSubtitle(profile) {
 
 // ---- Keyboard handler ----
 function handleKeydown(e) {
-  if (loading.value || profiles.value.length === 0) return
+  if (loading.value) return
+
+  // FIX #4: Bail if no cards are rendered yet (avoids firing selectProfile
+  // on a card that hasn't mounted). Use the DOM as the source of truth.
+  const cards = getCards()
+  if (cards.length === 0) return
 
   // Ignore typing in inputs / textareas / contentEditable
   const tag = e.target?.tagName
@@ -366,6 +397,7 @@ function handleKeydown(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return
 
   // --- Digits 1..9 select a profile ---
+  // Note: digits map ONLY to profiles (1..N), never to the "Add profile" card.
   let digit = null
   if (/^[1-9]$/.test(e.key)) {
     digit = parseInt(e.key, 10)
@@ -384,44 +416,54 @@ function handleKeydown(e) {
     }
   }
 
-  // --- Arrow navigation ---
+  // FIX #2: Wrap against the full card count (profiles + Add card) so arrows
+  // can land on the Add card too. This matches what getCards() returns.
+  const total = totalCardCount()
+
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
     e.stopPropagation()
-    focusedIndex.value = (focusedIndex.value + 1) % profiles.value.length
+    focusedIndex.value = (focusedIndex.value + 1) % total
     syncCardFocus()
     return
   }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
     e.stopPropagation()
-    focusedIndex.value = (focusedIndex.value - 1 + profiles.value.length) % profiles.value.length
+    focusedIndex.value = (focusedIndex.value - 1 + total) % total
     syncCardFocus()
     return
   }
 
-  // --- Enter activates the focused profile ---
-  // If the event already originated on a card button, let its own handler fire.
+  // FIX #1 & #5: Space / Enter handled ONLY here. The card no longer has a
+  // local @keydown.space.prevent handler, so there's exactly one code path
+  // and no double-trigger race with the native button click.
   if (e.key === 'Enter' || e.key === ' ') {
-    if (e.target instanceof HTMLButtonElement && e.target.classList.contains('profile-picker-card')) {
-      // Card's own click/enter handler will fire; do nothing.
-      return
-    }
-    const target = profiles.value[focusedIndex.value]
-    if (target) {
-      e.preventDefault()
-      e.stopPropagation()
-      selectProfile(target.id)
+    e.preventDefault()
+    e.stopPropagation()
+
+    // If the currently focused DOM element is a card (native focus landed on
+    // one), let it be the authority — but we still preventDefault to stop the
+    // browser's implicit Space→click on keyup.
+    const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
+    if (!target) return
+
+    if (target.classList.contains('add-profile-card')) {
+      openAddProfile()
+    } else {
+      const profile = profiles.value[focusedIndex.value]
+      if (profile) selectProfile(profile.id)
     }
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   // Single listener on window, bubble phase.
   window.addEventListener('keydown', handleKeydown)
   // Ensure the window is focused so key events reach us in WebView2.
   window.focus()
-  await loadData()
+  syncCardFocus()
+  loadData()
 })
 
 onUnmounted(() => {
@@ -558,7 +600,10 @@ onUnmounted(() => {
   user-select: none;
 }
 
-.profile-picker-card:focus-visible,
+/* FIX #7: Only .is-focused (set by keyboard handler) draws the "keyboard
+   focus" ring. :hover gets a distinct, softer treatment so mouse users are
+   never confused about which card Enter will activate. The mouseenter listener
+   that used to mutate focusedIndex has been removed from the template. */
 .profile-picker-card.is-focused {
   background: var(--surface-container);
   border-color: var(--primary);
@@ -645,7 +690,7 @@ onUnmounted(() => {
 }
 
 .profile-picker-card:hover .profile-avatar-circle,
-.profile-picker-card:focus-visible .profile-avatar-circle {
+.profile-picker-card.is-focused .profile-avatar-circle {
   transform: scale(1.06);
 }
 
@@ -787,7 +832,7 @@ onUnmounted(() => {
 }
 
 .add-profile-card:hover,
-.add-profile-card:focus-visible {
+.add-profile-card.is-focused {
   background: var(--surface-container-low);
   border-style: solid;
   border-color: var(--primary);
@@ -801,7 +846,7 @@ onUnmounted(() => {
 }
 
 .add-profile-card:hover .add-avatar,
-.add-profile-card:focus-visible .add-avatar {
+.add-profile-card.is-focused .add-avatar {
   background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-high)) !important;
   color: var(--primary);
   border-style: solid;
