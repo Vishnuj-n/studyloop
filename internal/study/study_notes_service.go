@@ -1083,6 +1083,27 @@ func (s *StudyService) MarkTopicReviewed(topicID string, startPage, endPage int)
 	return saveErr
 }
 
+// UnmarkTopicReviewed resets the last_reviewed_at timestamp to 0 in the markdown note's YAML frontmatter on disk.
+func (s *StudyService) UnmarkTopicReviewed(topicID string, startPage, endPage int) error {
+	topicID = strings.TrimSpace(topicID)
+	if topicID == "" {
+		return fmt.Errorf("topic ID is required")
+	}
+
+	existing, err := s.GetTopicStudyNoteForRange(topicID, startPage, endPage)
+	if err != nil {
+		return err
+	}
+
+	if existing == nil {
+		return nil
+	}
+
+	existing.LastReviewedAt = 0
+	_, saveErr := s.SaveNoteToDisk(*existing)
+	return saveErr
+}
+
 // OpenNotesFolder opens the local directory containing markdown study notes in the OS file explorer.
 func (s *StudyService) OpenNotesFolder(notebookID, topicID string) (string, error) {
 	folderPath := s.NotesBaseDir()

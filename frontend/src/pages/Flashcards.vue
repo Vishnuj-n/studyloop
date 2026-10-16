@@ -127,7 +127,7 @@
           <div class="card-inner">
             <!-- Front -->
             <div class="card-face card-front">
-              <div v-if="currentBookTitle" class="card-book-badge" :title="currentBookTitle">
+              <div v-if="currentCardOrigin || currentBookTitle" class="card-book-badge" :title="currentCardOrigin || currentBookTitle">
                 <svg
                   width="13"
                   height="13"
@@ -139,7 +139,7 @@
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
-                <span class="book-badge-text">{{ currentBookTitle }}</span>
+                <span class="book-badge-text">{{ currentCardOrigin || currentBookTitle }}</span>
               </div>
               <button
                 v-if="queueMode"
@@ -168,7 +168,7 @@
             </div>
             <!-- Back -->
             <div class="card-face card-back">
-              <div v-if="currentBookTitle" class="card-book-badge" :title="currentBookTitle">
+              <div v-if="currentCardOrigin || currentBookTitle" class="card-book-badge" :title="currentCardOrigin || currentBookTitle">
                 <svg
                   width="13"
                   height="13"
@@ -180,7 +180,7 @@
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
-                <span class="book-badge-text">{{ currentBookTitle }}</span>
+                <span class="book-badge-text">{{ currentCardOrigin || currentBookTitle }}</span>
               </div>
               <button
                 v-if="queueMode"
@@ -508,6 +508,25 @@ const currentBookTitle = computed(() => {
   const nb = notebooks.value.find((n) => n.id === selectedNotebookID.value)
   if (!nb?.title) return ''
   return nb.title.replace(/\.(pdf|apkg|anki|zip|epub|txt|md|docx)$/i, '').trim()
+})
+
+const currentCardOrigin = computed(() => {
+  const c = currentCard.value
+  if (!c) return ''
+  const parts = []
+  if (c.profile_name) {
+    parts.push(c.profile_name)
+  }
+  const book = (c.notebook_title || currentBookTitle.value || '').replace(/\.(pdf|apkg|anki|zip|epub|txt|md|docx)$/i, '').trim()
+  const topic = (c.topic_title || '').trim()
+  if (book && topic && book.toLowerCase() !== topic.toLowerCase()) {
+    parts.push(`${book} · ${topic}`)
+  } else if (book) {
+    parts.push(book)
+  } else if (topic) {
+    parts.push(topic)
+  }
+  return parts.join(' · ')
 })
 
 async function onDeckUpdated() {

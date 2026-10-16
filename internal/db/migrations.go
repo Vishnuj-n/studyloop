@@ -21,6 +21,7 @@ var alterStatements = []struct {
 	{"user_settings", "study_slots_json", "ALTER TABLE user_settings ADD COLUMN study_slots_json TEXT DEFAULT '[]'"},
 	{"user_settings", "reminders_enabled", "ALTER TABLE user_settings ADD COLUMN reminders_enabled BOOLEAN DEFAULT 1"},
 	{"user_settings", "show_reward_notifications", "ALTER TABLE user_settings ADD COLUMN show_reward_notifications BOOLEAN DEFAULT 1"},
+	{"user_settings", "ask_profile_on_startup", "ALTER TABLE user_settings ADD COLUMN ask_profile_on_startup BOOLEAN DEFAULT 1"},
 	{"user_settings", "active_profile_id", "ALTER TABLE user_settings ADD COLUMN active_profile_id TEXT"},
 	{"user_settings", "skip_to_reading_active", "ALTER TABLE user_settings ADD COLUMN skip_to_reading_active BOOLEAN DEFAULT 0"},
 	{"user_settings", "cloud_sync_url", "ALTER TABLE user_settings ADD COLUMN cloud_sync_url TEXT DEFAULT ''"},
@@ -72,6 +73,7 @@ var alterStatements = []struct {
 	{"study_profiles", "quiz_question_count", "ALTER TABLE study_profiles ADD COLUMN quiz_question_count INTEGER DEFAULT NULL"},
 	{"study_profiles", "quiz_passing_score", "ALTER TABLE study_profiles ADD COLUMN quiz_passing_score INTEGER DEFAULT NULL"},
 	{"study_profiles", "tutor_style", "ALTER TABLE study_profiles ADD COLUMN tutor_style TEXT DEFAULT ''"},
+	{"study_profiles", "inherited_flashcard_profile_ids_json", "ALTER TABLE study_profiles ADD COLUMN inherited_flashcard_profile_ids_json TEXT DEFAULT '[]'"},
 
 	// topics
 	{"topics", "external_help_required", "ALTER TABLE topics ADD COLUMN external_help_required BOOLEAN DEFAULT 0"},

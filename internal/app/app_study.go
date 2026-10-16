@@ -987,6 +987,19 @@ func (a *App) MarkTopicReviewed(topicID string, startPage, endPage int) map[stri
 	}
 }
 
+// UnmarkTopicReviewed marks a specific (topic, page range) note slot as unreviewed (reverts last_reviewed_at to 0).
+func (a *App) UnmarkTopicReviewed(topicID string, startPage, endPage int) map[string]interface{} {
+	if a.studyService == nil {
+		return map[string]interface{}{"error": "study service not initialized"}
+	}
+	if err := a.studyService.UnmarkTopicReviewed(topicID, startPage, endPage); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{
+		"success": true,
+	}
+}
+
 // OpenNotesFolder opens the local directory containing markdown study notes in the OS file explorer (Windows Explorer, Finder, etc.)
 func (a *App) OpenNotesFolder(notebookID, topicID string) map[string]interface{} {
 	if a.studyService == nil {

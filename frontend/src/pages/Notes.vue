@@ -119,10 +119,12 @@
                 </div>
 
                 <div class="popover-setting-row">
-                  <span class="popover-label">Prompt Style</span>
+                  <label for="notes-prompt-style-select" class="popover-label">Prompt Style</label>
                   <select
+                    id="notes-prompt-style-select"
                     v-model="noteDetailLevel"
                     class="popover-select"
+                    aria-label="Prompt Style"
                     @change="saveAutoNotesSetting"
                   >
                     <option value="briefing">Briefing Document (Mid-Size)</option>
@@ -175,9 +177,12 @@
             >
               <!-- Book / Notebook Header Item -->
               <div
+                role="button"
+                tabindex="0"
                 class="book-node-header"
                 :class="{ expanded: isNotebookExpanded(nb.notebook_id) }"
                 @click="toggleNotebook(nb.notebook_id)"
+                @keydown.enter.space.prevent="toggleNotebook(nb.notebook_id)"
               >
                 <button
                   type="button"
@@ -217,8 +222,8 @@
                   <div class="chapter-item-header">
                     <span
                       class="status-dot"
-                      :class="topic.has_note ? 'dot-has-note' : 'dot-missing-note'"
-                      :title="topic.has_note ? 'Study Note Ready' : 'No Study Note Yet'"
+                      :class="getTopicDotClass(topic)"
+                      :title="getTopicDotTitle(topic)"
                     ></span>
                     <span class="chapter-item-title" :title="topic.title">{{ topic.title }}</span>
                   </div>
@@ -289,6 +294,16 @@
             </div>
             <div class="note-header-actions">
               <button
+                v-if="isFromQuiz"
+                type="button"
+                class="secondary-btn btn-sm back-quiz-btn"
+                title="Return to Milestone Exam"
+                @click="goBackToQuiz"
+              >
+                <BaseIcon name="arrow-left" size="14" />
+                <span>Back to Exam</span>
+              </button>
+              <button
                 v-if="isFromFlashcards"
                 type="button"
                 class="secondary-btn btn-sm back-flashcards-btn"
@@ -327,6 +342,23 @@
               </button>
             </div>
           </header>
+
+          <!-- Quiz Navigation Context Banner -->
+          <div v-if="isFromQuiz" class="notes-flashcard-context-banner notes-quiz-context-banner">
+            <div class="banner-left">
+              <BaseIcon name="award" size="15" class="banner-icon" />
+              <span>Reviewing chapter notes before Milestone Exam</span>
+            </div>
+            <button
+              type="button"
+              class="banner-return-btn"
+              title="Return to Milestone Exam"
+              @click="goBackToQuiz"
+            >
+              <span>Ready for Exam</span>
+              <BaseIcon name="arrow-right" size="13" />
+            </button>
+          </div>
 
           <!-- Flashcard Navigation Context Banner -->
           <div v-if="isFromFlashcards" class="notes-flashcard-context-banner">
@@ -435,8 +467,7 @@
               <p>Start reading or click "Add Note" to write custom notes for this chapter.</p>
               <button
                 type="button"
-                class="primary-btn btn-sm"
-                style="margin-top: 12px;"
+                class="primary-btn btn-sm empty-box-add-btn"
                 @click="openAddNoteCard"
               >
                 <BaseIcon name="plus" size="14" />
@@ -555,13 +586,16 @@
                     <button
                       v-if="slot.content"
                       type="button"
-                      class="icon-btn-pill success"
-                      title="Mark as reviewed"
+                      class="icon-btn-pill"
+                      :class="slot.last_reviewed_at ? 'success reviewed-active' : 'mark-review-btn'"
+                      :title="slot.last_reviewed_at ? 'Reviewed — click to unmark' : 'Mark session as reviewed'"
                       :disabled="markingSlotKey === getSlotKey(slot) || isSlotGenerating(slot)"
                       @click="markSlotReviewed(slot)"
                     >
-                      <BaseIcon name="check" size="14" />
-                      <span>{{ markingSlotKey === getSlotKey(slot) ? 'Marking...' : 'Reviewed' }}</span>
+                      <BaseIcon :name="slot.last_reviewed_at ? 'check-circle' : 'check'" size="14" />
+                      <span>
+                        {{ getMarkReviewBtnText(slot) }}
+                      </span>
                     </button>
                   </template>
                 </div>
@@ -587,11 +621,8 @@
                 </div>
 
                 <!-- Rendered Note -->
-                <div
-                  v-else-if="slot.content"
-                  class="slot-markdown-content shared-markdown-content"
-                  v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"
-                ></div>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div v-else-if="slot.content" class="slot-markdown-content shared-markdown-content" v-html="renderMarkdown(slot.content, { noteRelativeFolder: slot.relative_folder_path })"></div>
 
                 <!-- Empty State within Card -->
                 <div v-else class="slot-empty-state">
@@ -679,7 +710,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -692,6 +723,7 @@ import {
   reorderTopicStudyNotes,
   saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
+  unmarkTopicReviewed as apiUnmarkTopicReviewed,
   openNotesFolder,
   getStudyNotesSettings,
   setStudyNotesSettings,
@@ -724,7 +756,6 @@ const showAllSessions = ref(false)
 // Auto-notes & sidebar settings state (persisted to SQLite user_settings)
 const autoNotesEnabled = ref(false)
 const noteDetailLevel = ref('briefing')
-const noteModelTier = ref('fast')
 const showRecapEnabled = ref(true)
 const showNotesSettingsPopover = ref(false)
 
@@ -746,11 +777,6 @@ function getDetailLevelLabel(val) {
     default:
       return 'Briefing Document'
   }
-}
-
-function navigateToSettings() {
-  showNotesSettingsPopover.value = false
-  router.push('/settings')
 }
 
 async function handleToggleAutoNotes(targetVal) {
@@ -831,6 +857,13 @@ function handleExternalSettingsUpdated(e) {
   }
 }
 
+// Constants
+const NOTES_POLL_INTERVAL_MS = 2500
+const MAX_NOTES_POLL_ATTEMPTS = 15
+const DEFAULT_IMAGE_PASTE_MARKDOWN_WIDTH = '75%'
+
+let isComponentMounted = false
+
 // Slot editing & action state
 const editingSlotKey = ref(null)
 const editSlotBuffer = ref('')
@@ -839,7 +872,6 @@ const generatingSlotKey = ref(null)
 const markingSlotKey = ref(null)
 let notesPollTimer = null
 let notesPollAttempts = 0
-const MAX_NOTES_POLL_ATTEMPTS = 15
 
 function clearNotesPolling() {
   if (notesPollTimer) {
@@ -855,7 +887,12 @@ function getSlotKey(slot) {
 
 function isSlotGenerating(slot) {
   if (!slot) return false
-  return generatingSlotKey.value === getSlotKey(slot) || Boolean(slot.is_generating)
+  const key = getSlotKey(slot)
+  // Generating if actively triggered locally, or marked by backend unless local generation finished
+  if (generatingSlotKey.value !== null) {
+    return generatingSlotKey.value === key
+  }
+  return Boolean(slot.is_generating)
 }
 
 function getSlotGenerateButtonText(slot) {
@@ -878,6 +915,35 @@ function isNotebookExpanded(notebookID) {
   return expandedNotebooks.value.has(notebookID)
 }
 
+// Helper to compute note metadata for a given topic
+function enrichTopic(t, nbID, nbTitle) {
+  const tid = t.topic_id || t.id
+  const topicNotes = notesMap.value[tid] || []
+  const hasNoteVal = topicNotes.some((n) => n && n.content && n.content.trim().length > 0)
+  let maxReviewedAt = 0
+  for (const n of topicNotes) {
+    if (n?.last_reviewed_at && n.last_reviewed_at > maxReviewedAt) {
+      maxReviewedAt = n.last_reviewed_at
+    }
+  }
+  const reviewedText = maxReviewedAt > 0 ? formatTimeAgo(maxReviewedAt) : ''
+  const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
+  if (!hasNoteVal && !hasStartedReading) {
+    return null
+  }
+  return {
+    topic_id: tid,
+    title: t.title || tid,
+    notebook_id: nbID,
+    notebook_title: nbTitle,
+    start_page: t.start_page || 0,
+    end_page: t.end_page || 0,
+    last_reviewed_at: maxReviewedAt,
+    last_reviewed_text: reviewedText,
+    has_note: hasNoteVal,
+  }
+}
+
 // Flat topic list with notebook title & note status
 const allTopics = computed(() => {
   const list = []
@@ -886,32 +952,10 @@ const allTopics = computed(() => {
     const nbID = nb.notebook_id || nb.id
     if (Array.isArray(nb.topics)) {
       for (const t of nb.topics) {
-        const tid = t.topic_id || t.id
-        const topicNotes = notesMap.value[tid] || []
-        const hasNoteVal = topicNotes.some((n) => n && n.content && n.content.trim().length > 0)
-        let maxReviewedAt = 0
-        for (const n of topicNotes) {
-          if (n?.last_reviewed_at && n.last_reviewed_at > maxReviewedAt) {
-            maxReviewedAt = n.last_reviewed_at
-          }
+        const enriched = enrichTopic(t, nbID, nbTitle)
+        if (enriched) {
+          list.push(enriched)
         }
-        const reviewedText = maxReviewedAt > 0 ? formatTimeAgo(maxReviewedAt) : ''
-        // A topic is active/reached if it has a note, is completed, or has active page reading progress
-        const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
-        if (!hasNoteVal && !hasStartedReading) {
-          continue
-        }
-        list.push({
-          topic_id: tid,
-          title: t.title || tid,
-          notebook_id: nbID,
-          notebook_title: nbTitle,
-          start_page: t.start_page || 0,
-          end_page: t.end_page || 0,
-          last_reviewed_at: maxReviewedAt,
-          last_reviewed_text: reviewedText,
-          has_note: hasNoteVal,
-        })
       }
     }
   }
@@ -932,48 +976,23 @@ const treeNotebooks = computed(() => {
     const processedTopics = []
 
     for (const t of rawTopics) {
-      const tid = t.topic_id || t.id
-      const topicNotes = notesMap.value[tid] || []
-      const hasNoteVal = topicNotes.some((n) => n && n.content && n.content.trim().length > 0)
-      if (hasNoteVal) {
+      const enriched = enrichTopic(t, nbID, nbTitle)
+      if (!enriched) continue
+
+      if (enriched.has_note) {
         totalChaptersWithNotes++
       }
 
-      let maxReviewedAt = 0
-      for (const n of topicNotes) {
-        if (n?.last_reviewed_at && n.last_reviewed_at > maxReviewedAt) {
-          maxReviewedAt = n.last_reviewed_at
-        }
-      }
-      const reviewedText = maxReviewedAt > 0 ? formatTimeAgo(maxReviewedAt) : ''
-
-      const hasStartedReading = (t.status === 'completed') || (t.current_page_cursor && t.current_page_cursor > 0)
-      // Only include chapters that have existing study notes or have been reached/started
-      if (!hasNoteVal && !hasStartedReading) {
-        continue
-      }
-
-      const topicObj = {
-        topic_id: tid,
-        title: t.title || tid,
-        notebook_id: nbID,
-        notebook_title: nbTitle,
-        start_page: t.start_page || 0,
-        end_page: t.end_page || 0,
-        last_reviewed_at: maxReviewedAt,
-        last_reviewed_text: reviewedText,
-        has_note: hasNoteVal,
-      }
-
       if (query) {
-        const titleMatch = topicObj.title.toLowerCase().includes(query)
+        const titleMatch = enriched.title.toLowerCase().includes(query)
         const nbMatch = nbTitle.toLowerCase().includes(query)
+        const topicNotes = notesMap.value[enriched.topic_id] || []
         const contentMatch = topicNotes.some((n) => (n?.content || '').toLowerCase().includes(query))
         if (titleMatch || nbMatch || contentMatch) {
-          processedTopics.push(topicObj)
+          processedTopics.push(enriched)
         }
       } else {
-        processedTopics.push(topicObj)
+        processedTopics.push(enriched)
       }
     }
 
@@ -1009,6 +1028,10 @@ const activeTopic = computed(() => {
 // Navigation & Loop helpers
 const isFromFlashcards = computed(() => {
   return route.query.from === 'flashcards'
+})
+
+const isFromQuiz = computed(() => {
+  return route.query.from === 'quiz'
 })
 
 const activeNotebook = computed(() => {
@@ -1122,9 +1145,19 @@ function goBackToFlashcards() {
   })
 }
 
-function canJumpToSource(_slot) {
-  // Can jump to reader if we have an active topic with a valid notebook
-  return Boolean(activeTopic.value?.notebook_id || selectedNotebookID.value)
+function goBackToQuiz() {
+  router.push({
+    path: '/quiz',
+    query: {
+      taskId: route.query.taskId || undefined,
+      reviewed: '1',
+    },
+  })
+}
+
+function canJumpToSource(slot) {
+  // Can jump to reader if we have a valid notebook from the slot or active topic
+  return Boolean(slot?.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value)
 }
 
 function jumpToReader(slot) {
@@ -1153,7 +1186,7 @@ function formatTimeAgo(unixSec) {
   if (!unixSec || unixSec <= 0) return 'Never'
   const nowSec = Math.floor(Date.now() / 1000)
   const diffSec = nowSec - unixSec
-  if (diffSec < 60) return 'Just now'
+  if (diffSec < 60) return 'Just now' // Covers recent reviews and clock skew (diffSec <= 0)
   const diffMin = Math.floor(diffSec / 60)
   if (diffMin < 60) return `${diffMin}m ago`
   const diffHours = Math.floor(diffMin / 60)
@@ -1248,11 +1281,13 @@ async function selectTopic(topic) {
 }
 
 async function loadTopicSlots(topicID, isBackgroundPoll = false) {
+  if (!isComponentMounted) return
   if (!isBackgroundPoll) {
     loadingSlots.value = true
   }
   try {
     const res = await getTopicStudyNoteSlots(topicID)
+    if (!isComponentMounted) return
     const dbSlots = (res && Array.isArray(res.slots)) ? res.slots : []
     sessionSlots.value = dbSlots
 
@@ -1266,13 +1301,14 @@ async function loadTopicSlots(topicID, isBackgroundPoll = false) {
       notesPollTimer = setTimeout(() => {
         notesPollAttempts++
         loadTopicSlots(topicID, true)
-      }, 2500)
+      }, NOTES_POLL_INTERVAL_MS)
     } else if (!hasGeneratingSlot) {
       notesPollAttempts = 0
     }
 
     if (!isBackgroundPoll && targetPageFromRoute.value && dbSlots.length > 0) {
       nextTick(() => {
+        if (!isComponentMounted) return
         const targetSlot = dbSlots.find((s) => isTargetSlot(s))
         if (targetSlot) {
           const el = document.getElementById(`session-slot-${targetSlot.start_page}-${targetSlot.end_page}`)
@@ -1284,6 +1320,7 @@ async function loadTopicSlots(topicID, isBackgroundPoll = false) {
     }
   } catch (err) {
     console.warn('[NOTES] Failed to fetch topic slots:', err)
+    if (!isComponentMounted) return
     if (!isBackgroundPoll) {
       sessionSlots.value = []
     } else if (selectedTopicID.value === topicID && notesPollAttempts < MAX_NOTES_POLL_ATTEMPTS) {
@@ -1295,10 +1332,10 @@ async function loadTopicSlots(topicID, isBackgroundPoll = false) {
       notesPollTimer = setTimeout(() => {
         notesPollAttempts++
         loadTopicSlots(topicID, true)
-      }, 2500)
+      }, NOTES_POLL_INTERVAL_MS)
     }
   } finally {
-    if (!isBackgroundPoll) {
+    if (!isBackgroundPoll && isComponentMounted) {
       loadingSlots.value = false
     }
   }
@@ -1316,7 +1353,7 @@ function cancelEditSlot() {
   editSlotBuffer.value = ''
 }
 
-async function handleNewNotePaste(e) {
+async function processImagePaste(e, topicId, notebookId, onImageMarkdownReady) {
   const clipboardData = e.clipboardData || window.clipboardData
   if (!clipboardData) return
   const items = clipboardData.items
@@ -1336,18 +1373,17 @@ async function handleNewNotePaste(e) {
 
         const ext = blob.type.split('/')[1] || 'png'
         const fileName = `screenshot_${Date.now()}.${ext}`
-        const nbID = activeTopic.value?.notebook_id || selectedNotebookID.value || ''
-        const res = await saveNoteImage(selectedTopicID.value, nbID, fileName, fileBytes)
+        const res = await saveNoteImage(topicId, notebookId || '', fileName, fileBytes)
 
         if (res && res.error) {
           errorMsg.value = res.error
           return
         }
 
-        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
-        newNoteBuffer.value += imageMarkdown
+        const imageMarkdown = `\n\n![Pasted Diagram|${DEFAULT_IMAGE_PASTE_MARKDOWN_WIDTH}](${res.path || fileName})\n\n`
+        onImageMarkdownReady(imageMarkdown, res?.relative_folder_path)
       } catch (err) {
-        console.error('[NOTES Paste] Failed to process image paste:', err)
+        console.error('[NOTES Image Paste] Failed to process image paste:', err)
         errorMsg.value = 'Failed to paste diagram image.'
       }
       break
@@ -1355,47 +1391,21 @@ async function handleNewNotePaste(e) {
   }
 }
 
+async function handleNewNotePaste(e) {
+  const nbID = activeTopic.value?.notebook_id || selectedNotebookID.value || ''
+  await processImagePaste(e, selectedTopicID.value, nbID, (markdown) => {
+    newNoteBuffer.value += markdown
+  })
+}
+
 async function handleSlotPaste(e, slot) {
-  const clipboardData = e.clipboardData || window.clipboardData
-  if (!clipboardData) return
-  const items = clipboardData.items
-  if (!items || items.length === 0) return
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    if (item.type.indexOf('image') !== -1) {
-      e.preventDefault()
-      const blob = item.getAsFile()
-      if (!blob) continue
-
-      try {
-        const arrayBuffer = await blob.arrayBuffer()
-        const uint8Array = new Uint8Array(arrayBuffer)
-        const fileBytes = Array.from(uint8Array)
-
-        const ext = blob.type.split('/')[1] || 'png'
-        const fileName = `screenshot_${Date.now()}.${ext}`
-        const nbID = slot.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value || ''
-        const res = await saveNoteImage(slot.topic_id, nbID, fileName, fileBytes)
-
-        if (res && res.error) {
-          errorMsg.value = res.error
-          return
-        }
-
-        if (res && res.relative_folder_path) {
-          slot.relative_folder_path = res.relative_folder_path
-        }
-
-        const imageMarkdown = `\n\n![Pasted Diagram|75%](${res.path || fileName})\n\n`
-        editSlotBuffer.value += imageMarkdown
-      } catch (err) {
-        console.error('[NOTES Slot Paste] Failed to process image paste:', err)
-        errorMsg.value = 'Failed to paste diagram image.'
-      }
-      break
+  const nbID = slot.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value || ''
+  await processImagePaste(e, slot.topic_id, nbID, (markdown, folderPath) => {
+    if (folderPath) {
+      slot.relative_folder_path = folderPath
     }
-  }
+    editSlotBuffer.value += markdown
+  })
 }
 
 async function saveSlot(slot) {
@@ -1512,6 +1522,7 @@ async function moveSlot(slot, delta) {
   const targetIdx = currentIdx + delta
   if (targetIdx < 0 || targetIdx >= sessionSlots.value.length) return
 
+  const originalSlots = [...sessionSlots.value]
   const updated = [...sessionSlots.value]
   const temp = updated[currentIdx]
   updated[currentIdx] = updated[targetIdx]
@@ -1522,9 +1533,11 @@ async function moveSlot(slot, delta) {
   try {
     const res = await reorderTopicStudyNotes(selectedTopicID.value, updated)
     if (res && res.error) {
+      sessionSlots.value = originalSlots
       errorMsg.value = res.error
     }
   } catch (err) {
+    sessionSlots.value = originalSlots
     console.error('[NOTES] Failed to reorder notes:', err)
     errorMsg.value = 'Failed to save note order.'
   } finally {
@@ -1596,31 +1609,84 @@ async function markSlotReviewed(slot) {
   const key = getSlotKey(slot)
   markingSlotKey.value = key
   errorMsg.value = ''
+  const isCurrentlyReviewed = Boolean(slot.last_reviewed_at)
   try {
-    const res = await apiMarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+    const res = isCurrentlyReviewed
+      ? await apiUnmarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+      : await apiMarkTopicReviewed(slot.topic_id, slot.start_page, slot.end_page)
+
     if (res && res.error) {
       errorMsg.value = res.error
       return
     }
-    const nowSec = Math.floor(Date.now() / 1000)
-    slot.last_reviewed_at = nowSec
-    successMsg.value = 'Marked as reviewed.'
+
+    const nextReviewedAt = isCurrentlyReviewed ? 0 : Math.floor(Date.now() / 1000)
+    slot.last_reviewed_at = nextReviewedAt
+
+    // Also update notesMap entry so sidebar topic dot dynamically updates
+    if (slot.topic_id && notesMap.value[slot.topic_id]) {
+      const topicNotes = notesMap.value[slot.topic_id]
+      const noteEntry = topicNotes.find(
+        (n) => n.start_page === slot.start_page && n.end_page === slot.end_page
+      )
+      if (noteEntry) {
+        noteEntry.last_reviewed_at = nextReviewedAt
+      }
+    }
+
+    successMsg.value = isCurrentlyReviewed ? 'Marked as unreviewed.' : 'Marked as reviewed.'
     setTimeout(() => { successMsg.value = '' }, 3000)
   } catch (err) {
-    console.error('[NOTES] Failed to mark reviewed:', err)
-    errorMsg.value = 'Failed to mark reviewed.'
+    console.error('[NOTES] Failed to toggle reviewed status:', err)
+    errorMsg.value = isCurrentlyReviewed ? 'Failed to unmark reviewed.' : 'Failed to mark reviewed.'
   } finally {
     markingSlotKey.value = null
   }
 }
 
+function getTopicDotClass(topic) {
+  if (!topic.has_note) return 'dot-missing-note'
+  if (topic.last_reviewed_at > 0) return 'dot-reviewed'
+  return 'dot-unreviewed'
+}
+
+function getTopicDotTitle(topic) {
+  if (!topic.has_note) return 'No Study Note Yet'
+  if (topic.last_reviewed_at > 0) return `Reviewed ${topic.last_reviewed_text}`
+  return 'Notes Ready (Unreviewed)'
+}
+
+function getMarkReviewBtnText(slot) {
+  if (markingSlotKey.value === getSlotKey(slot)) return 'Marking...'
+  if (slot.last_reviewed_at) return 'Reviewed'
+  return 'Mark as Reviewed'
+}
+
+watch(
+  () => route.query,
+  (newQuery) => {
+    const queryTopic = newQuery.topicId || newQuery.topic_id
+    if (queryTopic && queryTopic !== selectedTopicID.value) {
+      const found = allTopics.value.find((t) => t.topic_id === queryTopic)
+      if (found) {
+        selectTopic(found)
+      } else {
+        selectedTopicID.value = queryTopic
+        loadTopicSlots(queryTopic)
+      }
+    }
+  }
+)
+
 onMounted(() => {
+  isComponentMounted = true
   loadInitialData()
   loadNotesSettings()
   window.addEventListener('settings-updated', handleExternalSettingsUpdated)
 })
 
 onUnmounted(() => {
+  isComponentMounted = false
   clearNotesPolling()
   window.removeEventListener('settings-updated', handleExternalSettingsUpdated)
 })
@@ -1911,9 +1977,14 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.dot-has-note {
+.dot-reviewed {
   background: #10b981;
   box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
+}
+
+.dot-unreviewed {
+  background: #f59e0b;
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
 }
 
 .dot-missing-note {
@@ -2373,6 +2444,18 @@ onUnmounted(() => {
   background: color-mix(in srgb, #10b981 20%, transparent);
 }
 
+.icon-btn-pill.mark-review-btn {
+  background: color-mix(in srgb, var(--surface-container-high) 80%, transparent);
+  color: var(--on-surface-variant);
+  border-color: var(--outline-variant);
+}
+
+.icon-btn-pill.mark-review-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #10b981 10%, var(--surface-container-high));
+  color: #10b981;
+  border-color: color-mix(in srgb, #10b981 40%, transparent);
+}
+
 /* Card Body */
 .session-card-body {
   padding: 18px 20px;
@@ -2484,6 +2567,10 @@ onUnmounted(() => {
   margin: 0;
   font-size: 13px;
   color: var(--muted-text);
+}
+
+.empty-box-add-btn {
+  margin-top: 12px;
 }
 
 /* Spinner */

@@ -323,6 +323,28 @@ export function updateProfile(id, name, deadlineStr) {
   return appBridge().UpdateProfile(id, name, deadlineStr)
 }
 
+export function updateProfileWithInheritance(id, name, deadlineStr, inheritedIDs) {
+  const bridge = appBridge()
+  console.log('[appApi] updateProfileWithInheritance invoking bridge:', {
+    hasMethod: typeof bridge.UpdateProfileWithInheritance === 'function',
+    availableMethods: Object.keys(bridge).filter((k) => k.toLowerCase().includes('profile')),
+    args: { id, name, deadlineStr, inheritedIDs: inheritedIDs || [] },
+  })
+  if (typeof bridge.UpdateProfileWithInheritance !== 'function') {
+    console.error('[appApi] bridge.UpdateProfileWithInheritance is NOT A FUNCTION on window.go.app.App!')
+    throw new Error('UpdateProfileWithInheritance backend method not found on bridge')
+  }
+  return bridge.UpdateProfileWithInheritance(id, name, deadlineStr, inheritedIDs || [])
+}
+
+export function updateProfileFlashcardInheritance(profileID, inheritedIDs) {
+  return appBridge().UpdateProfileFlashcardInheritance(profileID, inheritedIDs || [])
+}
+
+export function getProfileFlashcardDueBreakdown() {
+  return appBridge().GetProfileFlashcardDueBreakdown()
+}
+
 export function deleteProfile(id) {
   return appBridge().DeleteProfile(id)
 }
@@ -661,6 +683,15 @@ export function markTopicReviewed(topicID, startPage = 0, endPage = 0) {
     return appBridge().MarkTopicReviewed(topicID, Number(startPage) || 0, Number(endPage) || 0)
   } catch (err) {
     console.error('Failed marking topic reviewed:', err)
+    throw err
+  }
+}
+
+export function unmarkTopicReviewed(topicID, startPage = 0, endPage = 0) {
+  try {
+    return appBridge().UnmarkTopicReviewed(topicID, Number(startPage) || 0, Number(endPage) || 0)
+  } catch (err) {
+    console.error('Failed unmarking topic reviewed:', err)
     throw err
   }
 }

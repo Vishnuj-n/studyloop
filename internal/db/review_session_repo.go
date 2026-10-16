@@ -116,6 +116,11 @@ func (r *Repository) GetNextDueReviewNotebook(now int64) (string, int, error) {
 	}
 	activeProfileStr := settings.ActiveProfileID
 
+	allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(activeProfileStr)
+	if err != nil {
+		return "", 0, fmt.Errorf("getNextDueReviewNotebook: getting allowed profiles: %w", err)
+	}
+
 	var notebookID string
 	var dueCount int
 	query := `
@@ -148,9 +153,11 @@ func (r *Repository) GetNextDueReviewNotebook(now int64) (string, int, error) {
 	`
 	var args []interface{}
 	args = append(args, now)
-	if activeProfileStr != "" {
-		query += ` AND (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
-		args = append(args, activeProfileStr)
+	if len(allowedProfiles) > 0 {
+		query += fmt.Sprintf(` AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '') `, buildInPlaceholders(len(allowedProfiles)))
+		for _, p := range allowedProfiles {
+			args = append(args, p)
+		}
 	}
 
 	query += `
@@ -368,17 +375,30 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 			fc.prompt,
 			fc.answer,
 			COALESCE(fc.due_at, 0),
-			fc.suspended
+			fc.suspended,
+			COALESCE(t.title, ''),
+			COALESCE(n.title, ''),
+			COALESCE(sp.name, '')
 		FROM review_task_cards rtc
 		JOIN fsrs_cards fc ON fc.id = rtc.card_id
 		LEFT JOIN chunks ch ON ch.id = fc.source_chunk_id
+		LEFT JOIN topics t ON t.id = fc.topic_id
+		LEFT JOIN notebooks n ON n.id = ? AND (
+			n.topic_id = t.id
+			OR EXISTS (
+				SELECT 1 FROM notebook_topics nt
+				WHERE nt.notebook_id = n.id AND nt.topic_id = t.id
+			)
+		)
+		LEFT JOIN study_profiles sp ON sp.id = n.profile_id
 		WHERE rtc.task_id = ?
+		GROUP BY rtc.card_id
 		ORDER BY
 			CASE rtc.status WHEN 'pending' THEN 0 ELSE 1 END,
 			fc.due_at ASC,
 			fc.created_at ASC,
 			fc.id ASC
-	`, taskID)
+	`, task.NotebookID, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +408,11 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 		var card models.ReviewSessionCard
 		var suspended bool
 		card.TaskID = taskID
-		if err := rows.Scan(&card.CardID, &card.Status, &card.TopicID, &card.SourceChunkID, &card.Page, &card.Prompt, &card.Answer, &card.DueAt, &suspended); err != nil {
+		if err := rows.Scan(
+			&card.CardID, &card.Status, &card.TopicID, &card.SourceChunkID, &card.Page,
+			&card.Prompt, &card.Answer, &card.DueAt, &suspended,
+			&card.TopicTitle, &card.NotebookTitle, &card.ProfileName,
+		); err != nil {
 			return nil, err
 		}
 		card.Suspended = suspended

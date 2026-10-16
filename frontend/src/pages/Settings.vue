@@ -142,11 +142,13 @@
             <SettingsProfilesPanel
               :profiles="profiles"
               :active-profile-id="settings.active_profile_id"
+              :ask-profile-on-startup="settings.ask_profile_on_startup !== false"
               :format-unix-date="formatUnixDate"
               @add="showAddModal = true"
               @select="setActiveProfile"
               @edit="openEditModal"
               @delete="handleDeleteProfile"
+              @update-startup-preference="updateStartupPreference"
             />
 
             <SettingsTextbooksPanel
@@ -239,8 +241,11 @@
     <SettingsProfileModal
       v-if="showEditModal"
       is-edit
+      :current-profile-id="editProfileId"
+      :all-profiles="profiles"
       :initial-name="editProfileName"
       :initial-deadline="editProfileDeadline"
+      :initial-inherited="editProfileInherited"
       @close="closeEditModal"
       @save="handleUpdateProfile"
     />
@@ -381,6 +386,7 @@ const {
   studyDuration,
   applyDurationPreset,
   loadSettings,
+  saveUserSettings,
   cleanup: cleanupSettings,
 } = useSettings(error, success)
 
@@ -400,8 +406,10 @@ const {
   notebooks,
   showAddModal,
   showEditModal,
+  editProfileId,
   editProfileName,
   editProfileDeadline,
+  editProfileInherited,
   openEditModal,
   closeEditModal,
   handleAddProfile,
@@ -491,6 +499,24 @@ async function setActiveProfile(profileID) {
   }
 }
 
+async function updateStartupPreference(enabled) {
+  const prev = settings.value.ask_profile_on_startup
+  settings.value.ask_profile_on_startup = enabled
+  try {
+    const res = await saveUserSettings({ ...settings.value, ask_profile_on_startup: enabled })
+    if (res?.error) {
+      settings.value.ask_profile_on_startup = prev
+      error.value = res.error
+      return
+    }
+    localStorage.setItem('studyloop_ask_profile_on_startup', String(enabled))
+    success.value = enabled ? 'Startup profile picker enabled' : 'Startup profile picker disabled'
+  } catch (err) {
+    settings.value.ask_profile_on_startup = prev
+    error.value = 'Failed to update startup profile preference'
+  }
+}
+
 async function runManualSync() {
   error.value = ''
   success.value = ''
@@ -536,6 +562,11 @@ onMounted(async () => {
     activeCategory.value = route.query.tab
   }
 
+  if (route.query.action === 'add' || route.query.add === 'true') {
+    activeCategory.value = 'profiles'
+    showAddModal.value = true
+  }
+
   const [envRes, cfgRes] = await Promise.all([
     getAppEnv().catch(() => null),
     getCloudConfig().catch(() => null),
@@ -557,7 +588,7 @@ onUnmounted(() => {
   display: flex;
   margin: -16px -20px;
   height: calc(100% + 32px);
-  min-height: calc(100vh);
+  min-height: 100%;
   overflow: hidden;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);

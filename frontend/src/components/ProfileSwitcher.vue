@@ -41,6 +41,10 @@
       </button>
 
       <div class="profile-menu-divider" aria-hidden="true"></div>
+      <button type="button" class="profile-menu-action" @click="handleOpenLauncher">
+        <BaseIcon name="user" size="14" />
+        Choose profile (Launcher)
+      </button>
       <button type="button" class="profile-menu-action" @click="handleManage">
         <BaseIcon name="settings" size="14" />
         Manage profiles &amp; notebooks
@@ -88,6 +92,11 @@ onUnmounted(() => {
 function handleSelect(profileId) {
   isOpen.value = false
   emit('select-profile', profileId)
+}
+
+function handleOpenLauncher() {
+  isOpen.value = false
+  window.dispatchEvent(new CustomEvent('open-profile-launcher'))
 }
 
 function handleManage() {

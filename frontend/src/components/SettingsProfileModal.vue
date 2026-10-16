@@ -27,16 +27,48 @@
           <label for="target-deadline">Target Deadline</label>
           <input id="target-deadline" v-model="localDeadline" type="date" required />
         </div>
+
+        <!-- Flashcard Retention & Inheritance -->
+        <div v-if="isEdit && otherProfiles.length > 0" class="inheritance-section">
+          <div class="inheritance-header">
+            <div class="inheritance-title-row">
+              <BaseIcon name="layers" size="14" />
+              <span class="inheritance-title">Flashcard Retention &amp; Inheritance</span>
+            </div>
+            <p class="inheritance-desc">
+              Choose which other profiles' due flashcards appear in this profile's daily review queue:
+            </p>
+          </div>
+          <div class="inheritance-list">
+            <label
+              v-for="prof in otherProfiles"
+              :key="prof.id"
+              class="inheritance-item"
+              :class="{ selected: selectedInherited.includes(prof.id) }"
+            >
+              <input
+                v-model="selectedInherited"
+                type="checkbox"
+                class="inheritance-checkbox"
+                :value="prof.id"
+              />
+              <span class="profile-name-bold">{{ prof.name }}</span>
+              <span class="due-count-pill" :class="{ 'has-due': getDueCount(prof.id) > 0 }">
+                {{ getDueCount(prof.id) }} cards due
+              </span>
+            </label>
+          </div>
+        </div>
       </div>
 
       <div class="modal-actions">
-        <button class="cancel-btn" @click="$emit('close')">Cancel</button>
+        <button class="cancel-btn" :disabled="isSaving" @click="$emit('close')">Cancel</button>
         <button
           class="save-btn"
-          :disabled="!localName || !localDeadline"
-          @click="$emit('save', { name: localName, deadline: localDeadline })"
+          :disabled="!localName || !localDeadline || isSaving"
+          @click="handleSave"
         >
-          {{ isEdit ? 'Save Changes' : 'Create Profile' }}
+          {{ saveButtonLabel }}
         </button>
       </div>
     </div>
@@ -44,19 +76,79 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
+import { getProfileFlashcardDueBreakdown } from '../services/appApi'
 
 const props = defineProps({
   isEdit: { type: Boolean, default: false },
   initialName: { type: String, default: '' },
   initialDeadline: { type: String, default: '' },
+  currentProfileId: { type: String, default: '' },
+  allProfiles: { type: Array, default: () => [] },
+  initialInherited: { type: Array, default: () => [] },
 })
 
-defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'save'])
 
 const localName = ref(props.initialName)
 const localDeadline = ref(props.initialDeadline)
+const selectedInherited = ref([...(props.initialInherited || [])])
+const profileDueMap = ref({})
+const isSaving = ref(false)
+
+const saveButtonLabel = computed(() => {
+  if (isSaving.value) return 'Saving...'
+  return props.isEdit ? 'Save Changes' : 'Create Profile'
+})
+
+const otherProfiles = computed(() => {
+  if (!props.allProfiles || !props.currentProfileId) return []
+  return props.allProfiles.filter((p) => p.id !== props.currentProfileId)
+})
+
+function getDueCount(profileId) {
+  return profileDueMap.value[profileId] ?? 0
+}
+
+async function handleSave() {
+  if (isSaving.value) return
+  isSaving.value = true
+  console.log('[SettingsProfileModal] Save Changes button pressed', {
+    name: localName.value,
+    deadline: localDeadline.value,
+    inheritedProfileIds: [...selectedInherited.value],
+    isEdit: props.isEdit,
+    currentProfileId: props.currentProfileId,
+  })
+  try {
+    await emit('save', {
+      name: localName.value,
+      deadline: localDeadline.value,
+      inheritedProfileIds: [...selectedInherited.value],
+    })
+  } finally {
+    // If modal remains open on error, release saving state
+    setTimeout(() => {
+      isSaving.value = false
+    }, 500)
+  }
+}
+
+onMounted(async () => {
+  try {
+    const res = await getProfileFlashcardDueBreakdown()
+    if (res && res.profiles) {
+      const map = {}
+      for (const p of res.profiles) {
+        map[p.profile_id] = p.due_cards || 0
+      }
+      profileDueMap.value = map
+    }
+  } catch (err) {
+    console.warn('Failed to load profile flashcard due breakdown:', err)
+  }
+})
 
 watch(
   () => props.initialName,
@@ -68,6 +160,12 @@ watch(
   () => props.initialDeadline,
   (v) => {
     localDeadline.value = v
+  }
+)
+watch(
+  () => props.initialInherited,
+  (v) => {
+    selectedInherited.value = [...(v || [])]
   }
 )
 </script>
@@ -195,6 +293,101 @@ input:focus {
 input::placeholder {
   color: var(--muted-text, #94a3b8);
   opacity: 0.8;
+}
+
+.inheritance-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface-container-low, #f8fafc);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.inheritance-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inheritance-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary, #4f46e5);
+}
+
+.inheritance-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inheritance-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-text, #64748b);
+  line-height: 1.4;
+}
+
+.inheritance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.inheritance-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-container-lowest, #ffffff);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.inheritance-item:hover {
+  border-color: color-mix(in srgb, var(--primary, #4f46e5) 40%, var(--outline-variant));
+  background: var(--surface-container-lowest, #ffffff);
+}
+
+.inheritance-item.selected {
+  border-color: var(--primary, #4f46e5);
+  background: color-mix(in srgb, var(--primary, #4f46e5) 4%, var(--surface-container-lowest));
+}
+
+.inheritance-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary, #4f46e5);
+  cursor: pointer;
+}
+
+.profile-name-bold {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #0f172a);
+}
+
+.due-count-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--surface-container-high, #e2e8f0);
+  color: var(--muted-text, #64748b);
+}
+
+.due-count-pill.has-due {
+  background: color-mix(in srgb, var(--tertiary, #d97706) 12%, transparent);
+  color: var(--tertiary, #b45309);
 }
 
 .modal-actions {

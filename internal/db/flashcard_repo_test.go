@@ -570,22 +570,22 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAllFlashcardsDeckOverview profA failed: %v", err)
 	}
-	if overviewA.Metrics.TotalCards != 1 {
-		t.Errorf("expected exactly 1 card for profA, got %d", overviewA.Metrics.TotalCards)
+	if overviewA.Metrics.TotalCards != 2 {
+		t.Errorf("expected 2 cards for profA (including unassigned notebook), got %d", overviewA.Metrics.TotalCards)
 	}
-	if len(overviewA.Notebooks) != 1 || overviewA.Notebooks[0].NotebookID != nbA {
-		t.Errorf("expected only notebook A in profA overview, got %+v", overviewA.Notebooks)
+	if len(overviewA.Notebooks) != 2 {
+		t.Errorf("expected 2 notebooks in profA overview (including unassigned notebook), got %+v", overviewA.Notebooks)
 	}
 
 	overviewB, err := testRepo.GetAllFlashcardsDeckOverview(profB)
 	if err != nil {
 		t.Fatalf("GetAllFlashcardsDeckOverview profB failed: %v", err)
 	}
-	if overviewB.Metrics.TotalCards != 1 {
-		t.Errorf("expected exactly 1 card for profB, got %d", overviewB.Metrics.TotalCards)
+	if overviewB.Metrics.TotalCards != 2 {
+		t.Errorf("expected 2 cards for profB (including unassigned notebook), got %d", overviewB.Metrics.TotalCards)
 	}
-	if len(overviewB.Notebooks) != 1 || overviewB.Notebooks[0].NotebookID != nbB {
-		t.Errorf("expected only notebook B in profB overview, got %+v", overviewB.Notebooks)
+	if len(overviewB.Notebooks) != 2 {
+		t.Errorf("expected 2 notebooks in profB overview (including unassigned notebook), got %+v", overviewB.Notebooks)
 	}
 }
 

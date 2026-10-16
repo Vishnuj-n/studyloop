@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import {
   getProfiles,
   createProfile,
-  updateProfile,
+  updateProfileWithInheritance,
   deleteProfile,
   getNotebooks,
   assignNotebookToProfile,
@@ -20,10 +20,12 @@ export function useProfiles(errorRef) {
   const editProfileId = ref('')
   const editProfileName = ref('')
   const editProfileDeadline = ref('')
+  const editProfileInherited = ref([])
 
   function openEditModal(profile) {
     editProfileId.value = profile.id
     editProfileName.value = profile.name
+    editProfileInherited.value = profile.inherited_flashcard_profile_ids || []
     const dateObj = new Date(profile.deadline_at * 1000)
     editProfileDeadline.value = dateObj.toISOString().split('T')[0]
     showEditModal.value = true
@@ -34,12 +36,16 @@ export function useProfiles(errorRef) {
     editProfileId.value = ''
     editProfileName.value = ''
     editProfileDeadline.value = ''
+    editProfileInherited.value = []
   }
 
   async function handleAddProfile({ name, deadline }) {
+    console.log('[useProfiles] handleAddProfile called', { name, deadline })
     try {
       const res = await createProfile(name, deadline)
+      console.log('[useProfiles] createProfile response:', res)
       if (res.error) {
+        console.error('[useProfiles] createProfile error:', res.error)
         await alert('Profile Error', res.error)
         return
       }
@@ -47,15 +53,29 @@ export function useProfiles(errorRef) {
       await loadProfiles()
       return true
     } catch (err) {
+      console.error('[useProfiles] createProfile exception:', err)
       await alert('Error', err.message || 'Failed to create profile')
       return false
     }
   }
 
-  async function handleUpdateProfile({ name, deadline }) {
+  async function handleUpdateProfile({ name, deadline, inheritedProfileIds }) {
+    console.log('[useProfiles] handleUpdateProfile called', {
+      editProfileId: editProfileId.value,
+      name,
+      deadline,
+      inheritedProfileIds,
+    })
     try {
-      const res = await updateProfile(editProfileId.value, name, deadline)
+      const res = await updateProfileWithInheritance(
+        editProfileId.value,
+        name,
+        deadline,
+        inheritedProfileIds !== undefined ? inheritedProfileIds : editProfileInherited.value
+      )
+      console.log('[useProfiles] updateProfileWithInheritance response:', res)
       if (res.error) {
+        console.error('[useProfiles] updateProfileWithInheritance error:', res.error)
         await alert('Profile Error', res.error)
         return
       }
@@ -63,6 +83,7 @@ export function useProfiles(errorRef) {
       await loadProfiles()
       return true
     } catch (err) {
+      console.error('[useProfiles] updateProfileWithInheritance exception:', err)
       await alert('Error', err.message || 'Failed to update profile')
       return false
     }
@@ -137,8 +158,10 @@ export function useProfiles(errorRef) {
     notebooks,
     showAddModal,
     showEditModal,
+    editProfileId,
     editProfileName,
     editProfileDeadline,
+    editProfileInherited,
     openEditModal,
     closeEditModal,
     handleAddProfile,

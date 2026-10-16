@@ -747,41 +747,35 @@ async function checkAndShowPreviousSessionRecap() {
     // ignore sessionStorage errors
   }
 
-  const currentStart = reader.effectiveMinPage.value || reader.currentPage.value || 0
+  const currentStart = Number(sessionTask.value?.start_page) || Number(reader.sessionStartPage?.value) || Number(reader.effectiveMinPage.value) || Number(reader.currentPage.value) || 0
   loadingPreviousSessionSlot.value = true
 
   try {
     const res = await getTopicStudyNoteSlots(reader.selectedTopicID.value)
     const slots = (res && Array.isArray(res.slots)) ? res.slots : []
 
-    // Filter slots with valid content
-    const validSlots = slots.filter((s) => s && s.content && s.content.trim() !== '')
+    // Filter slots with valid content, excluding chapter summaries (start_page=0, end_page=0)
+    const validSlots = slots.filter(
+      (s) => s && s.content && s.content.trim() !== '' && !(Number(s.start_page) === 0 && Number(s.end_page) === 0)
+    )
     if (validSlots.length === 0) {
       return
     }
 
-    // Find the immediately preceding slot strictly before currentStart
-    // (i.e. end_page < currentStart or start_page < currentStart, and excluding current session range)
+    // Find the immediately preceding session strictly before currentStart
+    // A preceding session started before the current session (s.start_page < currentStart)
+    // Sort descending by start_page (or end_page) so the nearest prior session comes first
     let prevSlot = null
     const priorSlots = validSlots
-      .filter((s) => {
-        // Exclude notes that encompass or start at/after the current start page
-        if (s.start_page >= currentStart) return false
-        if (s.end_page >= currentStart) return false
-        return true
+      .filter((s) => Number(s.start_page) < currentStart)
+      .sort((a, b) => {
+        const diff = (Number(b.start_page) || 0) - (Number(a.start_page) || 0)
+        if (diff !== 0) return diff
+        return (Number(b.end_page) || 0) - (Number(a.end_page) || 0)
       })
-      .sort((a, b) => (b.end_page || b.start_page) - (a.end_page || a.start_page))
 
     if (priorSlots.length > 0) {
       prevSlot = priorSlots[0]
-    } else if (currentStart > 1) {
-      // Fallback if end_page overlaps or is 0, but started before currentStart
-      const earlierSlots = validSlots
-        .filter((s) => s.start_page > 0 && s.start_page < currentStart)
-        .sort((a, b) => b.start_page - a.start_page)
-      if (earlierSlots.length > 0) {
-        prevSlot = earlierSlots[0]
-      }
     }
 
     if (prevSlot && prevSlot.content && prevSlot.content.trim() !== '') {

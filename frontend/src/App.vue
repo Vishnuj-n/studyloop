@@ -1,6 +1,6 @@
 <script setup>
 import Sidebar from './components/Sidebar.vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import MysteryChestModal from './components/MysteryChestModal.vue'
@@ -17,6 +17,8 @@ import { useExtensions } from './composables/useExtensions'
 import {
   getUserSettings,
   updateUserSettings,
+  getProfiles,
+  setActiveProfileID,
   getTodayPlan,
   checkForUpdates,
   getReleaseNotes,
@@ -32,6 +34,7 @@ const { showNotice, showError } = useToast()
 const { setupModalState, closeSetupModal } = useExtensions()
 
 const route = useRoute()
+const router = useRouter()
 
 const banner = ref({
   show: false,
@@ -386,6 +389,10 @@ function handleDismissPrivacyNotice() {
   showPrivacyNoticePopup.value = false
 }
 
+function handleOpenLauncherFromEvent() {
+  router.push('/select-profile')
+}
+
 let cancelIngestionListener = null
 let cancelUpdateProgressListener = null
 
@@ -393,6 +400,7 @@ onMounted(() => {
   initClerk()
   syncScheduler()
   window.addEventListener('settings-updated', syncScheduler)
+  window.addEventListener('open-profile-launcher', handleOpenLauncherFromEvent)
   checkAppUpdates()
   checkOneTimeReleaseNotes()
   checkOneTimePrivacyNotice()
@@ -420,6 +428,7 @@ onUnmounted(() => {
     schedulerTimeout = null
   }
   window.removeEventListener('settings-updated', syncScheduler)
+  window.removeEventListener('open-profile-launcher', handleOpenLauncherFromEvent)
   window.removeEventListener('study-reward-earned', handleStudyReward)
   if (cancelIngestionListener) cancelIngestionListener()
   if (cancelUpdateProgressListener) cancelUpdateProgressListener()
@@ -429,7 +438,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
-    <Sidebar v-if="route.path !== '/onboarding'" />
+    <Sidebar v-if="route.path !== '/onboarding' && route.path !== '/select-profile'" />
 
     <main class="content-shell">
       <!-- Update Alert Modal -->

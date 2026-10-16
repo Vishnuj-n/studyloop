@@ -33,7 +33,8 @@ func InitSchema(tx *sql.Tx) error {
 			default_remedial_strategy TEXT DEFAULT '',
 			quiz_question_count INTEGER DEFAULT NULL,
 			quiz_passing_score INTEGER DEFAULT NULL,
-			tutor_style TEXT DEFAULT ''
+			tutor_style TEXT DEFAULT '',
+			inherited_flashcard_profile_ids_json TEXT DEFAULT '[]'
 		)`,
 
 		// Core tables
@@ -130,6 +131,7 @@ func InitSchema(tx *sql.Tx) error {
 			study_slots_json TEXT DEFAULT '[]',
 			reminders_enabled BOOLEAN DEFAULT 1,
 			show_reward_notifications BOOLEAN DEFAULT 1,
+			ask_profile_on_startup BOOLEAN DEFAULT 1,
 			active_profile_id TEXT,
 			skip_to_reading_active BOOLEAN DEFAULT 0,
 			cloud_sync_url TEXT DEFAULT '',
