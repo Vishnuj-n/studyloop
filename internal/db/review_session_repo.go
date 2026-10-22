@@ -377,13 +377,14 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 			COALESCE(fc.due_at, 0),
 			fc.suspended,
 			COALESCE(t.title, ''),
+			COALESCE(n.id, ''),
 			COALESCE(n.title, ''),
 			COALESCE(sp.name, '')
 		FROM review_task_cards rtc
 		JOIN fsrs_cards fc ON fc.id = rtc.card_id
 		LEFT JOIN chunks ch ON ch.id = fc.source_chunk_id
 		LEFT JOIN topics t ON t.id = fc.topic_id
-		LEFT JOIN notebooks n ON n.id = ? AND (
+		LEFT JOIN notebooks n ON (
 			n.topic_id = t.id
 			OR EXISTS (
 				SELECT 1 FROM notebook_topics nt
@@ -398,7 +399,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 			fc.due_at ASC,
 			fc.created_at ASC,
 			fc.id ASC
-	`, task.NotebookID, taskID)
+	`, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +412,7 @@ func (r *Repository) GetReviewSession(taskID string) (*models.ReviewSession, err
 		if err := rows.Scan(
 			&card.CardID, &card.Status, &card.TopicID, &card.SourceChunkID, &card.Page,
 			&card.Prompt, &card.Answer, &card.DueAt, &suspended,
-			&card.TopicTitle, &card.NotebookTitle, &card.ProfileName,
+			&card.TopicTitle, &card.NotebookID, &card.NotebookTitle, &card.ProfileName,
 		); err != nil {
 			return nil, err
 		}

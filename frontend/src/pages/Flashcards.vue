@@ -433,6 +433,12 @@ const currentCardTopicID = computed(() => {
   return currentCardTopic.value?.topic_id || ''
 })
 
+// Resolve the source notebook for the current card, preferring the card's own notebook_id
+// (populated for inherited-profile cards) over the task's selectedNotebookID.
+const currentCardNotebookID = computed(() => {
+  return currentCard.value?.notebook_id || currentCardTopic.value?.notebook_id || selectedNotebookID.value || ''
+})
+
 const canViewCardNote = computed(() => {
   return Boolean(currentCardTopicID.value || selectedNotebookID.value)
 })
@@ -445,7 +451,7 @@ const cardPageNumber = computed(() => {
 
 function goToTopicNotes() {
   const topicId = currentCardTopicID.value
-  const nbId = selectedNotebookID.value || undefined
+  const nbId = currentCardNotebookID.value || undefined
   const cardPage = currentCard.value?.page ? Number(currentCard.value.page) : undefined
   router.push({
     path: '/notes',
@@ -465,7 +471,7 @@ async function goToCardPageInReader() {
   if (!cardPageNumber.value) return
   const topic = currentCardTopic.value
   const topicId = currentCardTopicID.value
-  const nbId = selectedNotebookID.value || topic?.notebook_id || undefined
+  const nbId = currentCardNotebookID.value || undefined
   const targetPage = cardPageNumber.value
 
   let sessionStart = topic?.start_page || targetPage

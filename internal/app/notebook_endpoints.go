@@ -1106,13 +1106,19 @@ func (a *App) GetNotebooks(topicID, profileID string) []map[string]interface{} {
 }
 
 // GetNotebookTopicTree returns notebook-scoped topic options for hierarchical selectors.
+// Includes notebooks from the active profile and any linked/inherited flashcard profiles so
+// that inherited flashcards can navigate to their source PDF pages and notes.
 func (a *App) GetNotebookTopicTree() ([]models.NotebookTopicTreeNode, error) {
 	repo := a.getRepo()
 	if repo == nil {
 		return nil, errors.New(errDatabaseNotInitialized)
 	}
 	profileID := a.resolveExplicitActiveProfileID()
-	tree, err := repo.GetNotebookTopicTree(profileID)
+	allowedProfileIDs, err := repo.GetAllowedFlashcardProfileIDs(profileID)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := repo.GetNotebookTopicTree(allowedProfileIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -1288,97 +1294,109 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 
 	// Workload in sessions
-	remainingSessions := 0.0
+	remainingSessions := 0
 	if remainingWords > 0 && targetWords > 0 {
-		remainingSessions = math.Ceil(float64(remainingWords) / float64(targetWords))
+		remainingSessions = int(math.Ceil(float64(remainingWords) / float64(targetWords)))
 	}
 
-	// Calculate required daily sessions (keep 1 decimal precision to avoid aggressive rounding)
-	requiredDailySessions := 0.0
-	if daysRemaining > 0 && remainingSessions > 0 {
-		requiredDailySessions = remainingSessions / float64(daysRemaining)
-	} else if remainingSessions > 0 {
-		requiredDailySessions = remainingSessions
+	// 1. Count Remaining Windows before Deadline
+	slotsPerDay := 1
+	var parsedSlots []struct {
+		Name  string `json:"name"`
+		Start string `json:"start"`
+		End   string `json:"end"`
+	}
+	if strings.TrimSpace(settings.StudySlotsJSON) != "" && settings.StudySlotsJSON != "[]" {
+		if err := json.Unmarshal([]byte(settings.StudySlotsJSON), &parsedSlots); err == nil && len(parsedSlots) > 0 {
+			slotsPerDay = len(parsedSlots)
+		}
+	}
+	remainingWindows := daysRemaining * slotsPerDay
+
+	// 2. Compute Integer Deficit
+	uncoveredSessions := remainingSessions - remainingWindows
+	if uncoveredSessions < 0 {
+		uncoveredSessions = 0
 	}
 
-	// Fetch historical completed reading stats from past 7 days
+	// 3. Weekly Historical Pace & Projected Finish
 	wordsPast7Days, sessionsPast7Days, _ := repo.GetProfileCompletedReadingStatsPastNDays(profileID, 7)
 
-	// Feasibility status evaluation: NO_DATA, AHEAD, ON_TRACK, BEHIND
 	feasibilityStatus := "NO_DATA"
 	projectedFinishStr := ""
-	daysGap := 0.0
-	currentDailySessions := 0.0
-	extraDailySessionsNeeded := 0.0
+	weeksToFinish := 0.0
 
-	if sessionsPast7Days < 2 {
-		// Not enough history to establish a reliable pace baseline
+	if daysRemaining <= 0 && remainingSessions > 0 {
+		feasibilityStatus = "DEADLINE_PASSED"
+	} else if sessionsPast7Days < 2 {
 		feasibilityStatus = "NO_DATA"
 	} else {
-		// Actual velocity in sessions per day
-		currentDailySessions = float64(sessionsPast7Days) / 7.0
-		if currentDailySessions <= 0 && wordsPast7Days > 0 {
-			currentDailySessions = (float64(wordsPast7Days) / float64(targetWords)) / 7.0
-		}
-
-		if currentDailySessions > 0 {
-			daysToFinishFloat := remainingSessions / currentDailySessions
-			daysToFinish := int(math.Ceil(daysToFinishFloat))
+		if sessionsPast7Days > 0 {
+			weeksToFinish = float64(remainingSessions) / float64(sessionsPast7Days)
+			daysToFinish := int(math.Ceil(weeksToFinish * 7.0))
 			projectedFinishDate := today.AddDate(0, 0, daysToFinish)
 			projectedFinishStr = projectedFinishDate.Format(dateFormatYYYYMMDD)
-			daysGap = math.Round((float64(daysRemaining)-daysToFinishFloat)*10) / 10
+		}
 
-			if daysGap >= 1.0 {
-				feasibilityStatus = "AHEAD"
-			} else if daysGap >= 0 {
-				feasibilityStatus = "ON_TRACK"
-			} else {
-				feasibilityStatus = "BEHIND"
-				diff := requiredDailySessions - currentDailySessions
-				if diff > 0 {
-					extraDailySessionsNeeded = math.Round(diff*10) / 10
-				}
-			}
+		requiredWeeklyPace := 0.0
+		if daysRemaining > 0 {
+			requiredWeeklyPace = float64(remainingSessions) / (float64(daysRemaining) / 7.0)
+		}
+
+		if remainingSessions > remainingWindows {
+			feasibilityStatus = "UNCOVERED_WORKLOAD"
+		} else if float64(sessionsPast7Days) < requiredWeeklyPace {
+			feasibilityStatus = "AT_RISK"
+		} else {
+			feasibilityStatus = "ON_TRACK"
 		}
 	}
 
 	// Friendly human pace label
 	paceLabel := ""
 	switch feasibilityStatus {
+	case "DEADLINE_PASSED":
+		paceLabel = "Exam target date passed"
 	case "NO_DATA":
 		paceLabel = "Estimating pace"
-	case "AHEAD":
-		if math.Mod(daysGap, 1) == 0 {
-			paceLabel = fmt.Sprintf("On track — %d days ahead", int(daysGap))
+	case "UNCOVERED_WORKLOAD":
+		if uncoveredSessions == 1 {
+			paceLabel = "1 session uncovered by routine"
 		} else {
-			paceLabel = fmt.Sprintf("On track — %.1f days ahead", daysGap)
+			paceLabel = fmt.Sprintf("%d sessions uncovered by routine", uncoveredSessions)
 		}
+	case "AT_RISK":
+		paceLabel = "Pace at risk — below target pace"
 	case "ON_TRACK":
 		paceLabel = "On track for deadline"
-	case "BEHIND":
-		absGap := math.Abs(daysGap)
-		if math.Mod(absGap, 1) == 0 {
-			paceLabel = fmt.Sprintf("Behind pace — %d days late", int(absGap))
-		} else {
-			paceLabel = fmt.Sprintf("Behind pace — %.1f days late", absGap)
-		}
 	}
+
+	// Compatibility fields
+	requiredDailySessions := 0.0
+	if daysRemaining > 0 && remainingSessions > 0 {
+		requiredDailySessions = float64(remainingSessions) / float64(daysRemaining)
+	}
+	currentDailySessions := float64(sessionsPast7Days) / 7.0
 
 	return map[string]interface{}{
 		"has_deadline":            true,
 		"deadline":                deadlineTime.Format(dateFormatYYYYMMDD),
 		"daily_pace":              dailyPace,
 		"remaining_words":         remainingWords,
-		"remaining_sessions":      math.Round(remainingSessions*10) / 10,
+		"remaining_sessions":      remainingSessions,
 		"target_session_words":    targetWords,
 		"days_remaining":          daysRemaining,
+		"slots_per_day":           slotsPerDay,
+		"remaining_windows":       remainingWindows,
+		"uncovered_sessions":      uncoveredSessions,
+		"sessions_past_7_days":    sessionsPast7Days,
+		"words_past_7_days":       wordsPast7Days,
+		"weeks_to_finish":         math.Round(weeksToFinish*10) / 10,
 		"sessions_per_day":        math.Round(requiredDailySessions*10) / 10,
 		"required_daily_sessions": math.Round(requiredDailySessions*10) / 10,
 		"current_daily_sessions":  math.Round(currentDailySessions*10) / 10,
-		"extra_sessions_needed":   extraDailySessionsNeeded,
 		"feasibility_status":      feasibilityStatus,
 		"projected_finish":        projectedFinishStr,
-		"days_gap":                daysGap,
 		"pace_label":              paceLabel,
 		"study_slots_json":        settings.StudySlotsJSON,
 	}

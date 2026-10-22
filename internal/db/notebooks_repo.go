@@ -900,7 +900,9 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 }
 
 // GetNotebookTopicTree returns notebooks with their discovered topics derived from linked chunks, optionally filtered by profile.
-func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTopicTreeNode, error) {
+// profileIDs is the full list of allowed profile IDs (active + inherited). When non-empty, only notebooks belonging
+// to one of those profiles (or unassigned notebooks) are returned, so inherited-profile notebooks are visible for navigation.
+func (r *Repository) GetNotebookTopicTree(profileIDs []string) ([]models.NotebookTopicTreeNode, error) {
 	query := `
 		SELECT
 			n.id,
@@ -917,9 +919,12 @@ func (r *Repository) GetNotebookTopicTree(profileID string) ([]models.NotebookTo
 		LEFT JOIN topics t ON t.id = c.topic_id
 	`
 	var args []interface{}
-	if profileID != "" {
-		query += ` WHERE (n.profile_id = ? OR n.profile_id IS NULL OR n.profile_id = '') `
-		args = append(args, profileID)
+	if len(profileIDs) > 0 {
+		placeholders := buildInPlaceholders(len(profileIDs))
+		query += fmt.Sprintf(` WHERE (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '') `, placeholders)
+		for _, p := range profileIDs {
+			args = append(args, p)
+		}
 	}
 	query += ` ORDER BY n.uploaded_at DESC, t.start_page ASC, t.title ASC, t.id ASC `
 

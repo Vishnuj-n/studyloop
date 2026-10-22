@@ -505,6 +505,7 @@ type ReviewSessionCard struct {
 	Position      int                  `json:"position"`
 	TopicID       string               `json:"topic_id"`
 	TopicTitle    string               `json:"topic_title,omitempty"`
+	NotebookID    string               `json:"notebook_id,omitempty"`
 	NotebookTitle string               `json:"notebook_title,omitempty"`
 	ProfileName   string               `json:"profile_name,omitempty"`
 	SourceChunkID string               `json:"source_chunk_id,omitempty"`

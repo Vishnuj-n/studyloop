@@ -200,7 +200,7 @@ func TestGetNotebookTopicTreeDeduplicatesTopicRowsPerNotebook(t *testing.T) {
 		t.Fatalf("LinkChunksToNotebook failed: %v", err)
 	}
 
-	tree, err := testRepo.GetNotebookTopicTree("")
+	tree, err := testRepo.GetNotebookTopicTree(nil)
 	if err != nil {
 		t.Fatalf("GetNotebookTopicTree failed: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestGetNotebookTopicTreeIncludesTopiclessAndIgnoresBrokenLinks(t *testing.T
 		t.Fatalf("failed to insert broken notebook chunk link: %v", err)
 	}
 
-	tree, err := testRepo.GetNotebookTopicTree("")
+	tree, err := testRepo.GetNotebookTopicTree(nil)
 	if err != nil {
 		t.Fatalf("GetNotebookTopicTree failed: %v", err)
 	}
