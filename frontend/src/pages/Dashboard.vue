@@ -141,6 +141,8 @@
       v-model="showPaceModal"
       :pace="activeProfilePace"
       :profile-name="activeProfileName"
+      :profile-id="userSettings.active_profile_id"
+      @pace-updated="loadActiveProfilePace"
       :study-slots-json="userSettings.study_slots_json"
       :study-start-time="userSettings.study_start_time"
       :study-end-time="userSettings.study_end_time"

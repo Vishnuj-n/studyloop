@@ -785,7 +785,9 @@ func (a *App) UpdateProfile(id string, name string, deadlineStr string) map[stri
 	}
 	deadlineStr = strings.TrimSpace(deadlineStr)
 	var deadlineTime time.Time
-	if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
+	if deadlineStr == "" || deadlineStr == "0" {
+		deadlineTime = time.Time{}
+	} else if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
 		deadlineTime = t
 	} else if t, err := time.Parse("02-01-2006", deadlineStr); err == nil {
 		deadlineTime = t
@@ -824,7 +826,9 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 	}
 	deadlineStr = strings.TrimSpace(deadlineStr)
 	var deadlineTime time.Time
-	if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
+	if deadlineStr == "" || deadlineStr == "0" {
+		deadlineTime = time.Time{}
+	} else if t, err := time.Parse(dateFormatYYYYMMDD, deadlineStr); err == nil {
 		deadlineTime = t
 	} else if t, err := time.Parse("02-01-2006", deadlineStr); err == nil {
 		deadlineTime = t
