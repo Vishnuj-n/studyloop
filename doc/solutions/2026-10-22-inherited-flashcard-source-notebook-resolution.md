@@ -1,17 +1,17 @@
-# Solution: Inherited Flashcard Source Notebook Resolution and Navigation
+# Solution: Inherited Flashcard Source Notebook Resolution and Profile Isolation
 
-**Date**: 2026-10-22  
+**Date**: 2026-10-22 (Updated 2026-10-24)  
 **Status**: Implemented  
-**Scope**: Backend (`internal/models`, `internal/db`, `internal/app`) & Frontend (`Flashcards.vue`)
+**Scope**: Backend (`internal/models`, `internal/db`, `internal/app`) & Frontend (`Flashcards.vue`, `Notes.vue`)
 
 ---
 
 ## 1. Problem Statement
-When studying flashcards in a study profile with linked flashcard inheritance enabled, review session cards can originate from linked/parent study profiles. Previously:
-1. `GetReviewSession` joined notebooks pinning to `n.id = task.NotebookID`, which caused cards inherited from other profiles or notebooks to fail to resolve their original notebook metadata or have `NotebookID` missing entirely.
+When studying flashcards in a study profile with linked flashcard inheritance enabled, review session cards can originate from linked/parent study profiles.
+1. `GetReviewSession` previously joined notebooks pinning to `n.id = task.NotebookID`, which caused cards inherited from other profiles or notebooks to fail to resolve their original notebook metadata or have `NotebookID` missing entirely.
 2. `ReviewSessionCard` lacked a `notebook_id` field in the payload.
-3. `GetNotebookTopicTree` only loaded notebooks matching the current profile ID (`n.profile_id = ?`), meaning inherited profiles' notebooks were absent from the tree.
-4. In `Flashcards.vue`, navigation handlers (`goToTopicNotes` and `goToCardPageInReader`) defaulted to `selectedNotebookID` (the task's notebook), redirecting inherited cards to the wrong notebook context or failing navigation.
+3. In `Flashcards.vue`, navigation handlers (`goToTopicNotes` and `goToCardPageInReader`) defaulted to `selectedNotebookID` (the task's notebook), redirecting inherited cards to the wrong notebook context or failing navigation.
+4. **Profile Isolation Regression**: An initial attempt widened `GetNotebookTopicTree` to fetch all `allowedProfileIDs` (active + inherited). While this allowed inherited notebooks to be resolved, it caused all notebooks from linked profiles to appear in the active profile's **Study Notes** sidebar tree (`Notes.vue`), breaking profile isolation.
 
 ---
 
@@ -27,24 +27,24 @@ When studying flashcards in a study profile with linked flashcard inheritance en
    - The query now resolves the notebook from the card's own topic (via `n.topic_id = t.id` or `notebook_topics`), allowing inherited cards to resolve their true source notebook.
    - Added `COALESCE(n.id, '')` to the `SELECT` column list and scanned it into `&card.NotebookID`.
 
-3. **Notebook Topic Tree Allowed Profiles (`internal/db/notebooks_repo.go`)**:
-   - Updated signature from `GetNotebookTopicTree(profileID string)` to `GetNotebookTopicTree(profileIDs []string)`.
-   - Uses SQL `IN (...)` to query across all allowed profiles (active + linked inherited profiles), ensuring notebooks linked via inheritance are present.
+3. **Repository Multi-Profile Support (`internal/db/notebooks_repo.go`)**:
+   - Signature: `GetNotebookTopicTree(profileIDs []string)` supporting `IN (...)` for flexible scoping.
+   - Tested in `internal/db/store_integration_test.go`.
 
-4. **App Layer Delegation (`internal/app/notebook_endpoints.go`)**:
-   - In `GetNotebookTopicTree`, resolved profile IDs using `repo.GetAllowedFlashcardProfileIDs(profileID)` and passed the slice to `repo.GetNotebookTopicTree`.
-
-5. **Test Updates (`internal/db/store_integration_test.go`)**:
-   - Updated existing call sites: `GetNotebookTopicTree("")` &rarr; `GetNotebookTopicTree(nil)`.
+4. **App Layer Scoping Restored (`internal/app/notebook_endpoints.go`)**:
+   - `GetNotebookTopicTree()` strictly queries only the **active profile ID** (and unassigned notebooks).
+   - Keeps the Study Notes explorer sidebar clean and strictly isolated to the current profile.
 
 ### Frontend Changes
 
 1. **Flashcard Navigation Target Resolution (`frontend/src/pages/Flashcards.vue`)**:
    - Introduced `currentCardNotebookID` computed property: prefers `card.notebook_id` &rarr; `currentCardTopic.value.notebook_id` &rarr; `selectedNotebookID`.
-   - Updated `goToTopicNotes()` and `goToCardPageInReader()` to use `currentCardNotebookID` instead of `selectedNotebookID`.
+   - Updated `goToTopicNotes()` and `goToCardPageInReader()` to pass `currentCardNotebookID` via query parameters (`?notebookId=...&topicId=...`).
+   - When viewing notes or jumping to the reader from an inherited card, the target note loads directly via query parameters without needing the source notebook to be in the active profile's sidebar tree.
 
 ---
 
 ## 3. Verification
-- All backend packages compiled cleanly (`go test -run=^$ ./internal/...`).
-- Existing integration tests updated for the new function signature.
+- Backend packages compile cleanly (`go test -run=^$ ./internal/...`).
+- Store integration tests passing (`GetNotebookTopicTree(nil)`).
+- Flashcards unit tests passing (`npm --prefix frontend run test -- src/pages/Flashcards.spec.js --run`).

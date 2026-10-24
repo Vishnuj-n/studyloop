@@ -132,10 +132,7 @@
         </label>
       </div>
 
-      <div class="footer-center-hint" title="You can also use number keys on your keyboard to switch workspace">
-        <BaseIcon name="info" size="13" />
-        <span>Press number keys to open quickly</span>
-      </div>
+      
 
       <div class="footer-corner-right">
         <button
@@ -463,7 +460,7 @@ function handleKeydown(e) {
 
 onMounted(() => {
   // Single listener on window, bubble phase.
-  window.addEventListener('keydown', handleKeydown)
+  document.addEventListener('keydown', handleKeydown, true)
   // Ensure the window is focused so key events reach us in WebView2.
   window.focus()
   syncCardFocus()
@@ -471,7 +468,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('keydown', handleKeydown, true)
 })
 </script>
 

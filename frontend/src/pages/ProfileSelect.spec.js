@@ -62,7 +62,6 @@ describe('ProfileSelect.vue', () => {
     await new Promise((r) => setTimeout(r, 10))
 
     expect(wrapper.text()).toContain('Who is studying today?')
-    expect(wrapper.text()).toContain('Press number keys to open quickly')
     expect(wrapper.text()).toContain('October Placement')
     expect(wrapper.text()).toContain('Kannada Basics')
     expect(wrapper.text()).toContain('17d left')

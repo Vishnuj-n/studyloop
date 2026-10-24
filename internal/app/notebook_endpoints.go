@@ -1114,11 +1114,11 @@ func (a *App) GetNotebookTopicTree() ([]models.NotebookTopicTreeNode, error) {
 		return nil, errors.New(errDatabaseNotInitialized)
 	}
 	profileID := a.resolveExplicitActiveProfileID()
-	allowedProfileIDs, err := repo.GetAllowedFlashcardProfileIDs(profileID)
-	if err != nil {
-		return nil, err
+	var profileIDs []string
+	if profileID != "" {
+		profileIDs = []string{profileID}
 	}
-	tree, err := repo.GetNotebookTopicTree(allowedProfileIDs)
+	tree, err := repo.GetNotebookTopicTree(profileIDs)
 	if err != nil {
 		return nil, err
 	}
