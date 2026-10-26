@@ -235,8 +235,8 @@ function syncCardFocus() {
   const idx = Math.max(0, Math.min(focusedIndex.value, cards.length - 1))
   const target = cards[idx]
   if (!target) return
-  target.focus({ preventScroll: true })
-  target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  if (typeof target.focus === 'function') target.focus({ preventScroll: true })
+  if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
 async function loadData() {
@@ -460,7 +460,7 @@ function handleKeydown(e) {
 
 onMounted(() => {
   // Single listener on window, bubble phase.
-  document.addEventListener('keydown', handleKeydown, true)
+  window.addEventListener('keydown', handleKeydown)
   // Ensure the window is focused so key events reach us in WebView2.
   window.focus()
   syncCardFocus()
@@ -468,7 +468,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown, true)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

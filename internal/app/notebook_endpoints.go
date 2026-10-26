@@ -1322,7 +1322,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	// 3. Weekly Historical Pace & Projected Finish
 	wordsPast7Days, sessionsPast7Days, _ := repo.GetProfileCompletedReadingStatsPastNDays(profileID, 7)
 
-	feasibilityStatus := "NO_DATA"
+	var feasibilityStatus string
 	projectedFinishStr := ""
 	weeksToFinish := 0.0
 
