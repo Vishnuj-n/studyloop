@@ -402,14 +402,24 @@ def main():
     # 5. Update VERSION file(s)
     formatted_new_ver = update_version_files(rec_version)
 
-    print(f"\nCommitting version update ({formatted_new_ver})...")
-    run_cmd(["git", "add", "internal/app/VERSION"], check=True)
+    # Check if VERSION file actually changed before committing
+    status_out = run_cmd(["git", "status", "--porcelain", "internal/app/VERSION"], capture=True).stdout.strip()
     root_file = PROJECT_ROOT / "VERSION"
     if root_file.exists():
-        run_cmd(["git", "add", "VERSION"], check=True)
+        root_status = run_cmd(["git", "status", "--porcelain", "VERSION"], capture=True).stdout.strip()
+        if root_status:
+            status_out = f"{status_out}\n{root_status}".strip()
 
-    commit_msg = f"chore: version bump to {formatted_new_ver}"
-    run_cmd(["git", "commit", "-m", commit_msg], check=True)
+    if status_out:
+        print(f"\nCommitting version update ({formatted_new_ver})...")
+        run_cmd(["git", "add", "internal/app/VERSION"], check=True)
+        if root_file.exists():
+            run_cmd(["git", "add", "VERSION"], check=True)
+
+        commit_msg = f"chore: version bump to {formatted_new_ver}"
+        run_cmd(["git", "commit", "-m", commit_msg], check=True)
+    else:
+        print(f"\nVersion file is already at {formatted_new_ver} (nothing to commit).")
 
     # NOTE: git push is intentionally deferred until after build and release
     # succeed. Pushing early would leave the remote with a version bump commit

@@ -1,25 +1,49 @@
 ## ✨ Features
-- **External Help Modal for Quiz Completion** – After finishing a quiz, a help modal appears offering guidance and next‑step suggestions.  
-- **“Restart Reading Session” Button** – Users can restart a reading session from a confirmation modal, making it easy to begin again when needed.  
-- **Obsidian‑style Image Sizing Syntax** – Markdown notes now support image size tags (e.g., `![[image.png|200x]]`) with a built‑in sizing guide modal to help users control image dimensions.  
-- **Adaptive Socratic AI Prompt** – The Socratic mode now uses a Feynman‑style interactive framework for clearer, more intuitive explanations.  
-- **Compact Quiz Response Display** – Quiz feedback is presented in a more concise format, improving readability.
+- **Profile Selection & Launcher**  
+  - New dedicated profile‑selection page that appears at startup when multiple study profiles exist.  
+  - “Who is studying?” launcher modal with a setting to show or hide it on app launch.  
+  - Ability to add, edit, and switch profiles directly from the launcher and Settings panel.
+
+- **Self‑Paced Study & Pacing Drawer**  
+  - Streamlined pacing drawer that lets users choose a self‑paced profile and control study speed.
+
+- **Flashcard Profile Inheritance**  
+  - Flashcards can now inherit content from other profiles, enabling shared decks across related study tracks.
+
+- **Unmark Reviewed Notes**  
+  - Users can unmark notes that were previously marked as reviewed, restoring them to the active study list.
+
+- **Topic Slots Caching**  
+  - Faster loading of topic slots in the Flashcards view, improving navigation speed.
+
+- **Enhanced Today Plan**  
+  - Today’s plan now reflects remaining review cards and provides clearer end‑of‑study notifications.
 
 ## 🚀 Improvements
-- **Faster Note Loading** – Enhanced fetching and background polling make notes appear more quickly and reliably.  
-- **Better Quiz Response Parsing** – More accurate answer evaluation and cleaner UI presentation.  
-- **Clearer UI Warning Messages** – Updated warnings in Notes and Quiz components provide more helpful guidance.  
-- **Improved Onboarding Error Handling** – Reduces interruptions for first‑time users.  
-- **Smoother Session Page Navigation** – Refined handling of session pages and note‑generation polling for a seamless experience.  
-- **Enhanced Image Rendering** – Automatic sizing adjustments improve markdown image display.  
-- **Accurate Token Counting** – Refined compression logic boosts performance and reliability.
+- **Keyboard Navigation & Accessibility**  
+  - Full keyboard support and focus management for profile selection cards and the profile launcher, making navigation smoother for power users and improving accessibility.
+
+- **UI & Layout Refreshes**  
+  - Updated profile card layout with clearer action buttons.  
+  - Refined styling for inherited‑profile components and flashcard views.  
+  - Notes view now includes a back‑to‑quiz link and a context banner during quiz review.
+
+- **Reader & Task Handling**  
+  - Better task description formatting and robust task‑ID handling in the Reader component.  
+  - Optimized flashcard navigation and reading session flow.
+
+- **Settings Enhancements**  
+  - New toggle to control the startup launcher.  
+  - Improved profile‑addition workflow and clearer settings UI.
 
 ## 🐛 Bug Fixes & Issue Resolutions
-- **Quiz Flow Fixes** – Failures now correctly route to concept rescue, and “Restart Reading” appears only at dead ends.  
-- **Compression Callback Reliability** – Ensured `onRangeComplete` is always invoked, preventing missed completions.  
-- **Compression Test Errors Resolved** – Fixed edge cases that could cause crashes during compression testing.  
-- **Note Slot Generation** – Corrected issues where note slots were not generated properly, ensuring consistent note creation.  
-- **UI Glitches Fixed** – Resolved minor visual glitches in warning messages and modal dialogs.
+- Safeguarded focus and scroll calls in the profile selection component to prevent runtime errors.  
+- Fixed source‑notebook resolution for inherited flashcards.  
+- Resolved explicit error handling in profile selection UI.  
+- Corrected flashcard and notes edge‑case bugs that could cause missing or duplicated items.  
+- Fixed JSON formatting tolerance in flashcard review updates, preventing sync issues.  
+- Patched max‑tokens validation in answer generation tests (ensuring smoother AI responses).  
+- Addressed various minor UI glitches and navigation hiccups across the app.  
 
 ---
 
