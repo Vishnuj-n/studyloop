@@ -385,7 +385,9 @@ onUnmounted(() => {
   unsubs.forEach((fn) => {
     try {
       fn()
-    } catch {}
+    } catch {
+      // ignore
+    }
   })
 })
 

@@ -19,8 +19,6 @@ import { useExtensions } from './composables/useExtensions'
 import {
   getUserSettings,
   updateUserSettings,
-  getProfiles,
-  setActiveProfileID,
   getTodayPlan,
   checkForUpdates,
   getReleaseNotes,
