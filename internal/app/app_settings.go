@@ -90,6 +90,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"notes_detail_level":         s.NotesDetailLevel,
 		"notes_model_tier":           s.NotesModelTier,
 		"show_recap_before_reading":  s.ShowRecapBeforeReading,
+		"quiz_synthesis_mode":       s.QuizSynthesisMode,
 		"rate_limit_strategy":        s.RateLimitStrategy,
 	}
 }
@@ -187,6 +188,9 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 		if s.NotesModelTier == "" {
 			s.NotesModelTier = existing.NotesModelTier
 		}
+		if s.QuizSynthesisMode == "" {
+			s.QuizSynthesisMode = existing.QuizSynthesisMode
+		}
 	}
 
 	if s.NotesDetailLevel == "" {
@@ -206,6 +210,10 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 		// valid
 	default:
 		s.NotesModelTier = "fast"
+	}
+	s.QuizSynthesisMode = strings.ToLower(strings.TrimSpace(s.QuizSynthesisMode))
+	if s.QuizSynthesisMode != "viva" && s.QuizSynthesisMode != "off" && s.QuizSynthesisMode != "feynman" {
+		s.QuizSynthesisMode = "feynman"
 	}
 	if s.MaxActiveNotebooks < 0 || s.MaxActiveNotebooks > maxActiveNotebooksLimit {
 		return map[string]interface{}{"error": fmt.Sprintf("max active notebooks must be between 0 (unlimited) and %d", maxActiveNotebooksLimit)}

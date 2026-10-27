@@ -93,7 +93,7 @@
               <span class="metric-value">
                 {{ pace?.projected_finish ? formatDate(pace.projected_finish) : 'Need 2+ sessions' }}
               </span>
-              <span class="metric-subtext">At recent weekly rhythm</span>
+              <span class="metric-subtext">{{ projectedFinishSubtext }}</span>
             </div>
           </div>
 
@@ -323,6 +323,25 @@ async function toggleSelfPaced() {
 const isDeadlinePassed = computed(() => props.pace?.feasibility_status === 'DEADLINE_PASSED')
 const uncoveredCount = computed(() => props.pace?.uncovered_sessions || 0)
 
+const projectedFinishSubtext = computed(() => {
+  if (!props.pace?.projected_finish) return 'At recent weekly rhythm'
+  if (!props.pace?.deadline || isSelfPaced.value) return 'At recent weekly rhythm'
+  try {
+    const d1 = new Date(props.pace.deadline).setHours(0, 0, 0, 0)
+    const d2 = new Date(props.pace.projected_finish).setHours(0, 0, 0, 0)
+    const diffDays = Math.round((d1 - d2) / 86400000)
+    if (diffDays > 0) {
+      return `~${diffDays}d buffer before deadline`
+    }
+    if (diffDays < 0) {
+      return `~${Math.abs(diffDays)}d after deadline`
+    }
+    return 'On target date'
+  } catch {
+    return 'At recent weekly rhythm'
+  }
+})
+
 const balanceClass = computed(() => {
   if (isSelfPaced.value) return 'balance-neutral'
   if (isDeadlinePassed.value) return 'balance-danger'
@@ -339,7 +358,7 @@ const statusHeadline = computed(() => {
   }
   if (s === 'AT_RISK') return 'Pace at risk — historical rhythm is behind'
   if (s === 'ON_TRACK') return 'On track to meet target date'
-  return 'Estimating your study velocity'
+  return 'Schedule capacity on track'
 })
 
 const statusExplanation = computed(() => {
@@ -361,7 +380,7 @@ const statusExplanation = computed(() => {
   if (s === 'ON_TRACK') {
     return 'Your current workload fits your scheduled routine and matches your recent study rhythm.'
   }
-  return 'Complete 2 to 3 study sessions so StudyLoop can estimate your personalized reading rhythm.'
+  return 'Your scheduled routine has enough windows to cover all remaining sessions. Complete 2+ sessions to calculate your projected finish date.'
 })
 
 const totalScheduledTime = computed(() => {

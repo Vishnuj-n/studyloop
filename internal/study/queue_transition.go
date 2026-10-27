@@ -33,6 +33,7 @@ type TransitionRequest struct {
 	NotebookID  string
 	QuizPayload *models.QuizTaskPayload
 	QuizAnswers []models.QuizAnswer
+	ReflectionText string
 	CardCount   int
 	Score       int
 	ErrorReason string
@@ -85,7 +86,7 @@ func (s *StudyService) TransitionTask(ctx context.Context, req TransitionRequest
 		if len(req.QuizAnswers) == 0 {
 			return TransitionResult{}, fmt.Errorf("quiz answers are required to submit quiz")
 		}
-		res, err := s.SubmitQuizAttempt(req.TaskID, req.QuizAnswers)
+		res, err := s.SubmitQuizAttemptWithReflection(req.TaskID, req.QuizAnswers, req.ReflectionText)
 		if err != nil {
 			return TransitionResult{}, fmt.Errorf("failed to process quiz submission transition: %w", err)
 		}

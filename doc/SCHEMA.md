@@ -207,6 +207,8 @@ Rollup of completed quiz task.
 | `passed` | INTEGER NOT NULL | Pass/fail flag |
 | `answers_json` | TEXT NOT NULL | Serialized answers |
 | `feedback` | TEXT | Attempt-level feedback |
+| `reflection_text` | TEXT DEFAULT '' | Optional Feynman reflection in user's own words |
+| `reflection_feedback` | TEXT DEFAULT '' | Serialized LLM critique (strengths, gaps, calibration) |
 | `completed_at` | INTEGER NOT NULL | Completion timestamp |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Record creation time |
 

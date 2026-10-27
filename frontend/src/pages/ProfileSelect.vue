@@ -360,16 +360,38 @@ function profilePaceBadge(profile) {
   const pace = profile?.pace
   if (!pace || pace.error) return null
   const status = pace.feasibility_status
+  if (status === 'DEADLINE_PASSED') {
+    return { text: 'Deadline passed', class: 'pace-behind' }
+  }
+  if (status === 'UNCOVERED_WORKLOAD') {
+    const uncovered = pace.uncovered_sessions
+    return { text: uncovered ? String(uncovered) + ' uncovered' : 'Uncovered workload', class: 'pace-behind' }
+  }
+  if (status === 'AT_RISK') {
+    return { text: 'At risk', class: 'pace-behind' }
+  }
+  if (status === 'ON_TRACK') {
+    if (pace.deadline && pace.projected_finish) {
+      try {
+        const d1 = new Date(pace.deadline).setHours(0, 0, 0, 0)
+        const d2 = new Date(pace.projected_finish).setHours(0, 0, 0, 0)
+        const diffDays = Math.round((d1 - d2) / 86400000)
+        if (diffDays > 0) {
+          return { text: String(diffDays) + 'd ahead', class: 'pace-ahead' }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return { text: 'On track', class: 'pace-ontrack' }
+  }
   const gap = pace.days_gap
   const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
   if (status === 'BEHIND' && pace.days_gap !== undefined) {
-    return { text: `${gapFormatted}d behind`, class: 'pace-behind' }
+    return { text: String(gapFormatted) + 'd behind', class: 'pace-behind' }
   }
   if (status === 'AHEAD' && pace.days_gap !== undefined) {
-    return { text: `${gapFormatted}d ahead`, class: 'pace-ahead' }
-  }
-  if (status === 'ON_TRACK') {
-    return { text: 'On track', class: 'pace-ontrack' }
+    return { text: String(gapFormatted) + 'd ahead', class: 'pace-ahead' }
   }
   return null
 }

@@ -48,6 +48,72 @@
         </label>
       </div>
     </div>
+
+    <div class="form-group" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));">
+      <label style="display: block; margin-bottom: 8px;">Post-Reading Synthesis &amp; Conceptual Articulation</label>
+      <p class="hint" style="margin-top: -4px; margin-bottom: 12px;">
+        Choose how you articulate what you learned (pick one method or turn off).
+      </p>
+
+      <div class="strategy-options">
+        <label
+          class="strategy-option"
+          :class="{ active: settings.quiz_synthesis_mode === 'feynman' }"
+        >
+          <input
+            v-model="settings.quiz_synthesis_mode"
+            type="radio"
+            value="feynman"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">In-Quiz Reflection (Feynman)</span>
+            <span class="option-desc">
+              Optional 2&ndash;4 sentence synthesis prompt at the bottom of the quiz before submission with AI feedback.
+            </span>
+          </div>
+        </label>
+
+        <label
+          class="strategy-option"
+          :class="{ active: settings.quiz_synthesis_mode === 'viva' }"
+        >
+          <input
+            v-model="settings.quiz_synthesis_mode"
+            type="radio"
+            value="viva"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">Examiner Viva Challenge</span>
+            <span class="option-desc">
+              Pure MCQs during the quiz; upon passing, offers an oral/written Viva exam challenge for bonus XP &amp; loot.
+            </span>
+          </div>
+        </label>
+
+        <label
+          class="strategy-option"
+          :class="{ active: settings.quiz_synthesis_mode === 'off' }"
+        >
+          <input
+            v-model="settings.quiz_synthesis_mode"
+            type="radio"
+            value="off"
+            :disabled="disabled"
+            style="cursor: pointer"
+          />
+          <div class="option-content">
+            <span class="option-title">Off (MCQ Only)</span>
+            <span class="option-desc">
+              Standard multiple-choice quiz only. No reflection prompt or Viva challenge banner.
+            </span>
+          </div>
+        </label>
+      </div>
+    </div>
   </article>
 </template>
 

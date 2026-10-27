@@ -51,6 +51,7 @@ var alterStatements = []struct {
 	{"user_settings", "notes_detail_level", "ALTER TABLE user_settings ADD COLUMN notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary'"},
 	{"user_settings", "notes_model_tier", "ALTER TABLE user_settings ADD COLUMN notes_model_tier TEXT NOT NULL DEFAULT 'fast'"},
 	{"user_settings", "show_recap_before_reading", "ALTER TABLE user_settings ADD COLUMN show_recap_before_reading BOOLEAN DEFAULT 1"},
+	{"user_settings", "quiz_synthesis_mode", "ALTER TABLE user_settings ADD COLUMN quiz_synthesis_mode TEXT NOT NULL DEFAULT 'feynman'"},
 	{"user_settings", "rate_limit_strategy", "ALTER TABLE user_settings ADD COLUMN rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD'"},
 	{"user_settings", "extension_settings", "ALTER TABLE user_settings ADD COLUMN extension_settings TEXT DEFAULT '{}'"},
 	{"user_settings", "session_cache_json", "ALTER TABLE user_settings ADD COLUMN session_cache_json TEXT DEFAULT ''"},
@@ -110,6 +111,10 @@ var alterStatements = []struct {
 	// gamification
 	{"user_gamification", "stats_json", "ALTER TABLE user_gamification ADD COLUMN stats_json TEXT NOT NULL DEFAULT '{}'"},
 	{"user_gamification", "last_freeze_purchased_at", "ALTER TABLE user_gamification ADD COLUMN last_freeze_purchased_at INTEGER NOT NULL DEFAULT 0"},
+
+	// quiz_attempts (Feynman Reflection)
+	{"quiz_attempts", "reflection_text", "ALTER TABLE quiz_attempts ADD COLUMN reflection_text TEXT DEFAULT ''"},
+	{"quiz_attempts", "reflection_feedback", "ALTER TABLE quiz_attempts ADD COLUMN reflection_feedback TEXT DEFAULT ''"},
 }
 
 // RunMigrations applies idempotent column additions, table deduping, and data backfills.

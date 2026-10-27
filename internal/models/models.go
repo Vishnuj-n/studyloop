@@ -140,30 +140,41 @@ type QuizDiagnosticResult struct {
 }
 
 type QuizAttemptRecord struct {
-	ID          string `json:"id"`
-	TaskID      string `json:"task_id"`
-	Score       int    `json:"score"`
-	Passed      bool   `json:"passed"`
-	AnswersJSON string `json:"answers_json"`
-	Feedback    string `json:"feedback"`
-	CompletedAt int64  `json:"completed_at"`
+	ID                 string `json:"id"`
+	TaskID             string `json:"task_id"`
+	Score              int    `json:"score"`
+	Passed             bool   `json:"passed"`
+	AnswersJSON        string `json:"answers_json"`
+	Feedback           string `json:"feedback"`
+	ReflectionText     string `json:"reflection_text,omitempty"`
+	ReflectionFeedback string `json:"reflection_feedback,omitempty"`
+	CompletedAt        int64  `json:"completed_at"`
+}
+
+type FeynmanReflectionFeedback struct {
+	Strengths   []string `json:"strengths"`
+	Gaps        []string `json:"gaps"`
+	Calibration string   `json:"calibration"`
+	Summary     string   `json:"summary"`
 }
 
 type QuizResult struct {
-	TaskID                  string `json:"task_id"`
-	Score                   int    `json:"score"`
-	Passed                  bool   `json:"passed"`
-	CorrectCount            int    `json:"correct_count"`
-	TotalCount              int    `json:"total_count"`
-	PassingScore            int    `json:"passing_score"`
-	Feedback                string `json:"feedback"`
-	ManualReviewRecommended bool   `json:"manual_review_recommended"`
-	RereadAttemptCount      int    `json:"reread_attempt_count"`
-	MaxRereadAttempts       int    `json:"max_reread_attempts"`
-	RereadTaskID            string `json:"reread_task_id,omitempty"`
-	SocraticTaskID          string `json:"socratic_task_id,omitempty"`
-	FlashcardTaskID         string `json:"flashcard_task_id,omitempty"`
-	AttemptRecord           string `json:"attempt_id,omitempty"`
+	TaskID                  string                     `json:"task_id"`
+	Score                   int                        `json:"score"`
+	Passed                  bool                       `json:"passed"`
+	CorrectCount            int                        `json:"correct_count"`
+	TotalCount              int                        `json:"total_count"`
+	PassingScore            int                        `json:"passing_score"`
+	Feedback                string                     `json:"feedback"`
+	ManualReviewRecommended bool                       `json:"manual_review_recommended"`
+	RereadAttemptCount      int                        `json:"reread_attempt_count"`
+	MaxRereadAttempts       int                        `json:"max_reread_attempts"`
+	RereadTaskID            string                     `json:"reread_task_id,omitempty"`
+	SocraticTaskID          string                     `json:"socratic_task_id,omitempty"`
+	FlashcardTaskID         string                     `json:"flashcard_task_id,omitempty"`
+	AttemptRecord           string                     `json:"attempt_id,omitempty"`
+	ReflectionText          string                     `json:"reflection_text,omitempty"`
+	ReflectionFeedback      *FeynmanReflectionFeedback `json:"reflection_feedback,omitempty"`
 	// Flashcard generation results (populated when quiz is passed and flashcards are generated)
 	FlashcardsGenerated int    `json:"flashcards_generated"`
 	FlashcardsScheduled int    `json:"flashcards_scheduled"`
@@ -714,6 +725,7 @@ type UserSettings struct {
 	NotesDetailLevel        string  `json:"notes_detail_level"`
 	NotesModelTier          string  `json:"notes_model_tier"`
 	ShowRecapBeforeReading  bool    `json:"show_recap_before_reading"`
+	QuizSynthesisMode       string  `json:"quiz_synthesis_mode"`
 	RateLimitStrategy       string  `json:"rate_limit_strategy"`
 }
 

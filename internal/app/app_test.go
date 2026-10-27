@@ -989,6 +989,7 @@ func TestApp_GetUserSettings_IncludesAllConfiguredFields(t *testing.T) {
 		QuizQuestionCount:       6,
 		QuizPassingScore:        80,
 		TutorStyle:              "direct",
+		QuizSynthesisMode:       "viva",
 	})
 	if updateRes["error"] != nil {
 		t.Fatalf("UpdateUserSettings failed: %v", updateRes["error"])
@@ -1020,6 +1021,9 @@ func TestApp_GetUserSettings_IncludesAllConfiguredFields(t *testing.T) {
 	}
 	if fetched["min_session_words"] != 2500 {
 		t.Errorf("expected min_session_words 2500, got %v", fetched["min_session_words"])
+	}
+	if fetched["quiz_synthesis_mode"] != "viva" {
+		t.Errorf("expected quiz_synthesis_mode viva, got %v", fetched["quiz_synthesis_mode"])
 	}
 }
 

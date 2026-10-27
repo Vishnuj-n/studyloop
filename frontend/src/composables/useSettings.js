@@ -37,6 +37,7 @@ export function useSettings(errorRef, successRef) {
     notes_detail_level: 'briefing',
     notes_model_tier: 'fast',
     show_recap_before_reading: true,
+    quiz_synthesis_mode: 'feynman',
   })
 
   const studyDuration = ref('')
