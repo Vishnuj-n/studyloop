@@ -151,7 +151,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   getDashboardOverview,
@@ -330,7 +330,14 @@ const completedSessionsToday = computed(() => {
 })
 
 // --- Lifecycle ---
+function handleExternalProfileOrSettingsChange() {
+  loadAgenda()
+}
+
 onMounted(async () => {
+  window.addEventListener('profile-switched', handleExternalProfileOrSettingsChange)
+  window.addEventListener('settings-updated', handleExternalProfileOrSettingsChange)
+
   const created = Number.parseInt(route.query.flashcardsCreated, 10)
   if (created > 0) {
     flashcardsJustCreated.value = created
@@ -340,6 +347,11 @@ onMounted(async () => {
   }
 
   await loadAgenda()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('profile-switched', handleExternalProfileOrSettingsChange)
+  window.removeEventListener('settings-updated', handleExternalProfileOrSettingsChange)
 })
 
 // --- Data Fetching ---

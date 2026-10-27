@@ -8,27 +8,43 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 
-describe('ProfileCommandPalette.vue', () => {
-  const dummyProfiles = [
-    { id: 'p-1', name: 'Computer Science', is_active: true, deadline_at: 0 },
-    { id: 'p-2', name: 'Mathematics', is_active: false, deadline_at: 0 },
-  ]
+const mockProfiles = [
+  { id: 'prof-1', name: 'Mathematics', is_active: true, pending_tasks: 2 },
+  { id: 'prof-2', name: 'Biology', is_active: false, pending_tasks: 0 },
+]
 
+describe('ProfileCommandPalette.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.spyOn(appApi, 'getProfiles').mockResolvedValue({ profiles: dummyProfiles })
+    vi.spyOn(appApi, 'getProfiles').mockResolvedValue({ profiles: mockProfiles })
     vi.spyOn(appApi, 'setActiveProfileID').mockResolvedValue({ ok: true })
-    document.body.innerHTML = ''
   })
 
-  it('renders nothing when modelValue is false', () => {
+  it('renders modal with actions and study profiles when opened', async () => {
     const wrapper = mount(ProfileCommandPalette, {
       props: { modelValue: false },
+      attachTo: document.body,
     })
-    expect(wrapper.find('.palette-shell').exists()).toBe(false)
+
+    expect(document.body.querySelector('.palette-shell')).toBeNull()
+
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+
+    expect(document.body.querySelector('.palette-shell')).not.toBeNull()
+    const items = document.body.querySelectorAll('.palette-item')
+    // 2 action items (Pomodoro, Settings) + 2 profiles = 4 items
+    expect(items.length).toBe(4)
+    expect(items[0].textContent).toContain('Pomodoro')
+    expect(items[1].textContent).toContain('Settings')
+    expect(items[2].textContent).toContain('Mathematics')
+    expect(items[3].textContent).toContain('Biology')
+
+    wrapper.unmount()
   })
 
-  it('renders modal and displays profiles when opened', async () => {
+  it('switches profile and fires settings-updated and profile-switched when selecting profile 2 directly via key 2 in search input', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     const wrapper = mount(ProfileCommandPalette, {
       props: { modelValue: false },
       attachTo: document.body,
@@ -37,18 +53,88 @@ describe('ProfileCommandPalette.vue', () => {
     await wrapper.setProps({ modelValue: true })
     await flushPromises()
 
-    const shell = document.body.querySelector('.palette-shell')
-    expect(shell).not.toBeNull()
+    const input = document.body.querySelector('.palette-search-input')
+    expect(input).not.toBeNull()
 
-    const items = document.body.querySelectorAll('.palette-item')
-    expect(items.length).toBe(2)
-    expect(items[0].textContent).toContain('Computer Science')
-    expect(items[1].textContent).toContain('Mathematics')
+    // Press '2' while focused in search input to directly select 2nd profile (Biology)
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }))
+    await flushPromises()
+
+    expect(appApi.setActiveProfileID).toHaveBeenCalledWith('prof-2')
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'profile-switched', detail: { profileId: 'prof-2' } })
+    )
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'settings-updated' })
+    )
+    expect(wrapper.emitted('profile-switched')[0]).toEqual(['prof-2'])
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual([false])
 
     wrapper.unmount()
   })
 
-  it('filters profiles when typing into search input', async () => {
+  it('switches profile via numpad digit code Numpad2', async () => {
+    const wrapper = mount(ProfileCommandPalette, {
+      props: { modelValue: false },
+      attachTo: document.body,
+    })
+
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+
+    const input = document.body.querySelector('.palette-search-input')
+    input.dispatchEvent(new KeyboardEvent('keydown', { code: 'Numpad2', bubbles: true }))
+    await flushPromises()
+
+    expect(appApi.setActiveProfileID).toHaveBeenCalledWith('prof-2')
+    wrapper.unmount()
+  })
+
+  it('executes Pomodoro toggle when selecting the first action item via Enter', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    const wrapper = mount(ProfileCommandPalette, {
+      props: { modelValue: false },
+      attachTo: document.body,
+    })
+
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+
+    const input = document.body.querySelector('.palette-search-input')
+    // Press Enter on the first item (focusedIdx = 0 by default, which is Pomodoro action)
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await flushPromises()
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'pomodoro-toggle' })
+    )
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual([false])
+
+    wrapper.unmount()
+  })
+
+  it('navigates to Settings when selecting Open Settings action', async () => {
+    const wrapper = mount(ProfileCommandPalette, {
+      props: { modelValue: false },
+      attachTo: document.body,
+    })
+
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+
+    const input = document.body.querySelector('.palette-search-input')
+    // Down arrow to Settings item
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    await flushPromises()
+
+    expect(mockPush).toHaveBeenCalledWith('/settings')
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual([false])
+
+    wrapper.unmount()
+  })
+
+  it('filters commands and profiles when typing into search input', async () => {
     const wrapper = mount(ProfileCommandPalette, {
       props: { modelValue: false },
       attachTo: document.body,

@@ -318,6 +318,7 @@ onMounted(async () => {
 
   window.addEventListener('pomodoro-settings-updated', loadConfiguration)
   window.addEventListener('profile-switched', loadConfiguration)
+  window.addEventListener('pomodoro-toggle', handlePlayPause)
 })
 
 onUnmounted(() => {
@@ -330,6 +331,7 @@ onUnmounted(() => {
   })
   window.removeEventListener('pomodoro-settings-updated', loadConfiguration)
   window.removeEventListener('profile-switched', loadConfiguration)
+  window.removeEventListener('pomodoro-toggle', handlePlayPause)
 })
 </script>
 

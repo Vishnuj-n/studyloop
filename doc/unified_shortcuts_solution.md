@@ -1,90 +1,48 @@
-# Solution Report: Unified Shortcut Controller & `Ctrl + Shift + P` Profile Bar
+# Solution Report: Unified Shortcut Controller & Command Palette Actions
 
-## 1. Did we add `Ctrl + Shift + P`?
+## 1. Quick Pomodoro & Settings Actions via `Ctrl + Shift + P`
 
-**Yes, it is implemented and wired globally.**
+The Profile Bar has been enhanced into a full **Quick Action & Profile Command Palette** ([`ProfileCommandPalette.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/components/ProfileCommandPalette.vue)):
 
-In [`frontend/src/App.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/App.vue#L41-L56):
+### ⏱ Start / Pause 25m Pomodoro:
+- Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>.
+- The first action selected by default is **"Start 25m Pomodoro Focus"** (or **"Pause Pomodoro Focus"** when active).
+- Press <kbd>Enter</kbd> immediately:
+  - Toggles the Pomodoro focus timer without touching the mouse or searching for the sidebar widget.
+  - Dynamically updates subtitle and badge with live time remaining (e.g. `Timer active (24:45 left) - Running`).
 
-```javascript
-// ── Profile Command Palette (Ctrl+Shift+P) ────────────────────────────────
-const showProfilePalette = ref(false)
-useShortcuts({
-  scope: 'global',
-  bindings: [
-    {
-      key: 'p',
-      ctrl: true,
-      shift: true,
-      allowInInputs: true,
-      handler() {
-        showProfilePalette.value = !showProfilePalette.value
-      },
-    },
-  ],
-})
+### ⚙ Direct Access to Settings:
+- Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>.
+- Type `set` or hit <kbd>↓</kbd> to reach **"Open Settings"**.
+- Press <kbd>Enter</kbd>:
+  - Immediately navigates to `/settings` without sidebar navigation.
+
+---
+
+## 2. Updated Interaction Model & Direct Profile Switching
+
+```
+Press Ctrl + Shift + P
+ ├── ⏱ [Item 0] Start / Pause 25m Pomodoro Focus  ──> [Enter] (Toggle focus mode)
+ ├── ⚙ [Item 1] Open Settings                     ──> [Enter] (Direct jump to config)
+ ├── 👤 [Item 2] Study Profile 1                  ──> [1 or Enter] (Direct profile switch)
+ └── 👤 [Item 3] Study Profile 2                  ──> [2 or Enter] (Direct profile switch)
 ```
 
-And in the template of [`frontend/src/App.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/App.vue#L571-L574):
-
-```html
-<RouterView />
-<ConfirmModal />
-<ProfileCommandPalette v-model="showProfilePalette" />
-```
+- **Instant 1 & 2 Profile Shortcuts**:
+  - In both [`ProfileCommandPalette.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/components/ProfileCommandPalette.vue) and [`ProfileSelect.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/pages/ProfileSelect.vue), pressing `1` or `2` (either from the standard number row or the numeric keypad `Numpad1`/`Numpad2`) directly selects that study profile without polluting the search input or getting swallowed.
+  - Profile switching dispatches both `'profile-switched'` and `'settings-updated'`, ensuring Dashboard agenda, active task queue, and widgets reactively re-fetch without manual reloads.
+- **Instant Search**: Typing `pomo`, `focus`, `timer`, `set`, `config`, or any profile name instantly isolates the item.
+- **Key Navigation**: <kbd>↑</kbd> / <kbd>↓</kbd> wraps around all items seamlessly, and <kbd>Esc</kbd> closes.
 
 ---
 
-## 2. Key Casing Detail (`p` vs `P`)
+## 3. Test & Build Status
 
-When the user physically presses <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>, standard browsers emit `e.key = "P"` (uppercase) because Shift is held. In the test suite, dispatching `key: 'p'` with `shiftKey: true` matched, but in native DOM environments where `e.key` is uppercase `"P"`, normalising key comparison (comparing lowercase or handling both `'p'` and `'P'`) ensures 100% reliability across all browsers and platforms.
-
----
-
-## 3. What Was Done Across the Codebase
-
-### A. New Composable: `useShortcuts.js`
-*Path: [`frontend/src/composables/useShortcuts.js`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/composables/useShortcuts.js)*
-
-1. **Centralized listener**: Instead of each component attaching its own raw `window.addEventListener('keydown')`, a single listener manages all keystrokes.
-2. **Priority Stack (LIFO)**: Scopes are registered on a stack (`[Global] -> [Page] -> [Modal]`). When a modal opens, it pushes its own scope to the top. It consumes keys, stopping lower background page shortcuts from firing.
-3. **Typing Guard**: Automatically silences single-key shortcuts (like digits `1..4` or `Space`) when typing in `<input>`, `<textarea>`, `<select>`, or content-editable elements, unless explicitly flagged with `allowInInputs: true`.
-4. **Auto-Cleanup**: Automatically cleans up on Vue component unmount via `onMounted` / `onUnmounted`.
-
-### B. New Component: `ProfileCommandPalette.vue`
-*Path: [`frontend/src/components/ProfileCommandPalette.vue`](file:///c:/Users/vishn/PROJECT/ai-tutor/frontend/src/components/ProfileCommandPalette.vue)*
-
-1. **Floating Command Palette Overlay**:
-   - Opens when `showProfilePalette` is set to `true` via `Ctrl + Shift + P`.
-   - Auto-focuses a search input to quickly filter profiles by name.
-2. **Keyboard Navigation**:
-   - Press <kbd>1</kbd>–<kbd>9</kbd> to pick that visible profile directly.
-   - Use <kbd>ArrowUp</kbd> / <kbd>ArrowDown</kbd> to cycle items and <kbd>Enter</kbd> to activate.
-   - Press <kbd>Esc</kbd> or click the backdrop to dismiss.
-3. **Data & State**:
-   - Displays profile color dots, active status badges, and pending study task counts.
-   - Emits `profile-switched` event matching existing app components.
-   - Links to "Manage Profiles" and "Add Profile".
-
-### C. Refactored Existing Pages
-
-1. **`Flashcards.vue`**:
-   - Removed raw `window.addEventListener('keydown', handleKeydown)`.
-   - Replaced with `useShortcuts({ scope: 'flashcards', bindings: [...] })` for <kbd>Space</kbd> (flip), <kbd>1</kbd>–<kbd>4</kbd> (rate), and <kbd>Shift + S</kbd> (suspend).
-2. **`ProfileSelect.vue`**:
-   - Removed raw capturing listener `document.addEventListener('keydown', handleKeydown, true)`.
-   - Replaced with `useShortcuts({ scope: 'profile-select', bindings: [...] })` for <kbd>1</kbd>–<kbd>9</kbd> profile cards, arrow key navigation, and <kbd>Enter</kbd>/<kbd>Space</kbd>.
-
----
-
-## 4. Verification & Test Results
-
-All test suites passed:
-
-| Test Suite | Result | Details |
+| Suite | Result | Details |
 | :--- | :--- | :--- |
-| `useShortcuts.spec.js` | **9 / 9 passed** | Key matching, modifier checks, input guards, stack priority |
-| `ProfileCommandPalette.spec.js` | **4 / 4 passed** | Opening, profile rendering, search filtering, escape closing |
-| `Flashcards.spec.js` | **5 / 5 passed** | Flips with Space, rates with 1-4, deck manager suppression |
-| `ProfileSelect.spec.js` | **5 / 5 passed** | Card selection via digits, arrow navigation, Enter/Space |
-| **Go Backend** (`go test -short`) | **Passed (0 errors)** | All internal packages pass |
+| `src/components/ProfileCommandPalette.spec.js` | **7/7 passed** | Verifies 1/2 key shortcut in input, Numpad code, settings-updated event |
+| `src/composables/useShortcuts.spec.js` | **9/9 passed** | Supports key, physical code (`Digit`/`Numpad`), modifiers, scope stack |
+| `src/pages/ProfileSelect.spec.js` | **5/5 passed** | Top-row and Numpad digits, arrow navigation, Enter/Space |
+| `src/pages/Flashcards.spec.js` | **5/5 passed** | Unified shortcut scope integration |
+| **Vite Production Build** | **`✓ built in 21.64s` (0 errors)** | Clean compilation |

@@ -411,23 +411,39 @@ function profileTaskSubtitle(profile) {
 useShortcuts({
   scope: 'profile-select',
   bindings: [
-    // Digits 1..9 — directly select the nth profile card
-    ...Array.from({ length: 9 }, (_, i) => ({
-      key: String(i + 1),
-      handler(e) {
-        if (loading.value) return
-        // Reject if any modifier is held (let Ctrl+1 etc pass through)
-        if (e.ctrlKey || e.metaKey || e.altKey) return
-        const cards = getCards()
-        if (cards.length === 0) return
-        const idx = i
-        if (idx < profiles.value.length) {
-          e.stopPropagation()
-          focusedIndex.value = idx
-          selectProfile(profiles.value[idx].id)
-        }
+    // Digits 1..9 (both top row and numpad) — directly select the nth profile card
+    ...Array.from({ length: 9 }, (_, i) => [
+      {
+        key: String(i + 1),
+        handler(e) {
+          if (loading.value) return
+          if (e.ctrlKey || e.metaKey || e.altKey) return
+          const cards = getCards()
+          if (cards.length === 0) return
+          const idx = i
+          if (idx < profiles.value.length) {
+            e.stopPropagation()
+            focusedIndex.value = idx
+            selectProfile(profiles.value[idx].id)
+          }
+        },
       },
-    })),
+      {
+        code: 'Numpad' + (i + 1),
+        handler(e) {
+          if (loading.value) return
+          if (e.ctrlKey || e.metaKey || e.altKey) return
+          const cards = getCards()
+          if (cards.length === 0) return
+          const idx = i
+          if (idx < profiles.value.length) {
+            e.stopPropagation()
+            focusedIndex.value = idx
+            selectProfile(profiles.value[idx].id)
+          }
+        },
+      },
+    ]).flat(),
     // ArrowRight / ArrowDown — move focus forward
     {
       key: 'ArrowRight',

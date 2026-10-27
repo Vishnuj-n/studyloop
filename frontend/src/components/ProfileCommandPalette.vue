@@ -6,7 +6,7 @@
           class="palette-shell"
           role="dialog"
           aria-modal="true"
-          aria-label="Quick Profile Switcher"
+          aria-label="Quick Command and Profile Switcher"
           @click.stop
         >
           <!-- Header / Search -->
@@ -32,69 +32,138 @@
               v-model="query"
               type="text"
               class="palette-search-input"
-              placeholder="Switch profile or search…"
+              placeholder="Type a command or profile name…"
               autocomplete="off"
               spellcheck="false"
-              aria-label="Search profiles"
+              aria-label="Search profiles and actions"
               @keydown.down.prevent="moveFocus(1)"
               @keydown.up.prevent="moveFocus(-1)"
               @keydown.enter.prevent="confirmSelection"
               @keydown.esc.prevent="close"
+              @keydown="handleInputKeydown"
             />
             <kbd class="palette-esc-hint" aria-label="Press Escape to close">esc</kbd>
           </div>
 
-          <!-- Profile list -->
+          <!-- Command Items / Results list -->
           <ul
             class="palette-results"
             role="listbox"
-            aria-label="Profiles"
+            aria-label="Commands and Profiles"
             :aria-activedescendant="focusedId"
           >
-            <li
-              v-for="(p, idx) in filteredProfiles"
-              :id="`palette-item-${p.id}`"
-              :key="p.id"
-              class="palette-item"
-              :class="{
-                'palette-item--active': p.id === activeProfileId,
-                'palette-item--focused': idx === focusedIdx,
-              }"
-              role="option"
-              :aria-selected="p.id === activeProfileId"
-              @click="selectProfile(p.id)"
-              @mouseenter="focusedIdx = idx"
-            >
-              <!-- Colour dot / avatar -->
-              <span
-                class="palette-item-dot"
-                :style="{ background: profileColor(p) }"
-                aria-hidden="true"
-              />
+            <!-- Quick Actions Section (Pomodoro & Settings) -->
+            <template v-if="filteredActions.length > 0">
+              <li class="palette-section-header">Actions</li>
+              <li
+                v-for="item in filteredActions"
+                :id="`palette-item-${item.id}`"
+                :key="item.id"
+                class="palette-item palette-action-item"
+                :class="{
+                  'palette-item--focused': allItems[focusedIdx]?.id === item.id,
+                }"
+                role="option"
+                @click="executeItem(item)"
+                @mouseenter="setFocusedById(item.id)"
+              >
+                <span class="palette-action-icon" aria-hidden="true">
+                  <!-- Pomodoro Icon -->
+                  <svg
+                    v-if="item.id === 'action-pomodoro'"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <!-- Settings Icon -->
+                  <svg
+                    v-else-if="item.id === 'action-settings'"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                    />
+                  </svg>
+                </span>
 
-              <!-- Name & subtitle -->
-              <span class="palette-item-body">
-                <span class="palette-item-name">{{ p.name }}</span>
-                <span class="palette-item-subtitle">{{ profileSubtitle(p) }}</span>
-              </span>
+                <span class="palette-item-body">
+                  <span class="palette-item-name">{{ item.name }}</span>
+                  <span class="palette-item-subtitle">{{ item.subtitle }}</span>
+                </span>
 
-              <!-- Right-hand badges -->
-              <span class="palette-item-end">
-                <span v-if="p.id === activeProfileId" class="badge badge--active">Active</span>
-                <kbd v-else-if="idx < 9" class="palette-item-digit" aria-label="Press {{ idx + 1 }}">
-                  {{ idx + 1 }}
-                </kbd>
-              </span>
-            </li>
+                <span class="palette-item-end">
+                  <span v-if="item.badge" class="badge badge--action">{{ item.badge }}</span>
+                  <kbd class="palette-item-digit">↵</kbd>
+                </span>
+              </li>
+            </template>
 
-            <li v-if="filteredProfiles.length === 0" class="palette-empty" role="alert">
-              No profiles match "{{ query }}"
+            <!-- Profiles Section -->
+            <template v-if="filteredProfiles.length > 0">
+              <li class="palette-section-header">Study Profiles</li>
+              <li
+                v-for="(p, pIdx) in filteredProfiles"
+                :id="`palette-item-${p.id}`"
+                :key="p.id"
+                class="palette-item"
+                :class="{
+                  'palette-item--active': p.id === activeProfileId,
+                  'palette-item--focused': allItems[focusedIdx]?.id === p.id,
+                }"
+                role="option"
+                :aria-selected="p.id === activeProfileId"
+                @click="selectProfile(p.id)"
+                @mouseenter="setFocusedById(p.id)"
+              >
+                <!-- Colour dot / avatar -->
+                <span
+                  class="palette-item-dot"
+                  :style="{ background: profileColor(p) }"
+                  aria-hidden="true"
+                />
+
+                <!-- Name & subtitle -->
+                <span class="palette-item-body">
+                  <span class="palette-item-name">{{ p.name }}</span>
+                  <span class="palette-item-subtitle">{{ profileSubtitle(p) }}</span>
+                </span>
+
+                <!-- Right-hand badges -->
+                <span class="palette-item-end">
+                  <span v-if="p.id === activeProfileId" class="badge badge--active">Active</span>
+                  <kbd v-else-if="pIdx < 9" class="palette-item-digit">
+                    {{ pIdx + 1 }}
+                  </kbd>
+                </span>
+              </li>
+            </template>
+
+            <li v-if="allItems.length === 0" class="palette-empty" role="alert">
+              No results match "{{ query }}"
             </li>
           </ul>
 
           <!-- Footer actions -->
           <div class="palette-footer">
-            <button class="palette-footer-btn" type="button" @click="goManage">
+            <button class="palette-footer-btn" type="button" @click="goSettings">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -112,7 +181,25 @@
                   d="M19.07 4.93A9.93 9.93 0 0 0 12 2a10 10 0 0 0-10 10 10 10 0 0 0 10 10 9.93 9.93 0 0 0 7.07-2.93"
                 />
               </svg>
-              Manage Profiles
+              Open Settings
+            </button>
+            <button class="palette-footer-btn" type="button" @click="togglePomodoro">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {{ pomoRunning ? 'Pause Pomodoro' : 'Start Pomodoro' }}
             </button>
             <button class="palette-footer-btn" type="button" @click="goAddProfile">
               <svg
@@ -140,10 +227,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProfiles, setActiveProfileID } from '../services/appApi'
-import { useShortcuts } from '../composables/useShortcuts'
+import { getPomodoroTimerState } from '../services/pomodoroApi'
+import { EventsOn } from '../../wailsjs/runtime/runtime'
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
 
@@ -168,6 +256,65 @@ const query = ref('')
 const focusedIdx = ref(0)
 const searchInputRef = ref(null)
 
+// ── Pomodoro state for palette item ──────────────────────────────────────────
+const pomoRunning = ref(false)
+const pomoRemainSec = ref(25 * 60)
+let unsubs = []
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0')
+  const s = (sec % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+async function syncPomodoroState() {
+  try {
+    const s = await getPomodoroTimerState()
+    if (s) {
+      pomoRunning.value = !!s.running
+      if (typeof s.remainingSec === 'number' && s.remainingSec > 0) {
+        pomoRemainSec.value = s.remainingSec
+      }
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
+// ── Built-in Command Actions ──────────────────────────────────────────────────
+const commandActions = computed(() => {
+  return [
+    {
+      id: 'action-pomodoro',
+      type: 'action',
+      name: pomoRunning.value ? 'Pause Pomodoro Focus' : 'Start 25m Pomodoro Focus',
+      subtitle: pomoRunning.value ? `Timer active (${formatTime(pomoRemainSec.value)} left)` : 'Toggle focus timer',
+      badge: pomoRunning.value ? 'Running' : '25m',
+      handler: togglePomodoro,
+    },
+    {
+      id: 'action-settings',
+      type: 'action',
+      name: 'Open Settings',
+      subtitle: 'System, profiles, AI providers & study limits',
+      badge: 'Config',
+      handler: goSettings,
+    },
+  ]
+})
+
+const filteredActions = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return commandActions.value
+  return commandActions.value.filter(
+    (a) =>
+      a.name.toLowerCase().includes(q) ||
+      a.subtitle.toLowerCase().includes(q) ||
+      (a.id === 'action-pomodoro' && (q.includes('pomo') || q.includes('focus') || q.includes('timer'))) ||
+      (a.id === 'action-settings' && (q.includes('set') || q.includes('conf') || q.includes('pref')))
+  )
+})
+
 // ── Derived ───────────────────────────────────────────────────────────────────
 
 const filteredProfiles = computed(() => {
@@ -176,45 +323,88 @@ const filteredProfiles = computed(() => {
   return profiles.value.filter((p) => p.name.toLowerCase().includes(q))
 })
 
-const focusedId = computed(() => {
-  const p = filteredProfiles.value[focusedIdx.value]
-  return p ? `palette-item-${p.id}` : undefined
+// Unified list of all navigable items (Actions first, then Profiles)
+const allItems = computed(() => {
+  return [...filteredActions.value, ...filteredProfiles.value]
 })
+
+const focusedId = computed(() => {
+  const item = allItems.value[focusedIdx.value]
+  return item ? `palette-item-${item.id}` : undefined
+})
+
+function setFocusedById(id) {
+  const idx = allItems.value.findIndex((it) => it.id === id)
+  if (idx !== -1) focusedIdx.value = idx
+}
 
 // ── Palette shortcut scope (only active when open) ────────────────────────────
 
-useShortcuts({
-  scope: 'profile-palette',
-  bindings: [
-    // Digit shortcuts 1..9 pick the nth visible profile
-    ...Array.from({ length: 9 }, (_, i) => ({
-      key: String(i + 1),
-      allowInInputs: true,
-      handler(e) {
-        if (!isOpen.value) return
-        // Only fire when NO modifier is held (avoids eating Ctrl+1 etc)
-        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
-        const p = filteredProfiles.value[i]
-        if (p) selectProfile(p.id)
-      },
-    })),
-    { key: 'Escape', allowInInputs: true, handler: () => isOpen.value && close() },
-  ],
+function handleInputKeydown(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+  const isDigit = /^[1-9]$/.test(e.key) || /^Digit[1-9]$/.test(e.code) || /^Numpad[1-9]$/.test(e.code)
+  if (isDigit) {
+    let digit = parseInt(e.key, 10)
+    if (isNaN(digit) && e.code) {
+      digit = parseInt(e.code.replace(/^(Digit|Numpad)/, ''), 10)
+    }
+    const idx = digit - 1
+    if (idx >= 0 && idx < filteredProfiles.value.length) {
+      e.preventDefault()
+      e.stopPropagation()
+      selectProfile(filteredProfiles.value[idx].id)
+    }
+  }
+}
+
+// ponytail: modal navigation is cleanly handled by input @keydown without global stack competition
+
+// ── Lifecycle & Listeners ─────────────────────────────────────────────────────
+
+onMounted(() => {
+  try {
+    const unsubTick = EventsOn('timerTicked', (data) => {
+      if (data && typeof data.remainingSec === 'number') {
+        pomoRemainSec.value = data.remainingSec
+        pomoRunning.value = true
+      }
+    })
+    if (typeof unsubTick === 'function') unsubs.push(unsubTick)
+
+    const unsubDone = EventsOn('timerCompleted', () => {
+      pomoRunning.value = false
+    })
+    if (typeof unsubDone === 'function') unsubs.push(unsubDone)
+  } catch {
+    // Non-blocking
+  }
+})
+
+onUnmounted(() => {
+  unsubs.forEach((fn) => {
+    try {
+      fn()
+    } catch {}
+  })
 })
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
-watch(isOpen, async (opened) => {
-  if (opened) {
-    query.value = ''
-    focusedIdx.value = 0
-    await loadProfiles()
-    await nextTick()
-    searchInputRef.value?.focus()
-  }
-})
+watch(
+  isOpen,
+  async (opened) => {
+    if (opened) {
+      query.value = ''
+      focusedIdx.value = 0
+      await Promise.all([loadProfiles(), syncPomodoroState()])
+      await nextTick()
+      searchInputRef.value?.focus()
+    }
+  },
+  { immediate: true }
+)
 
-watch(filteredProfiles, () => {
+watch(allItems, () => {
   focusedIdx.value = 0
 })
 
@@ -236,14 +426,33 @@ async function loadProfiles() {
 // ── Keyboard navigation ───────────────────────────────────────────────────────
 
 function moveFocus(delta) {
-  const len = filteredProfiles.value.length
+  const len = allItems.value.length
   if (len === 0) return
   focusedIdx.value = (focusedIdx.value + delta + len) % len
 }
 
 function confirmSelection() {
-  const p = filteredProfiles.value[focusedIdx.value]
-  if (p) selectProfile(p.id)
+  const item = allItems.value[focusedIdx.value]
+  if (!item) return
+  executeItem(item)
+}
+
+function executeItem(item) {
+  if (item.type === 'action' && typeof item.handler === 'function') {
+    item.handler()
+  } else if (item.id) {
+    selectProfile(item.id)
+  }
+}
+
+function togglePomodoro() {
+  window.dispatchEvent(new CustomEvent('pomodoro-toggle'))
+  close()
+}
+
+function goSettings() {
+  close()
+  router.push('/settings')
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -259,6 +468,7 @@ async function selectProfile(profileId) {
     localStorage.setItem('studyloop_cached_active_profile_id', profileId)
     activeProfileId.value = profileId
     window.dispatchEvent(new CustomEvent('profile-switched', { detail: { profileId } }))
+    window.dispatchEvent(new CustomEvent('settings-updated'))
     emit('profile-switched', profileId)
   } catch (err) {
     console.error('[ProfileCommandPalette] setActiveProfileID failed:', err)
@@ -268,11 +478,6 @@ async function selectProfile(profileId) {
 
 function close() {
   isOpen.value = false
-}
-
-function goManage() {
-  close()
-  router.push('/settings?category=profiles')
 }
 
 function goAddProfile() {
@@ -285,8 +490,14 @@ function goAddProfile() {
 /** Deterministic colour from profile id string */
 function profileColor(p) {
   const PALETTE = [
-    '#6c8ebf', '#82b366', '#d6a520', '#ae4132',
-    '#7952b3', '#17a589', '#ca6f1e', '#2e86c1',
+    '#6c8ebf',
+    '#82b366',
+    '#d6a520',
+    '#ae4132',
+    '#7952b3',
+    '#17a589',
+    '#ca6f1e',
+    '#2e86c1',
   ]
   let hash = 0
   const str = p.id || p.name || ''
@@ -384,7 +595,7 @@ function profileSubtitle(p) {
   list-style: none;
   margin: 0;
   padding: 6px;
-  max-height: 320px;
+  max-height: 340px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -396,6 +607,16 @@ function profileSubtitle(p) {
 .palette-results::-webkit-scrollbar-thumb {
   background: var(--outline-variant, rgba(255, 255, 255, 0.1));
   border-radius: 99px;
+}
+
+.palette-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--on-surface-muted, rgba(255, 255, 255, 0.4));
+  padding: 8px 12px 3px;
+  user-select: none;
 }
 
 .palette-item {
@@ -416,6 +637,27 @@ function profileSubtitle(p) {
 
 .palette-item--active {
   background: var(--primary-container, rgba(124, 158, 245, 0.12));
+}
+
+.palette-action-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-variant, rgba(255, 255, 255, 0.06));
+  color: var(--primary, #7c9ef5);
+  flex-shrink: 0;
+}
+
+.badge--action {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-variant, rgba(255, 255, 255, 0.08));
+  color: var(--on-surface-muted, rgba(255, 255, 255, 0.6));
+  font-weight: 500;
 }
 
 .palette-item-dot {
@@ -454,6 +696,7 @@ function profileSubtitle(p) {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 
 .badge--active {
@@ -503,7 +746,9 @@ function profileSubtitle(p) {
   color: var(--on-surface-muted, rgba(255, 255, 255, 0.5));
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
 }
 
 .palette-footer-btn:hover {

@@ -24,7 +24,8 @@ let listenerInstalled = false
 
 /**
  * @typedef {Object} Binding
- * @property {string}   key            - Key value (e.g. ' ', 'ArrowDown', 'p')
+ * @property {string}   [key]          - Key value (e.g. ' ', 'ArrowDown', 'p')
+ * @property {string}   [code]         - Physical key code (e.g. 'Digit1', 'Numpad1', 'KeyP')
  * @property {Function} handler        - Called with the KeyboardEvent
  * @property {boolean}  [ctrl]         - Require Ctrl (Windows) or Cmd (Mac)
  * @property {boolean}  [shift]        - Require Shift
@@ -48,7 +49,7 @@ function isTyping(e) {
 
 /**
  * Normalise a raw binding definition.
- * Lowercases the key; normalises 'Space' → ' ', 'Ctrl' aliases etc.
+ * Normalises 'Space' → ' ' etc.
  * @param {Binding} binding
  * @returns {NormalizedBinding}
  */
@@ -67,8 +68,11 @@ function matchesBinding(e, b) {
   if (b.alt !== undefined && b.alt !== e.altKey) return false
   if (b.meta !== undefined && b.meta !== e.metaKey) return false
 
+  // If code is specified, allow match by physical code (e.g. Numpad1 vs Digit1)
+  if (b.code && e.code === b.code) return true
+
   // Key comparison (case-sensitive for letters like 'S' vs 's')
-  return e.key === b.key
+  return Boolean(b.key && e.key === b.key)
 }
 
 // ─── Global dispatcher ───────────────────────────────────────────────────────
