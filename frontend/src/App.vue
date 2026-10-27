@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import ProfileCommandPalette from './components/ProfileCommandPalette.vue'
+import { useShortcuts } from './composables/useShortcuts'
 import MysteryChestModal from './components/MysteryChestModal.vue'
 import MilestoneCelebrationModal from './components/MilestoneCelebrationModal.vue'
 import RewardToast from './components/RewardToast.vue'
@@ -35,6 +37,34 @@ const { setupModalState, closeSetupModal } = useExtensions()
 
 const route = useRoute()
 const router = useRouter()
+
+// ── Profile Command Palette (Ctrl+Shift+P) ────────────────────────────────
+const showProfilePalette = ref(false)
+useShortcuts({
+  scope: 'global',
+  bindings: [
+    {
+      key: 'P',
+      code: 'KeyP',
+      ctrl: true,
+      shift: true,
+      allowInInputs: true,
+      handler() {
+        showProfilePalette.value = !showProfilePalette.value
+      },
+    },
+    {
+      key: 'p',
+      code: 'KeyP',
+      ctrl: true,
+      shift: true,
+      allowInInputs: true,
+      handler() {
+        showProfilePalette.value = !showProfilePalette.value
+      },
+    },
+  ],
+})
 
 const banner = ref({
   show: false,
@@ -551,6 +581,7 @@ onUnmounted(() => {
 
       <RouterView />
       <ConfirmModal />
+      <ProfileCommandPalette v-model="showProfilePalette" />
 
       <RewardToast
         v-if="pendingReward"

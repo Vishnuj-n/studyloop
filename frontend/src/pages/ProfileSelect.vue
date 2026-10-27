@@ -159,7 +159,8 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
+import { useShortcuts } from '../composables/useShortcuts'
 import { useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -403,94 +404,114 @@ function profileTaskSubtitle(profile) {
   return `${count} pending study task${count === 1 ? '' : 's'}`
 }
 
-// ---- Keyboard handler ----
-function handleKeydown(e) {
-  if (loading.value) return
-
-  // FIX #4: Bail if no cards are rendered yet (avoids firing selectProfile
-  // on a card that hasn't mounted). Use the DOM as the source of truth.
-  const cards = getCards()
-  if (cards.length === 0) return
-
-  // Ignore typing in inputs / textareas / contentEditable
-  const tag = e.target?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
-
-  // Ignore modified keys (let browser/system shortcuts through)
-  if (e.ctrlKey || e.metaKey || e.altKey) return
-
-  // --- Digits 1..9 select a profile ---
-  // Note: digits map ONLY to profiles (1..N), never to the "Add profile" card.
-  let digit = null
-  if (/^[1-9]$/.test(e.key)) {
-    digit = parseInt(e.key, 10)
-  } else if (/^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
-    digit = parseInt(e.code.replace(/^(?:Digit|Numpad)/, ''), 10)
-  }
-
-  if (digit !== null) {
-    const idx = digit - 1
-    if (idx >= 0 && idx < profiles.value.length) {
-      e.preventDefault()
-      e.stopPropagation()
-      focusedIndex.value = idx
-      selectProfile(profiles.value[idx].id)
-      return
-    }
-  }
-
-  // FIX #2: Wrap against the full card count (profiles + Add card) so arrows
-  // can land on the Add card too. This matches what getCards() returns.
-  const total = totalCardCount()
-
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-    e.preventDefault()
-    e.stopPropagation()
-    focusedIndex.value = (focusedIndex.value + 1) % total
-    syncCardFocus()
-    return
-  }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    e.preventDefault()
-    e.stopPropagation()
-    focusedIndex.value = (focusedIndex.value - 1 + total) % total
-    syncCardFocus()
-    return
-  }
-
-  // FIX #1 & #5: Space / Enter handled ONLY here. The card no longer has a
-  // local @keydown.space.prevent handler, so there's exactly one code path
-  // and no double-trigger race with the native button click.
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault()
-    e.stopPropagation()
-
-    // If the currently focused DOM element is a card (native focus landed on
-    // one), let it be the authority — but we still preventDefault to stop the
-    // browser's implicit Space→click on keyup.
-    const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
-    if (!target) return
-
-    if (target.classList.contains('add-profile-card')) {
-      openAddProfile()
-    } else {
-      const profile = profiles.value[focusedIndex.value]
-      if (profile) selectProfile(profile.id)
-    }
-  }
-}
+// ── ProfileSelect keyboard shortcuts ─────────────────────────────────────────
+// Replaced the manual addEventListener with the unified scope-stack controller.
+// The form-element guard is handled automatically by useShortcuts for all
+// single-character bindings (digits, space, enter), so no manual tag checks.
+useShortcuts({
+  scope: 'profile-select',
+  bindings: [
+    // Digits 1..9 — directly select the nth profile card
+    ...Array.from({ length: 9 }, (_, i) => ({
+      key: String(i + 1),
+      handler(e) {
+        if (loading.value) return
+        // Reject if any modifier is held (let Ctrl+1 etc pass through)
+        if (e.ctrlKey || e.metaKey || e.altKey) return
+        const cards = getCards()
+        if (cards.length === 0) return
+        const idx = i
+        if (idx < profiles.value.length) {
+          e.stopPropagation()
+          focusedIndex.value = idx
+          selectProfile(profiles.value[idx].id)
+        }
+      },
+    })),
+    // ArrowRight / ArrowDown — move focus forward
+    {
+      key: 'ArrowRight',
+      handler(e) {
+        if (loading.value || getCards().length === 0) return
+        e.stopPropagation()
+        focusedIndex.value = (focusedIndex.value + 1) % totalCardCount()
+        syncCardFocus()
+      },
+    },
+    {
+      key: 'ArrowDown',
+      handler(e) {
+        if (loading.value || getCards().length === 0) return
+        e.stopPropagation()
+        focusedIndex.value = (focusedIndex.value + 1) % totalCardCount()
+        syncCardFocus()
+      },
+    },
+    // ArrowLeft / ArrowUp — move focus backward
+    {
+      key: 'ArrowLeft',
+      handler(e) {
+        if (loading.value || getCards().length === 0) return
+        e.stopPropagation()
+        const total = totalCardCount()
+        focusedIndex.value = (focusedIndex.value - 1 + total) % total
+        syncCardFocus()
+      },
+    },
+    {
+      key: 'ArrowUp',
+      handler(e) {
+        if (loading.value || getCards().length === 0) return
+        e.stopPropagation()
+        const total = totalCardCount()
+        focusedIndex.value = (focusedIndex.value - 1 + total) % total
+        syncCardFocus()
+      },
+    },
+    // Enter — activate focused card
+    {
+      key: 'Enter',
+      handler(e) {
+        if (loading.value) return
+        const cards = getCards()
+        if (cards.length === 0) return
+        e.stopPropagation()
+        const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
+        if (!target) return
+        if (target.classList.contains('add-profile-card')) {
+          openAddProfile()
+        } else {
+          const profile = profiles.value[focusedIndex.value]
+          if (profile) selectProfile(profile.id)
+        }
+      },
+    },
+    // Space — same as Enter for profile card activation
+    {
+      key: ' ',
+      handler(e) {
+        if (loading.value) return
+        const cards = getCards()
+        if (cards.length === 0) return
+        e.stopPropagation()
+        const target = cards[Math.min(focusedIndex.value, cards.length - 1)]
+        if (!target) return
+        if (target.classList.contains('add-profile-card')) {
+          openAddProfile()
+        } else {
+          const profile = profiles.value[focusedIndex.value]
+          if (profile) selectProfile(profile.id)
+        }
+      },
+    },
+  ],
+})
 
 onMounted(() => {
-  // Single listener on window, bubble phase.
-  window.addEventListener('keydown', handleKeydown)
   // Ensure the window is focused so key events reach us in WebView2.
   window.focus()
   syncCardFocus()
   loadData()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

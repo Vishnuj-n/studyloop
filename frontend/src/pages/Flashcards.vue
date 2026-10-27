@@ -341,6 +341,7 @@ import StudyPageLayout from '../components/StudyPageLayout.vue'
 import FlashcardDeckManagerModal from '../components/FlashcardDeckManagerModal.vue'
 import { playCardRatingTick } from '../utils/audioJuice'
 import { useToast } from '../composables/useToast'
+import { useShortcuts } from '../composables/useShortcuts'
 
 const { showNotice, showError } = useToast()
 const route = useRoute()
@@ -543,7 +544,7 @@ async function onDeckUpdated() {
 }
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleKeydown)
+  // Keyboard shortcuts are registered declaratively via useShortcuts below
   try {
     const res = await getNotebooks()
     notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
@@ -585,9 +586,7 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
+// Shortcut cleanup is automatic via useShortcuts lifecycle hooks
 
 async function generate() {
   error.value = ''
@@ -721,48 +720,61 @@ async function suspendCard() {
   }
 }
 
-function handleKeydown(e) {
-  if (showDeckManager.value || !reviewing.value || !currentCard.value) return
-
-  // Prevent hotkeys when typing in inputs/textareas
-  if (
-    e.target &&
-    (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)
-  ) {
-    return
-  }
-
-  // Shift+S to suspend
-  if (queueMode.value && e.key === 'S' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-    e.preventDefault()
-    suspendCard()
-    return
-  }
-
-  // Space to flip card (toggle question and answer)
-  if (e.key === ' ') {
-    e.preventDefault()
-    flipped.value = !flipped.value
-    return
-  }
-
-  // 1-4 keys to rate (only when answer is revealed)
-  if (flipped.value) {
-    if (e.key === '1') {
-      e.preventDefault()
-      rate('again')
-    } else if (e.key === '2') {
-      e.preventDefault()
-      rate('hard')
-    } else if (e.key === '3') {
-      e.preventDefault()
-      rate('good')
-    } else if (e.key === '4') {
-      e.preventDefault()
-      rate('easy')
-    }
-  }
-}
+// ── Flashcard keyboard shortcuts ─────────────────────────────────────────────
+// Registered via useShortcuts so they integrate with the global scope stack.
+// The deck manager modal owns a higher scope and consumes its own keys, so
+// these bindings naturally go dormant while that modal is open.
+useShortcuts({
+  scope: 'flashcards',
+  bindings: [
+    // Shift+S — suspend card (queue mode only)
+    {
+      key: 'S',
+      shift: true,
+      handler() {
+        if (!queueMode.value || showDeckManager.value || !reviewing.value || !currentCard.value) return
+        suspendCard()
+      },
+    },
+    // Space — flip card
+    {
+      key: ' ',
+      handler() {
+        if (showDeckManager.value || !reviewing.value || !currentCard.value) return
+        flipped.value = !flipped.value
+      },
+    },
+    // 1..4 — rate card (only when answer revealed)
+    {
+      key: '1',
+      handler() {
+        if (showDeckManager.value || !reviewing.value || !currentCard.value || !flipped.value) return
+        rate('again')
+      },
+    },
+    {
+      key: '2',
+      handler() {
+        if (showDeckManager.value || !reviewing.value || !currentCard.value || !flipped.value) return
+        rate('hard')
+      },
+    },
+    {
+      key: '3',
+      handler() {
+        if (showDeckManager.value || !reviewing.value || !currentCard.value || !flipped.value) return
+        rate('good')
+      },
+    },
+    {
+      key: '4',
+      handler() {
+        if (showDeckManager.value || !reviewing.value || !currentCard.value || !flipped.value) return
+        rate('easy')
+      },
+    },
+  ],
+})
 
 async function loadQueueSession(taskID, notebookID = '') {
   error.value = ''
