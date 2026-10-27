@@ -391,6 +391,7 @@ Singleton table for global preferences.
 | `notes_detail_level` | TEXT NOT NULL DEFAULT 'briefing' | Summary format variant (`briefing`, `exec_summary`, `concept_card`, `cheatsheet`, `feynman`, `detailed`) |
 | `notes_model_tier` | TEXT NOT NULL DEFAULT 'fast' | LLM performance tier used for study notes generation (`fast` or `heavy`) |
 | `show_recap_before_reading` | BOOLEAN DEFAULT 1 | Whether previous session notes recap modal automatically pops up before reading |
+| `quiz_synthesis_mode` | TEXT NOT NULL DEFAULT 'feynman' | Quiz synthesis mode (`feynman` or `none`) |
 | `rate_limit_strategy` | TEXT NOT NULL DEFAULT 'STANDARD' | Rate limit fallback strategy (`STANDARD` or `PACED`) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `session_cache_json` | TEXT DEFAULT '' | HMAC-signed session cache blob for resilient auth restoration across updates |

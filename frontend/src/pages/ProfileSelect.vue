@@ -940,23 +940,6 @@ onMounted(() => {
 
 .footer-corner-right { gap: 12px; }
 
-.footer-center-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted-text);
-  opacity: 0.65;
-  user-select: none;
-  white-space: nowrap;
-  transition: opacity 0.2s ease, color 0.2s ease;
-}
-
-.footer-center-hint:hover {
-  opacity: 1;
-  color: var(--on-surface);
-}
-
 .remember-toggle {
   display: inline-flex;
   align-items: center;

@@ -341,7 +341,8 @@ function setFocusedById(id) {
 // ── Palette shortcut scope (only active when open) ────────────────────────────
 
 function handleInputKeydown(e) {
-  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+  const hasModifier = [e.ctrlKey, e.metaKey, e.altKey, e.shiftKey].some(Boolean)
+  if (hasModifier) return
   const isDigit = /^[1-9]$/.test(e.key) || /^Digit[1-9]$/.test(e.code) || /^Numpad[1-9]$/.test(e.code)
   if (isDigit) {
     let digit = parseInt(e.key, 10)

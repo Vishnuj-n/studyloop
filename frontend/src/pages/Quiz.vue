@@ -449,7 +449,7 @@
           type="submit"
           :disabled="submitting || !allAnswered"
         >
-          {{ submitting ? 'Scoring…' : feynmanReflection.trim() ? 'Submit Quiz with Reflection' : 'Submit Quiz' }}
+          {{ submitButtonLabel }}
         </button>
       </div>
     </form>
@@ -676,6 +676,12 @@ const allAnswered = computed(() => {
   return questions.value.every(
     (q) => typeof answers.value[q.id] === 'string' && answers.value[q.id].trim() !== ''
   )
+})
+
+const submitButtonLabel = computed(() => {
+  if (submitting.value) return 'Scoring…'
+  if (feynmanReflection.value.trim()) return 'Submit Quiz with Reflection'
+  return 'Submit Quiz'
 })
 
 const canGenerateManual = computed(
