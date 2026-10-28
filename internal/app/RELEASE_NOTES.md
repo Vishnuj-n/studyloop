@@ -1,50 +1,17 @@
 ## ✨ Features
-- **Profile Selection & Launcher**  
-  - New dedicated profile‑selection page that appears at startup when multiple study profiles exist.  
-  - “Who is studying?” launcher modal with a setting to show or hide it on app launch.  
-  - Ability to add, edit, and switch profiles directly from the launcher and Settings panel.
-
-- **Self‑Paced Study & Pacing Drawer**  
-  - Streamlined pacing drawer that lets users choose a self‑paced profile and control study speed.
-
-- **Flashcard Profile Inheritance**  
-  - Flashcards can now inherit content from other profiles, enabling shared decks across related study tracks.
-
-- **Unmark Reviewed Notes**  
-  - Users can unmark notes that were previously marked as reviewed, restoring them to the active study list.
-
-- **Topic Slots Caching**  
-  - Faster loading of topic slots in the Flashcards view, improving navigation speed.
-
-- **Enhanced Today Plan**  
-  - Today’s plan now reflects remaining review cards and provides clearer end‑of‑study notifications.
+- **Unified Command Palette** – Press **Ctrl + Shift + P** to open a global command palette. Quickly start/stop Pomodoro timers, switch profiles, jump to settings, and execute other common actions with a single shortcut.
+- **Quiz Rescue & Reflection Flow** – New safety net lets you recover a quiz attempt if something goes wrong, and a built‑in reflection step helps you review answers and insights after completing a quiz.
+- **Study Pacing Updates** – Enhanced pacing controls give you more flexibility to manage the flow of your study sessions.
 
 ## 🚀 Improvements
-- **Keyboard Navigation & Accessibility**  
-  - Full keyboard support and focus management for profile selection cards and the profile launcher, making navigation smoother for power users and improving accessibility.
-
-- **UI & Layout Refreshes**  
-  - Updated profile card layout with clearer action buttons.  
-  - Refined styling for inherited‑profile components and flashcard views.  
-  - Notes view now includes a back‑to‑quiz link and a context banner during quiz review.
-
-- **Reader & Task Handling**  
-  - Better task description formatting and robust task‑ID handling in the Reader component.  
-  - Optimized flashcard navigation and reading session flow.
-
-- **Settings Enhancements**  
-  - New toggle to control the startup launcher.  
-  - Improved profile‑addition workflow and clearer settings UI.
+- **Flashcard Generation Guidelines** – Updated guidance focuses on creating atomic, clear concepts, making it easier to produce effective flashcards.
+- **Unified Shortcut System** – A new shortcut controller provides consistent key handling across the app, including support for physical key codes and smarter conflict resolution.
+- **Profile Switching Enhancements** – Select profiles using the top‑row or numpad digit keys, and see the agenda automatically refresh when you change profiles or update settings.
+- **Accessibility & UI Tweaks** – The command palette now includes icons and improved accessibility attributes for a smoother user experience.
 
 ## 🐛 Bug Fixes & Issue Resolutions
-- Safeguarded focus and scroll calls in the profile selection component to prevent runtime errors.  
-- Fixed source‑notebook resolution for inherited flashcards.  
-- Resolved explicit error handling in profile selection UI.  
-- Corrected flashcard and notes edge‑case bugs that could cause missing or duplicated items.  
-- Fixed JSON formatting tolerance in flashcard review updates, preventing sync issues.  
-- Patched max‑tokens validation in answer generation tests (ensuring smoother AI responses).  
-- Addressed various minor UI glitches and navigation hiccups across the app.  
+- **Quiz Submission Reliability** – The `submitQuizAttempt` call now includes an additional parameter required by the API, preventing submission errors.
+- Minor stability fixes and cleanup of unused styles and code that could affect performance.
 
----
-
+---  
 *Thanks for using Studyloop!*
