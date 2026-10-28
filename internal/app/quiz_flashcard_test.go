@@ -1131,4 +1131,32 @@ func TestMilestoneExamTriggers(t *testing.T) {
 	}
 }
 
+func TestSubmitQuizAttemptWithFeynmanReflection(t *testing.T) {
+	app := newClassicTestApp(t)
+	mustInsertActiveQuizTask(t, "nb-feynman-1", "topic-feynman-1", "task-feynman-1", 70)
+
+	resp := app.SubmitQuizAttemptWithReflection("task-feynman-1", []models.QuizAnswer{
+		{QuestionID: "quiz-q1", Selected: "A"},
+		{QuestionID: "quiz-q2", Selected: "B"},
+	}, "In my own words, preemptive scheduling allows the OS kernel to preempt running processes.")
+
+	result := mustExtractQuizResult(t, resp)
+	if !result.Passed {
+		t.Fatalf("expected passed quiz result")
+	}
+	if result.ReflectionText != "In my own words, preemptive scheduling allows the OS kernel to preempt running processes." {
+		t.Fatalf("expected reflection text in result, got: %s", result.ReflectionText)
+	}
+
+	// Verify persistence in SQLite quiz_attempts table
+	var persistedText, persistedFeedback string
+	err := testRepo.QueryRowForTest("SELECT reflection_text, reflection_feedback FROM quiz_attempts WHERE task_id = ?", "task-feynman-1").Scan(&persistedText, &persistedFeedback)
+	if err != nil {
+		t.Fatalf("failed to query quiz_attempts for reflection: %v", err)
+	}
+	if persistedText != result.ReflectionText {
+		t.Fatalf("persisted reflection text mismatch: expected %q, got %q", result.ReflectionText, persistedText)
+	}
+}
+
 

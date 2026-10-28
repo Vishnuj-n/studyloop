@@ -102,7 +102,17 @@ export function generateQuizForPageRange(notebookID, startPage, endPage) {
   return appBridge().GenerateQuizForPageRange(notebookID, startPage, endPage)
 }
 
-export function submitQuizAttempt(taskID, answers) {
+export function submitQuizAttempt(taskID, answers, reflectionText = '') {
+  if (reflectionText && typeof appBridge().SubmitQuizAttemptWithReflection === 'function') {
+    return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
+  }
+  return appBridge().SubmitQuizAttempt(taskID, answers)
+}
+
+export function submitQuizAttemptWithReflection(taskID, answers, reflectionText = '') {
+  if (typeof appBridge().SubmitQuizAttemptWithReflection === 'function') {
+    return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
+  }
   return appBridge().SubmitQuizAttempt(taskID, answers)
 }
 

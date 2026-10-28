@@ -207,6 +207,8 @@ Rollup of completed quiz task.
 | `passed` | INTEGER NOT NULL | Pass/fail flag |
 | `answers_json` | TEXT NOT NULL | Serialized answers |
 | `feedback` | TEXT | Attempt-level feedback |
+| `reflection_text` | TEXT DEFAULT '' | Optional Feynman reflection in user's own words |
+| `reflection_feedback` | TEXT DEFAULT '' | Serialized LLM critique (strengths, gaps, calibration) |
 | `completed_at` | INTEGER NOT NULL | Completion timestamp |
 | `created_at` | TIMESTAMP DEFAULT CURRENT_TIMESTAMP | Record creation time |
 
@@ -389,6 +391,7 @@ Singleton table for global preferences.
 | `notes_detail_level` | TEXT NOT NULL DEFAULT 'briefing' | Summary format variant (`briefing`, `exec_summary`, `concept_card`, `cheatsheet`, `feynman`, `detailed`) |
 | `notes_model_tier` | TEXT NOT NULL DEFAULT 'fast' | LLM performance tier used for study notes generation (`fast` or `heavy`) |
 | `show_recap_before_reading` | BOOLEAN DEFAULT 1 | Whether previous session notes recap modal automatically pops up before reading |
+| `quiz_synthesis_mode` | TEXT NOT NULL DEFAULT 'feynman' | Quiz synthesis mode (`feynman` or `none`) |
 | `rate_limit_strategy` | TEXT NOT NULL DEFAULT 'STANDARD' | Rate limit fallback strategy (`STANDARD` or `PACED`) |
 | `extension_settings` | TEXT DEFAULT '{}' | JSON string persisting user-configured extension preferences |
 | `session_cache_json` | TEXT DEFAULT '' | HMAC-signed session cache blob for resilient auth restoration across updates |

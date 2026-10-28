@@ -210,8 +210,53 @@
         </article>
       </section>
 
+      <!-- Feynman Reflection Feedback Card (when provided) -->
+      <section v-if="result.reflection_feedback" class="feynman-feedback-card">
+        <div class="feynman-feedback-header">
+          <div class="feynman-badge">
+            <BaseIcon name="sparkles" size="14" />
+            <span>Feynman Synthesis Feedback</span>
+          </div>
+          <span
+            class="feynman-calibration-badge"
+            :class="getCalibrationClass(result.reflection_feedback.calibration)"
+          >
+            {{ result.reflection_feedback.calibration || 'Reflected' }}
+          </span>
+        </div>
+
+        <div v-if="result.reflection_text" class="feynman-your-words">
+          <span class="feynman-words-label">Your Explanation:</span>
+          <p class="feynman-words-quote">&ldquo;{{ result.reflection_text }}&rdquo;</p>
+        </div>
+
+        <div v-if="result.reflection_feedback.strengths && result.reflection_feedback.strengths.length > 0" class="feynman-feedback-block block--strengths">
+          <h4 class="feedback-heading">
+            <BaseIcon name="check" size="14" />
+            <span>What You Got Right</span>
+          </h4>
+          <ul class="feedback-list">
+            <li v-for="(item, idx) in result.reflection_feedback.strengths" :key="idx">{{ item }}</li>
+          </ul>
+        </div>
+
+        <div v-if="result.reflection_feedback.gaps && result.reflection_feedback.gaps.length > 0" class="feynman-feedback-block block--gaps">
+          <h4 class="feedback-heading">
+            <BaseIcon name="alert-triangle" size="14" />
+            <span>Nuances / Gaps to Watch</span>
+          </h4>
+          <ul class="feedback-list">
+            <li v-for="(item, idx) in result.reflection_feedback.gaps" :key="idx">{{ item }}</li>
+          </ul>
+        </div>
+
+        <p v-if="result.reflection_feedback.summary" class="feynman-summary-text">
+          {{ result.reflection_feedback.summary }}
+        </p>
+      </section>
+
       <!-- Viva Examiner Challenge Hero Banner on Pass -->
-      <section v-if="result.passed" class="viva-challenge-card">
+      <section v-if="result.passed && synthesisMode === 'viva'" class="viva-challenge-card">
         <div class="viva-challenge-card__content">
           <div class="viva-challenge-card__badge">
             <span style="display: inline-flex; align-items: center; gap: 4px;">
@@ -373,6 +418,29 @@
         </div>
       </article>
 
+      <!-- Optional Feynman Reflection Card -->
+      <article v-if="synthesisMode === 'feynman'" class="question-card feynman-reflection-card">
+        <div class="feynman-header">
+          <span class="feynman-badge">
+            <BaseIcon name="sparkles" size="14" />
+            <span>Self-Explanation &bull; Optional</span>
+          </span>
+          <span class="feynman-hint">Explain in your own words to check your mental model</span>
+        </div>
+        <p class="question-prompt feynman-prompt">
+          What was the core insight or mechanism of this section? (2&ndash;4 sentences)
+        </p>
+        <div class="reflection-input-shell">
+          <textarea
+            v-model="feynmanReflection"
+            class="feynman-textarea"
+            placeholder="In my own words, the key idea here is..."
+            rows="3"
+            :disabled="submitting"
+          ></textarea>
+        </div>
+      </article>
+
       <div class="form-footer">
         <p v-if="!allAnswered" class="footer-hint">Answer all questions to submit.</p>
         <button
@@ -381,7 +449,7 @@
           type="submit"
           :disabled="submitting || !allAnswered"
         >
-          {{ submitting ? 'Scoring…' : 'Submit Quiz' }}
+          {{ submitButtonLabel }}
         </button>
       </div>
     </form>
@@ -559,6 +627,15 @@ const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
 const result = ref(null)
 const generatingFlashcards = ref(false)
+const feynmanReflection = ref('')
+const synthesisMode = ref('feynman')
+
+function getCalibrationClass(calibration) {
+  const c = String(calibration || '').toLowerCase()
+  if (c.includes('solid')) return 'cal--solid'
+  if (c.includes('partially')) return 'cal--partial'
+  return 'cal--misaligned'
+}
 
 // Restart Reading Session modal state
 const showRestartReadingModal = ref(false)
@@ -601,6 +678,12 @@ const allAnswered = computed(() => {
   )
 })
 
+const submitButtonLabel = computed(() => {
+  if (submitting.value) return 'Scoring…'
+  if (feynmanReflection.value.trim()) return 'Submit Quiz with Reflection'
+  return 'Submit Quiz'
+})
+
 const canGenerateManual = computed(
   () =>
     selectedNotebookID.value &&
@@ -629,6 +712,7 @@ onMounted(async () => {
     const settings = await getUserSettings()
     analyticsEnabled.value = settings?.analytics_enabled ?? false
     anonymousUserID.value = settings?.anonymous_user_id ?? ''
+    synthesisMode.value = (settings?.quiz_synthesis_mode || 'feynman').toLowerCase()
   } catch (err) {
     console.error('Failed to load user settings in Quiz:', err)
   }
@@ -843,7 +927,7 @@ async function submitQuiz() {
       question_id: q.id,
       selected: answers.value[q.id],
     }))
-    const response = await submitQuizAttempt(taskID.value, payload)
+    const response = await submitQuizAttempt(taskID.value, payload, feynmanReflection.value.trim())
     if (response?.error) {
       error.value = response.error
       return
@@ -2017,5 +2101,186 @@ async function confirmRestartReading() {
 
 .skip-btn:hover:not(:disabled) {
   filter: brightness(1.1);
+}
+
+/* Feynman Reflection Styles - Blends seamlessly into normal cards */
+.feynman-reflection-card {
+  border: none;
+  background: var(--surface-container-lowest);
+  box-shadow: none;
+}
+
+.feynman-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.feynman-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+.feynman-hint {
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.feynman-prompt {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--on-surface);
+  line-height: 1.5;
+}
+
+.reflection-input-shell {
+  margin-top: 6px;
+}
+
+.feynman-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.feynman-textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  background: color-mix(in srgb, var(--primary) 3%, var(--surface-container-low));
+}
+
+/* Feynman Feedback Card */
+.feynman-feedback-card {
+  margin: 20px 0;
+  padding: 18px 20px;
+  border-radius: 8px;
+  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.feynman-feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.feynman-calibration-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cal--solid {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cal--partial {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.cal--misaligned {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.feynman-your-words {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-surface, rgba(0, 0, 0, 0.15));
+  border-left: 2px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+}
+
+.feynman-words-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #888);
+  margin-bottom: 4px;
+}
+
+.feynman-words-quote {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--text-normal, #ddd);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.feynman-feedback-block {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+}
+
+.block--strengths {
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+.block--gaps {
+  background: rgba(234, 179, 8, 0.06);
+  border: 1px solid rgba(234, 179, 8, 0.15);
+}
+
+.feedback-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+}
+
+.block--strengths .feedback-heading {
+  color: #22c55e;
+}
+
+.block--gaps .feedback-heading {
+  color: #eab308;
+}
+
+.feedback-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-normal, #ddd);
+}
+
+.feynman-summary-text {
+  font-size: 13px;
+  color: var(--text-muted, #aaa);
+  margin: 8px 0 0 0;
+  line-height: 1.4;
 }
 </style>

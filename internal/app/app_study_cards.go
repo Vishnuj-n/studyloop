@@ -214,6 +214,10 @@ func (a *App) GenerateQuizForPageRange(notebookID string, startPage, endPage int
 }
 
 func (a *App) SubmitQuizAttempt(taskID string, answers []models.QuizAnswer) map[string]interface{} {
+	return a.SubmitQuizAttemptWithReflection(taskID, answers, "")
+}
+
+func (a *App) SubmitQuizAttemptWithReflection(taskID string, answers []models.QuizAnswer, reflectionText string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
 	}
@@ -221,9 +225,10 @@ func (a *App) SubmitQuizAttempt(taskID string, answers []models.QuizAnswer) map[
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
 	transitionRes, err := a.studyService.TransitionTask(context.Background(), studypkg.TransitionRequest{
-		TaskID:      taskID,
-		Event:       studypkg.EventSubmitQuiz,
-		QuizAnswers: answers,
+		TaskID:         taskID,
+		Event:          studypkg.EventSubmitQuiz,
+		QuizAnswers:    answers,
+		ReflectionText: reflectionText,
 	})
 	if err != nil {
 		return mapTaskError(err)

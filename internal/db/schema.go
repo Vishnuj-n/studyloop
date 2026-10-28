@@ -82,6 +82,8 @@ func InitSchema(tx *sql.Tx) error {
 			passed INTEGER NOT NULL,
 			answers_json TEXT NOT NULL,
 			feedback TEXT,
+			reflection_text TEXT DEFAULT '',
+			reflection_feedback TEXT DEFAULT '',
 			completed_at INTEGER NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (task_id) REFERENCES study_queue(id) ON DELETE CASCADE
@@ -161,6 +163,7 @@ func InitSchema(tx *sql.Tx) error {
 			notes_detail_level TEXT NOT NULL DEFAULT 'briefing',
 			notes_model_tier TEXT NOT NULL DEFAULT 'fast',
 			show_recap_before_reading BOOLEAN DEFAULT 1,
+			quiz_synthesis_mode TEXT NOT NULL DEFAULT 'feynman',
 			rate_limit_strategy TEXT NOT NULL DEFAULT 'STANDARD',
 			extension_settings TEXT DEFAULT '{}',
 			session_cache_json TEXT DEFAULT '',

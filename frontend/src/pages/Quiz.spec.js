@@ -125,9 +125,11 @@ describe('Quiz.vue Integration & State', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(appApi.submitQuizAttempt).toHaveBeenCalledWith('task-123', [
-      { question_id: 'q1', selected: 'Yes' },
-    ])
+    expect(appApi.submitQuizAttempt).toHaveBeenCalledWith(
+      'task-123',
+      [{ question_id: 'q1', selected: 'Yes' }],
+      ''
+    )
     expect(wrapper.find('.result-panel').exists()).toBe(true)
     expect(wrapper.text()).toContain('Passed')
     expect(wrapper.text()).toContain('100%')

@@ -65,13 +65,40 @@ defineEmits(['open-pace-modal'])
 const feasibilityPillText = computed(() => {
   if (!props.pace) return 'Study Pace'
   const s = props.pace.feasibility_status
+  if (s === 'DEADLINE_PASSED') {
+    return 'Deadline passed'
+  }
+  if (s === 'UNCOVERED_WORKLOAD') {
+    const uncovered = props.pace.uncovered_sessions
+    if (uncovered) {
+      return `${uncovered} ${uncovered === 1 ? 'session' : 'sessions'} uncovered`
+    }
+    return props.pace.pace_label || 'Workload uncovered'
+  }
+  if (s === 'AT_RISK') {
+    return 'Pace at risk'
+  }
+  if (s === 'ON_TRACK') {
+    // Check if projected finish date is ahead of deadline
+    if (props.pace.deadline && props.pace.projected_finish) {
+      try {
+        const d1 = new Date(props.pace.deadline).setHours(0, 0, 0, 0)
+        const d2 = new Date(props.pace.projected_finish).setHours(0, 0, 0, 0)
+        const diffDays = Math.round((d1 - d2) / 86400000)
+        if (diffDays > 0) {
+          return `On track · ${diffDays}d buffer`
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return 'On track for deadline'
+  }
+  // Legacy / fallback checks
   const gap = props.pace.days_gap
   const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
   if (s === 'AHEAD') {
-    return `On track · Finish ${gapFormatted}d early`
-  }
-  if (s === 'ON_TRACK') {
-    return 'On track for deadline'
+    return `On track · ${gapFormatted}d early`
   }
   if (s === 'BEHIND') {
     return `Behind pace · ${gapFormatted}d late`
@@ -152,35 +179,42 @@ function formatDaysRemainingShort(days) {
   display: inline-block;
 }
 
-.pill-AHEAD {
+.pill-AHEAD,
+.pill-ON_TRACK {
   background: rgba(39, 174, 96, 0.1);
   border-color: rgba(39, 174, 96, 0.35);
   color: #1b8744;
 }
 
-.pill-AHEAD .status-dot {
+.pill-AHEAD .status-dot,
+.pill-ON_TRACK .status-dot {
   background: #27ae60;
   box-shadow: 0 0 6px rgba(39, 174, 96, 0.4);
 }
 
-.pill-ON_TRACK {
-  background: rgba(245, 158, 11, 0.1);
+.pill-UNCOVERED_WORKLOAD,
+.pill-AT_RISK {
+  background: rgba(245, 158, 11, 0.12);
   border-color: rgba(245, 158, 11, 0.35);
   color: #b45309;
 }
 
-.pill-ON_TRACK .status-dot {
+.pill-UNCOVERED_WORKLOAD .status-dot,
+.pill-AT_RISK .status-dot {
   background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
 }
 
-.pill-BEHIND {
+.pill-BEHIND,
+.pill-DEADLINE_PASSED {
   background: rgba(235, 94, 85, 0.12);
   border-color: rgba(235, 94, 85, 0.35);
   color: #eb5e55;
   font-weight: 700;
 }
 
-.pill-BEHIND .status-dot {
+.pill-BEHIND .status-dot,
+.pill-DEADLINE_PASSED .status-dot {
   background: #eb5e55;
   box-shadow: 0 0 6px rgba(235, 94, 85, 0.4);
 }

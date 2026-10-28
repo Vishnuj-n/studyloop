@@ -191,4 +191,30 @@ describe('Dashboard.vue Integration', () => {
     expect(sessionPill.exists()).toBe(true)
     expect(sessionPill.text()).toContain('2 / 3 Reading Sessions Today')
   })
+
+  it('reloads agenda when profile-switched or settings-updated is dispatched', async () => {
+    appApi.getDashboardOverview.mockResolvedValue(makeOverview())
+    const wrapper = mount(Dashboard)
+    await flushPromises()
+
+    const initialCallCount = appApi.getDashboardOverview.mock.calls.length
+    expect(initialCallCount).toBeGreaterThanOrEqual(1)
+
+    const callsBefore = appApi.getDashboardOverview.mock.calls.length
+
+    // Trigger external profile switch event
+    window.dispatchEvent(new CustomEvent('profile-switched', { detail: { profileId: 'prof-2' } }))
+    await flushPromises()
+
+    expect(appApi.getDashboardOverview.mock.calls.length).toBeGreaterThan(callsBefore)
+
+    const callsBeforeSettings = appApi.getDashboardOverview.mock.calls.length
+    // Trigger settings-updated event
+    window.dispatchEvent(new CustomEvent('settings-updated'))
+    await flushPromises()
+
+    expect(appApi.getDashboardOverview.mock.calls.length).toBeGreaterThan(callsBeforeSettings)
+
+    wrapper.unmount()
+  })
 })

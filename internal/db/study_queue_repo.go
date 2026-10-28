@@ -488,9 +488,9 @@ func (r *Repository) SaveQuizAttemptTx(tx *sql.Tx, attempt models.QuizAttemptRec
 		return fmt.Errorf("nil tx passed to SaveQuizAttemptTx")
 	}
 	_, err := tx.Exec(`
-	INSERT INTO quiz_attempts (id, task_id, score, passed, answers_json, feedback, completed_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
-`, attempt.ID, attempt.TaskID, attempt.Score, boolToInt(attempt.Passed), attempt.AnswersJSON, attempt.Feedback, attempt.CompletedAt)
+	INSERT INTO quiz_attempts (id, task_id, score, passed, answers_json, feedback, reflection_text, reflection_feedback, completed_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, attempt.ID, attempt.TaskID, attempt.Score, boolToInt(attempt.Passed), attempt.AnswersJSON, attempt.Feedback, attempt.ReflectionText, attempt.ReflectionFeedback, attempt.CompletedAt)
 	return err
 }
 

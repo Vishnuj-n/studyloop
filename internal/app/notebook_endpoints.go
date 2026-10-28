@@ -1328,6 +1328,9 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 
 	if daysRemaining <= 0 && remainingSessions > 0 {
 		feasibilityStatus = "DEADLINE_PASSED"
+	} else if remainingSessions > remainingWindows {
+		// Capacity deficit takes precedence over historical velocity
+		feasibilityStatus = "UNCOVERED_WORKLOAD"
 	} else if sessionsPast7Days < 2 {
 		feasibilityStatus = "NO_DATA"
 	} else {
@@ -1343,9 +1346,7 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 			requiredWeeklyPace = float64(remainingSessions) / (float64(daysRemaining) / 7.0)
 		}
 
-		if remainingSessions > remainingWindows {
-			feasibilityStatus = "UNCOVERED_WORKLOAD"
-		} else if float64(sessionsPast7Days) < requiredWeeklyPace {
+		if float64(sessionsPast7Days) < requiredWeeklyPace {
 			feasibilityStatus = "AT_RISK"
 		} else {
 			feasibilityStatus = "ON_TRACK"

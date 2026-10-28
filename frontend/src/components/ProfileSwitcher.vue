@@ -125,6 +125,48 @@ function profilePaceBadge(profile) {
   }
 
   const status = pace.feasibility_status
+  if (status === 'DEADLINE_PASSED') {
+    return {
+      text: 'Deadline passed',
+      class: 'pace-behind',
+    }
+  }
+  if (status === 'UNCOVERED_WORKLOAD') {
+    const uncovered = pace.uncovered_sessions
+    return {
+      text: uncovered ? `${uncovered} uncovered` : 'Uncovered workload',
+      class: 'pace-behind',
+    }
+  }
+  if (status === 'AT_RISK') {
+    return {
+      text: 'At risk',
+      class: 'pace-behind',
+    }
+  }
+  if (status === 'ON_TRACK') {
+    if (pace.deadline && pace.projected_finish) {
+      try {
+        const d1 = new Date(pace.deadline).setHours(0, 0, 0, 0)
+        const d2 = new Date(pace.projected_finish).setHours(0, 0, 0, 0)
+        const diffDays = Math.round((d1 - d2) / 86400000)
+        if (diffDays > 0) {
+          return {
+            text: `${diffDays}d ahead`,
+            class: 'pace-ahead',
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return {
+      text: 'On track',
+      class: 'pace-ontrack',
+    }
+  }
+
+  // Legacy fallback
   const gap = pace.days_gap
   const gapFormatted = gap !== undefined ? (gap % 1 === 0 ? Math.abs(gap) : Math.abs(Number(gap.toFixed(1)))) : 0
 
@@ -138,12 +180,6 @@ function profilePaceBadge(profile) {
     return {
       text: `${gapFormatted}d ahead`,
       class: 'pace-ahead',
-    }
-  }
-  if (status === 'ON_TRACK') {
-    return {
-      text: 'On track',
-      class: 'pace-ontrack',
     }
   }
   return null
