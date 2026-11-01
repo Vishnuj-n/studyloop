@@ -37,6 +37,7 @@ func CheckReadiness(ctx context.Context, ext *Extension) ReadinessStatus {
 			Error:   "extension is nil",
 		}
 	}
+	ext.EnsureManifestLoaded()
 
 	status := ReadinessStatus{
 		ID:      ext.ID(),
@@ -53,7 +54,7 @@ func CheckReadiness(ctx context.Context, ext *Extension) ReadinessStatus {
 		return status
 	}
 
-	// For Python runtime: check virtual environment and smoke test
+	// For Python runtime: check virtual environment, fingerprint, and smoke test
 	if runtimeType == "python" || runtimeType == "py" {
 		venvDir := ResolveExtensionVenvDir(ext)
 		status.VenvPath = venvDir
@@ -65,6 +66,14 @@ func CheckReadiness(ctx context.Context, ext *Extension) ReadinessStatus {
 			status.IsReady = false
 			status.NeedsSetup = true
 			status.Message = "Virtual environment not initialized"
+			return status
+		}
+
+		// Check if virtual environment is stale (manifest version bump or requirements modified)
+		if isStale, _, reason := IsExtensionVenvStale(ext, venvDir); isStale {
+			status.IsReady = false
+			status.NeedsSetup = true
+			status.Message = reason
 			return status
 		}
 
@@ -147,6 +156,7 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	if ext == nil {
 		return fmt.Errorf("cannot setup nil extension")
 	}
+	ext.EnsureManifestLoaded()
 
 	uvPath, err := FindUVExecutable()
 	if err != nil {
@@ -167,6 +177,16 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 
 	logLine(fmt.Sprintf("Using uv engine: %s", uvPath))
 	logLine(fmt.Sprintf("Configuring isolated environment in: %s", venvDir))
+
+	currentFp := ComputeFingerprint(ext)
+
+	// Check if existing environment has a major version change; if so, recreate from scratch
+	if oldFp, err := ReadFingerprint(venvDir); err == nil {
+		if ShouldRecreateVenv(oldFp.ManifestVersion, currentFp.ManifestVersion) {
+			logLine(fmt.Sprintf("Extension major version changed (%s -> %s). Recreating virtual environment from scratch...", oldFp.ManifestVersion, currentFp.ManifestVersion))
+			_ = os.RemoveAll(venvDir)
+		}
+	}
 
 	// Validate that existing .venv was created with the selected Python interpreter
 	pyvenvCfg := filepath.Join(venvDir, "pyvenv.cfg")
@@ -206,7 +226,6 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	}
 
 	// 1. Create venv with uv (uv venv <venvDir> --allow-existing --system-site-packages)
-	// uv automatically detects system Python and reuses already-installed global packages (e.g. yt-dlp, edge-tts)
 	logLine("Step 1/3: Initializing Python virtual environment...")
 	absExtDir, _ := filepath.Abs(ext.Dir)
 	absVenvDir, _ := filepath.Abs(venvDir)
@@ -231,12 +250,12 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 	}
 	logLine("[OK] Python virtual environment created successfully.")
 
-	// 2. Install requirements if requirements.txt exists
+	// 2. Install / upgrade requirements if requirements.txt exists
 	reqPath := filepath.Join(ext.Dir, "requirements.txt")
 	if info, err := os.Stat(reqPath); err == nil && !info.IsDir() {
 		logLine("Step 2/3: Installing extension dependencies from requirements.txt...")
 		absReqPath, _ := filepath.Abs(reqPath)
-		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--python", absVenvDir, "-r", absReqPath)
+		pipCmd := exec.CommandContext(ctx, uvPath, "pip", "install", "--upgrade", "--python", absVenvDir, "-r", absReqPath)
 		pipCmd.Dir = absExtDir
 		hideConsoleWindow(pipCmd)
 
@@ -287,6 +306,13 @@ func SetupExtensionEnv(ctx context.Context, ext *Extension, onLog func(line stri
 			return ErrSetupCanceled
 		}
 		return fmt.Errorf("extension self-test failed after installation: %w", err)
+	}
+
+	// Save environment fingerprint on successful verification
+	if err := WriteFingerprint(venvDir, currentFp); err != nil {
+		logLine(fmt.Sprintf("[WARN] Failed to write environment fingerprint: %v", err))
+	} else {
+		logLine("[OK] Environment fingerprint saved.")
 	}
 
 	logLine("[OK] Extension verified and ready!")

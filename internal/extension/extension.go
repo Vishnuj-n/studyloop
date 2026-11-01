@@ -1,7 +1,9 @@
 package extension
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -87,4 +89,45 @@ func (e *Extension) Entrypoint() string {
 // EntrypointPath returns the absolute path to the extension's entrypoint.
 func (e *Extension) EntrypointPath() string {
 	return filepath.Join(e.Dir, e.Manifest.Entrypoint)
+}
+
+// EnsureManifestLoaded reads and populates Manifest from ext.Dir/manifest.json if Version or ID is not set.
+func (e *Extension) EnsureManifestLoaded() {
+	if e == nil || e.Dir == "" {
+		return
+	}
+	if e.Manifest.Version != "" && e.Manifest.ID != "" && e.Manifest.Runtime != "" {
+		return
+	}
+	manifestPath := filepath.Join(e.Dir, "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err == nil {
+		var m Manifest
+		if jsonErr := json.Unmarshal(data, &m); jsonErr == nil {
+			if e.Manifest.ID == "" {
+				e.Manifest.ID = m.ID
+			}
+			if e.Manifest.Name == "" {
+				e.Manifest.Name = m.Name
+			}
+			if e.Manifest.Version == "" {
+				e.Manifest.Version = m.Version
+			}
+			if e.Manifest.Runtime == "" {
+				e.Manifest.Runtime = m.Runtime
+			}
+			if e.Manifest.Entrypoint == "" {
+				e.Manifest.Entrypoint = m.Entrypoint
+			}
+			if e.Manifest.Tier == "" {
+				e.Manifest.Tier = m.Tier
+			}
+			if e.Manifest.Description == "" {
+				e.Manifest.Description = m.Description
+			}
+			if e.Manifest.Category == "" {
+				e.Manifest.Category = m.Category
+			}
+		}
+	}
 }

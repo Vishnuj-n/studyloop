@@ -11,6 +11,7 @@ import (
 
 	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/extension"
+	"ai-tutor/internal/utils"
 )
 
 // AudioChunk represents a synthesized audio chunk streamed to the client.
@@ -244,6 +245,18 @@ func (s *StudyService) GenerateAudioOverview(
 		Manifest: extension.Manifest{ID: "audio_overview", Name: "Audio Overview", Runtime: "python", Entrypoint: "edge_tts_stream.py"},
 		Dir:      filepath.Join(extDir, "audio_overview"),
 	}
+	audioExt.EnsureManifestLoaded()
+
+	venvDir := extension.ResolveExtensionVenvDir(audioExt)
+	if isStale, _, reason := extension.IsExtensionVenvStale(audioExt, venvDir); isStale {
+		utils.Infof("[AudioOverview] Environment is out of date (%s). Updating with uv...", reason)
+		if setupErr := extension.SetupExtensionEnv(ctx, audioExt, func(line string) {
+			utils.Infof("[AudioOverview Setup] %s", line)
+		}); setupErr != nil {
+			return fmt.Errorf("failed to update Audio Overview environment: %w", setupErr)
+		}
+	}
+
 	pythonPath, err := extension.FindExtensionPython(audioExt)
 	if err != nil {
 		return fmt.Errorf("python executable not found for Audio Overview: %w", err)
