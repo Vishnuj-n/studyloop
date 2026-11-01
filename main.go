@@ -54,7 +54,7 @@ func main() {
 		OnStartup:        a.Startup,
 		OnShutdown:       a.Shutdown,
 		Debug: options.Debug{
-			OpenInspectorOnStartup: false,
+			OpenInspectorOnStartup: true,
 		},
 		Bind: []interface{}{
 			a,

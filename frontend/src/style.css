@@ -296,3 +296,13 @@ select option {
 }
 
 
+
+/* Pause animations ONLY when window is minimized/hidden — zero style recalculation overhead when visible */
+body.window-hidden * {
+  animation-play-state: paused !important;
+}
+
+body.window-hidden .spinner,
+body.window-hidden .generating-spinner {
+  animation-play-state: running !important;
+}

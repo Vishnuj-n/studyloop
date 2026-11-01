@@ -424,6 +424,16 @@ function handleOpenLauncherFromEvent() {
 let cancelIngestionListener = null
 let cancelUpdateProgressListener = null
 
+function handleVisibilityChange() {
+  if (typeof document !== 'undefined' && document.body) {
+    if (document.hidden) {
+      document.body.classList.add('window-hidden')
+    } else {
+      document.body.classList.remove('window-hidden')
+    }
+  }
+}
+
 onMounted(() => {
   initClerk()
   syncScheduler()
@@ -448,6 +458,8 @@ onMounted(() => {
     })
   }
   window.addEventListener('study-reward-earned', handleStudyReward)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  handleVisibilityChange()
 })
 
 onUnmounted(() => {
@@ -461,6 +473,7 @@ onUnmounted(() => {
   if (cancelIngestionListener) cancelIngestionListener()
   if (cancelUpdateProgressListener) cancelUpdateProgressListener()
   if (EventsOff) EventsOff('update:progress')
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

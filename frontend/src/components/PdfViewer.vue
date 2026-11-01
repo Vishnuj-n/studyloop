@@ -17,8 +17,8 @@
         :style="{ height: pageSlotHeight + 'px', marginBottom: PAGE_GAP + 'px' }"
       >
         <PdfPage
-          v-if="isPageActive(pg)"
-          :source="source"
+          v-if="isPageActive(pg) && (doc || !source)"
+          :source="doc || source"
           :page-num="pg"
           :width="containerWidth"
           @rendered="onPageRendered(pg)"
@@ -32,6 +32,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { usePdfDocument } from 'vue-pdf-embed'
 import PdfPage from './PdfPage.vue'
 
 const props = defineProps({
@@ -47,10 +48,16 @@ const props = defineProps({
 
 const emit = defineEmits(['update:currentPage', 'load-error', 'rendered'])
 
+// Shared single PDF document proxy across all virtualized page slots
+const { doc } = usePdfDocument({
+  source: () => props.source,
+  onError: onLoadError,
+})
+
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const BASE_WIDTH = 800
 const PAGE_GAP = 20
-const BUFFER = 3 // render activePage ± BUFFER pages (3 above, current, 3 below = 7 active pages)
+const BUFFER = 1 // render activePage ± BUFFER pages (1 above, current, 1 below = 3 active pages max)
 
 // ─── History Stack for Back Navigation ──────────────────────────────────────────
 const historyStack = ref([])
