@@ -3,7 +3,9 @@ package study
 import (
 	"fmt"
 	"strings"
-	"sync"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"ai-tutor/internal/models"
 )
@@ -472,7 +474,6 @@ type PromptRepository interface {
 // PromptService provides centralized, safe prompt management and multilingual rendering.
 type PromptService struct {
 	repo PromptRepository
-	mu   sync.RWMutex
 }
 
 // NewPromptService creates a new PromptService instance.
@@ -601,7 +602,8 @@ func (s *PromptService) BuildPrompt(category string, placeholders map[string]str
 
 	// Inject language instruction if not English
 	if outputLang != "english" {
-		langInstruction := fmt.Sprintf(LanguageInstructionTemplate, strings.Title(outputLang))
+		titleCaser := cases.Title(language.English)
+		langInstruction := fmt.Sprintf(LanguageInstructionTemplate, titleCaser.String(outputLang))
 		rendered = rendered + "\n\n" + langInstruction
 	}
 

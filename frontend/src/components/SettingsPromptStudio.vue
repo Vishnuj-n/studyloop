@@ -1191,7 +1191,7 @@ onMounted(() => {
 
 .custom-tag {
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: var(--amber-high-contrast, #b45309);
 }
 
 /* Editor Subhead */
@@ -1227,7 +1227,7 @@ onMounted(() => {
   font-size: 0.68rem;
   padding: 0.1rem 0.4rem;
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: var(--green-high-contrast, #059669);
   border-radius: 3px;
 }
 
@@ -1261,7 +1261,7 @@ onMounted(() => {
   justify-content: center;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  color: var(--red-high-contrast, #dc2626);
   border-radius: 5px;
   padding: 0.25rem 0.4rem;
   cursor: pointer;
@@ -1303,7 +1303,7 @@ onMounted(() => {
   border-radius: 4px;
   padding: 0.15rem 0.4rem;
   font-size: 0.72rem;
-  color: #cbd5e1;
+  color: var(--on-surface-variant, #94a3b8);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1494,7 +1494,7 @@ onMounted(() => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.78rem;
   line-height: 1.55;
-  color: #cbd5e1;
+  color: var(--on-surface-variant, #94a3b8);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1596,7 +1596,7 @@ onMounted(() => {
   border-radius: 4px;
   padding: 0.25rem 0.55rem;
   font-size: 0.72rem;
-  color: #cbd5e1;
+  color: var(--on-surface-variant, #94a3b8);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -1610,7 +1610,7 @@ onMounted(() => {
 .assignment-toggle-btn.assigned-active {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  color: var(--green-high-contrast, #059669);
 }
 
 .guardrail-footer {

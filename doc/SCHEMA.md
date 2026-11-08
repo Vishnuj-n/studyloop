@@ -14,7 +14,7 @@ Generated from + must stay synchronized with `internal/db/schema.go`. Every `CRE
 | Content       | `notebooks`, `topics`, `chunks`, `notebook_topics`, `notebook_chunks`, `topic_progress` |
 | Assessment    | `quiz_attempts`, `reread_attempts`, `written_questions`, `written_user_answers`         |
 | Retention     | `fsrs_cards`, `fsrs_review_log`, `manual_flashcards`                                    |
-| Configuration | `user_settings`, `llm_settings`, `study_profiles`                                       |
+| Configuration | `user_settings`, `llm_settings`, `study_profiles`, `custom_task_prompts`, `prompt_notebook_assignments` |
 | Gamification  | `user_gamification`, `pending_loot_boxes`                                               |
 | Utility       | `internal/utils/hash.go` — `CleanTopicTitle`, `MD5Hex`, `FileSHA256`                    |
 | Analytics     | `analytics_events`                                                                      |
@@ -387,6 +387,7 @@ Singleton table for global preferences.
 | `log_level` | TEXT NOT NULL DEFAULT 'INFO' | Active diagnostic logging threshold (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `prompt_compression_mode` | TEXT NOT NULL DEFAULT 'OVER_LIMIT' | Background prompt compression mode (`OVER_LIMIT`, `ALWAYS`, `DISABLED`) |
 | `prompt_compression_rate` | REAL NOT NULL DEFAULT 0.80 | Compression rate / preserved token retention factor (0.1 to 1.0) |
+| `preferred_language` | TEXT NOT NULL DEFAULT 'english' | User preferred study language for AI responses and task instructions |
 | `auto_generate_study_notes` | BOOLEAN DEFAULT 0 | Automatic post-compression study note generation toggle |
 | `notes_detail_level` | TEXT NOT NULL DEFAULT 'briefing' | Summary format variant (`briefing`, `exec_summary`, `concept_card`, `cheatsheet`, `feynman`, `detailed`) |
 | `notes_model_tier` | TEXT NOT NULL DEFAULT 'fast' | LLM performance tier used for study notes generation (`fast` or `heavy`) |
@@ -435,6 +436,44 @@ LLM provider config per performance tier.
 ```
 ('fast',  'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 60000, 'keyring', 0)
 ('heavy', 'groq', 'https://api.groq.com/openai/v1', 'openai/gpt-oss-120b', 90000, 'keyring', 0)
+```
+
+### `custom_task_prompts`
+
+Custom user-defined and system prompt templates across study workflows.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | TEXT PRIMARY KEY | Unique prompt variant identifier |
+| `category` | TEXT NOT NULL | Prompt workflow category (e.g. `quiz_generator`, `flashcard_generator`, `study_notes`, `socratic_tutor`, `simplifier`, `reader_ai`) |
+| `name` | TEXT NOT NULL | Human-readable variant name |
+| `template` | TEXT NOT NULL | Raw prompt template containing placeholder variables |
+| `is_active` | BOOLEAN NOT NULL DEFAULT 0 | Whether variant is active globally for its category |
+| `is_system` | BOOLEAN NOT NULL DEFAULT 0 | 1 if immutable/seeded system default prompt, 0 if user created |
+| `created_at` | INTEGER NOT NULL | Unix epoch creation timestamp |
+| `updated_at` | INTEGER NOT NULL | Unix epoch last update timestamp |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_custom_task_prompts_category ON custom_task_prompts(category);
+```
+
+### `prompt_notebook_assignments`
+
+Scoped overrides mapping notebooks (books) to specific prompt variants.
+
+| Field | Type | Description |
+|---|---|---|
+| `notebook_id` | TEXT NOT NULL | Target notebook identifier |
+| `category` | TEXT NOT NULL | Prompt workflow category |
+| `variant_id` | TEXT NOT NULL | Prompt variant identifier |
+| `updated_at` | INTEGER NOT NULL | Unix epoch assignment update timestamp |
+
+**Primary key:** `(notebook_id, category)`
+
+**Indexes:**
+```sql
+CREATE INDEX idx_prompt_notebook_assignments_category ON prompt_notebook_assignments(category);
 ```
 
 ### `study_profiles`
