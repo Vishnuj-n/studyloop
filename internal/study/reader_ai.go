@@ -66,8 +66,17 @@ func (s *StudyService) AnswerReaderQuestion(req ReaderAIRequest) map[string]inte
 
 	limits := llm.GetLimits()
 
-	// Compute overhead (template + student question + scope label)
-	templateOverhead := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
+	// Compute overhead from unified template with empty context or fallback
+	var templatePrompt string
+	if s.promptService != nil {
+		templatePrompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryReaderQA, map[string]string{
+			"{CONTENT}":  "",
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		}, req.NotebookID)
+	}
+	if templatePrompt == "" {
+		templatePrompt = fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
 Use the retrieved reading material below to answer the student's question.
 If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
 
@@ -84,8 +93,9 @@ Selected retrieval scope: %s
 Student question: %s
 
 Answer:`, scopeLabel, req.Question)
+	}
 
-	overheadTokens, err := embeddings.CountTokens(templateOverhead)
+	overheadTokens, err := embeddings.CountTokens(templatePrompt)
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to count prompt overhead tokens: %v", err)}
 	}
@@ -107,11 +117,11 @@ Answer:`, scopeLabel, req.Question)
 	var prompt string
 	if s.promptService != nil {
 		var pErr error
-		prompt, pErr = s.promptService.BuildPrompt(PromptCategoryReaderQA, map[string]string{
+		prompt, pErr = s.promptService.BuildPromptWithScope(PromptCategoryReaderQA, map[string]string{
 			"{CONTENT}":  contextText,
 			"{QUESTION}": req.Question,
 			"{TOPIC}":    scopeLabel,
-		})
+		}, req.NotebookID)
 		if pErr != nil {
 			prompt = ""
 		}

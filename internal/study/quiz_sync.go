@@ -776,13 +776,20 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 
 
 
+	notebookID := ""
+	if s.repo != nil {
+		if resolvedID, rErr := s.repo.GetNotebookIDByTopic(topicID); rErr == nil {
+			notebookID = resolvedID
+		}
+	}
+
 	var templatePrompt string
 	if s.promptService != nil {
-		templatePrompt, _ = s.promptService.BuildPrompt(PromptCategoryQuiz, map[string]string{
+		templatePrompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryQuiz, map[string]string{
 			"{CONTENT}":       "",
 			"{NUM_QUESTIONS}": fmt.Sprintf("%d", userQuizCount),
 			"{TOPIC}":         notebookTitle,
-		})
+		}, notebookID)
 	}
 	if templatePrompt == "" {
 		templatePrompt = buildQuizPrompt(notebookTitle, userQuizCount, nil)
@@ -809,11 +816,11 @@ func (s *StudyService) GenerateQuizSync(topicID string, chunkIDs []string, chunk
 	joinedContext := strings.Join(ctxRes.contextParts, "\n")
 	var prompt string
 	if s.promptService != nil {
-		prompt, _ = s.promptService.BuildPrompt(PromptCategoryQuiz, map[string]string{
+		prompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryQuiz, map[string]string{
 			"{CONTENT}":       joinedContext,
 			"{NUM_QUESTIONS}": fmt.Sprintf("%d", userQuizCount),
 			"{TOPIC}":         notebookTitle,
-		})
+		}, notebookID)
 	}
 	if prompt == "" {
 		prompt = buildQuizPrompt(notebookTitle, userQuizCount, ctxRes.contextParts)

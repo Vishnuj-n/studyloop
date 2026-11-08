@@ -460,6 +460,7 @@ type PromptRepository interface {
 	GetPreferredLanguage() (string, error)
 	SetPreferredLanguage(lang string) error
 	GetActiveCustomPrompt(category string) (string, error)
+	GetAssignedPromptTemplate(notebookID, category string) (string, error)
 	GetPromptVariants(category string) ([]models.CustomTaskPromptVariant, error)
 	GetAllPromptVariants() ([]models.CustomTaskPromptVariant, error)
 	SavePromptVariant(v models.CustomTaskPromptVariant) error
@@ -536,9 +537,16 @@ func (s *PromptService) GetDefaultTemplate(category string) (string, error) {
 	return tmpl, nil
 }
 
-// GetTemplate returns the active template for a category (active variant if set, otherwise default).
-func (s *PromptService) GetTemplate(category string) (string, error) {
+// GetTemplate returns the active template for a category.
+// If notebookID is provided and has an assigned template override, it takes precedence.
+func (s *PromptService) GetTemplate(category string, notebookID ...string) (string, error) {
 	if s.repo != nil {
+		if len(notebookID) > 0 && strings.TrimSpace(notebookID[0]) != "" {
+			assigned, err := s.repo.GetAssignedPromptTemplate(strings.TrimSpace(notebookID[0]), category)
+			if err == nil && strings.TrimSpace(assigned) != "" {
+				return assigned, nil
+			}
+		}
 		custom, err := s.repo.GetActiveCustomPrompt(category)
 		if err == nil && strings.TrimSpace(custom) != "" {
 			return custom, nil
@@ -569,7 +577,12 @@ func (s *PromptService) ResetToDefault(category string) error {
 // BuildPrompt renders the prompt for a given category with placeholder substitution and multilingual support.
 // If lang is empty, it uses the user's preferred language from repository.
 func (s *PromptService) BuildPrompt(category string, placeholders map[string]string, lang ...string) (string, error) {
-	template, err := s.GetTemplate(category)
+	return s.BuildPromptWithScope(category, placeholders, "", lang...)
+}
+
+// BuildPromptWithScope renders the prompt for a given category scoped to a specific notebook if assigned.
+func (s *PromptService) BuildPromptWithScope(category string, placeholders map[string]string, notebookID string, lang ...string) (string, error) {
+	template, err := s.GetTemplate(category, notebookID)
 	if err != nil {
 		return "", err
 	}
@@ -612,22 +625,32 @@ func (s *PromptService) BuildPrompt(category string, placeholders map[string]str
 
 // renderPlaceholders performs single-pass replacement of placeholders without recursion vulnerabilities.
 func renderPlaceholders(template string, placeholders map[string]string) string {
-	res := template
-	// Replace standard uppercase placeholders
+	seenKeys := make(map[string]bool)
+	var pairs []string
+
+	// Add supplied placeholders first so they take precedence
 	for k, v := range placeholders {
-		keyUpper := k
-		if !strings.HasPrefix(keyUpper, "{") {
-			keyUpper = "{" + keyUpper + "}"
+		key := k
+		if !strings.HasPrefix(key, "{") {
+			key = "{" + key + "}"
 		}
-		res = strings.ReplaceAll(res, keyUpper, v)
+		seenKeys[key] = true
+		pairs = append(pairs, key, v)
 	}
 
 	// Clean up any remaining unpopulated optional placeholders gracefully
 	for _, spec := range CategorySpecs {
 		for _, opt := range spec.OptionalPlaceholders {
-			res = strings.ReplaceAll(res, opt, "")
+			if !seenKeys[opt] {
+				seenKeys[opt] = true
+				pairs = append(pairs, opt, "")
+			}
 		}
 	}
 
-	return res
+	if len(pairs) == 0 {
+		return template
+	}
+	replacer := strings.NewReplacer(pairs...)
+	return replacer.Replace(template)
 }

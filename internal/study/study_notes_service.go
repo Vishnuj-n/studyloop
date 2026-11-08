@@ -607,13 +607,41 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 	topicHeader := tTitle + sectionContext
 	var prompt string
 	if s.promptService != nil {
-		var pErr error
-		prompt, pErr = s.promptService.BuildPrompt(PromptCategoryNotes, map[string]string{
-			"{CONTENT}": referenceText,
-			"{TOPIC}":   topicHeader,
-		})
-		if pErr != nil {
-			prompt = ""
+		// If notebook assignment exists or user has a custom active variant, use that variant.
+		// If on system default, select the preset template matching detailLevel.
+		categoryTmpl, _ := s.promptService.GetTemplate(PromptCategoryNotes, nbID)
+		matchedPreset := getPresetForDetailLevel(detailLevel)
+		if matchedPreset != "" {
+			variants, _ := s.repo.GetPromptVariants(PromptCategoryNotes)
+			hasCustomActive := false
+			for _, v := range variants {
+				if v.IsActive && !v.IsSystem {
+					hasCustomActive = true
+					break
+				}
+			}
+			assignments, _ := s.repo.GetPromptAssignmentsForCategory(PromptCategoryNotes)
+			hasNotebookAssignment := nbID != "" && assignments != nil && assignments[nbID] != ""
+			if !hasCustomActive && !hasNotebookAssignment {
+				categoryTmpl = matchedPreset
+			}
+		}
+
+		if categoryTmpl != "" {
+			rendered := renderPlaceholders(categoryTmpl, map[string]string{
+				"{CONTENT}": referenceText,
+				"{TOPIC}":   topicHeader,
+			})
+			prefLang := "english"
+			if s.repo != nil {
+				if l, err := s.repo.GetPreferredLanguage(); err == nil {
+					prefLang = NormalizeLanguage(l)
+				}
+			}
+			if prefLang != "english" {
+				rendered = rendered + "\n\n" + fmt.Sprintf(LanguageInstructionTemplate, strings.Title(prefLang))
+			}
+			prompt = rendered
 		}
 	}
 	if prompt == "" {
@@ -1199,4 +1227,47 @@ func (s *StudyService) SaveNoteImage(topicID, notebookID, fileName string, fileD
 	relPath := fmt.Sprintf("assets/%s", uniqueName)
 	relFolder := s.GetTopicRelativeFolder(topicID, notebookID)
 	return relPath, relFolder, nil
+}
+
+func getPresetForDetailLevel(detailLevel string) string {
+	presets := BuiltInPresets[PromptCategoryNotes]
+	switch strings.ToLower(strings.TrimSpace(detailLevel)) {
+	case "briefing":
+		for _, p := range presets {
+			if p.ID == "notes_briefing" {
+				return p.Template
+			}
+		}
+	case "exec_summary", "concise":
+		for _, p := range presets {
+			if p.ID == "notes_exec_summary" {
+				return p.Template
+			}
+		}
+	case "concept_card":
+		for _, p := range presets {
+			if p.ID == "notes_concept_card" {
+				return p.Template
+			}
+		}
+	case "cheatsheet":
+		for _, p := range presets {
+			if p.ID == "notes_cheatsheet" {
+				return p.Template
+			}
+		}
+	case "feynman":
+		for _, p := range presets {
+			if p.ID == "notes_feynman" {
+				return p.Template
+			}
+		}
+	case "detailed":
+		for _, p := range presets {
+			if p.ID == "notes_detailed" {
+				return p.Template
+			}
+		}
+	}
+	return ""
 }

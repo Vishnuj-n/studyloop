@@ -39,9 +39,12 @@ jobs:
           install-mode: goinstall
           args: --timeout=5m ./...
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
       - name: Run Go tests
         if: success() || failure()
-        run: go test -v -count=1 -race . ./internal/...
+        run: gotestsum --format pkgname-and-test-fails -- -count=1 -race . ./internal/...
 
   frontend:
     name: Frontend (Node Lint, Test & Build)
@@ -87,7 +90,7 @@ jobs:
 
       - name: Test frontend
         if: success() || failure()
-        run: npm test
+        run: npm test -- --reporter=dot --reporter=github-actions
         working-directory: frontend
 
       - name: Build frontend production bundle

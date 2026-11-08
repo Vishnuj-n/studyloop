@@ -268,9 +268,10 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	if s.retrievalEngine == nil {
 		return nil, fmt.Errorf("retrieval engine not initialized")
 	}
-	// ponytail: check for active remedial task and retrieve failed questions payload
+	// Check for active remedial task and retrieve failed questions payload ONLY on turn 1
+	// (when conversation history is empty), so subsequent turns are not polluted with redundant failure dumps.
 	var failedQuestionsSummary string
-	if topicID != "" {
+	if topicID != "" && len(conversationHistory) == 0 {
 		if payloadJSON, err := s.repo.GetActiveRemedialTaskPayloadByTopic(topicID); err == nil && payloadJSON != "" {
 			var payload struct {
 				FailedQuestions []models.FailedQuestionDetail `json:"failed_questions"`
@@ -362,6 +363,14 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	// and the student question.
 	limits := llm.GetLimits()
 
+	// Resolve topic title for prompt display
+	topicTitle := topicID
+	if s.repo != nil && topicID != "" {
+		if t, tErr := s.repo.GetTopic(topicID); tErr == nil && t != nil && t.Title != "" {
+			topicTitle = t.Title
+		}
+	}
+
 	// Build conversation history block for the prompt
 	// Calculate baseline instructions tokens to establish the remaining history budget
 	instructionsOnlyText := strings.Join([]string{
@@ -375,8 +384,18 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		return nil, fmt.Errorf("error calculating prompt tokens: %w", err)
 	}
 
-	// History budget should leave space for context (e.g. 1500 tokens) and safety margin (100 tokens)
-	historyBudget := limits.MaxInputTokens - instructionsTokens - 1500 - 100
+	// History budget: dynamically scaled based on user-configured limits.MaxInputTokens.
+	// Reserve ~30% for retrieved textbook context (clamped between 800 and 2500 tokens)
+	// and a safety margin (100 tokens), allowing conversation history to naturally expand
+	// when larger model context limits are configured.
+	contextReserve := int(float64(limits.MaxInputTokens) * 0.30)
+	if contextReserve > 2500 {
+		contextReserve = 2500
+	} else if contextReserve < 800 {
+		contextReserve = 800
+	}
+
+	historyBudget := limits.MaxInputTokens - instructionsTokens - contextReserve - 100
 	if historyBudget < 0 {
 		historyBudget = 0
 	}
@@ -439,6 +458,9 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	var socraticPrompt string
 	if s.promptService != nil {
 		contentParts := []string{}
+		if socraticInstructions != "" {
+			contentParts = append(contentParts, socraticInstructions)
+		}
 		if failedQuestionsSummary != "" {
 			contentParts = append(contentParts, failedQuestionsSummary)
 		}
@@ -450,11 +472,11 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 		}
 		fullContent := strings.Join(contentParts, "\n\n")
 		var pErr error
-		socraticPrompt, pErr = s.promptService.BuildPrompt(PromptCategoryTutorDuck, map[string]string{
+		socraticPrompt, pErr = s.promptService.BuildPromptWithScope(PromptCategoryTutorDuck, map[string]string{
 			"{CONTENT}":  fullContent,
 			"{QUESTION}": question,
-			"{TOPIC}":    topicID,
-		})
+			"{TOPIC}":    topicTitle,
+		}, notebookID)
 		if pErr != nil {
 			socraticPrompt = ""
 		}

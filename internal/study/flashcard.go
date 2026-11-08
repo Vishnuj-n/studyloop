@@ -149,29 +149,9 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	}
 
 	// Build prompt with token budgeting
-	prompt, promptTokenCount, includedChunkIDs := buildMarathonFlashcardPromptWithBudget(notebookTitle, startPage, endPage, contextChunks, maxInputTokens)
+	prompt, promptTokenCount, includedChunkIDs := s.buildMarathonFlashcardPromptWithServiceBudget(notebookID, notebookTitle, startPage, endPage, contextChunks, maxInputTokens)
 	if len(includedChunkIDs) == 0 {
 		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
-	}
-
-	// If promptService is configured, re-render using unified prompt
-	if s.promptService != nil {
-		var contentBuilder strings.Builder
-		for _, chunk := range contextChunks {
-			for _, incID := range includedChunkIDs {
-				if chunk.ChunkID == incID {
-					fmt.Fprintf(&contentBuilder, "[Page %d]\n%s\n\n", chunk.PageNum, strings.TrimSpace(chunk.Text))
-					break
-				}
-			}
-		}
-		if unifiedPrompt, pErr := s.promptService.BuildPrompt(PromptCategoryFlashcard, map[string]string{
-			"{CONTENT}":   contentBuilder.String(),
-			"{MAX_CARDS}": "5",
-			"{TOPIC}":     fmt.Sprintf("%s (Pages %d-%d)", notebookTitle, startPage, endPage),
-		}); pErr == nil && unifiedPrompt != "" {
-			prompt = unifiedPrompt
-		}
 	}
 
 	// Log token estimates before generation
@@ -338,4 +318,67 @@ func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage int) 
 	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
 	b.WriteString("\n=== SOURCE CHUNKS ===\n")
 	return b.String()
+}
+
+func (s *StudyService) buildMarathonFlashcardPromptWithServiceBudget(notebookID, notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, maxInputTokens int) (string, int, []string) {
+	topicStr := fmt.Sprintf("%s (Pages %d-%d)", notebookTitle, startPage, endPage)
+	var templatePrompt string
+	if s.promptService != nil {
+		templatePrompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryFlashcard, map[string]string{
+			"{CONTENT}":   "",
+			"{MAX_CARDS}": "5",
+			"{TOPIC}":     topicStr,
+		}, notebookID)
+	}
+	if templatePrompt == "" {
+		templatePrompt = buildFlashcardStaticTemplate(notebookTitle, startPage, endPage)
+	}
+
+	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, templatePrompt)
+	if err != nil || availableBudget < 1000 {
+		availableBudget = 1000
+	}
+
+	currentTokens := 0
+	var includedChunkIDs []string
+	var contentBuilder strings.Builder
+
+	for _, chunk := range contextChunks {
+		text := strings.TrimSpace(chunk.Text)
+		if text == "" {
+			continue
+		}
+		chunkLine := fmt.Sprintf("[Page %d]\n%s\n\n", chunk.PageNum, text)
+		chunkTokens, err := embeddings.CountTokens(chunkLine)
+		if err != nil {
+			chunkTokens = len(strings.Fields(chunkLine))
+		}
+		if currentTokens+chunkTokens > availableBudget {
+			continue
+		}
+		contentBuilder.WriteString(chunkLine)
+		includedChunkIDs = append(includedChunkIDs, chunk.ChunkID)
+		currentTokens += chunkTokens
+	}
+
+	var prompt string
+	if s.promptService != nil {
+		prompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryFlashcard, map[string]string{
+			"{CONTENT}":   contentBuilder.String(),
+			"{MAX_CARDS}": "5",
+			"{TOPIC}":     topicStr,
+		}, notebookID)
+	}
+	if prompt == "" {
+		var b strings.Builder
+		b.WriteString(templatePrompt)
+		b.WriteString(contentBuilder.String())
+		prompt = b.String()
+	}
+
+	actualTokens, err := embeddings.CountTokens(prompt)
+	if err != nil {
+		actualTokens = currentTokens
+	}
+	return prompt, actualTokens, includedChunkIDs
 }

@@ -424,12 +424,18 @@ import {
   setPreferredLanguage
 } from '../services/appApi.js'
 
-defineProps({
+const props = defineProps({
   disabled: {
     type: Boolean,
     default: false
+  },
+  settings: {
+    type: Object,
+    default: () => ({})
   }
 })
+
+const emit = defineEmits(['update-settings'])
 
 const promptCategories = [
   { id: 'notes', label: 'Study Notes', icon: 'book-open' },
@@ -619,7 +625,11 @@ async function revertBookToDefault(bookId) {
   assigningBookId.value = bookId
   actionSuccess.value = ''
   try {
-    await setPromptNotebookAssignment(bookId, activeCategory.value, '')
+    const res = await setPromptNotebookAssignment(bookId, activeCategory.value, '')
+    if (res?.error) {
+      validationError.value = 'Failed reverting book assignment: ' + res.error
+      return
+    }
     await loadTemplates()
     actionSuccess.value = 'Book reverted to Global Active default'
   } catch (err) {
@@ -637,7 +647,11 @@ async function toggleBookAssignment(bookId) {
     const isCurrentlyAssigned = isBookAssignedToCurrentVariant(bookId)
     // If currently assigned, toggle off (pass empty string to revert to global default)
     const newVariantTarget = isCurrentlyAssigned ? '' : selectedVariant.value.id
-    await setPromptNotebookAssignment(bookId, activeCategory.value, newVariantTarget)
+    const res = await setPromptNotebookAssignment(bookId, activeCategory.value, newVariantTarget)
+    if (res?.error) {
+      validationError.value = 'Failed updating book assignment: ' + res.error
+      return
+    }
     await loadTemplates()
     actionSuccess.value = isCurrentlyAssigned
       ? 'Book reverted to Global Active default'
@@ -803,8 +817,14 @@ async function loadLanguage() {
 async function handleLanguageChange() {
   savingLang.value = true
   try {
-    await setPreferredLanguage(selectedLanguage.value)
-    actionSuccess.value = `Study language updated to ${languageDisplayName.value}`
+    const res = await setPreferredLanguage(selectedLanguage.value)
+    if (res?.error) {
+      validationError.value = 'Failed saving language: ' + res.error
+      return
+    }
+    const savedLang = res?.preferred_language || selectedLanguage.value
+    emit('update-settings', { preferred_language: savedLang })
+    actionSuccess.value = 'Study language updated to ' + languageDisplayName.value
   } catch (err) {
     validationError.value = 'Failed saving language: ' + (err.message || err)
   } finally {
@@ -832,6 +852,10 @@ async function saveCurrentEditor() {
     }
 
     const res = await savePromptVariant(variantToSave)
+    if (res?.error) {
+      validationError.value = 'Failed saving variant: ' + res.error
+      return
+    }
     if (res && res.variant) {
       await loadTemplates()
       selectedVariantId.value = res.variant.id
@@ -850,7 +874,11 @@ async function activateCurrentVariant() {
   activatingVariant.value = true
   actionSuccess.value = ''
   try {
-    await setActivePromptVariant(activeCategory.value, selectedVariant.value.id)
+    const res = await setActivePromptVariant(activeCategory.value, selectedVariant.value.id)
+    if (res?.error) {
+      validationError.value = 'Failed activating variant: ' + res.error
+      return
+    }
     await loadTemplates()
     actionSuccess.value = `Activated "${selectedVariant.value.name}" globally for ${promptCategories.find(c => c.id === activeCategory.value)?.label}`
   } catch (err) {
@@ -867,7 +895,11 @@ async function deleteCurrentVariant() {
   deletingVariant.value = true
   actionSuccess.value = ''
   try {
-    await deletePromptVariant(selectedVariant.value.id)
+    const res = await deletePromptVariant(selectedVariant.value.id)
+    if (res?.error) {
+      validationError.value = 'Failed deleting variant: ' + res.error
+      return
+    }
     await loadTemplates()
     actionSuccess.value = 'Variant deleted successfully'
   } catch (err) {
@@ -903,6 +935,10 @@ async function confirmCreateVariant() {
     }
 
     const res = await savePromptVariant(newV)
+    if (res?.error) {
+      validationError.value = 'Failed creating variant: ' + res.error
+      return
+    }
     if (res && res.variant) {
       showNewVariantModal.value = false
       await loadTemplates()
@@ -1676,6 +1712,14 @@ onMounted(() => {
   background: color-mix(in srgb, #10b981 15%, transparent);
   border-color: color-mix(in srgb, #10b981 35%, transparent);
   color: var(--green-high-contrast, #059669);
+}
+
+.default-badge {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted-text);
+  white-space: nowrap;
+  padding: 0.3rem 0.65rem;
 }
 
 .guardrail-footer {

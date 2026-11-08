@@ -62,5 +62,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     pool: 'vmThreads',
+    isolate: false,
   }
 })

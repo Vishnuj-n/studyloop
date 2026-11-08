@@ -8,16 +8,18 @@ import (
 )
 
 type mockPromptRepo struct {
-	prefLang      string
-	customPrompts map[string]string
-	variants      map[string][]models.CustomTaskPromptVariant
+	prefLang        string
+	customPrompts   map[string]string
+	assignedPrompts map[string]string
+	variants        map[string][]models.CustomTaskPromptVariant
 }
 
 func newMockPromptRepo() *mockPromptRepo {
 	return &mockPromptRepo{
-		prefLang:      "english",
-		customPrompts: make(map[string]string),
-		variants:      make(map[string][]models.CustomTaskPromptVariant),
+		prefLang:        "english",
+		customPrompts:   make(map[string]string),
+		assignedPrompts: make(map[string]string),
+		variants:        make(map[string][]models.CustomTaskPromptVariant),
 	}
 }
 
@@ -32,6 +34,15 @@ func (m *mockPromptRepo) SetPreferredLanguage(lang string) error {
 
 func (m *mockPromptRepo) GetActiveCustomPrompt(category string) (string, error) {
 	return m.customPrompts[category], nil
+}
+
+func (m *mockPromptRepo) GetAssignedPromptTemplate(notebookID, category string) (string, error) {
+	if m.assignedPrompts != nil {
+		if tmpl, ok := m.assignedPrompts[notebookID+":"+category]; ok && tmpl != "" {
+			return tmpl, nil
+		}
+	}
+	return m.GetActiveCustomPrompt(category)
 }
 
 func (m *mockPromptRepo) GetPromptVariants(category string) ([]models.CustomTaskPromptVariant, error) {
@@ -214,5 +225,31 @@ func TestPromptService_ResetToDefault(t *testing.T) {
 	activeAfter, _ := svc.GetTemplate(PromptCategoryNotes)
 	if activeAfter != defTmpl {
 		t.Fatalf("expected default template after reset, got %s", activeAfter)
+	}
+}
+
+func TestPromptService_GetTemplate_NotebookOverride(t *testing.T) {
+	repo := newMockPromptRepo()
+	svc := NewPromptService(repo)
+
+	// Setup assigned override for a notebook
+	repo.assignedPrompts["book-123:" + PromptCategoryFlashcard] = "Custom Flashcards for book: {CONTENT} {MAX_CARDS}"
+	repo.customPrompts[PromptCategoryFlashcard] = "Global Flashcards: {CONTENT} {MAX_CARDS}"
+
+	tmpl, err := svc.GetTemplate(PromptCategoryFlashcard, "book-123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(tmpl, "Custom Flashcards for book") {
+		t.Errorf("expected book override, got: %s", tmpl)
+	}
+
+	// Different book should fallback to global active
+	globalTmpl, err := svc.GetTemplate(PromptCategoryFlashcard, "other-book")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(globalTmpl, "Global Flashcards") {
+		t.Errorf("expected global template, got: %s", globalTmpl)
 	}
 }
