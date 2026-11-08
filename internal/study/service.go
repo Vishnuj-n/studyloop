@@ -90,6 +90,7 @@ type Config struct {
 // StudyService owns all study-mode generation and scoring logic.
 type StudyService struct {
 	repo                 *db.Repository
+	promptService        *PromptService
 	fastLLMProvider      LLMProvider
 	heavyLLMProvider     LLMProvider
 	retrievalEngine      *retrieval.Engine
@@ -112,6 +113,7 @@ func NewStudyService(cfg Config) *StudyService {
 	}
 	s := &StudyService{
 		repo:             cfg.Repo,
+		promptService:    NewPromptService(cfg.Repo),
 		heavyLLMProvider: cfg.HeavyLLMProvider,
 		retrievalEngine:  cfg.RetrievalEngine,
 		notesDir:         cfg.NotesDir,
@@ -236,3 +238,9 @@ func (s *StudyService) selectLLM(contextText string) (LLMProvider, string) {
 	}
 	return nil, "none"
 }
+
+// PromptService returns the underlying PromptService instance.
+func (s *StudyService) PromptService() *PromptService {
+	return s.promptService
+}
+

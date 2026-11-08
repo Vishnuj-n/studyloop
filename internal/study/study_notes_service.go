@@ -604,8 +604,22 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 		sectionContext = fmt.Sprintf(" (Pages %d–%d)", startPage, endPage)
 	}
 
-	systemPrompt := getStudyNoteSystemPrompt(detailLevel)
-	prompt := fmt.Sprintf("%s\n\nTopic Title: %s%s\n\nReference Material:\n%s\n\nStructured Study Note:", systemPrompt, tTitle, sectionContext, referenceText)
+	topicHeader := tTitle + sectionContext
+	var prompt string
+	if s.promptService != nil {
+		var pErr error
+		prompt, pErr = s.promptService.BuildPrompt(PromptCategoryNotes, map[string]string{
+			"{CONTENT}": referenceText,
+			"{TOPIC}":   topicHeader,
+		})
+		if pErr != nil {
+			prompt = ""
+		}
+	}
+	if prompt == "" {
+		systemPrompt := getStudyNoteSystemPrompt(detailLevel)
+		prompt = fmt.Sprintf("%s\n\nTopic Title: %s%s\n\nReference Material:\n%s\n\nStructured Study Note:", systemPrompt, tTitle, sectionContext, referenceText)
+	}
 
 	answer, genErr := provider.GenerateAnswer(prompt)
 	if genErr != nil {

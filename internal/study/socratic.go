@@ -436,17 +436,42 @@ func (s *StudyService) AskSocratic(notebookID string, topicID string, question s
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
 
 	// Ensure contextText label is omitted when empty
-	promptParts := []string{
-		socraticInstructions,
-		failedQuestionsSummary,
-		"",
-		historyBlock,
+	var socraticPrompt string
+	if s.promptService != nil {
+		contentParts := []string{}
+		if failedQuestionsSummary != "" {
+			contentParts = append(contentParts, failedQuestionsSummary)
+		}
+		if historyBlock != "" {
+			contentParts = append(contentParts, historyBlock)
+		}
+		if contextText != "" {
+			contentParts = append(contentParts, "Retrieved material:\n"+contextText)
+		}
+		fullContent := strings.Join(contentParts, "\n\n")
+		var pErr error
+		socraticPrompt, pErr = s.promptService.BuildPrompt(PromptCategoryTutorDuck, map[string]string{
+			"{CONTENT}":  fullContent,
+			"{QUESTION}": question,
+			"{TOPIC}":    topicID,
+		})
+		if pErr != nil {
+			socraticPrompt = ""
+		}
 	}
-	if contextText != "" {
-		promptParts = append(promptParts, "Retrieved material:", contextText, "")
+	if socraticPrompt == "" {
+		promptParts := []string{
+			socraticInstructions,
+			failedQuestionsSummary,
+			"",
+			historyBlock,
+		}
+		if contextText != "" {
+			promptParts = append(promptParts, "Retrieved material:", contextText, "")
+		}
+		promptParts = append(promptParts, "Student question: "+question)
+		socraticPrompt = strings.Join(promptParts, "\n")
 	}
-	promptParts = append(promptParts, "Student question: "+question)
-	socraticPrompt := strings.Join(promptParts, "\n")
 
 	if llm == s.fastLLMProvider && s.heavyLLMProvider == nil {
 		utils.Warnf("[SOCRATIC] heavy LLM provider not configured; falling back to fast LLM provider for topic %s", topicID)

@@ -159,6 +159,7 @@ func InitSchema(tx *sql.Tx) error {
 			log_level TEXT NOT NULL DEFAULT 'INFO',
 			prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT',
 			prompt_compression_rate REAL NOT NULL DEFAULT 0.80,
+			preferred_language TEXT NOT NULL DEFAULT 'english',
 			auto_generate_study_notes BOOLEAN DEFAULT 0,
 			notes_detail_level TEXT NOT NULL DEFAULT 'briefing',
 			notes_model_tier TEXT NOT NULL DEFAULT 'fast',
@@ -316,6 +317,29 @@ func InitSchema(tx *sql.Tx) error {
 			stats_json TEXT NOT NULL DEFAULT '{}',
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
+
+		`CREATE TABLE IF NOT EXISTS custom_task_prompts (
+			id TEXT PRIMARY KEY,
+			category TEXT NOT NULL,
+			name TEXT NOT NULL,
+			template TEXT NOT NULL,
+			is_active BOOLEAN NOT NULL DEFAULT 0,
+			is_system BOOLEAN NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		)`,
+
+		`CREATE INDEX IF NOT EXISTS idx_custom_task_prompts_category ON custom_task_prompts(category)`,
+
+		`CREATE TABLE IF NOT EXISTS prompt_notebook_assignments (
+			notebook_id TEXT NOT NULL,
+			category TEXT NOT NULL,
+			variant_id TEXT NOT NULL,
+			updated_at INTEGER NOT NULL,
+			PRIMARY KEY (notebook_id, category)
+		)`,
+
+		`CREATE INDEX IF NOT EXISTS idx_prompt_notebook_assignments_category ON prompt_notebook_assignments(category)`,
 
 		`CREATE TABLE IF NOT EXISTS pending_loot_boxes (
 			id TEXT PRIMARY KEY,

@@ -104,7 +104,20 @@ Answer:`, scopeLabel, req.Question)
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
 
-	prompt := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
+	var prompt string
+	if s.promptService != nil {
+		var pErr error
+		prompt, pErr = s.promptService.BuildPrompt(PromptCategoryReaderQA, map[string]string{
+			"{CONTENT}":  contextText,
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		})
+		if pErr != nil {
+			prompt = ""
+		}
+	}
+	if prompt == "" {
+		prompt = fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
 Use the retrieved reading material below to answer the student's question.
 If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
 
@@ -124,6 +137,7 @@ Retrieved reading material:
 Student question: %s
 
 Answer:`, scopeLabel, contextText, req.Question)
+	}
 
 	answer, err := llm.GenerateAnswer(prompt)
 	if err != nil {

@@ -126,6 +126,25 @@
               @rag-toggle="onRagToggle"
               @open-setup="openRagModal"
             />
+
+          </div>
+        </div>
+
+        <!-- Prompt Studio Category -->
+        <div v-show="activeCategory === 'prompts'" class="category-pane">
+          <header class="pane-header">
+            <h2>Prompt Studio</h2>
+            <p class="pane-subtitle">
+              Inspect, engineer, and customize academic prompts, syntax guardrails, and multilingual instructions.
+            </p>
+          </header>
+
+          <div class="pane-body">
+            <SettingsPromptStudio
+              :settings="settings"
+              :disabled="loading || saving"
+              @update-settings="Object.assign(settings, $event)"
+            />
           </div>
         </div>
 
@@ -282,6 +301,7 @@ import BaseIcon from '../components/BaseIcon.vue'
 import SettingsStudyBudget from '../components/SettingsStudyBudget.vue'
 import SettingsQuizRescue from '../components/SettingsQuizRescue.vue'
 import SettingsAIProvider from '../components/SettingsAIProvider.vue'
+import SettingsPromptStudio from '../components/SettingsPromptStudio.vue'
 import SettingsRagRetrieval from '../components/SettingsRagRetrieval.vue'
 import SettingsExtensions from '../components/SettingsExtensions.vue'
 import SettingsTheme from '../components/SettingsTheme.vue'
@@ -307,6 +327,12 @@ const categories = [
     label: 'AI & Retrieval',
     desc: 'LLM models, API keys, RAG',
     keywords: ['ai', 'llm', 'retrieval', 'rag', 'onnx', 'vector', 'embeddings', 'api key', 'keys', 'fast', 'heavy', 'gemini', 'openai', 'groq', 'openrouter', 'ollama', 'provider', 'tutor', 'persona', 'socratic', 'limits']
+  },
+  {
+    id: 'prompts',
+    label: 'Prompt Studio',
+    desc: 'Prompt engineering & multilingual',
+    keywords: ['prompt', 'prompts', 'studio', 'template', 'templates', 'language', 'multilingual', 'kannada', 'hindi', 'tamil', 'malayalam', 'system prompt', 'quiz prompt', 'flashcard prompt', 'notes prompt']
   },
   {
     id: 'profiles',

@@ -154,6 +154,26 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
 	}
 
+	// If promptService is configured, re-render using unified prompt
+	if s.promptService != nil {
+		var contentBuilder strings.Builder
+		for _, chunk := range contextChunks {
+			for _, incID := range includedChunkIDs {
+				if chunk.ChunkID == incID {
+					fmt.Fprintf(&contentBuilder, "[Page %d]\n%s\n\n", chunk.PageNum, strings.TrimSpace(chunk.Text))
+					break
+				}
+			}
+		}
+		if unifiedPrompt, pErr := s.promptService.BuildPrompt(PromptCategoryFlashcard, map[string]string{
+			"{CONTENT}":   contentBuilder.String(),
+			"{MAX_CARDS}": "5",
+			"{TOPIC}":     fmt.Sprintf("%s (Pages %d-%d)", notebookTitle, startPage, endPage),
+		}); pErr == nil && unifiedPrompt != "" {
+			prompt = unifiedPrompt
+		}
+	}
+
 	// Log token estimates before generation
 	utils.Warnf("[FLASHCARD_PIPELINE] token_budget_estimate prompt_tokens=%d max_input=%d budget_used_pct=%.2f", promptTokenCount, maxInputTokens, float64(promptTokenCount)/float64(maxInputTokens)*100)
 
