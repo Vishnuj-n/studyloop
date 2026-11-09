@@ -20,56 +20,26 @@
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          class="rescue-complete-btn"
-          :disabled="completingRescue"
-          @click="finishRescue"
-        >
+        <button type="button" class="rescue-complete-btn" :disabled="completingRescue" @click="finishRescue">
           {{ completingRescue ? 'Completing...' : 'Complete Session & Retry Quiz' }}
         </button>
       </div>
 
       <div class="chat-header-row">
-        <NotebookTopicSelector
-          v-model:notebook-id="selectedNotebookID"
-          v-model:topic-id="selectedTopicID"
-          :disabled="isRescueMode"
-          allow-entire-notebook
-          variant="pills"
-          @change-notebook="handleNotebookChange"
-          @change-topic="handleTopicChange"
-        />
+        <NotebookTopicSelector v-model:notebook-id="selectedNotebookID" v-model:topic-id="selectedTopicID"
+          :disabled="isRescueMode" allow-entire-notebook variant="pills" @change-notebook="handleNotebookChange"
+          @change-topic="handleTopicChange" />
 
         <div class="chat-header-actions">
-          <router-link
-            to="/settings"
-            class="clear-btn-slim"
-            title="Change AI Tutor Style in Settings"
-          >
+          <router-link to="/settings" class="clear-btn-slim" title="Change AI Tutor Style in Settings">
             <BaseIcon name="settings" size="14" />
             <span>Tutor Style</span>
           </router-link>
 
-          <button
-            type="button"
-            class="clear-btn-slim"
-            :disabled="isRescueMode"
-            title="Clear chat history"
-            @click="clearConversation"
-          >
-            <svg
-              class="clear-btn-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
+          <button type="button" class="clear-btn-slim" :disabled="isRescueMode" title="Clear chat history"
+            @click="clearConversation">
+            <svg class="clear-btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 6h18" />
               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
@@ -83,17 +53,8 @@
         <div v-if="messages.length === 0" class="empty-state">
           <div class="welcome-card">
             <div class="welcome-icon">
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
                 <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
                 <path d="M12 5v13" />
@@ -116,12 +77,8 @@
               {{ selectionHint }}
             </p>
 
-            <button
-              type="button"
-              class="start-session-btn"
-              :disabled="!canStart || isLoading"
-              @click="initiateSocraticSession"
-            >
+            <button type="button" class="start-session-btn" :disabled="!canStart || isLoading"
+              @click="initiateSocraticSession">
               <span v-if="isLoading" class="spinner"></span>
               <span v-else class="start-icon">▶</span>
               {{
@@ -143,58 +100,32 @@
 
             <div v-if="message.role === 'assistant' && message.error" class="message-error">
               <p class="error-text">{{ message.error }}</p>
-              <button
-                v-if="message.isNetworkError && message.promptText"
-                class="retry-msg-btn"
-                @click="retrySocraticMessage(idx)"
-              >
+              <button v-if="message.isNetworkError && message.promptText" class="retry-msg-btn"
+                @click="retrySocraticMessage(idx)">
                 {{ retryingMessageId === idx ? 'Retrying...' : 'Retry' }}
               </button>
-              <button
-                v-if="message.isNetworkError && message.promptText && message.isRescueContext"
-                class="copy-prompt-btn"
-                @click="copyPromptToClipboard(message.promptText)"
-              >
+              <button v-if="message.isNetworkError && message.promptText && message.isRescueContext"
+                class="copy-prompt-btn" @click="copyPromptToClipboard(message.promptText)">
                 {{ copiedMessageId === idx ? 'Copied!' : 'Copy Prompt' }}
               </button>
             </div>
 
-            <div
-              v-if="
-                message.role === 'assistant' && message.citations && message.citations.length > 0
-              "
-              class="citations"
-            >
-              <button
-                type="button"
-                class="citation-info-btn"
-                @click.stop="toggleCitationPopover(idx)"
-                @mouseenter="showCitationPopover = idx"
-                @mouseleave="scheduleHideCitationPopover"
-              >
+            <div v-if="
+              message.role === 'assistant' && message.citations && message.citations.length > 0
+            " class="citations">
+              <button type="button" class="citation-info-btn" @click.stop="toggleCitationPopover(idx)"
+                @mouseenter="showCitationPopover = idx" @mouseleave="scheduleHideCitationPopover">
                 ℹ
               </button>
-              <div
-                v-if="showCitationPopover === idx"
-                class="citation-popover"
-                @mouseenter="cancelHideCitationPopover"
-                @mouseleave="hideCitationPopover"
-              >
+              <div v-if="showCitationPopover === idx" class="citation-popover" @mouseenter="cancelHideCitationPopover"
+                @mouseleave="hideCitationPopover">
                 <p class="citation-popover-title">Source Chunks</p>
-                <div
-                  v-for="(chunk, cIdx) in message.chunkTexts || []"
-                  :key="cIdx"
-                  class="citation-chunk"
-                >
+                <div v-for="(chunk, cIdx) in message.chunkTexts || []" :key="cIdx" class="citation-chunk">
                   <span class="citation-chunk-label">{{ message.citations[cIdx] || '' }}</span>
                   <p class="citation-chunk-text">{{ chunk }}</p>
                 </div>
                 <div v-if="!message.chunkTexts || message.chunkTexts.length === 0">
-                  <p
-                    v-for="(citation, cIdx) in message.citations"
-                    :key="cIdx"
-                    class="citation-chunk-label"
-                  >
+                  <p v-for="(citation, cIdx) in message.citations" :key="cIdx" class="citation-chunk-label">
                     {{ citation }}
                   </p>
                 </div>
@@ -214,31 +145,15 @@
 
       <form class="composer" @submit.prevent="submitQuestion">
         <div class="composer-box">
-          <textarea
-            v-model="inputQuestion"
-            class="composer-input"
-            aria-label="Question"
+          <textarea v-model="inputQuestion" class="composer-input" aria-label="Question"
             placeholder="Ask a grounded question about your material, and the tutor will guide you..."
-            :disabled="isLoading"
-            @keydown="handleComposerKeydown"
-          ></textarea>
+            :disabled="isLoading" @keydown="handleComposerKeydown"></textarea>
 
-          <button
-            type="submit"
-            class="composer-send-btn"
-            :disabled="!canSend || isLoading"
-            title="Send message"
-          >
-            <svg
-              v-if="!isLoading"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              class="send-svg"
-            >
+          <button type="submit" class="composer-send-btn" :disabled="!canSend || isLoading" title="Send message">
+            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+              class="send-svg">
               <path
-                d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z"
-              />
+                d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
             </svg>
             <span v-else class="thinking-dot-loader">
               <span></span><span></span><span></span>
@@ -898,9 +813,11 @@ h1 {
 .markdown-body :first-child {
   margin-top: 0;
 }
+
 .markdown-body :last-child {
   margin-bottom: 0;
 }
+
 .markdown-body p,
 .markdown-body ul,
 .markdown-body ol,
@@ -1141,16 +1058,19 @@ h1 {
 .thinking-dot-loader span:nth-child(2) {
   animation-delay: 0.12s;
 }
+
 .thinking-dot-loader span:nth-child(3) {
   animation-delay: 0.24s;
 }
 
 @keyframes pulse-slow {
+
   0%,
   100% {
     transform: scale(1);
     opacity: 0.9;
   }
+
   50% {
     transform: scale(1.04);
     opacity: 1;
@@ -1158,11 +1078,13 @@ h1 {
 }
 
 @keyframes pulse {
+
   0%,
   80%,
   100% {
     opacity: 0.32;
   }
+
   40% {
     opacity: 1;
   }
@@ -1173,17 +1095,21 @@ h1 {
     height: auto;
     overflow: visible;
   }
+
   h1 {
     font-size: 30px;
   }
+
   .chat-header-row {
     flex-direction: column;
     align-items: stretch;
   }
+
   .clear-btn-slim {
     width: 100%;
     justify-content: center;
   }
+
   .bubble {
     max-width: 94%;
   }

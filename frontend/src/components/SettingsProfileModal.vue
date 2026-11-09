@@ -14,13 +14,8 @@
 
         <div class="form-group">
           <label for="profile-name">Profile Name</label>
-          <input
-            id="profile-name"
-            v-model="localName"
-            type="text"
-            :placeholder="isEdit ? '' : 'e.g. UPSC, Semester Finals'"
-            required
-          />
+          <input id="profile-name" v-model="localName" type="text"
+            :placeholder="isEdit ? '' : 'e.g. UPSC, Semester Finals'" required />
         </div>
 
         <div class="form-group">
@@ -40,18 +35,9 @@
             </p>
           </div>
           <div class="inheritance-list">
-            <label
-              v-for="prof in otherProfiles"
-              :key="prof.id"
-              class="inheritance-item"
-              :class="{ selected: selectedInherited.includes(prof.id) }"
-            >
-              <input
-                v-model="selectedInherited"
-                type="checkbox"
-                class="inheritance-checkbox"
-                :value="prof.id"
-              />
+            <label v-for="prof in otherProfiles" :key="prof.id" class="inheritance-item"
+              :class="{ selected: selectedInherited.includes(prof.id) }">
+              <input v-model="selectedInherited" type="checkbox" class="inheritance-checkbox" :value="prof.id" />
               <span class="profile-name-bold">{{ prof.name }}</span>
               <span class="due-count-pill" :class="{ 'has-due': getDueCount(prof.id) > 0 }">
                 {{ getDueCount(prof.id) }} cards due
@@ -63,11 +49,7 @@
 
       <div class="modal-actions">
         <button class="cancel-btn" :disabled="isSaving" @click="$emit('close')">Cancel</button>
-        <button
-          class="save-btn"
-          :disabled="!localName || !localDeadline || isSaving"
-          @click="handleSave"
-        >
+        <button class="save-btn" :disabled="!localName || !localDeadline || isSaving" @click="handleSave">
           {{ saveButtonLabel }}
         </button>
       </div>
@@ -446,6 +428,7 @@ input::placeholder {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -456,6 +439,7 @@ input::placeholder {
     opacity: 0;
     transform: translateY(16px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
