@@ -75,14 +75,14 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 		t.Fatalf("expected empty user session on failed restore, got %#v", tamperedSess)
 	}
 
-	// 3. Grace Period Expiration (>10 days)
-	elevenDaysAgo := time.Now().Unix() - (11 * 24 * 60 * 60)
-	sig := computeSessionSignature(getMachineID(), "user_old", "old@example.com", true, elevenDaysAgo)
+	// 3. Grace Period Expiration (>30 days)
+	thirtyOneDaysAgo := time.Now().Unix() - (31 * 24 * 60 * 60)
+	sig := computeSessionSignature(getMachineID(), "user_old", "old@example.com", true, thirtyOneDaysAgo)
 	expiredSess := persistentSession{
 		UserID:     "user_old",
 		Email:      "old@example.com",
 		IsPro:      true,
-		VerifiedAt: elevenDaysAgo,
+		VerifiedAt: thirtyOneDaysAgo,
 		Signature:  sig,
 	}
 	expiredBytes, _ := json.Marshal(expiredSess)

@@ -30,7 +30,7 @@ import (
 var ClerkPublishableKey string
 
 const (
-	tenDaysSec        = 10 * 24 * 60 * 60
+	thirtyDaysSec     = 30 * 24 * 60 * 60
 	sessionSecretSalt = "studyloop-desktop-auth-salt-v1-wails"
 )
 
@@ -254,6 +254,7 @@ func (a *App) setSession(userID, email string, isPro bool) {
 	a.sessionUserID = userID
 	a.sessionEmail = email
 	a.sessionIsPro = isPro
+	a.sessionGraceExpired = false
 	a.sessionVerifiedAt = now
 	a.sessionMu.Unlock()
 
@@ -328,29 +329,36 @@ func (a *App) RestoreSession(userID, email string, isPro bool, verifiedAt int64)
 		return false
 	}
 
-	// Check 10-day offline grace period
+	// Check 30-day (1 month) offline grace period
 	now := time.Now().Unix()
 	actualIsPro := sess.IsPro
-	if actualIsPro && sess.VerifiedAt > 0 && (now-sess.VerifiedAt) > tenDaysSec {
-		utils.Warnf("[AUTH] Session 10-day grace period expired. VerifiedAt=%d, Now=%d, DiffSec=%d, MaxSec=%d. Re-verification required.",
-			sess.VerifiedAt, now, (now - sess.VerifiedAt), tenDaysSec)
+	graceExpired := false
+	if actualIsPro && sess.VerifiedAt > 0 && (now-sess.VerifiedAt) > thirtyDaysSec {
+		utils.Warnf("[AUTH] Session 30-day grace period expired. VerifiedAt=%d, Now=%d, DiffSec=%d, MaxSec=%d. Re-verification required.",
+			sess.VerifiedAt, now, (now - sess.VerifiedAt), thirtyDaysSec)
 		actualIsPro = false
+		graceExpired = true
 	} else {
-		utils.Debugf("[AUTH] Session 10-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
+		utils.Debugf("[AUTH] Session 30-day grace period valid. VerifiedAt=%d, Now=%d, DiffSec=%d, IsPro=%v",
 			sess.VerifiedAt, now, (now - sess.VerifiedAt), actualIsPro)
 	}
 
-	a.applyRestoredSession(sess.UserID, sess.Email, actualIsPro, sess.VerifiedAt)
-	utils.Debugf("[AUTH] Session restoration complete: user=%s, email=%s, isPro=%v", sess.UserID, sess.Email, actualIsPro)
+	a.applyRestoredSession(sess.UserID, sess.Email, actualIsPro, sess.VerifiedAt, graceExpired)
+	utils.Debugf("[AUTH] Session restoration complete: user=%s, email=%s, isPro=%v, graceExpired=%v", sess.UserID, sess.Email, actualIsPro, graceExpired)
 	return actualIsPro
 }
 
-func (a *App) applyRestoredSession(userID, email string, isPro bool, verifiedAt int64) {
+func (a *App) applyRestoredSession(userID, email string, isPro bool, verifiedAt int64, graceExpired ...bool) {
 	a.sessionMu.Lock()
 	defer a.sessionMu.Unlock()
 	a.sessionUserID = userID
 	a.sessionEmail = email
 	a.sessionIsPro = isPro
+	if len(graceExpired) > 0 {
+		a.sessionGraceExpired = graceExpired[0]
+	} else {
+		a.sessionGraceExpired = false
+	}
 	a.sessionVerifiedAt = verifiedAt
 }
 
@@ -360,6 +368,7 @@ func (a *App) ClearSession() {
 	a.sessionUserID = ""
 	a.sessionEmail = ""
 	a.sessionIsPro = false
+	a.sessionGraceExpired = false
 	a.sessionVerifiedAt = 0
 	a.sessionMu.Unlock()
 
@@ -383,10 +392,11 @@ func (a *App) GetUserSession() map[string]interface{} {
 	a.sessionMu.RLock()
 	defer a.sessionMu.RUnlock()
 	return map[string]interface{}{
-		"userId":     a.sessionUserID,
-		"email":      a.sessionEmail,
-		"isPro":      a.sessionIsPro,
-		"verifiedAt": a.sessionVerifiedAt,
+		"userId":         a.sessionUserID,
+		"email":          a.sessionEmail,
+		"isPro":          a.sessionIsPro,
+		"isGraceExpired": a.sessionGraceExpired,
+		"verifiedAt":     a.sessionVerifiedAt,
 	}
 }
 
@@ -1015,7 +1025,7 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 
 	var targetURL string
 	escapedCallback := url.QueryEscape(callbackURL)
-	if mode == "billing" {
+	if mode == "billing" || mode == "reverify" {
 		targetURL = fmt.Sprintf("https://innocent-orca-5605.accounts.dev/user?redirect_url=%s&force_redirect_url=%s&after_sign_in_url=%s&after_sign_up_url=%s", escapedCallback, escapedCallback, escapedCallback, escapedCallback)
 	} else {
 		targetURL = fmt.Sprintf("https://innocent-orca-5605.accounts.dev/sign-in?redirect_url=%s&force_redirect_url=%s&after_sign_in_url=%s&after_sign_up_url=%s", escapedCallback, escapedCallback, escapedCallback, escapedCallback)

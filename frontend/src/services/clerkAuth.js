@@ -4,16 +4,19 @@ import { startBrowserAuth, openURLInBrowser, restoreSession, getUserSession, cle
 const isLoaded = ref(false)
 const user = ref(null)
 const isPro = ref(false)
+const isGraceExpired = ref(false)
+const isReverifying = ref(false)
 const authError = ref('')
-const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 const lastVerifiedAt = ref(0)
 
-function saveLocalSession(u, proStatus, verifiedTime) {
+function saveLocalSession(u, proStatus, verifiedTime, graceExpired = false) {
   if (u) {
     localStorage.setItem('studyloop_user_session', JSON.stringify({
       user: u,
       isPro: !!proStatus,
       lastVerifiedAt: verifiedTime || 0,
+      isGraceExpired: Boolean(graceExpired),
     }))
   } else {
     localStorage.removeItem('studyloop_user_session')
@@ -66,7 +69,8 @@ async function syncWithBackend(force = false) {
           lastVerifiedAt.value = backendSession.verifiedAt * 1000
         }
         isPro.value = Boolean(backendSession.isPro)
-        saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+        isGraceExpired.value = Boolean(backendSession.isGraceExpired)
+        saveLocalSession(user.value, isPro.value, lastVerifiedAt.value, isGraceExpired.value)
       } else if (backendSession && typeof backendSession === 'object') {
         // Go backend explicitly reported no session -> reset frontend auth state
         if (isPro.value || user.value) {
@@ -75,8 +79,9 @@ async function syncWithBackend(force = false) {
         }
         user.value = null
         isPro.value = false
+        isGraceExpired.value = false
         lastVerifiedAt.value = 0
-        saveLocalSession(null, false, 0)
+        saveLocalSession(null, false, 0, false)
       }
       lastSyncSuccessTime = Date.now()
       hasInitialSyncRan = true
@@ -110,9 +115,10 @@ if (typeof window !== 'undefined' && window?.runtime?.EventsOn) {
         fullName: 'Authenticated User',
       }
       isPro.value = !!data.isPro
+      isGraceExpired.value = false
       lastVerifiedAt.value = Date.now()
       authError.value = ''
-      saveLocalSession(user.value, isPro.value, lastVerifiedAt.value)
+      saveLocalSession(user.value, isPro.value, lastVerifiedAt.value, false)
       console.log('[AUTH] Updated localStorage and memory with Pro status:', isPro.value)
       syncWithBackend(true)
     }
@@ -128,22 +134,40 @@ try {
     if (parsed && parsed.user) {
       user.value = parsed.user
       const savedTime = parsed.lastVerifiedAt || 0
-      const isWithinGracePeriod = (Date.now() - savedTime) < TEN_DAYS_MS
+      const isWithinGracePeriod = (Date.now() - savedTime) < THIRTY_DAYS_MS
 
       if (parsed.isPro && !isWithinGracePeriod) {
-        console.warn('[AUTH] 10-day offline Pro grace period expired. Re-verification required.')
+        console.warn('[AUTH] 30-day offline Pro grace period expired. Needs online verification.')
+        isGraceExpired.value = true
         isPro.value = false
       } else {
+        isGraceExpired.value = Boolean(parsed.isGraceExpired)
         isPro.value = !!parsed.isPro
       }
       lastVerifiedAt.value = savedTime || 0
-      console.log('[AUTH] Restored session from localStorage: isSignedIn =', !!parsed.user, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod)
+      console.log('[AUTH] Restored session from localStorage: isSignedIn =', !!parsed.user, 'isPro =', isPro.value, 'withinGrace =', isWithinGracePeriod, 'isGraceExpired =', isGraceExpired.value)
     }
   } else {
     console.log('[AUTH] No saved session found in localStorage')
   }
 } catch (err) {
   console.warn('[AUTH] Could not restore saved local user session:', err)
+}
+
+async function verifyProOnline() {
+  if (isReverifying.value) return
+  isReverifying.value = true
+  authError.value = ''
+  try {
+    const res = await startBrowserAuth('reverify')
+    if (res?.error) {
+      authError.value = res.error
+    }
+  } catch (err) {
+    authError.value = err?.message || 'Failed to check subscription online'
+  } finally {
+    isReverifying.value = false
+  }
 }
 
 export function useClerkAuth() {
@@ -157,6 +181,9 @@ export function useClerkAuth() {
     isSignedIn: computed(() => !!user.value),
     user: computed(() => user.value),
     isPro: computed(() => isPro.value),
+    isGraceExpired: computed(() => isGraceExpired.value),
+    isReverifying: computed(() => isReverifying.value),
+    verifyProOnline,
     lastVerifiedAt: computed(() => lastVerifiedAt.value),
     authError: computed(() => authError.value),
     clearAuthError: () => {

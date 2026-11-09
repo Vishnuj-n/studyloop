@@ -70,6 +70,7 @@ type App struct {
 	sessionUserID       string
 	sessionEmail        string
 	sessionIsPro        bool
+	sessionGraceExpired bool
 	sessionVerifiedAt   int64
 }
 
