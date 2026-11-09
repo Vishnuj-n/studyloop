@@ -1,17 +1,34 @@
 ## ✨ Features
-- **Unified Command Palette** – Press **Ctrl + Shift + P** to open a global command palette. Quickly start/stop Pomodoro timers, switch profiles, jump to settings, and execute other common actions with a single shortcut.
-- **Quiz Rescue & Reflection Flow** – New safety net lets you recover a quiz attempt if something goes wrong, and a built‑in reflection step helps you review answers and insights after completing a quiz.
-- **Study Pacing Updates** – Enhanced pacing controls give you more flexibility to manage the flow of your study sessions.
+- **Unified Prompt Management with Book‑Level Scoping**  
+  - Create and edit custom prompt variants directly from the new **Prompt Studio** UI.  
+  - Assign specific prompts to individual notebooks (books), giving you fine‑grained control over AI‑generated content such as flashcards, quizzes, study notes, Socratic tutoring, text simplification, and the AI Reader.  
+  - Choose a preferred language for prompts, enabling multilingual instructions automatically.
+
+- **AI Reader & Simplifier Services**  
+  - New AI‑powered Reader that can summarize, explain, and answer questions about your study material.  
+  - Text Simplifier that rewrites complex passages into clearer, easier‑to‑understand language.
+
+- **Extension Support Enhancements**  
+  - Environment fingerprinting and manifest loading enable smoother installation and operation of third‑party extensions.
 
 ## 🚀 Improvements
-- **Flashcard Generation Guidelines** – Updated guidance focuses on creating atomic, clear concepts, making it easier to produce effective flashcards.
-- **Unified Shortcut System** – A new shortcut controller provides consistent key handling across the app, including support for physical key codes and smarter conflict resolution.
-- **Profile Switching Enhancements** – Select profiles using the top‑row or numpad digit keys, and see the agenda automatically refresh when you change profiles or update settings.
-- **Accessibility & UI Tweaks** – The command palette now includes icons and improved accessibility attributes for a smoother user experience.
+- **Prompt Studio UI Refresh**  
+  - Redesigned header now appears as a top‑bar component with clearer navigation.  
+  - Updated design tokens and high‑contrast color variables improve visual consistency and accessibility.  
+  - Refined language picker styling and overall typography for a cleaner look.
+
+- **Multilingual & Token Handling**  
+  - Prompt service now leverages robust language title‑casing, improving multilingual prompt generation.  
+  - Enhanced token budgeting in flashcard generation ensures more reliable AI output when using scoped templates.
+
+- **Performance & Reliability**  
+  - Faster placeholder rendering using an optimized replacer.  
+  - Animations automatically pause when the browser window is hidden, reducing unnecessary CPU usage.
 
 ## 🐛 Bug Fixes & Issue Resolutions
-- **Quiz Submission Reliability** – The `submitQuizAttempt` call now includes an additional parameter required by the API, preventing submission errors.
-- Minor stability fixes and cleanup of unused styles and code that could affect performance.
+- **Authentication Fix** – Resolved login/session issues that could prevent access to certain study features.  
+- Minor stability improvements across the study workflow components.
 
----  
+---
+
 *Thanks for using Studyloop!*
