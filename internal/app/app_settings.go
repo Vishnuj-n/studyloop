@@ -945,20 +945,6 @@ func (a *App) GetProfileFlashcardDueBreakdown() map[string]interface{} {
 	}
 }
 
-func (a *App) UpdateProfileFull(profile models.StudyProfile) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	if strings.TrimSpace(profile.ID) == "" || strings.TrimSpace(profile.Name) == "" {
-		return map[string]interface{}{"error": "profile ID and Name are required"}
-	}
-	if err := repo.UpdateProfile(profile); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"ok": true}
-}
-
 func (a *App) DeleteProfile(id string) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {

@@ -8,10 +8,10 @@ import (
 
 func submitFailedQuiz(t *testing.T, app *App, taskID string) models.QuizResult {
 	t.Helper()
-	resp := app.SubmitQuizAttempt(taskID, []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection(taskID, []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	if _, hasErr := resp["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", resp["error"])
 	}

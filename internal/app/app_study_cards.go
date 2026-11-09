@@ -213,10 +213,6 @@ func (a *App) GenerateQuizForPageRange(notebookID string, startPage, endPage int
 	return a.studyService.GenerateQuizForPageRange(notebookID, startPage, endPage)
 }
 
-func (a *App) SubmitQuizAttempt(taskID string, answers []models.QuizAnswer) map[string]interface{} {
-	return a.SubmitQuizAttemptWithReflection(taskID, answers, "")
-}
-
 func (a *App) SubmitQuizAttemptWithReflection(taskID string, answers []models.QuizAnswer, reflectionText string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -369,16 +365,6 @@ func (a *App) GenerateManualFlashcards(notebookID string, startPage, endPage int
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}
 	return a.studyService.GenerateManualFlashcards(notebookID, startPage, endPage)
-}
-
-func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage int) map[string]interface{} {
-	if _, errMap := requireRepo(a); errMap != nil {
-		return errMap
-	}
-	if a.studyService == nil {
-		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-	return a.studyService.GenerateComprehensiveExam(notebookID, startPage, endPage)
 }
 
 func (a *App) GenerateVivaExam(notebookID string, startPage, endPage int, quizTaskID string) map[string]interface{} {

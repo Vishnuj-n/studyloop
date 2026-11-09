@@ -31,7 +31,6 @@ Lists functions defined in frontend service bridge files and their usage count i
 | `deleteFlashcard` | `DeleteFlashcard` | 1 | Active |
 | `deleteLLMAPIKey` | `DeleteLLMAPIKey` | 1 | Active |
 | `deleteNotebook` | `DeleteNotebook` | 1 | Active |
-| `deletePomodoroProfile` | - | 0 | Unused |
 | `deleteProfile` | `DeleteProfile` | 1 | Active |
 | `deletePromptVariant` | `DeletePromptVariant` | 1 | Active |
 | `downloadAndApplyUpdate` | `DownloadAndApplyUpdate` | 2 | Active |
@@ -65,7 +64,6 @@ Lists functions defined in frontend service bridge files and their usage count i
 | `getNotebooks` | `GetNotebooks` | 6 | Active |
 | `getNotesByNotebook` | `GetNotesByNotebook` | 1 | Active |
 | `getOutlookCalendarUrl` | - | 2 | Active |
-| `getPomodoroAudioState` | `PomodoroGetAudioState` | 0 | Unused |
 | `getPomodoroSettings` | - | 2 | Active |
 | `getPomodoroTimerState` | `PomodoroGetTimerState` | 1 | Active |
 | `getPreferredLanguage` | `GetPreferredLanguage` | 1 | Active |
@@ -109,14 +107,12 @@ Lists functions defined in frontend service bridge files and their usage count i
 | `pausePomodoroTimer` | `PomodoroPauseTimer` | 1 | Active |
 | `pickPomodoroMusicFile` | `PomodoroPickMusicFile` | 1 | Active |
 | `pickPomodoroMusicFolder` | `PomodoroPickMusicFolder` | 1 | Active |
-| `playPomodoroChime` | `PomodoroPlayChime` | 0 | Unused |
 | `playPomodoroLooping` | `PomodoroPlayLooping` | 1 | Active |
 | `playPomodoroShuffleFolder` | `PomodoroPlayShuffleFolder` | 1 | Active |
 | `playStudyChime` | - | 3 | Active |
 | `recordCardReview` | `RecordCardReview` | 1 | Active |
 | `renderMarkdown` | - | 7 | Active |
 | `reorderTopicStudyNotes` | `ReorderTopicStudyNotes` | 1 | Active |
-| `resetPromptTemplate` | `ResetPromptTemplate` | 0 | Unused |
 | `resolveNoteAssetSrc` | - | 0 | Unused |
 | `restoreSession` | `RestoreSession` | 0 | Unused |
 | `resumePomodoroTimer` | `PomodoroResumeTimer` | 1 | Active |
@@ -124,7 +120,6 @@ Lists functions defined in frontend service bridge files and their usage count i
 | `revertReadingTaskSession` | `RevertReadingTaskSession` | 1 | Active |
 | `revertTopicToReadingFromQuiz` | `RevertTopicToReadingFromQuiz` | 1 | Active |
 | `runExtension` | `RunExtension` | 1 | Active |
-| `saveCustomPromptTemplate` | `SaveCustomPromptTemplate` | 0 | Unused |
 | `saveExtensionConfig` | `SaveExtensionConfig` | 1 | Active |
 | `saveLLMAPIKey` | `SaveLLMAPIKey` | 2 | Active |
 | `saveNoteImage` | `SaveNoteImage` | 2 | Active |
@@ -209,7 +204,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `DeletePromptVariant` | Yes |
 | `DownloadAndApplyUpdate` | Yes |
 | `DraftNotebookSyllabus` | Yes |
-| `GenerateComprehensiveExam` | No (Unused API) |
 | `GenerateFlashcardsForQuizTask` | Yes |
 | `GenerateManualFlashcards` | Yes |
 | `GenerateQuizForPageRange` | Yes |
@@ -271,14 +265,11 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `OpenNotesFolder` | Yes |
 | `OpenRepoURL` | Yes |
 | `OpenURLInBrowser` | Yes |
-| `PomodoroGetAudioState` | No (Unused API) |
-| `PomodoroGetProfileByID` | No (Unused API) |
 | `PomodoroGetTimerState` | Yes |
 | `PomodoroLoadProfiles` | Yes |
 | `PomodoroPauseTimer` | Yes |
 | `PomodoroPickMusicFile` | Yes |
 | `PomodoroPickMusicFolder` | Yes |
-| `PomodoroPlayChime` | No (Unused API) |
 | `PomodoroPlayLooping` | Yes |
 | `PomodoroPlayShuffleFolder` | Yes |
 | `PomodoroResumeTimer` | Yes |
@@ -289,14 +280,12 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `PomodoroStopTimer` | Yes |
 | `RecordCardReview` | Yes |
 | `ReorderTopicStudyNotes` | Yes |
-| `ResetPromptTemplate` | No (Unused API) |
 | `RestoreDatabaseFromBackup` | No (Unused API) |
 | `RestoreSession` | No (Unused API) |
 | `RetryFlashcardGeneration` | Yes |
 | `RevertReadingTaskSession` | Yes |
 | `RevertTopicToReadingFromQuiz` | Yes |
 | `RunExtension` | Yes |
-| `SaveCustomPromptTemplate` | No (Unused API) |
 | `SaveExtensionConfig` | Yes |
 | `SaveLLMAPIKey` | Yes |
 | `SaveNoteImage` | Yes |
@@ -318,7 +307,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `StartBrowserAuth` | No (Unused API) |
 | `StartTopicAudioOverview` | Yes |
 | `StopTopicAudioOverview` | Yes |
-| `SubmitQuizAttempt` | No (Unused API) |
 | `SubmitQuizAttemptWithReflection` | Yes |
 | `SuspendFlashcard` | Yes |
 | `TestLLMConnection` | Yes |
@@ -336,7 +324,6 @@ Lists exported API endpoints defined on `App` in the backend and whether they ar
 | `UpdateNotebookTitle` | Yes |
 | `UpdateProfile` | Yes |
 | `UpdateProfileFlashcardInheritance` | Yes |
-| `UpdateProfileFull` | No (Unused API) |
 | `UpdateProfileWithInheritance` | Yes |
 | `UpdateTopicStudyNote` | Yes |
 | `UpdateUserSettings` | Yes |
@@ -783,8 +770,8 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `buildComprehensiveExamPrompt` | `internal/study/examiner.go:239` | None | `function` |
 | `buildContextTextFromChunks` | `internal/study/prompt_budget.go:96` | None | `function` |
 | `buildContextTextFromQuizQuestions` | `internal/study/examiner.go:204` | None | `function` |
-| `buildFlashcardPrompt` | `internal/study/flashcard.go:251` | `StudyService` | `method` |
-| `buildFlashcardStaticTemplate` | `internal/study/flashcard.go:229` | None | `function` |
+| `buildFlashcardPrompt` | `internal/study/flashcard.go:249` | `StudyService` | `method` |
+| `buildFlashcardStaticTemplate` | `internal/study/flashcard.go:227` | None | `function` |
 | `buildInPlaceholders` | `internal/db/study_queue_queries.go:810` | None | `function` |
 | `buildInputValues` | `internal/embeddings/onnx.go:337` | `OnnxEmbedder` | `method` |
 | `buildPageBoundedContext` | `internal/study/prompt_budget.go:16` | `StudyService` | `method` |
@@ -808,7 +795,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `calculateQuizScore` | `internal/study/quiz_sync.go:1157` | None | `function` |
 | `capEndPageByWordBudget` | `internal/db/study_queue_queries.go:373` | `Repository` | `method` |
 | `chapterIndexForPage` | `internal/notebook/ingestion.go:83` | None | `function` |
-| `checkAndInsertMilestoneExam` | `internal/app/app_study_cards.go:302` | None | `function` |
+| `checkAndInsertMilestoneExam` | `internal/app/app_study_cards.go:298` | None | `function` |
 | `checkNotebookIndexingStatus` | `internal/app/app.go` | `App` | `AppHelper` |
 | `cleanDiagnosticJSON` | `internal/study/diagnostic.go:150` | None | `function` |
 | `cleanLLMJSON` | `internal/study/reflection.go:95` | None | `function` |
@@ -821,7 +808,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `computeTextHash` | `internal/retrieval/indexer.go:268` | None | `function` |
 | `copyFile` | `internal/runtime/asset_manager.go:669` | None | `function` |
 | `copyFileWithProgress` | `internal/runtime/asset_manager.go:602` | None | `function` |
-| `copyPomoFile` | `internal/app/app_pomodoro.go:268` | None | `function` |
+| `copyPomoFile` | `internal/app/app_pomodoro.go:220` | None | `function` |
 | `cosineSimilarity` | `internal/retrieval/engine.go:486` | None | `function` |
 | `countWords` | `internal/db/study_queue_queries.go:416` | None | `function` |
 | `countWordsInPageRange` | `internal/db/study_queue_queries.go:352` | `Repository` | `method` |
@@ -910,7 +897,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `initRetrievalEngine` | `internal/runtime/boot.go:392` | None | `function` |
 | `insertChunkRow` | `internal/db/notebooks_repo.go:78` | None | `function` |
 | `insertChunkRowRepo` | `internal/db/notebooks_repo.go:999` | None | `function` |
-| `insertMilestoneForAttempts` | `internal/app/app_study_cards.go:321` | None | `function` |
+| `insertMilestoneForAttempts` | `internal/app/app_study_cards.go:317` | None | `function` |
 | `isFrontMatterChunk` | `internal/study/quiz_sync.go:373` | None | `function` |
 | `isPacingEnabled` | `internal/study/service.go:143` | `StudyService` | `method` |
 | `isPreferredBoundary` | `internal/notebook/upload.go:795` | None | `function` |
@@ -982,7 +969,7 @@ Lists internal Go functions/methods and unexported `App` helpers that are **not 
 | `resolveNotebookTitle` | `internal/study/quiz_sync.go:211` | `StudyService` | `method` |
 | `resolveNotebookUploadDir` | `internal/study/sync.go:401` | None | `function` |
 | `resolveReadingBounds` | `internal/db/study_queue_queries.go:428` | `Repository` | `method` |
-| `resolveRetryTopicAndBounds` | `internal/app/app_study_cards.go:619` | None | `function` |
+| `resolveRetryTopicAndBounds` | `internal/app/app_study_cards.go:605` | None | `function` |
 | `resolveRuntimeLibraryPath` | `internal/embeddings/onnx.go:544` | None | `function` |
 | `resolveSocraticLineage` | `internal/study/socratic.go:229` | `StudyService` | `method` |
 | `reviewSessionNow` | `internal/db/review_session_repo.go:553` | None | `function` |

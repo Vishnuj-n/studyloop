@@ -103,17 +103,11 @@ export function generateQuizForPageRange(notebookID, startPage, endPage) {
 }
 
 export function submitQuizAttempt(taskID, answers, reflectionText = '') {
-  if (reflectionText && typeof appBridge().SubmitQuizAttemptWithReflection === 'function') {
-    return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
-  }
-  return appBridge().SubmitQuizAttempt(taskID, answers)
+  return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
 }
 
 export function submitQuizAttemptWithReflection(taskID, answers, reflectionText = '') {
-  if (typeof appBridge().SubmitQuizAttemptWithReflection === 'function') {
-    return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
-  }
-  return appBridge().SubmitQuizAttempt(taskID, answers)
+  return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
 }
 
 export function generateFlashcardsForQuizTask(taskID) {
@@ -159,10 +153,7 @@ export function generateManualFlashcards(notebookID, startPage, endPage) {
 }
 
 export function generateComprehensiveExam(notebookID, startPage, endPage, quizTaskID = '') {
-  if (appBridge().GenerateVivaExam) {
-    return appBridge().GenerateVivaExam(notebookID, startPage, endPage, quizTaskID)
-  }
-  return appBridge().GenerateComprehensiveExam(notebookID, startPage, endPage)
+  return appBridge().GenerateVivaExam(notebookID, startPage, endPage, quizTaskID)
 }
 
 export function scoreShortAnswer(questionID, userAnswer) {
@@ -743,10 +734,6 @@ export function getPromptStudioTemplates() {
   return appBridge().GetPromptStudioTemplates()
 }
 
-export function saveCustomPromptTemplate(category, template) {
-  return appBridge().SaveCustomPromptTemplate(category, template)
-}
-
 export function savePromptVariant(variant) {
   return appBridge().SavePromptVariant(variant)
 }
@@ -757,10 +744,6 @@ export function setActivePromptVariant(category, variantID) {
 
 export function deletePromptVariant(variantID) {
   return appBridge().DeletePromptVariant(variantID)
-}
-
-export function resetPromptTemplate(category) {
-  return appBridge().ResetPromptTemplate(category)
 }
 
 export function setPromptNotebookAssignment(notebookID, category, variantID) {

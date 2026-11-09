@@ -1,8 +1,6 @@
 package app
 
 import (
-	"strings"
-
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/study"
 )
@@ -123,22 +121,6 @@ func (a *App) SetPromptNotebookAssignment(notebookID, category, variantID string
 	return map[string]interface{}{"ok": true, "notebook_id": notebookID, "category": category, "variant_id": variantID}
 }
 
-// SaveCustomPromptTemplate validates and saves a custom prompt variant for a category.
-func (a *App) SaveCustomPromptTemplate(category, template string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	category = strings.ToLower(strings.TrimSpace(category))
-	if err := study.ValidateTemplate(category, template); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	if err := repo.SetCustomPrompt(category, template); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	return map[string]interface{}{"ok": true, "category": category}
-}
-
 // SavePromptVariant saves a named prompt variant.
 func (a *App) SavePromptVariant(variant models.CustomTaskPromptVariant) map[string]interface{} {
 	repo := a.getRepo()
@@ -176,18 +158,4 @@ func (a *App) DeletePromptVariant(variantID string) map[string]interface{} {
 		return map[string]interface{}{"error": err.Error()}
 	}
 	return map[string]interface{}{"ok": true, "variant_id": variantID}
-}
-
-// ResetPromptTemplate removes custom prompt override for a category, restoring system default.
-func (a *App) ResetPromptTemplate(category string) map[string]interface{} {
-	repo := a.getRepo()
-	if repo == nil {
-		return map[string]interface{}{"error": errDatabaseNotInitialized}
-	}
-	category = strings.ToLower(strings.TrimSpace(category))
-	if err := repo.DeleteCustomPrompt(category); err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-	defTmpl := study.DefaultTemplates[category]
-	return map[string]interface{}{"ok": true, "category": category, "template": defTmpl}
 }
