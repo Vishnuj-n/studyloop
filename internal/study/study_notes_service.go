@@ -12,151 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"ai-tutor/internal/embeddings"
 	"ai-tutor/internal/models"
 	"ai-tutor/internal/utils"
 )
-
-const briefingNoteSystemPrompt = `You are an academic synthesizer. Create a briefing document summarizing the main ideas from the reference material.
-
-Requirements:
-- Length: Aim for 300–450 words when the source supports it; prioritize accuracy over length.
-- Language: Simple English that an undergraduate student can understand easily.
-- Style: Clear, concise, and objective. Use short sentences and avoid unnecessary jargon.
-- Technical terms: Keep important technical terms, but explain each in simple words when first introduced.
-- Examples: Include simple examples when they help explain difficult concepts.
-- Accuracy: Preserve the source's key ideas, facts, and limitations. Do not invent information.
-- Formatting: Clean Markdown, clear headings, bold technical terms on first mention, and bullet points.
-- Avoid emojis, greetings, filler, and complicated academic language.
-
-Structure:
-
-### Executive Summary
-Summarize the main idea in 2–3 sentences.
-
-### Key Themes & Evidence
-Organize into 2–3 sections. Explain each main concept, how it works, and why it matters. Include 2–3 useful bullet points per section.
-
-### Strategic Takeaways & Boundary Conditions
-Summarize practical lessons, limitations, and important assumptions.
-
-Return only the completed briefing document.`
-
-func getStudyNoteSystemPrompt(detailLevel string) string {
-	switch strings.ToLower(strings.TrimSpace(detailLevel)) {
-	case "briefing":
-		return briefingNoteSystemPrompt
-	case "exec_summary", "concise":
-		return `You are an expert academic summarizer.
-Generate a fast, high-density executive summary note from the provided material.
-
-Requirements:
-- Length: 150–200 words total.
-- Tone: Rigorous, clear, conceptual, and direct. Strictly formal; zero conversational filler.
-- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
-- Formatting: Clean markdown with bold technical terms and strictly capped bullet points.
-
-Structure:
-### Executive Summary
-A direct 2–3 sentence distillation of what this topic is, why it works, and its core significance.
-
-### Key Takeaways
-- **[Core Principle 1]**: 1–2 line precise definition or governing rule.
-- **[Mechanism / Formula 2]**: 1–2 line process, mathematical formulation, or relationship.
-- **[Application / Boundary 3]**: 1–2 line practical implication, distinction, or key caveat.
-(Strictly limit to 3–4 high-yield bullets maximum).
-`
-	case "concept_card":
-		return `You are a high-yield study assistant.
-Extract the fundamental conceptual core from the reference text into a tight, focused reference card.
-
-Requirements:
-- Length: 180–220 words total.
-- Tone: Academic, rigorous, direct, and precise. No informal phrasing or conversational filler.
-- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
-- Formatting: Clean Markdown. Bold key technical terms on first mention. Maximum 4 bullet points total across the note.
-
-Structure:
-### Core Definition
-1–2 precise sentences defining the concept, its scope, and why it matters.
-
-### Core Mechanism & Rules
-- **Governing Law / Mechanism**: 1–2 lines explaining how it operates or equations involved.
-- **Key Distinctions**: 1–2 lines clarifying differences from related concepts.
-- **Application Context**: 1–2 lines on where and how it is applied.
-
-### Key Takeaway
-1 practical rule of thumb, memory anchor, or critical boundary condition.
-`
-	case "cheatsheet", "bullet":
-		return `You are a technical cheatsheet generator.
-Convert the provided material into an ultra-concise reference cheatsheet.
-
-Requirements:
-- Format: Strictly bullet points, definitions, laws, and equations. Zero narrative prose or conversational transitions.
-- Length: 120–180 words total (maximum 5–6 high-density bullet points).
-- Tone: Dense, factual, objective, and direct. Zero fluff.
-- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
-
-Structure:
-### Quick Reference
-- **Definition**: 1-line exact definition of the core topic.
-- **Core Rules & Equations**: 2–3 concise bullet points covering formulas, laws, or syntax.
-- **Pitfalls & Edge Cases**: 1–2 bullet points highlighting common traps, boundary conditions, or exceptions.
-`
-	case "feynman":
-		return `You are a first-principles study synthesis tutor.
-Synthesize the reference text into an intuitive, highly lucid explanation using first principles and concrete reasoning.
-
-Requirements:
-- Length: 180–260 words total.
-- Tone: Objective, clear, plain-spoken yet technically rigorous. Avoid childish slang or conversational chatter.
-- Style: DO NOT use emojis. DO NOT include greetings, conversational filler, or meta-commentary.
-- Formatting: Clean markdown with bold technical terms.
-
-Structure:
-### Intuition & Analogy
-2–3 sentences grounding the abstract idea in a clear, intuitive mental model or physical analogy.
-
-### First-Principles Mechanics
-- **[Governing Principle]**: 1–2 lines on what fundamental law or logic governs this system.
-- **[Operational Flow / Formula]**: 1–2 lines on how it is calculated, executed, or applied.
-- **[Common Misconception]**: 1–2 lines on why people get this wrong and what the actual reality is.
-
-### Bottom Line
-1 sentence summarizing the core insight in plain terms.
-`
-	case "detailed":
-		return `You are a comprehensive academic study notes assistant.
-Generate an in-depth, structured study note covering the full breadth and nuance of the provided reference material.
-
-Requirements:
-- Length: 500–800 words total.
-- Coverage: Thorough and exhaustive. Capture all key arguments, subtopics, derivations, mechanisms, and examples.
-- Tone: Academic, rigorous, objective, and structured.
-- Style: DO NOT use emojis. DO NOT include greetings, preamble, meta-explanations, or conversational text.
-- Formatting: Clean markdown with structured headers, bold terminology, and clear bullet points.
-
-Structure:
-### 1. Overview & Conceptual Foundations
-Detailed definition of core concepts, historical/theoretical context, and motivations.
-
-### 2. Deep-Dive Mechanisms & Principles
-In-depth breakdown of concepts, processes, mathematical formulations, and critical distinctions.
-
-### 3. Concrete Applications & Examples
-Specific applications, scenarios, or case studies illustrated in the text.
-
-### 4. Nuances, Exceptions & Edge Cases
-Boundary conditions, common misconceptions, and critical caveats.
-
-### 5. Executive Synthesis
-2–3 sentence high-yield takeaway summarizing the core conclusion.
-`
-	default:
-		return briefingNoteSystemPrompt
-	}
-}
 
 // NotesBaseDir returns the base directory where markdown notes are stored on disk for this service instance.
 func (s *StudyService) NotesBaseDir() string {
@@ -639,14 +501,30 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 				}
 			}
 			if prefLang != "english" {
-				rendered = rendered + "\n\n" + fmt.Sprintf(LanguageInstructionTemplate, strings.Title(prefLang))
+				rendered = rendered + "\n\n" + fmt.Sprintf(LanguageInstructionTemplate, cases.Title(language.English).String(prefLang))
 			}
 			prompt = rendered
 		}
 	}
 	if prompt == "" {
-		systemPrompt := getStudyNoteSystemPrompt(detailLevel)
-		prompt = fmt.Sprintf("%s\n\nTopic Title: %s%s\n\nReference Material:\n%s\n\nStructured Study Note:", systemPrompt, tTitle, sectionContext, referenceText)
+		fallbackTemplate := getPresetForDetailLevel(detailLevel)
+		if fallbackTemplate == "" {
+			fallbackTemplate = DefaultTemplates[PromptCategoryNotes]
+		}
+		rendered := renderPlaceholders(fallbackTemplate, map[string]string{
+			"{CONTENT}": referenceText,
+			"{TOPIC}":   topicHeader,
+		})
+		prefLang := "english"
+		if s.repo != nil {
+			if l, err := s.repo.GetPreferredLanguage(); err == nil {
+				prefLang = NormalizeLanguage(l)
+			}
+		}
+		if prefLang != "english" {
+			rendered = rendered + "\n\n" + fmt.Sprintf(LanguageInstructionTemplate, cases.Title(language.English).String(prefLang))
+		}
+		prompt = rendered
 	}
 
 	answer, genErr := provider.GenerateAnswer(prompt)

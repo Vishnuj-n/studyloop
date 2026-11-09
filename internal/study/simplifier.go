@@ -47,42 +47,10 @@ func buildSimplifierPrompt(promptTemplate, content, styleDirective string) strin
 		return tmpl + "\n\nReading Material:\n\"\"\"\n" + content + "\n\"\"\"\n"
 	}
 
-	return fmt.Sprintf(`You are an AI Text Simplifier.
-
-Transform the provided reading material into clear, well-structured Markdown notes that are easier to understand while preserving the original meaning and core information.
-
-The user's selected comprehension level is:
-
-%s
-
-Adapt the explanation strictly to this level.
-
-## Core Requirements
-
-- Match tone, sentence complexity, and vocabulary strictly to the user's selected comprehension level above.
-- For ELI5 / Very Simple levels: Strictly replace technical jargon, heavy formulas, and abstract terminology with simple, everyday real-world analogies. Do NOT keep un-simplified technical terms.
-- For Academic / Simple levels: Retain essential technical vocabulary, precise definitions, and formulas when precision requires it.
-- Preserve the author's underlying core meaning, main facts, arguments, and conclusions accurately.
-- Do not invent facts, examples, or conclusions, and do not add opinions or meta-commentary.
-- Remove unnecessary repetition, fluff, and filler.
-- Use clean, natural Markdown structure: headings, subheadings, bullet points, and numbered steps.
-
-## Output
-
-Create a clear, well-structured breakdown of the provided material matched to the selected comprehension level.
-
-Start with a short, simple overview of the main topic.
-
-Then organize the explanation into natural sections based on the material.
-
-End with a short **Key Takeaways** section summarizing the most important ideas.
-
-Reading Material:
-"""
-%s
-"""
-
-Return only the markdown response without meta-commentary.`, styleDirective, content)
+	return renderPlaceholders(DefaultTemplates[PromptCategorySimplify], map[string]string{
+		"{CONTENT}":    content,
+		"{DIFFICULTY}": styleDirective,
+	})
 }
 
 // SimplifyReadingContent takes dense text content and simplifies it using PromptService and the preferred language.

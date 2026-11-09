@@ -76,23 +76,11 @@ func (s *StudyService) AnswerReaderQuestion(req ReaderAIRequest) map[string]inte
 		}, req.NotebookID)
 	}
 	if templatePrompt == "" {
-		templatePrompt = fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
-Use the retrieved reading material below to answer the student's question.
-If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
-
-Rules:
-- Keep the response concise and grounded.
-- Explain in simple, clear, and easy-to-understand language, avoiding overly academic or complex jargon.
-- If the student asks to explain a specific paragraph, passage, or concept from the material, focus on explaining the underlying logic, meaning, and rationale of the passage (e.g., why something is done or how it works) rather than just describing a specific tool or example mentioned within it.
-- Prefer 2 short paragraphs or up to 3 bullets.
-- Explain clearly, but do not turn this into a full tutoring session.
-- Stay anchored to the student's current reading flow and selected scope.
-
-Selected retrieval scope: %s
-
-Student question: %s
-
-Answer:`, scopeLabel, req.Question)
+		templatePrompt = renderPlaceholders(DefaultTemplates[PromptCategoryReaderQA], map[string]string{
+			"{CONTENT}":  "",
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		})
 	}
 
 	overheadTokens, err := embeddings.CountTokens(templatePrompt)
@@ -127,26 +115,11 @@ Answer:`, scopeLabel, req.Question)
 		}
 	}
 	if prompt == "" {
-		prompt = fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
-Use the retrieved reading material below to answer the student's question.
-If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
-
-Rules:
-- Keep the response concise and grounded.
-- Explain in simple, clear, and easy-to-understand language, avoiding overly academic or complex jargon.
-- If the student asks to explain a specific paragraph, passage, or concept from the material, focus on explaining the underlying logic, meaning, and rationale of the passage (e.g., why something is done or how it works) rather than just describing a specific tool or example mentioned within it.
-- Prefer 2 short paragraphs or up to 3 bullets.
-- Explain clearly, but do not turn this into a full tutoring session.
-- Stay anchored to the student's current reading flow and selected scope.
-
-Selected retrieval scope: %s
-
-Retrieved reading material:
-%s
-
-Student question: %s
-
-Answer:`, scopeLabel, contextText, req.Question)
+		prompt = renderPlaceholders(DefaultTemplates[PromptCategoryReaderQA], map[string]string{
+			"{CONTENT}":  contextText,
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		})
 	}
 
 	answer, err := llm.GenerateAnswer(prompt)
