@@ -28,6 +28,9 @@
           <span v-if="clerkAuth.isPro.value" class="plan-pill pro">
             PRO PLAN
           </span>
+          <span v-else-if="clerkAuth.isGraceExpired.value" class="plan-pill pro-warning" title="Offline grace expired. Connect online to re-verify.">
+            PRO (VERIFICATION NEEDED)
+          </span>
           <span v-else class="plan-pill free">
             FREE PLAN
           </span>
@@ -35,9 +38,21 @@
       </div>
 
       <div class="account-actions">
+        <!-- Re-verify subscription online if offline grace expired -->
+        <button
+          v-if="clerkAuth.isGraceExpired.value"
+          type="button"
+          class="reverify-btn"
+          :disabled="clerkAuth.isReverifying.value"
+          @click="onReverifyClick"
+        >
+          <BaseIcon name="refresh" size="14" />
+          <span>{{ clerkAuth.isReverifying.value ? 'Verifying Online...' : 'Check Pro Status Online' }}</span>
+        </button>
+
         <!-- ponytail: 1 button is enough; upgrade when free, manage when pro -->
         <button
-          v-if="!clerkAuth.isPro.value"
+          v-else-if="!clerkAuth.isPro.value"
           type="button"
           class="upgrade-btn"
           @click="onBillingClick"
@@ -352,6 +367,11 @@ function onSignInClick() {
   clerkAuth.signIn()
 }
 
+function onReverifyClick() {
+  console.log('[SETTINGS_ACCOUNT] Re-verify clicked')
+  clerkAuth.verifyProOnline()
+}
+
 function onBillingClick() {
   console.log('[SETTINGS_ACCOUNT] Billing clicked')
   clerkAuth.openBilling()
@@ -483,10 +503,36 @@ h2 {
   color: #ffffff;
 }
 
+.plan-pill.pro-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
 .account-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.reverify-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f59e0b;
+  color: #0b0d16;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.reverify-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .upgrade-btn {

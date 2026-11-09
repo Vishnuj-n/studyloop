@@ -66,26 +66,24 @@ func (s *StudyService) AnswerReaderQuestion(req ReaderAIRequest) map[string]inte
 
 	limits := llm.GetLimits()
 
-	// Compute overhead (template + student question + scope label)
-	templateOverhead := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
-Use the retrieved reading material below to answer the student's question.
-If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
+	// Compute overhead from unified template with empty context or fallback
+	var templatePrompt string
+	if s.promptService != nil {
+		templatePrompt, _ = s.promptService.BuildPromptWithScope(PromptCategoryReaderQA, map[string]string{
+			"{CONTENT}":  "",
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		}, req.NotebookID)
+	}
+	if templatePrompt == "" {
+		templatePrompt = renderPlaceholders(DefaultTemplates[PromptCategoryReaderQA], map[string]string{
+			"{CONTENT}":  "",
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		})
+	}
 
-Rules:
-- Keep the response concise and grounded.
-- Explain in simple, clear, and easy-to-understand language, avoiding overly academic or complex jargon.
-- If the student asks to explain a specific paragraph, passage, or concept from the material, focus on explaining the underlying logic, meaning, and rationale of the passage (e.g., why something is done or how it works) rather than just describing a specific tool or example mentioned within it.
-- Prefer 2 short paragraphs or up to 3 bullets.
-- Explain clearly, but do not turn this into a full tutoring session.
-- Stay anchored to the student's current reading flow and selected scope.
-
-Selected retrieval scope: %s
-
-Student question: %s
-
-Answer:`, scopeLabel, req.Question)
-
-	overheadTokens, err := embeddings.CountTokens(templateOverhead)
+	overheadTokens, err := embeddings.CountTokens(templatePrompt)
 	if err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("failed to count prompt overhead tokens: %v", err)}
 	}
@@ -104,26 +102,25 @@ Answer:`, scopeLabel, req.Question)
 
 	contextText := strings.TrimSpace(strings.Join(newBlocks, "\n\n"))
 
-	prompt := fmt.Sprintf(`You are the Reader sidebar AI: a lightweight, context-aware reading companion.
-Use the retrieved reading material below to answer the student's question.
-If the answer is not supported by the selected scope, reply exactly: "I couldn’t find a strong answer within the selected scope. Try expanding the retrieval scope."
-
-Rules:
-- Keep the response concise and grounded.
-- Explain in simple, clear, and easy-to-understand language, avoiding overly academic or complex jargon.
-- If the student asks to explain a specific paragraph, passage, or concept from the material, focus on explaining the underlying logic, meaning, and rationale of the passage (e.g., why something is done or how it works) rather than just describing a specific tool or example mentioned within it.
-- Prefer 2 short paragraphs or up to 3 bullets.
-- Explain clearly, but do not turn this into a full tutoring session.
-- Stay anchored to the student's current reading flow and selected scope.
-
-Selected retrieval scope: %s
-
-Retrieved reading material:
-%s
-
-Student question: %s
-
-Answer:`, scopeLabel, contextText, req.Question)
+	var prompt string
+	if s.promptService != nil {
+		var pErr error
+		prompt, pErr = s.promptService.BuildPromptWithScope(PromptCategoryReaderQA, map[string]string{
+			"{CONTENT}":  contextText,
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		}, req.NotebookID)
+		if pErr != nil {
+			prompt = ""
+		}
+	}
+	if prompt == "" {
+		prompt = renderPlaceholders(DefaultTemplates[PromptCategoryReaderQA], map[string]string{
+			"{CONTENT}":  contextText,
+			"{QUESTION}": req.Question,
+			"{TOPIC}":    scopeLabel,
+		})
+	}
 
 	answer, err := llm.GenerateAnswer(prompt)
 	if err != nil {

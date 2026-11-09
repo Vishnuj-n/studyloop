@@ -49,7 +49,18 @@ const (
 	RateLimitStrategyPaced    = "PACED"
 )
 
-// ReviewTaskDailyID is the synthetic task ID for daily flashcard review materialization.
+// CustomTaskPromptVariant represents a prompt variation (system preset or user custom version).
+type CustomTaskPromptVariant struct {
+	ID        string `json:"id"`
+	Category  string `json:"category"`
+	Name      string `json:"name"`
+	Template  string `json:"template"`
+	IsActive  bool   `json:"is_active"`
+	IsSystem  bool   `json:"is_system"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
 const ReviewTaskDailyID = "task-review-daily"
 
 // StudyQueueTask is the persisted queue task driving guided study progression.
@@ -721,6 +732,7 @@ type UserSettings struct {
 	LogLevel                string  `json:"log_level"`
 	PromptCompressionMode   string  `json:"prompt_compression_mode"`
 	PromptCompressionRate   float64 `json:"prompt_compression_rate"`
+	PreferredLanguage       string  `json:"preferred_language"`
 	AutoGenerateStudyNotes  bool    `json:"auto_generate_study_notes"`
 	NotesDetailLevel        string  `json:"notes_detail_level"`
 	NotesModelTier          string  `json:"notes_model_tier"`

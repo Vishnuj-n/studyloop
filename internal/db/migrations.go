@@ -47,6 +47,7 @@ var alterStatements = []struct {
 	{"user_settings", "log_level", "ALTER TABLE user_settings ADD COLUMN log_level TEXT NOT NULL DEFAULT 'INFO'"},
 	{"user_settings", "prompt_compression_mode", "ALTER TABLE user_settings ADD COLUMN prompt_compression_mode TEXT NOT NULL DEFAULT 'OVER_LIMIT'"},
 	{"user_settings", "prompt_compression_rate", "ALTER TABLE user_settings ADD COLUMN prompt_compression_rate REAL NOT NULL DEFAULT 0.80"},
+	{"user_settings", "preferred_language", "ALTER TABLE user_settings ADD COLUMN preferred_language TEXT NOT NULL DEFAULT 'english'"},
 	{"user_settings", "auto_generate_study_notes", "ALTER TABLE user_settings ADD COLUMN auto_generate_study_notes BOOLEAN DEFAULT 0"},
 	{"user_settings", "notes_detail_level", "ALTER TABLE user_settings ADD COLUMN notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary'"},
 	{"user_settings", "notes_model_tier", "ALTER TABLE user_settings ADD COLUMN notes_model_tier TEXT NOT NULL DEFAULT 'fast'"},
@@ -197,6 +198,42 @@ func dedupeNotebookChunks(tx *sql.Tx) error {
 }
 
 func seedDefaults(tx *sql.Tx) error {
+	// Upgrade legacy custom_task_prompts table if id column is missing
+	if hasID, _ := columnExists(tx, "custom_task_prompts", "id"); !hasID {
+		_, _ = tx.Exec(`DROP TABLE IF EXISTS custom_task_prompts`)
+	}
+
+	// custom_task_prompts
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS custom_task_prompts (
+			id TEXT PRIMARY KEY,
+			category TEXT NOT NULL,
+			name TEXT NOT NULL,
+			template TEXT NOT NULL,
+			is_active BOOLEAN NOT NULL DEFAULT 0,
+			is_system BOOLEAN NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		)
+	`); err != nil {
+		return fmt.Errorf("failed to create custom_task_prompts table: %w", err)
+	}
+
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS prompt_notebook_assignments (
+			notebook_id TEXT NOT NULL,
+			category TEXT NOT NULL,
+			variant_id TEXT NOT NULL,
+			updated_at INTEGER NOT NULL,
+			PRIMARY KEY (notebook_id, category)
+		)
+	`); err != nil {
+		return fmt.Errorf("failed to create prompt_notebook_assignments table: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_prompt_notebook_assignments_category ON prompt_notebook_assignments(category)`); err != nil {
+		return fmt.Errorf("failed to create prompt_notebook_assignments index: %w", err)
+	}
+
 	// Default user settings
 	if _, err := tx.Exec(`
 		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, reminders_enabled)

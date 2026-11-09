@@ -3,8 +3,6 @@ package study
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"ai-tutor/internal/embeddings"
@@ -28,6 +26,7 @@ func getSimplifierLevelDirective(level string) string {
 }
 
 // buildSimplifierPrompt formats the prompt given a template, material content, and comprehension style.
+// Preserved for backward compatibility in tests.
 func buildSimplifierPrompt(promptTemplate, content, styleDirective string) string {
 	if styleDirective == "" {
 		styleDirective = getSimplifierLevelDirective("simple")
@@ -39,51 +38,24 @@ func buildSimplifierPrompt(promptTemplate, content, styleDirective string) strin
 		if strings.Contains(tmpl, "{{content}}") {
 			return strings.ReplaceAll(tmpl, "{{content}}", content)
 		}
+		if strings.Contains(tmpl, "{CONTENT}") {
+			tmpl = strings.ReplaceAll(tmpl, "{CONTENT}", content)
+		}
+		if strings.Contains(tmpl, "{DIFFICULTY}") {
+			tmpl = strings.ReplaceAll(tmpl, "{DIFFICULTY}", styleDirective)
+		}
 		return tmpl + "\n\nReading Material:\n\"\"\"\n" + content + "\n\"\"\"\n"
 	}
 
-	return fmt.Sprintf(`You are an AI Text Simplifier.
-
-Transform the provided reading material into clear, well-structured Markdown notes that are easier to understand while preserving the original meaning and core information.
-
-The user's selected comprehension level is:
-
-%s
-
-Adapt the explanation strictly to this level.
-
-## Core Requirements
-
-- Match tone, sentence complexity, and vocabulary strictly to the user's selected comprehension level above.
-- For ELI5 / Very Simple levels: Strictly replace technical jargon, heavy formulas, and abstract terminology with simple, everyday real-world analogies. Do NOT keep un-simplified technical terms.
-- For Academic / Simple levels: Retain essential technical vocabulary, precise definitions, and formulas when precision requires it.
-- Preserve the author's underlying core meaning, main facts, arguments, and conclusions accurately.
-- Do not invent facts, examples, or conclusions, and do not add opinions or meta-commentary.
-- Remove unnecessary repetition, fluff, and filler.
-- Use clean, natural Markdown structure: headings, subheadings, bullet points, and numbered steps.
-
-## Output
-
-Create a clear, well-structured breakdown of the provided material matched to the selected comprehension level.
-
-Start with a short, simple overview of the main topic.
-
-Then organize the explanation into natural sections based on the material.
-
-End with a short **Key Takeaways** section summarizing the most important ideas.
-
-Reading Material:
-"""
-%s
-"""
-
-Return only the markdown response without meta-commentary.`, styleDirective, content)
+	return renderPlaceholders(DefaultTemplates[PromptCategorySimplify], map[string]string{
+		"{CONTENT}":    content,
+		"{DIFFICULTY}": styleDirective,
+	})
 }
 
-// SimplifyReadingContent takes dense text content and simplifies it using the fast LLM provider,
-// loading the prompt template dynamically from extensions/text_simplifier/prompt.md and injecting the comprehension style.
+// SimplifyReadingContent takes dense text content and simplifies it using PromptService and the preferred language.
 func (s *StudyService) SimplifyReadingContent(ctx context.Context, content string, level ...string) (string, error) {
-// ponytail: select LLM tier dynamically based on reading content length
+	// ponytail: select LLM tier dynamically based on reading content length
 	llm, tier := s.selectLLM(content)
 	if llm == nil {
 		return "", fmt.Errorf("AI provider not available. Please check your API key in Settings")
@@ -100,15 +72,20 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 	}
 	styleDirective := getSimplifierLevelDirective(styleLevel)
 
-	// Attempt to load dynamic prompt template from extensions directory
-	promptTemplate := ""
-	promptPath := filepath.Join("extensions", "text_simplifier", "prompt.md")
-	if data, err := os.ReadFile(promptPath); err == nil {
-		promptTemplate = string(data)
+	// Build template prompt to compute context budget
+	limits := llm.GetLimits()
+	var templateText string
+	var err error
+	if s.promptService != nil {
+		templateText, err = s.promptService.BuildPrompt(PromptCategorySimplify, map[string]string{
+			"{CONTENT}":    "",
+			"{DIFFICULTY}": styleDirective,
+		})
+	}
+	if err != nil || templateText == "" {
+		templateText = buildSimplifierPrompt("", "", styleDirective)
 	}
 
-	limits := llm.GetLimits()
-	templateText := buildSimplifierPrompt(promptTemplate, "", styleDirective)
 	availableBudget, err := CalculateAvailableContextBudget(limits.MaxInputTokens, templateText)
 	if err != nil {
 		return "", err
@@ -119,7 +96,16 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 		return "", fmt.Errorf("failed to budget content tokens: %w", err)
 	}
 
-	prompt := buildSimplifierPrompt(promptTemplate, truncatedContent, styleDirective)
+	var prompt string
+	if s.promptService != nil {
+		prompt, err = s.promptService.BuildPrompt(PromptCategorySimplify, map[string]string{
+			"{CONTENT}":    truncatedContent,
+			"{DIFFICULTY}": styleDirective,
+		})
+	}
+	if err != nil || prompt == "" {
+		prompt = buildSimplifierPrompt("", truncatedContent, styleDirective)
+	}
 
 	simplified, err := llm.GenerateAnswer(prompt)
 	if err != nil {
@@ -129,4 +115,3 @@ func (s *StudyService) SimplifyReadingContent(ctx context.Context, content strin
 
 	return simplified, nil
 }
-

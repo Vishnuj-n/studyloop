@@ -30,6 +30,7 @@ export function useSettings(errorRef, successRef) {
     quiz_question_count: 8,
     quiz_passing_score: 70,
     tutor_style: 'socratic',
+    preferred_language: 'english',
     prompt_compression_mode: 'OVER_LIMIT',
     prompt_compression_rate: 0.80,
     rate_limit_strategy: 'STANDARD',
@@ -203,6 +204,7 @@ export function useSettings(errorRef, successRef) {
       if (!res.quiz_question_count) res.quiz_question_count = 8
       if (!res.quiz_passing_score) res.quiz_passing_score = 70
       if (!res.tutor_style) res.tutor_style = 'socratic'
+      if (!res.preferred_language) res.preferred_language = 'english'
       settings.value = res
       computeDuration()
       setTimeout(() => {

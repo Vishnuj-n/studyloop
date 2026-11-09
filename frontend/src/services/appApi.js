@@ -730,3 +730,39 @@ export function saveNoteImage(topicID = '', notebookID = '', fileName = 'pasted_
 
 
 
+
+export function getPreferredLanguage() {
+  return appBridge().GetPreferredLanguage()
+}
+
+export function setPreferredLanguage(lang) {
+  return appBridge().SetPreferredLanguage(lang)
+}
+
+export function getPromptStudioTemplates() {
+  return appBridge().GetPromptStudioTemplates()
+}
+
+export function saveCustomPromptTemplate(category, template) {
+  return appBridge().SaveCustomPromptTemplate(category, template)
+}
+
+export function savePromptVariant(variant) {
+  return appBridge().SavePromptVariant(variant)
+}
+
+export function setActivePromptVariant(category, variantID) {
+  return appBridge().SetActivePromptVariant(category, variantID)
+}
+
+export function deletePromptVariant(variantID) {
+  return appBridge().DeletePromptVariant(variantID)
+}
+
+export function resetPromptTemplate(category) {
+  return appBridge().ResetPromptTemplate(category)
+}
+
+export function setPromptNotebookAssignment(notebookID, category, variantID) {
+  return appBridge().SetPromptNotebookAssignment(notebookID, category, variantID)
+}

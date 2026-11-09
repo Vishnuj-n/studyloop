@@ -86,6 +86,7 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"tutor_style":                s.TutorStyle,
 		"llm_prompt_logging":         s.LLMPromptLogging,
 		"log_level":                  s.LogLevel,
+		"preferred_language":         s.PreferredLanguage,
 		"auto_generate_study_notes":  s.AutoGenerateStudyNotes,
 		"notes_detail_level":         s.NotesDetailLevel,
 		"notes_model_tier":           s.NotesModelTier,
@@ -172,6 +173,9 @@ func (a *App) UpdateUserSettings(s models.UserSettings) map[string]interface{} {
 		}
 		if s.LogLevel == "" {
 			s.LogLevel = existing.LogLevel
+		}
+		if s.PreferredLanguage == "" {
+			s.PreferredLanguage = existing.PreferredLanguage
 		}
 		if s.PromptCompressionMode == "" {
 			s.PromptCompressionMode = existing.PromptCompressionMode
@@ -1475,5 +1479,29 @@ func (a *App) OpenDataDirectory(subDir string) map[string]interface{} {
 	return map[string]interface{}{"ok": true, "path": targetDir}
 }
 
+// GetPreferredLanguage returns the user's preferred language.
+func (a *App) GetPreferredLanguage() map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	lang, err := repo.GetPreferredLanguage()
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "preferred_language": lang}
+}
 
+// SetPreferredLanguage updates the user's preferred language.
+func (a *App) SetPreferredLanguage(lang string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	normLang := study.NormalizeLanguage(lang)
+	if err := repo.SetPreferredLanguage(normLang); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "preferred_language": normLang}
+}
 

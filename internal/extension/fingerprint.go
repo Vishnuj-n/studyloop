@@ -30,7 +30,8 @@ func ComputeFingerprint(ext *Extension) EnvironmentFingerprint {
 	reqSHA := ""
 	reqPath := filepath.Join(ext.Dir, "requirements.txt")
 	if data, err := os.ReadFile(reqPath); err == nil {
-		hash := sha256.Sum256(data)
+		normalized := strings.ReplaceAll(string(data), "\r\n", "\n")
+		hash := sha256.Sum256([]byte(strings.TrimSpace(normalized)))
 		reqSHA = hex.EncodeToString(hash[:])
 	}
 
