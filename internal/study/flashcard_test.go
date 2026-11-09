@@ -7,7 +7,8 @@ import (
 	"ai-tutor/internal/models"
 )
 
-func TestBuildMarathonFlashcardPromptWithBudget_IncludesChunks(t *testing.T) {
+func TestBuildFlashcardPrompt_IncludesChunks(t *testing.T) {
+	svc := &StudyService{}
 	chunks := []models.ChunkWithContext{
 		{
 			ChunkID: "chunk_001",
@@ -21,7 +22,7 @@ func TestBuildMarathonFlashcardPromptWithBudget_IncludesChunks(t *testing.T) {
 		},
 	}
 
-	prompt, currentTokens, includedIDs := buildMarathonFlashcardPromptWithBudget("Deep Learning", 15, 20, chunks, 8000)
+	prompt, currentTokens, includedIDs := svc.buildFlashcardPrompt("nb1", "Deep Learning", 15, 20, chunks, 8000)
 
 	if len(includedIDs) != 2 {
 		t.Errorf("expected 2 included chunk IDs, got %d", len(includedIDs))
@@ -40,8 +41,9 @@ func TestBuildMarathonFlashcardPromptWithBudget_IncludesChunks(t *testing.T) {
 	}
 }
 
-func TestBuildMarathonFlashcardPromptWithBudget_EmptyChunks(t *testing.T) {
-	prompt, _, includedIDs := buildMarathonFlashcardPromptWithBudget("Empty Book", 1, 5, nil, 8000)
+func TestBuildFlashcardPrompt_EmptyChunks(t *testing.T) {
+	svc := &StudyService{}
+	prompt, _, includedIDs := svc.buildFlashcardPrompt("nb1", "Empty Book", 1, 5, nil, 8000)
 
 	if len(includedIDs) != 0 {
 		t.Errorf("expected 0 included chunk IDs for nil chunks, got %d", len(includedIDs))
@@ -55,14 +57,15 @@ func TestBuildMarathonFlashcardPromptWithBudget_EmptyChunks(t *testing.T) {
 	}
 }
 
-func TestBuildMarathonFlashcardPromptWithBudget_EvenCoverage(t *testing.T) {
+func TestBuildFlashcardPrompt_EvenCoverage(t *testing.T) {
+	svc := &StudyService{}
 	chunks := []models.ChunkWithContext{
 		{ChunkID: "c1", PageNum: 1, Text: "Matrix operations definition."},
 		{ChunkID: "c2", PageNum: 2, Text: "Eigenvectors and eigenvalues properties."},
 		{ChunkID: "c3", PageNum: 3, Text: "Singular Value Decomposition applications."},
 	}
 
-	prompt, _, includedIDs := buildMarathonFlashcardPromptWithBudget("Linear Algebra", 1, 3, chunks, 8000)
+	prompt, _, includedIDs := svc.buildFlashcardPrompt("nb1", "Linear Algebra", 1, 3, chunks, 8000)
 
 	if len(includedIDs) != 3 {
 		t.Errorf("expected 3 included chunk IDs, got %d", len(includedIDs))

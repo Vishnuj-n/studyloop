@@ -20,7 +20,7 @@ func (s *StudyService) GenerateManualFlashcards(notebookID string, startPage, en
 		return map[string]interface{}{"error": err.Error()}
 	}
 
-	syntheticTopicID := fmt.Sprintf("marathon-%s-p%d-%d", notebookID, startPage, endPage)
+	syntheticTopicID := fmt.Sprintf("adhoc-%s-p%d-%d", notebookID, startPage, endPage)
 	for i := range cards {
 		cards[i].TopicID = syntheticTopicID
 	}
@@ -149,7 +149,7 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	}
 
 	// Build prompt with token budgeting
-	prompt, promptTokenCount, includedChunkIDs := s.buildMarathonFlashcardPromptWithServiceBudget(notebookID, notebookTitle, startPage, endPage, contextChunks, maxInputTokens)
+	prompt, promptTokenCount, includedChunkIDs := s.buildFlashcardPrompt(notebookID, notebookTitle, startPage, endPage, contextChunks, maxInputTokens)
 	if len(includedChunkIDs) == 0 {
 		return nil, "", fmt.Errorf("no chunks fit within prompt token budget for page range %d-%d", startPage, endPage)
 	}
@@ -224,80 +224,6 @@ func (s *StudyService) generateFlashcardsCore(notebookID string, startPage, endP
 	return cards, tier, nil
 }
 
-func buildMarathonFlashcardPromptWithBudget(notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, maxInputTokens int) (string, int, []string) {
-	// Template with empty chunks to calculate static template prompt overhead
-	emptyTemplate := buildFlashcardStaticTemplate(notebookTitle, startPage, endPage)
-	availableBudget, err := CalculateAvailableContextBudget(maxInputTokens, emptyTemplate)
-	if err != nil || availableBudget < 1000 {
-		availableBudget = 1000 // Minimum budget for meaningful content
-	}
-
-	var b strings.Builder
-	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
-	b.WriteString("CRITICAL: Return ONLY valid JSON. No markdown. No code blocks. No explanations.\n")
-	b.WriteString("Output must start with { and end with }.\n")
-	fmt.Fprintf(&b, "Notebook: \"%s\"\n", notebookTitle)
-
-	b.WriteString("\n=== JSON FORMAT ===\n")
-	b.WriteString(`{"cards":[{"prompt":"...","answer":"..."}]}` + "\n")
-	b.WriteString("\n=== GUIDELINES ===\n")
-	b.WriteString("- ONE CONCEPT PER CARD (ATOMIC): Each card must test exactly one distinction, mechanism, or rule. Never combine two separate concepts or tools into one question.\n")
-	b.WriteString("- MECHANISM OVER DEFINITIONS: Test 'how it works', 'why it is used', or 'what trade-off it introduces' instead of asking for dictionary-style definitions.\n")
-	b.WriteString("- INCLUDE CONDITIONS & LIMITS: If a technique, algorithm, or theorem only works under certain assumptions or introduces specific failure modes/trade-offs, reflect that boundary in the prompt or answer.\n")
-	b.WriteString("- CONCISE & PLAIN LANGUAGE: Use simple, direct words. Answers must be 1–3 clear, self-contained sentences explaining the causal 'why' without unnecessary jargon.\n")
-	b.WriteString("- NO FILLER OR DUPLICATES: Generate fewer cards if the text has only 1–2 distinct important ideas; do not manufacture repetitive cards.\n")
-	b.WriteString("- Ensure balanced concept coverage evenly distributed across the entire requested page range.\n")
-	fmt.Fprintf(&b, "\nGenerate up to 5 flashcards from the provided source material (pages %d-%d).\n", startPage, endPage)
-	b.WriteString("Generate fewer if there are not enough distinct important concepts.\n")
-	b.WriteString("\n=== SOURCE CHUNKS ===\n")
-
-	// Trim chunks based on token budget
-	currentTokens := 0
-	var includedChunks []models.ChunkWithContext
-	var includedChunkIDs []string
-	truncatedCount := 0
-
-	for _, chunk := range contextChunks {
-		text := strings.TrimSpace(chunk.Text)
-		if text == "" {
-			continue
-		}
-
-		// Estimate tokens for this chunk with formatting
-		chunkLine := fmt.Sprintf("[Page %d]\n%s\n\n", chunk.PageNum, text)
-		chunkTokens, err := embeddings.CountTokens(chunkLine)
-		if err != nil {
-			// Fallback to word count if tokenization fails
-			chunkTokens = len(strings.Fields(chunkLine))
-		}
-
-		// Check if adding this chunk would exceed budget
-		if currentTokens+chunkTokens > availableBudget {
-			truncatedCount++
-			continue
-		}
-
-		includedChunks = append(includedChunks, chunk)
-		includedChunkIDs = append(includedChunkIDs, chunk.ChunkID)
-		currentTokens += chunkTokens
-	}
-
-	// Add chunks to prompt
-	for _, chunk := range includedChunks {
-		text := strings.TrimSpace(chunk.Text)
-		fmt.Fprintf(&b, "[Page %d]\n%s\n\n", chunk.PageNum, text)
-	}
-
-	if truncatedCount > 0 {
-		fmt.Fprintf(&b, "[...%d additional chunks truncated to stay within token budget...]\n", truncatedCount)
-	}
-
-	utils.Warnf("[FLASHCARD_PIPELINE] chunk_trimming total_chunks=%d included=%d truncated=%d budget_used=%d available=%d",
-		len(contextChunks), len(includedChunks), truncatedCount, currentTokens, availableBudget)
-
-	return b.String(), currentTokens, includedChunkIDs
-}
-
 func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage int) string {
 	var b strings.Builder
 	b.WriteString("You are an expert academic tutor and flashcard generator creating study materials for spaced repetition (FSRS).\n")
@@ -320,7 +246,7 @@ func buildFlashcardStaticTemplate(notebookTitle string, startPage, endPage int) 
 	return b.String()
 }
 
-func (s *StudyService) buildMarathonFlashcardPromptWithServiceBudget(notebookID, notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, maxInputTokens int) (string, int, []string) {
+func (s *StudyService) buildFlashcardPrompt(notebookID, notebookTitle string, startPage, endPage int, contextChunks []models.ChunkWithContext, maxInputTokens int) (string, int, []string) {
 	topicStr := fmt.Sprintf("%s (Pages %d-%d)", notebookTitle, startPage, endPage)
 	var templatePrompt string
 	if s.promptService != nil {
