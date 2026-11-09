@@ -77,9 +77,9 @@ func (a *App) UploadNotebook(fileData []byte, fileName string) map[string]interf
 	return a.finalizeNotebookUpload(uploadResult)
 }
 
-// SelectAndUploadDeepStructuredPDF opens a native OS file picker and initiates background deep structured PDF extraction.
+// UploadStructuredPDF opens a native OS file picker and initiates background deep structured PDF extraction.
 // This is zero-copy and instant on desktop without browser DOM file array serialization.
-func (a *App) SelectAndUploadDeepStructuredPDF() map[string]interface{} {
+func (a *App) UploadStructuredPDF() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -727,9 +727,9 @@ func (a *App) DraftNotebookSyllabus(notebookID string, regenerate bool) map[stri
 	return resp
 }
 
-// AICleanupNotebookSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.
+// CleanSyllabus re-runs chapter extraction with LLM to improve bookmark-based drafts.
 // Explicit user action — not called automatically.
-func (a *App) AICleanupNotebookSyllabus(notebookID string) map[string]interface{} {
+func (a *App) CleanSyllabus(notebookID string) map[string]interface{} {
 	return a.DraftNotebookSyllabus(notebookID, true)
 }
 
@@ -1403,8 +1403,8 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 	}
 }
 
-// UpgradeNotebookToDeepPDF re-extracts an existing PDF using the deep_pdf (PyMuPDF) engine.
-func (a *App) UpgradeNotebookToDeepPDF(notebookID string) map[string]interface{} {
+// UpgradeNotebookToStructuredPDF re-extracts an existing PDF using the deep_pdf (PyMuPDF) engine.
+func (a *App) UpgradeNotebookToStructuredPDF(notebookID string) map[string]interface{} {
 	_, nb, errResp := a.getNotebookAndRepo(notebookID)
 	if errResp != nil {
 		return errResp

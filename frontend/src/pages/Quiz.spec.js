@@ -14,7 +14,7 @@ vi.mock('../services/appApi', () => ({
   submitQuizAttempt: vi.fn(),
   getNotebooks: vi.fn(),
   generateQuizForPageRange: vi.fn(),
-  generateFlashcardsForQuizTask: vi.fn(),
+  generateFlashcards: vi.fn(),
   getUserSettings: vi.fn(),
 }))
 

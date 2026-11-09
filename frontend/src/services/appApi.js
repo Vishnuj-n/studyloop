@@ -65,8 +65,8 @@ export function revertReadingTaskSession(taskID) {
   return appBridge().RevertReadingTaskSession(taskID)
 }
 
-export function revertTopicToReadingFromQuiz(quizTaskID) {
-  return appBridge().RevertTopicToReadingFromQuiz(quizTaskID)
+export function returnToReading(quizTaskID) {
+  return appBridge().ReturnToReading(quizTaskID)
 }
 
 
@@ -110,8 +110,8 @@ export function submitQuizAttemptWithReflection(taskID, answers, reflectionText 
   return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
 }
 
-export function generateFlashcardsForQuizTask(taskID) {
-  return appBridge().GenerateFlashcardsForQuizTask(taskID)
+export function generateFlashcards(taskID) {
+  return appBridge().GenerateFlashcards(taskID)
 }
 
 export function retryFlashcardGeneration(taskID) {
@@ -184,8 +184,8 @@ export function toggleCardSuspension(cardID, suspended) {
   return appBridge().ToggleCardSuspension(cardID, suspended)
 }
 
-export function toggleNotebookCardsSuspension(notebookID, suspended) {
-  return appBridge().ToggleNotebookCardsSuspension(notebookID, suspended)
+export function toggleNotebookCards(notebookID, suspended) {
+  return appBridge().ToggleNotebookCards(notebookID, suspended)
 }
 
 export function updateFlashcardContent(cardID, prompt, answer) {
@@ -216,12 +216,12 @@ export async function importAnkiDeck(filePath, targetNotebookID = '', targetTopi
   return await appBridge().ImportAnkiDeck(filePath, targetNotebookID, targetTopicID, preserveHistory)
 }
 
-export async function selectAndUploadDeepStructuredPDF() {
-  return await appBridge().SelectAndUploadDeepStructuredPDF()
+export async function uploadStructuredPDF() {
+  return await appBridge().UploadStructuredPDF()
 }
 
-export async function upgradeNotebookToDeepPDF(notebookID) {
-  return await appBridge().UpgradeNotebookToDeepPDF(notebookID)
+export async function upgradeNotebookToStructuredPDF(notebookID) {
+  return await appBridge().UpgradeNotebookToStructuredPDF(notebookID)
 }
 
 export function uploadNotebook(fileBytes, fileName) {
@@ -232,8 +232,8 @@ export function draftNotebookSyllabus(notebookID, regenerate = false) {
   return appBridge().DraftNotebookSyllabus(notebookID, regenerate)
 }
 
-export function aiCleanupNotebookSyllabus(notebookID) {
-  return appBridge().AICleanupNotebookSyllabus(notebookID)
+export function cleanSyllabus(notebookID) {
+  return appBridge().CleanSyllabus(notebookID)
 }
 
 export function confirmNotebookSyllabus(notebookID, chapters) {
@@ -338,12 +338,12 @@ export function updateProfileWithInheritance(id, name, deadlineStr, inheritedIDs
   return bridge.UpdateProfileWithInheritance(id, name, deadlineStr, inheritedIDs || [])
 }
 
-export function updateProfileFlashcardInheritance(profileID, inheritedIDs) {
-  return appBridge().UpdateProfileFlashcardInheritance(profileID, inheritedIDs || [])
+export function updateFlashcardSharing(profileID, inheritedIDs) {
+  return appBridge().UpdateFlashcardSharing(profileID, inheritedIDs || [])
 }
 
-export function getProfileFlashcardDueBreakdown() {
-  return appBridge().GetProfileFlashcardDueBreakdown()
+export function getDueCardStats() {
+  return appBridge().GetDueCardStats()
 }
 
 export function deleteProfile(id) {
@@ -374,8 +374,8 @@ export function getProfileDailyPace(profileID) {
   return appBridge().GetProfileDailyPace(profileID)
 }
 
-export function completeSocraticRescue(taskID) {
-  return appBridge().CompleteSocraticRescue(taskID)
+export function completeRescue(taskID) {
+  return appBridge().CompleteRescue(taskID)
 }
 
 export function completeMilestoneExam(taskID) {
@@ -588,36 +588,36 @@ export function getNotebookCertificateStats(notebookID) {
   }
 }
 
-export function generateTopicStudyNote(topicID, notebookID = '') {
+export function generateStudyNote(topicID, notebookID = '') {
   try {
-    return appBridge().GenerateTopicStudyNote(topicID, notebookID)
+    return appBridge().GenerateStudyNote(topicID, notebookID)
   } catch (err) {
     console.error('Failed generating topic study note:', err)
     throw err
   }
 }
 
-export function generateTopicStudyNoteForRange(topicID, notebookID = '', startPage = 0, endPage = 0) {
+export function generateStudyNoteForRange(topicID, notebookID = '', startPage = 0, endPage = 0) {
   try {
-    return appBridge().GenerateTopicStudyNoteForRange(topicID, notebookID, startPage, endPage)
+    return appBridge().GenerateStudyNoteForRange(topicID, notebookID, startPage, endPage)
   } catch (err) {
     console.error('Failed generating topic study note for range:', err)
     throw err
   }
 }
 
-export function getTopicStudyNote(topicID) {
+export function getStudyNote(topicID) {
   try {
-    return appBridge().GetTopicStudyNote(topicID)
+    return appBridge().GetStudyNote(topicID)
   } catch (err) {
     console.error('Failed fetching topic study note:', err)
     throw err
   }
 }
 
-export function getTopicStudyNoteForRange(topicID, startPage = 0, endPage = 0) {
+export function getStudyNoteForRange(topicID, startPage = 0, endPage = 0) {
   try {
-    return appBridge().GetTopicStudyNoteForRange(topicID, Number(startPage) || 0, Number(endPage) || 0)
+    return appBridge().GetStudyNoteForRange(topicID, Number(startPage) || 0, Number(endPage) || 0)
   } catch (err) {
     console.error('Failed fetching topic study note for range:', err)
     throw err
@@ -642,7 +642,7 @@ export async function isTopicNoteGenerating(topicID, notebookID = '', startPage 
   }
 }
 
-export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, content = '') {
+export function updateStudyNote(topicID, startPage = 0, endPage = 0, content = '') {
   try {
     // If called with (topicID, content) backward-compatibility
     if (typeof startPage === 'string' && content === '') {
@@ -650,7 +650,7 @@ export function updateTopicStudyNote(topicID, startPage = 0, endPage = 0, conten
       startPage = 0
       endPage = 0
     }
-    return appBridge().UpdateTopicStudyNote(topicID, Number(startPage) || 0, Number(endPage) || 0, content)
+    return appBridge().UpdateStudyNote(topicID, Number(startPage) || 0, Number(endPage) || 0, content)
   } catch (err) {
     console.error('Failed updating topic study note:', err)
     throw err

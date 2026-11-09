@@ -263,7 +263,7 @@ import NotebookTopicSelector from '../components/NotebookTopicSelector.vue'
 import {
   askSocratic,
   getUserSettings,
-  completeSocraticRescue,
+  completeRescue,
   activateTask,
   getTaskContext,
 } from '../services/appApi'
@@ -633,7 +633,7 @@ async function finishRescue() {
   completingRescue.value = true
   globalError.value = ''
   try {
-    const res = await completeSocraticRescue(taskId.value)
+    const res = await completeRescue(taskId.value)
     if (res && res.error) {
       globalError.value = res.error
       completingRescue.value = false

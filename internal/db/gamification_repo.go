@@ -5,23 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 
 	"ai-tutor/internal/models"
-
-	"github.com/google/uuid"
 )
 
 var (
-	ErrInsufficientCoins    = errors.New("insufficient coins")
-	ErrNoFreezes            = errors.New("no streak freezes available")
-	ErrFreezeInventoryFull  = errors.New("cannot own more than 2 streak freezes")
-	ErrFreezeWeeklyLimit    = errors.New("streak freeze purchase limit reached for this week (1 purchase per 7 days)")
-	ErrBoxNotFound          = errors.New("loot box not found")
-	ErrBoxAlreadyOpened     = errors.New("loot box already opened")
+	ErrInsufficientCoins   = errors.New("insufficient coins")
+	ErrNoFreezes           = errors.New("no streak freezes available")
+	ErrFreezeInventoryFull = errors.New("cannot own more than 2 streak freezes")
+	ErrFreezeWeeklyLimit   = errors.New("streak freeze purchase limit reached for this week (1 purchase per 7 days)")
+	ErrBoxNotFound         = errors.New("loot box not found")
+	ErrBoxAlreadyOpened    = errors.New("loot box already opened")
 )
-
 
 // Title milestones: minimum XP required for each title rank
 var TitleTiers = []struct {
@@ -548,73 +544,6 @@ func getCosmeticCatalog() []models.CosmeticItem {
 		{ID: "skin:fox:midnight", Name: "Rusty Midnight Shadow Skin", Type: "pet_skin", Price: 1000},
 	}
 }
-
-// GenerateLootBox produces a randomized reward loot box based on tier.
-func GenerateLootBox(tier string) *models.PendingLootBox {
-	boxID := uuid.NewString()
-	var rewardType string
-	var amount int
-
-	roll := rand.Intn(100)
-
-	switch tier {
-	case "BRONZE":
-		if roll < 60 {
-			rewardType = "XP"
-			amount = 15 + rand.Intn(26)
-		} else {
-			rewardType = "COINS"
-			amount = 5 + rand.Intn(6)
-		}
-
-	case "SILVER":
-		if roll < 65 {
-			rewardType = "XP"
-			amount = 40 + rand.Intn(61)
-		} else {
-			rewardType = "COINS"
-			amount = 15 + rand.Intn(16)
-		}
-
-	case "GOLD":
-		if roll < 50 {
-			rewardType = "XP"
-			amount = 100 + rand.Intn(151)
-		} else if roll < 85 {
-			rewardType = "COINS"
-			amount = 30 + rand.Intn(21)
-		} else {
-			rewardType = "STREAK_FREEZE"
-			amount = 1
-		}
-
-	case "MYTHIC":
-		if roll < 45 {
-			rewardType = "XP"
-			amount = 200 + rand.Intn(301)
-		} else if roll < 80 {
-			rewardType = "COINS"
-			amount = 50 + rand.Intn(51)
-		} else {
-			rewardType = "STREAK_FREEZE"
-			amount = 1
-		}
-
-	default:
-		rewardType = "XP"
-		amount = 20
-	}
-
-	return &models.PendingLootBox{
-		ID:           boxID,
-		BoxTier:      tier,
-		RewardType:   rewardType,
-		RewardAmount: amount,
-		Opened:       false,
-	}
-}
-
-
 
 func getCosmeticDefinition(itemCode string) (*models.CosmeticItem, bool) {
 	for _, item := range getCosmeticCatalog() {

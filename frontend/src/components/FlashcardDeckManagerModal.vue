@@ -481,10 +481,10 @@ import BaseIcon from './BaseIcon.vue'
 import {
   getFlashcardsDeckOverview,
   toggleCardSuspension,
-  toggleNotebookCardsSuspension,
+  toggleNotebookCards,
   deleteFlashcard,
   updateFlashcardContent,
-  updateProfileFlashcardInheritance,
+  updateFlashcardSharing,
 } from '../services/appApi.js'
 import { copyTextToClipboard } from '../utils/clipboard'
 import { useDialog } from '../composables/useDialog'
@@ -927,7 +927,7 @@ async function toggleProfileInheritance(p) {
   }
 
   try {
-    const res = await updateProfileFlashcardInheritance(activeProf.profile_id, nextInherited)
+    const res = await updateFlashcardSharing(activeProf.profile_id, nextInherited)
     if (res && res.error) {
       showError(res.error)
       return
@@ -987,7 +987,7 @@ async function handleToggleNotebook(nb) {
 
   pendingNotebookIds.value = new Set(pendingNotebookIds.value).add(nbKey)
   try {
-    const res = await toggleNotebookCardsSuspension(nb.notebook_id, newSuspended)
+    const res = await toggleNotebookCards(nb.notebook_id, newSuspended)
     if (res && res.error) {
       showError(res.error)
       return

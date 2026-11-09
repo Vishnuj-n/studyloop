@@ -912,8 +912,8 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 	return map[string]interface{}{"ok": true}
 }
 
-// UpdateProfileFlashcardInheritance toggles or sets inherited flashcard profiles for a profile.
-func (a *App) UpdateProfileFlashcardInheritance(profileID string, inheritedIDs []string) map[string]interface{} {
+// UpdateFlashcardSharing toggles or sets inherited flashcard profiles for a profile.
+func (a *App) UpdateFlashcardSharing(profileID string, inheritedIDs []string) map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}
@@ -928,8 +928,8 @@ func (a *App) UpdateProfileFlashcardInheritance(profileID string, inheritedIDs [
 	return map[string]interface{}{"ok": true}
 }
 
-// GetProfileFlashcardDueBreakdown returns due and total card breakdown for all profiles.
-func (a *App) GetProfileFlashcardDueBreakdown() map[string]interface{} {
+// GetDueCardStats returns due and total card breakdown for all profiles.
+func (a *App) GetDueCardStats() map[string]interface{} {
 	repo := a.getRepo()
 	if repo == nil {
 		return map[string]interface{}{"error": errDatabaseNotInitialized}

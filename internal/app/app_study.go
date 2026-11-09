@@ -816,8 +816,8 @@ func (a *App) ClaimAchievement(achievementID string) map[string]interface{} {
 	}
 }
 
-// GenerateTopicStudyNote generates or regenerates the whole-chapter (0,0) study note for a topic.
-func (a *App) GenerateTopicStudyNote(topicID, notebookID string) map[string]interface{} {
+// GenerateStudyNote generates or regenerates the whole-chapter (0,0) study note for a topic.
+func (a *App) GenerateStudyNote(topicID, notebookID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
@@ -831,9 +831,9 @@ func (a *App) GenerateTopicStudyNote(topicID, notebookID string) map[string]inte
 	}
 }
 
-// GenerateTopicStudyNoteForRange creates or replaces the study note for a specific reading session page range.
+// GenerateStudyNoteForRange creates or replaces the study note for a specific reading session page range.
 // Each (topicID, startPage, endPage) is its own independent note slot — no merging.
-func (a *App) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPage, endPage int) map[string]interface{} {
+func (a *App) GenerateStudyNoteForRange(topicID, notebookID string, startPage, endPage int) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
@@ -847,9 +847,9 @@ func (a *App) GenerateTopicStudyNoteForRange(topicID, notebookID string, startPa
 	}
 }
 
-// GetTopicStudyNote retrieves the whole-chapter (0,0) study note for a topic.
+// GetStudyNote retrieves the whole-chapter (0,0) study note for a topic.
 // Use GetTopicStudyNoteSlots to get all per-session notes.
-func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
+func (a *App) GetStudyNote(topicID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
@@ -863,8 +863,8 @@ func (a *App) GetTopicStudyNote(topicID string) map[string]interface{} {
 	}
 }
 
-// GetTopicStudyNoteForRange retrieves the study note for a specific (topic, startPage, endPage) slot.
-func (a *App) GetTopicStudyNoteForRange(topicID string, startPage, endPage int) map[string]interface{} {
+// GetStudyNoteForRange retrieves the study note for a specific (topic, startPage, endPage) slot.
+func (a *App) GetStudyNoteForRange(topicID string, startPage, endPage int) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}
@@ -910,9 +910,9 @@ func (a *App) GetTopicStudyNoteSlots(topicID string) map[string]interface{} {
 	}
 }
 
-// UpdateTopicStudyNote updates the markdown content of a specific (topic, page range) note slot.
+// UpdateStudyNote updates the markdown content of a specific (topic, page range) note slot.
 // Use startPage=0, endPage=0 for the whole-chapter note.
-func (a *App) UpdateTopicStudyNote(topicID string, startPage, endPage int, content string) map[string]interface{} {
+func (a *App) UpdateStudyNote(topicID string, startPage, endPage int, content string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": "study service not initialized"}
 	}

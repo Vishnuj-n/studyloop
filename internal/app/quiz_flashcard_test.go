@@ -622,13 +622,13 @@ func TestCompleteSocraticRescueInsertsRequiz(t *testing.T) {
 	if err := testRepo.InsertStudyTask(task); err != nil {
 		t.Fatalf("failed to insert socratic task: %v", err)
 	}
-	res := app.CompleteSocraticRescue("task-socratic-test")
+	res := app.CompleteRescue("task-socratic-test")
 	if errVal, ok := res["error"]; ok && errVal != nil {
-		t.Fatalf("CompleteSocraticRescue failed: %v", errVal)
+		t.Fatalf("CompleteRescue failed: %v", errVal)
 	}
 	returnedQuizTaskID, ok := res["quiz_task_id"].(string)
 	if !ok || returnedQuizTaskID == "" {
-		t.Fatalf("expected completeSocraticRescue to return quiz_task_id")
+		t.Fatalf("expected completeRescue to return quiz_task_id")
 	}
 
 	socraticTask, err := testRepo.GetTaskByID("task-socratic-test")
@@ -875,7 +875,7 @@ func TestFSRSCalibrationEasyAndDoubleGood(t *testing.T) {
 		t.Fatalf("expected submit success, got error: %v", respAce["error"])
 	}
 
-	genResp1 := app.GenerateFlashcardsForQuizTask("task-quiz-ace")
+	genResp1 := app.GenerateFlashcards("task-quiz-ace")
 	if _, hasErr := genResp1["error"]; hasErr {
 		t.Fatalf("expected flashcard generation success, got error: %v", genResp1["error"])
 	}
@@ -911,7 +911,7 @@ func TestFSRSCalibrationEasyAndDoubleGood(t *testing.T) {
 		t.Fatalf("expected submit success, got error: %v", respPass["error"])
 	}
 
-	genResp2 := app.GenerateFlashcardsForQuizTask("task-quiz-pass")
+	genResp2 := app.GenerateFlashcards("task-quiz-pass")
 	if _, hasErr := genResp2["error"]; hasErr {
 		t.Fatalf("expected flashcard generation success, got error: %v", genResp2["error"])
 	}
@@ -1014,7 +1014,7 @@ func TestMilestoneExamTriggers(t *testing.T) {
 			t.Fatalf("insert quiz task %d failed: %v", i, err)
 		}
 		_ = app.SubmitQuizAttemptWithReflection(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
-		_ = app.GenerateFlashcardsForQuizTask(taskID)
+		_ = app.GenerateFlashcards(taskID)
 	}
 
 	// Verify no milestone yet
@@ -1038,7 +1038,7 @@ func TestMilestoneExamTriggers(t *testing.T) {
 		t.Fatalf("insert quiz task 3 failed: %v", err)
 	}
 	_ = app.SubmitQuizAttemptWithReflection("task-ms-q3", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
-	_ = app.GenerateFlashcardsForQuizTask("task-ms-q3")
+	_ = app.GenerateFlashcards("task-ms-q3")
 
 	// Verify milestone exam was inserted for Chapter 1
 	msTasks, err := testRepo.GetAllPendingTasks()
@@ -1071,7 +1071,7 @@ func TestMilestoneExamTriggers(t *testing.T) {
 		t.Fatalf("insert short chapter quiz failed: %v", err)
 	}
 	_ = app.SubmitQuizAttemptWithReflection("task-ms-short-q1", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
-	_ = app.GenerateFlashcardsForQuizTask("task-ms-short-q1")
+	_ = app.GenerateFlashcards("task-ms-short-q1")
 
 	// Count milestones - should still be 1 (only the one from Chapter 1)
 	countAfterShort, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
@@ -1121,7 +1121,7 @@ func TestMilestoneExamTriggers(t *testing.T) {
 				t.Fatalf("corrupt ch3 attempt 2 failed: %v", err)
 			}
 		}
-		_ = app.GenerateFlashcardsForQuizTask(taskID)
+		_ = app.GenerateFlashcards(taskID)
 	}
 
 	// Count milestones: still 1 because the corrupt attempt leaves only 2 valid quizzes (< 3)

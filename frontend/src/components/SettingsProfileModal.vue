@@ -78,7 +78,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import BaseIcon from './BaseIcon.vue'
-import { getProfileFlashcardDueBreakdown } from '../services/appApi'
+import { getDueCardStats } from '../services/appApi'
 
 const props = defineProps({
   isEdit: { type: Boolean, default: false },
@@ -137,7 +137,7 @@ async function handleSave() {
 
 onMounted(async () => {
   try {
-    const res = await getProfileFlashcardDueBreakdown()
+    const res = await getDueCardStats()
     if (res && res.profiles) {
       const map = {}
       for (const p of res.profiles) {

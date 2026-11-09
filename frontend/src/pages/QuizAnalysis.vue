@@ -522,7 +522,7 @@ import { useRoute, useRouter } from 'vue-router'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import {
   analyzeQuizFailure,
-  generateFlashcardsForQuizTask,
+  generateFlashcards,
   GetTaskContext,
 } from '../services/appApi'
 
@@ -794,7 +794,7 @@ async function handleExit(shouldGenerateFlashcards) {
 
   if (shouldGenerateFlashcards && flashcardsPending.value && taskID.value) {
     try {
-      const genResult = await generateFlashcardsForQuizTask(taskID.value)
+      const genResult = await generateFlashcards(taskID.value)
       if (genResult?.error) {
         exitError.value = genResult.error
         processingExit.value = false
