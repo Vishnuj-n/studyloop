@@ -255,15 +255,16 @@ func printRedundantImports(analysis *DuplicateAnalysis) {
 func printSimilarities(analysis *DuplicateAnalysis) {
 	fmt.Println("🔄 PATTERN SIMILARITIES:")
 
-	if len(analysis.Similarities) > 0 {
-		for _, sim := range analysis.Similarities {
-			fmt.Printf("  🎯 %s (%.0f%% similar)\n", sim.Name, sim.Similarity*100)
-			fmt.Printf("     %s\n", sim.Description)
-			fmt.Printf("     Files: %s\n\n", strings.Join(sim.Files, ", "))
-		}
-	} else {
+	if len(analysis.Similarities) == 0 {
 		fmt.Println("  ✅ No obvious pattern duplications detected")
 		fmt.Println()
+		return
+	}
+
+	for _, sim := range analysis.Similarities {
+		fmt.Printf("  🎯 %s (%.0f%% similar)\n", sim.Name, sim.Similarity*100)
+		fmt.Printf("     %s\n", sim.Description)
+		fmt.Printf("     Files: %s\n\n", strings.Join(sim.Files, ", "))
 	}
 }
 
