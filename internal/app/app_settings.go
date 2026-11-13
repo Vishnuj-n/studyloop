@@ -65,7 +65,6 @@ func (a *App) GetUserSettings() map[string]interface{} {
 		"show_reward_notifications":  s.ShowRewardNotifications,
 		"ask_profile_on_startup":     s.AskProfileOnStartup,
 		"active_profile_id":          s.ActiveProfileID,
-		"skip_to_reading_active":     s.SkipToReadingActive,
 		"cloud_sync_url":             s.CloudSyncURL,
 		"cloud_api_token":            s.CloudAPIToken,
 		"theme":                      s.Theme,
@@ -608,7 +607,6 @@ type ProfileWithSummary struct {
 	Theme                   string                 `json:"theme,omitempty"`
 	MaxFlashcardsPerSession *int                   `json:"max_flashcards_per_session,omitempty"`
 	MaxActiveNotebooks      *int                   `json:"max_active_notebooks,omitempty"`
-	SkipToReadingActive     *bool                  `json:"skip_to_reading_active,omitempty"`
 	DefaultRemedialStrategy string                 `json:"default_remedial_strategy,omitempty"`
 	QuizQuestionCount       *int                   `json:"quiz_question_count,omitempty"`
 	QuizPassingScore        *int                   `json:"quiz_passing_score,omitempty"`
@@ -655,7 +653,6 @@ func (a *App) GetProfiles() map[string]interface{} {
 			Theme:                   p.Theme,
 			MaxFlashcardsPerSession: p.MaxFlashcardsPerSession,
 			MaxActiveNotebooks:      p.MaxActiveNotebooks,
-			SkipToReadingActive:     p.SkipToReadingActive,
 			DefaultRemedialStrategy: p.DefaultRemedialStrategy,
 			QuizQuestionCount:       p.QuizQuestionCount,
 			QuizPassingScore:        p.QuizPassingScore,
@@ -684,7 +681,6 @@ func (a *App) CreateProfile(name string, deadlineStr string) map[string]interfac
 
 	// Auto-clone preferences from current active profile or user settings
 	var initialTargetWords, initialMinWords, initialCards, initialActive, initialQuizCount, initialQuizScore *int
-	var initialSkipRead *bool
 	var initialTheme, initialStrategy, initialTutorStyle string
 	initialPomoDur := 1500
 	initialPomoBreak := 300
@@ -697,7 +693,6 @@ func (a *App) CreateProfile(name string, deadlineStr string) map[string]interfac
 			initialMinWords = activeProf.MinSessionWords
 			initialCards = activeProf.MaxFlashcardsPerSession
 			initialActive = activeProf.MaxActiveNotebooks
-			initialSkipRead = activeProf.SkipToReadingActive
 			initialTheme = activeProf.Theme
 			initialStrategy = activeProf.DefaultRemedialStrategy
 			initialQuizCount = activeProf.QuizQuestionCount
@@ -725,10 +720,6 @@ func (a *App) CreateProfile(name string, deadlineStr string) map[string]interfac
 		if initialActive == nil && currentSettings.MaxActiveNotebooks > 0 {
 			act := currentSettings.MaxActiveNotebooks
 			initialActive = &act
-		}
-		if initialSkipRead == nil {
-			sr := currentSettings.SkipToReadingActive
-			initialSkipRead = &sr
 		}
 		if initialTheme == "" {
 			initialTheme = currentSettings.Theme
@@ -758,7 +749,6 @@ func (a *App) CreateProfile(name string, deadlineStr string) map[string]interfac
 		Theme:                   initialTheme,
 		MaxFlashcardsPerSession: initialCards,
 		MaxActiveNotebooks:      initialActive,
-		SkipToReadingActive:     initialSkipRead,
 		DefaultRemedialStrategy: initialStrategy,
 		QuizQuestionCount:       initialQuizCount,
 		QuizPassingScore:        initialQuizScore,
@@ -892,7 +882,6 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 		    theme = ?,
 		    max_flashcards_per_session = ?,
 		    max_active_notebooks = ?,
-		    skip_to_reading_active = ?,
 		    default_remedial_strategy = ?,
 		    quiz_question_count = ?,
 		    quiz_passing_score = ?,
@@ -900,7 +889,7 @@ func (a *App) UpdateProfileWithInheritance(id string, name string, deadlineStr s
 		    inherited_flashcard_profile_ids_json = ?
 		WHERE id = ?
 	`, current.Name, current.DeadlineAt, current.TargetSessionWords, current.MinSessionWords, current.Theme, current.MaxFlashcardsPerSession,
-		current.MaxActiveNotebooks, current.SkipToReadingActive, current.DefaultRemedialStrategy,
+		current.MaxActiveNotebooks, current.DefaultRemedialStrategy,
 		current.QuizQuestionCount, current.QuizPassingScore, current.TutorStyle, inheritedJSON, current.ID)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}

@@ -363,7 +363,6 @@ Singleton table for global preferences.
 | `show_reward_notifications` | BOOLEAN DEFAULT 1 | Whether reward popups & toasts are shown upon task completion |
 | `ask_profile_on_startup` | BOOLEAN DEFAULT 1 | Whether "Who is studying?" profile picker prompt appears on app launch when $\ge 2$ profiles exist |
 | `active_profile_id` | TEXT | Active study profile. FK → `study_profiles(id)` ON DELETE SET NULL |
-| `skip_to_reading_active` | BOOLEAN DEFAULT 0 | Skip dashboard to active reading |
 | `cloud_sync_url` | TEXT DEFAULT '' | Remote sync endpoint URL |
 | `cloud_api_token` | TEXT DEFAULT '' | Remote sync auth token |
 | `theme` | TEXT DEFAULT 'dark-gruvbox' | UI theme selector |
@@ -497,7 +496,6 @@ Named study profiles with deadline tracking and profile-scoped study parameters.
 | `theme` | TEXT DEFAULT '' | Profile visual theme (empty = inherit global) |
 | `max_flashcards_per_session` | INTEGER DEFAULT NULL | Review volume per session (null = inherit global) |
 | `max_active_notebooks` | INTEGER DEFAULT NULL | Concurrent active decks/books (null = inherit global) |
-| `skip_to_reading_active` | BOOLEAN DEFAULT NULL | Priority bypass behavior (null = inherit global) |
 | `default_remedial_strategy` | TEXT DEFAULT '' | Remedial strategy `FAST` or `CLASSIC` (empty = inherit global) |
 | `quiz_question_count` | INTEGER DEFAULT NULL | Target questions per quiz (null = inherit global) |
 | `quiz_passing_score` | INTEGER DEFAULT NULL | Passing score percentage (null = inherit global) |

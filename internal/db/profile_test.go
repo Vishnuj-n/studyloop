@@ -63,7 +63,6 @@ func TestProfileAndSettingsLifecycle(t *testing.T) {
 	// 4. Test UpdateUserSettings with active profile
 	s.ActiveProfileID = "prof-1"
 	s.MaxFlashcardsPerSession = 50
-	s.SkipToReadingActive = true
 	s.CloudSyncURL = "http://localhost/sync"
 	s.CloudAPIToken = "secret-token"
 
@@ -80,9 +79,6 @@ func TestProfileAndSettingsLifecycle(t *testing.T) {
 	}
 	if sUpdated.ActiveProfileID != "prof-1" {
 		t.Errorf("expected active profile prof-1, got %q", sUpdated.ActiveProfileID)
-	}
-	if !sUpdated.SkipToReadingActive {
-		t.Errorf("expected skip_to_reading_active to be true")
 	}
 	if sUpdated.CloudSyncURL != "http://localhost/sync" {
 		t.Errorf("expected cloud_sync_url to be http://localhost/sync, got %q", sUpdated.CloudSyncURL)
