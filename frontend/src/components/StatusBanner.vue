@@ -166,7 +166,7 @@ const isKnownIcon = computed(() => Boolean(icons[props.icon]))
   transform: translateY(-1px);
 }
 
-/* --- Variant: info (escape hatch) --- */
+/* --- Variant: info --- */
 .banner--info {
   background: rgba(230, 126, 34, 0.1);
   border: 1px solid var(--outline-variant);

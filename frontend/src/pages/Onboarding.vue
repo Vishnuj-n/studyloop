@@ -974,7 +974,6 @@ async function completeOnboarding() {
       study_end_time: studyEndTime.value,
       reminders_enabled: remindersEnabled.value,
       active_profile_id: newProfile.id,
-      skip_to_reading_active: false,
       cloud_sync_url: cloudSyncURL.value.trim(),
       cloud_api_token: apiToken.value.trim(),
       theme: selectedTheme.value,

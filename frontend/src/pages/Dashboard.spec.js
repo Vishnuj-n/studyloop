@@ -45,7 +45,6 @@ const baseSettings = {
   study_end_time: '18:00',
   reminders_enabled: true,
   active_profile_id: 'prof-1',
-  skip_to_reading_active: false,
   cloud_sync_url: '',
   cloud_api_token: '',
   theme: '',
@@ -119,27 +118,6 @@ describe('Dashboard.vue Integration', () => {
 
     expect(wrapper.find('.status-strip h1').text()).toBe("Today's Tasks")
     expect(wrapper.text()).toContain('Introduction to Calculus')
-  })
-
-  it('toggles escape hatch status when clicked', async () => {
-    appApi.getDashboardOverview.mockResolvedValue(
-      makeOverview({
-        today_plan: { tasks: [], due_review_cards: 0 },
-      })
-    )
-
-    const wrapper = mount(Dashboard)
-    await flushPromises()
-
-    const toggleBtn = wrapper.find('.escape-hatch-toggle')
-    expect(toggleBtn.text()).toBe('Skip to Reading')
-
-    await toggleBtn.trigger('click')
-    expect(appApi.updateUserSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip_to_reading_active: true,
-      })
-    )
   })
 
   it('displays concept rescue banner when socratic task is present', async () => {

@@ -13,7 +13,6 @@ export function useSettings(errorRef, successRef) {
     reminders_enabled: true,
     show_reward_notifications: true,
     active_profile_id: '',
-    skip_to_reading_active: false,
     cloud_sync_url: '',
     cloud_api_token: '',
     theme: 'dark-gruvbox',

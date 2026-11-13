@@ -21,7 +21,6 @@
       :streak-saved-event="streakSavedEvent"
       :pending-ingestion-book="pendingIngestionBook"
       :is-cloud-account="Boolean(userSettings.classroom_code)"
-      :skip-to-reading-active="userSettings.skip_to_reading_active"
       :has-socratic-rescue-task="hasSocraticRescueTask"
       :flashcard-notice="flashcardNotice"
       :flashcards-just-created="flashcardsJustCreated"
@@ -47,15 +46,6 @@
           :completed-sessions="completedSessionsToday"
           @open-pace-modal="showPaceModal = true"
         />
-
-        <!-- Escape Hatch Quick Toggle Button -->
-        <button
-          class="escape-hatch-toggle"
-          :class="{ active: userSettings.skip_to_reading_active }"
-          @click="toggleEscapeHatch"
-        >
-          {{ userSettings.skip_to_reading_active ? 'Disable Escape Hatch' : 'Skip to Reading' }}
-        </button>
       </div>
     </article>
 
@@ -242,7 +232,6 @@ const userSettings = ref({
   classroom_code: '',
   reminders_enabled: true,
   active_profile_id: '',
-  skip_to_reading_active: false,
   cloud_sync_url: '',
   cloud_api_token: '',
   theme: '',
@@ -289,9 +278,7 @@ const nonReviewTasks = computed(() => {
 })
 
 const isReviewHero = computed(() => {
-  return (
-    !!reviewTask.value && !userSettings.value.skip_to_reading_active
-  )
+  return !!reviewTask.value
 })
 
 const focusHeroTask = computed(() => {
@@ -483,28 +470,6 @@ function goToProfileOverview() {
   router.push({ path: '/settings', query: { category: 'profiles' } })
 }
 
-async function toggleEscapeHatch() {
-  const previousSkipToReading = userSettings.value.skip_to_reading_active
-  try {
-    refreshing.value = true
-    actionError.value = ''
-    userSettings.value.skip_to_reading_active = !userSettings.value.skip_to_reading_active
-    const res = await updateUserSettings(userSettings.value)
-    if (res && res.error) {
-      userSettings.value.skip_to_reading_active = previousSkipToReading
-      actionError.value = res.error
-      return
-    }
-    window.dispatchEvent(new CustomEvent('settings-updated'))
-    await loadAgenda()
-  } catch (err) {
-    userSettings.value.skip_to_reading_active = previousSkipToReading
-    actionError.value = 'Failed to toggle escape hatch'
-  } finally {
-    refreshing.value = false
-  }
-}
-
 async function runFlashcardSyncInline(task) {
   try {
     isSyncing.value = true
@@ -640,30 +605,6 @@ function goToNotebooks() {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.escape-hatch-toggle {
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-  border: 1px solid var(--outline-variant);
-  border-radius: 9999px;
-  padding: 7px 16px;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
-}
-
-.escape-hatch-toggle:hover {
-  border-color: var(--primary);
-}
-
-.escape-hatch-toggle.active {
-  background: linear-gradient(135deg, #e67e22, #d35400);
-  border-color: #d35400;
-  color: white;
-  box-shadow: 0 0 12px rgba(230, 126, 34, 0.3);
 }
 
 .card {
