@@ -3,7 +3,7 @@
  * To add a new importer extension (e.g. ArXiv, Notion, Audio Transcriber),
  * simply add an entry here and register its modal/handler component.
  */
-export const NOTEBOOK_IMPORTERS = [
+const NOTEBOOK_IMPORTERS = [
   {
     id: 'deep_pdf',
     name: 'Deep Structured PDF',

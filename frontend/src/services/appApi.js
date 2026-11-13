@@ -95,7 +95,6 @@ export function getTask(taskID) {
 export function getTaskContext(taskID) {
   return appBridge().GetTaskContext(taskID)
 }
-export const GetTaskContext = getTaskContext
 
 
 export function generateQuizForPageRange(notebookID, startPage, endPage) {
@@ -106,9 +105,6 @@ export function submitQuizAttempt(taskID, answers, reflectionText = '') {
   return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
 }
 
-export function submitQuizAttemptWithReflection(taskID, answers, reflectionText = '') {
-  return appBridge().SubmitQuizAttemptWithReflection(taskID, answers, reflectionText)
-}
 
 export function generateFlashcards(taskID) {
   return appBridge().GenerateFlashcards(taskID)

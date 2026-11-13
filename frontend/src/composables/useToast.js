@@ -15,7 +15,7 @@ const rateLimitBanner = ref({
   message: '',
 })
 
-export function isRateLimitError(err) {
+function isRateLimitError(err) {
   if (!err) return false
   const str = String(err).toLowerCase()
   return (
