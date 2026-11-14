@@ -1,7 +1,7 @@
 # API Dependency Analysis: False Positives & Status Reference
 <!-- Reference document to avoid rescanning and false reporting -->
 
-## 1. Executive Summary
+am## 1. Executive Summary
 
 In `doc/api_dependency_report.md`, **Section 3 flagged 66 internal Go functions and methods as "unreachable / dead code"**. 
 
