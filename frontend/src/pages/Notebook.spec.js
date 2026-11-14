@@ -13,7 +13,7 @@ window.runtime = {
 vi.mock('../services/appApi', () => ({
   getNotebooks: vi.fn(),
   confirmNotebookSyllabus: vi.fn(),
-  aiCleanupNotebookSyllabus: vi.fn(),
+  cleanSyllabus: vi.fn(),
   getNotebookDetail: vi.fn(),
   updateNotebookPriority: vi.fn(),
   updateNotebookTitle: vi.fn(),
@@ -58,7 +58,7 @@ describe('Notebook.vue - AI Cleanup then Confirm regression test', () => {
   })
 
   it('preserves originalDraftChapters snapshot after AI cleanup so confirmNotebookSyllabus receives cleaned chapters', async () => {
-    appApi.aiCleanupNotebookSyllabus.mockResolvedValue({
+    appApi.cleanSyllabus.mockResolvedValue({
       chapters: [
         { title: 'Cleaned Chapter 1', start_page: 1, end_page: 5 },
         { title: 'Cleaned Chapter 2', start_page: 6, end_page: 10 },
@@ -91,7 +91,7 @@ describe('Notebook.vue - AI Cleanup then Confirm regression test', () => {
     await flushPromises()
 
     // Assert AI cleanup ran and updated draftChapters
-    expect(appApi.aiCleanupNotebookSyllabus).toHaveBeenCalledWith('nb-1')
+    expect(appApi.cleanSyllabus).toHaveBeenCalledWith('nb-1')
     expect(wrapper.vm.draftChapters).toEqual([
       { title: 'Cleaned Chapter 1', start_page: 1, end_page: 5 },
       { title: 'Cleaned Chapter 2', start_page: 6, end_page: 10 },

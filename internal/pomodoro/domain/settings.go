@@ -11,15 +11,4 @@ type Settings struct {
 	Theme               string `json:"theme"` // "dark" | "ocean" | "forest" | "minimal-black"
 }
 
-// DefaultSettings returns the factory defaults shown on first run.
-func DefaultSettings() Settings {
-	return Settings{
-		Enabled:             true,
-		DefaultVolume:       70,
-		AutoStartAudio:      true,
-		NotifyOnComplete:    true,
-		AutoStartNextTimer:  false,
-		PlaySoundOnComplete: true,
-		Theme:               "dark",
-	}
-}
+

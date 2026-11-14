@@ -158,7 +158,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
   getTopicSectionsContent,
-  completeSocraticRescue,
+  completeRescue,
   getTaskContext,
   activateTask,
 } from '../services/appApi'
@@ -294,7 +294,7 @@ async function finishRescueSession() {
   completing.value = true
   error.value = ''
   try {
-    const res = await completeSocraticRescue(taskID.value)
+    const res = await completeRescue(taskID.value)
     if (res && res.error) {
       error.value = res.error
       completing.value = false

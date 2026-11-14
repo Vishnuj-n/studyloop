@@ -149,16 +149,16 @@ import {
   getAvailableTopics,
   getNotebooks as fetchNotebooks,
   uploadNotebook as apiUploadNotebook,
-  selectAndUploadDeepStructuredPDF,
+  uploadStructuredPDF,
   uploadYouTubeNotebook as apiUploadYouTubeNotebook,
   importAnkiDeck as apiImportAnkiDeck,
   draftNotebookSyllabus as apiDraftNotebookSyllabus,
-  aiCleanupNotebookSyllabus as apiAICleanupNotebookSyllabus,
+  cleanSyllabus as apiCleanSyllabus,
   confirmNotebookSyllabus as apiConfirmNotebookSyllabus,
   updateNotebookTitle as apiUpdateNotebookTitle,
   updateNotebookPriority as apiUpdateNotebookPriority,
   deleteNotebook as apiDeleteNotebook,
-  upgradeNotebookToDeepPDF as apiUpgradeNotebookToDeepPDF,
+  upgradeNotebookToStructuredPDF as apiUpgradeNotebookToStructuredPDF,
   updateNotebookStudyStatus,
   getUserSettings,
   getNotebookCertificateStats,
@@ -468,7 +468,7 @@ async function handleDeepStructuredUpload() {
   uploadError.value = ''
   successMessage.value = ''
   try {
-    const result = await selectAndUploadDeepStructuredPDF()
+    const result = await uploadStructuredPDF()
     if (result?.canceled) {
       return
     }
@@ -505,7 +505,7 @@ async function handleUpgradeToDeepPDF(notebookID) {
     const target = notebooks.value.find((n) => n.id === notebookID)
     const bookTitle = target?.title || 'this textbook'
 
-    const result = await apiUpgradeNotebookToDeepPDF(notebookID)
+    const result = await apiUpgradeNotebookToStructuredPDF(notebookID)
     if (result?.error) {
       throw new Error(result.error)
     }
@@ -680,7 +680,7 @@ async function aiCleanupChapters() {
   draftError.value = ''
 
   try {
-    const result = await apiAICleanupNotebookSyllabus(draftNotebookID.value)
+    const result = await apiCleanSyllabus(draftNotebookID.value)
     if (result?.error) {
       throw new Error(result.error)
     }

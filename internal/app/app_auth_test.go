@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"ai-tutor/internal/db"
+	"ai-tutor/internal/runtime"
 )
 
 func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
@@ -44,7 +45,7 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 	}
 
 	// 2. Tampering Attack: modify session.json directly on disk to gain Pro
-	filePath, err := getSessionFilePath()
+	filePath, err := runtime.ResolveSessionPath()
 	if err != nil {
 		t.Fatalf("failed to get session file path: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestRestoreSession_HMACAndGracePeriod(t *testing.T) {
 
 	// 3. Grace Period Expiration (>30 days)
 	thirtyOneDaysAgo := time.Now().Unix() - (31 * 24 * 60 * 60)
-	sig := computeSessionSignature(getMachineID(), "user_old", "old@example.com", true, thirtyOneDaysAgo)
+	sig := computeSessionSignature(getNormalizedMachineID(), "user_old", "old@example.com", true, thirtyOneDaysAgo)
 	expiredSess := persistentSession{
 		UserID:     "user_old",
 		Email:      "old@example.com",
@@ -289,7 +290,7 @@ func TestRestoreSession_DatabaseFallback(t *testing.T) {
 		t.Fatalf("expected user to be Pro")
 	}
 
-	filePath, err := getSessionFilePath()
+	filePath, err := runtime.ResolveSessionPath()
 	if err != nil {
 		t.Fatalf("failed to get session file path: %v", err)
 	}

@@ -23,7 +23,6 @@ var alterStatements = []struct {
 	{"user_settings", "show_reward_notifications", "ALTER TABLE user_settings ADD COLUMN show_reward_notifications BOOLEAN DEFAULT 1"},
 	{"user_settings", "ask_profile_on_startup", "ALTER TABLE user_settings ADD COLUMN ask_profile_on_startup BOOLEAN DEFAULT 1"},
 	{"user_settings", "active_profile_id", "ALTER TABLE user_settings ADD COLUMN active_profile_id TEXT"},
-	{"user_settings", "skip_to_reading_active", "ALTER TABLE user_settings ADD COLUMN skip_to_reading_active BOOLEAN DEFAULT 0"},
 	{"user_settings", "cloud_sync_url", "ALTER TABLE user_settings ADD COLUMN cloud_sync_url TEXT DEFAULT ''"},
 	{"user_settings", "cloud_api_token", "ALTER TABLE user_settings ADD COLUMN cloud_api_token TEXT DEFAULT ''"},
 	{"user_settings", "theme", "ALTER TABLE user_settings ADD COLUMN theme TEXT DEFAULT 'dark-gruvbox'"},
@@ -70,7 +69,6 @@ var alterStatements = []struct {
 	{"study_profiles", "theme", "ALTER TABLE study_profiles ADD COLUMN theme TEXT DEFAULT ''"},
 	{"study_profiles", "max_flashcards_per_session", "ALTER TABLE study_profiles ADD COLUMN max_flashcards_per_session INTEGER DEFAULT NULL"},
 	{"study_profiles", "max_active_notebooks", "ALTER TABLE study_profiles ADD COLUMN max_active_notebooks INTEGER DEFAULT NULL"},
-	{"study_profiles", "skip_to_reading_active", "ALTER TABLE study_profiles ADD COLUMN skip_to_reading_active BOOLEAN DEFAULT NULL"},
 	{"study_profiles", "default_remedial_strategy", "ALTER TABLE study_profiles ADD COLUMN default_remedial_strategy TEXT DEFAULT ''"},
 	{"study_profiles", "quiz_question_count", "ALTER TABLE study_profiles ADD COLUMN quiz_question_count INTEGER DEFAULT NULL"},
 	{"study_profiles", "quiz_passing_score", "ALTER TABLE study_profiles ADD COLUMN quiz_passing_score INTEGER DEFAULT NULL"},
@@ -141,6 +139,13 @@ func RunMigrations(tx *sql.Tx) error {
 	// 3. Seed default rows and backfill settings
 	if err := seedDefaults(tx); err != nil {
 		return err
+	}
+
+	// 4. Safely drop deprecated columns from pre-existing databases if present
+	for _, table := range []string{"user_settings", "study_profiles"} {
+		if hasCol, _ := columnExists(tx, table, "skip_to_reading_active"); hasCol {
+			_, _ = tx.Exec(fmt.Sprintf("ALTER TABLE %s DROP COLUMN skip_to_reading_active", table))
+		}
 	}
 
 	return nil

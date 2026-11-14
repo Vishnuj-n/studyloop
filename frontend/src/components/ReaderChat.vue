@@ -368,11 +368,11 @@ import BaseIcon from './BaseIcon.vue'
 import { useToast } from '../composables/useToast'
 import {
   logFrontendEvent,
-  getTopicStudyNote,
-  getTopicStudyNoteForRange,
-  generateTopicStudyNote,
-  generateTopicStudyNoteForRange,
-  updateTopicStudyNote,
+  getStudyNote,
+  getStudyNoteForRange,
+  generateStudyNote,
+  generateStudyNoteForRange,
+  updateStudyNote,
   saveNoteImage,
   isTopicNoteGenerating,
 } from '../services/appApi'
@@ -534,12 +534,12 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     console.log('[ReaderChat Note] fetchTopicNote called for topic:', topicId, 'pages:', startPage, 'to', endPage)
     let res = null
     if (startPage > 0 && endPage >= startPage) {
-      res = await getTopicStudyNoteForRange(topicId, startPage, endPage)
+      res = await getStudyNoteForRange(topicId, startPage, endPage)
       if (token !== noteRequestToken) return
     }
     // PDF Context Bridge Fallback: if user is on page-1 view (e.g. 166 vs 167), try startPage + 1
     if ((!res || !res.note || !res.note.content) && startPage > 0 && endPage >= startPage + 1) {
-      const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage + 1, endPage)
+      const bridgeRes = await getStudyNoteForRange(topicId, startPage + 1, endPage)
       if (token !== noteRequestToken) return
       if (bridgeRes?.note?.content) {
         console.log('[ReaderChat Note] Found note using +1 PDF context bridge fallback:', startPage + 1, 'to', endPage)
@@ -548,7 +548,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
     }
     // If startPage was > 1 and note was generated at startPage - 1, check startPage - 1
     if ((!res || !res.note || !res.note.content) && startPage > 1 && endPage >= startPage) {
-      const bridgeRes = await getTopicStudyNoteForRange(topicId, startPage - 1, endPage)
+      const bridgeRes = await getStudyNoteForRange(topicId, startPage - 1, endPage)
       if (token !== noteRequestToken) return
       if (bridgeRes?.note?.content) {
         console.log('[ReaderChat Note] Found note using -1 PDF context bridge fallback:', startPage - 1, 'to', endPage)
@@ -556,7 +556,7 @@ async function fetchTopicNote(topicId, isBackgroundPoll = false) {
       }
     }
     if (!res || !res.note || !res.note.content) {
-      res = await getTopicStudyNote(topicId)
+      res = await getStudyNote(topicId)
       if (token !== noteRequestToken) return
     }
     console.log('[ReaderChat Note] fetchTopicNote result:', { found: Boolean(res?.note?.content), is_generating: res?.is_generating })
@@ -712,7 +712,7 @@ async function saveNote() {
   try {
     const startPage = effectiveStartPage.value
     const endPage = effectiveEndPage.value
-    const res = await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
+    const res = await updateStudyNote(tid, startPage, endPage, noteEditContent.value)
     if (res && res.error) {
       showError(res.error, 'Failed to Save Note')
     } else if (res && res.note) {
@@ -756,7 +756,7 @@ async function generateNote() {
     // If user is currently editing with unsaved text, auto-save first so backend preserves it
     if (noteEditing.value && noteEditContent.value.trim().length > 0) {
       try {
-        await updateTopicStudyNote(tid, startPage, endPage, noteEditContent.value)
+        await updateStudyNote(tid, startPage, endPage, noteEditContent.value)
       } catch (saveErr) {
         console.warn('[ReaderChat Note] Auto-save before generate failed:', saveErr)
       }
@@ -765,9 +765,9 @@ async function generateNote() {
 
     let res = null
     if (startPage > 0 && endPage >= startPage) {
-      res = await generateTopicStudyNoteForRange(tid, nbid, startPage, endPage)
+      res = await generateStudyNoteForRange(tid, nbid, startPage, endPage)
     } else {
-      res = await generateTopicStudyNote(tid, nbid)
+      res = await generateStudyNote(tid, nbid)
     }
     if (res && res.error) {
       showError(res.error, 'Failed to Generate Note')

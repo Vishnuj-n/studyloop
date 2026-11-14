@@ -30,16 +30,6 @@ function getLocalDateString(date) {
   return `${year}-${month}-${day}`
 }
 
-/**
- * Human-readable label for days remaining until a deadline.
- * @param {number} days
- * @returns {string}
- */
-export function formatDaysRemaining(days) {
-  if (days === 0) return 'today!'
-  if (days < 0) return 'passed'
-  return `${days} days left`
-}
 
 /**
  * Map a task action_type to a human-readable label.

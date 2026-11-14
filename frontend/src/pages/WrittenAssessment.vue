@@ -184,7 +184,7 @@ import {
   getNotebooks,
   generateComprehensiveExam,
   scoreShortAnswer,
-  generateFlashcardsForQuizTask,
+  generateFlashcards,
 } from '../services/appApi.js'
 import { renderMarkdown } from '../services/markdown'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
@@ -322,7 +322,7 @@ async function goToDashboard() {
     // Strip params from route query to prevent repeat executions on navigation/refresh
     await router.replace({ query: { ...route.query, quizTaskId: undefined, flashcardsPending: undefined } })
     try {
-      const genResult = await generateFlashcardsForQuizTask(quizTaskId)
+      const genResult = await generateFlashcards(quizTaskId)
       if (genResult?.rewards) {
         window.dispatchEvent(
           new CustomEvent('study-reward-earned', { detail: { rewards: genResult.rewards } })

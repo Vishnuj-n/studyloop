@@ -14,7 +14,7 @@ const DEFAULT_ENABLED_EXTENSIONS = {
   audio_overview: false,
 }
 
-export const DEFAULT_EXTENSION_CONFIG = {
+const DEFAULT_EXTENSION_CONFIG = {
   audio_overview: {
     voice: 'en-US-ChristopherNeural',
     speed: 1.0,

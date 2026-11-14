@@ -33,3 +33,9 @@ bin/
 cloud-dashboard/dist/
 /extensions/
 .tmp-go-cache/
+
+# Repomix generated files and configuration
+repomix-output.*
+repomix-output-*
+.repomixignore
+unvibecode_results/

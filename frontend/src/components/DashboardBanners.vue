@@ -37,14 +37,6 @@
     />
 
     <StatusBanner
-      v-if="skipToReadingActive"
-      variant="info"
-      icon="zap"
-      title='"Skip to Reading" Escape Hatch Active'
-      subtitle="Review tasks have been pushed to the background so you can focus on reading new chapters."
-    />
-
-    <StatusBanner
       v-if="hasSocraticRescueTask"
       variant="rescue"
       icon="shield"
@@ -88,7 +80,6 @@ const props = defineProps({
   streakSavedEvent: { type: Object, default: null },
   pendingIngestionBook: { type: Object, default: null },
   isCloudAccount: { type: Boolean, default: false },
-  skipToReadingActive: { type: Boolean, default: false },
   hasSocraticRescueTask: { type: Boolean, default: false },
   flashcardNotice: { type: String, default: '' },
   flashcardsJustCreated: { type: Number, default: 0 },

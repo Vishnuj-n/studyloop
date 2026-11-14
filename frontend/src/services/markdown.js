@@ -65,7 +65,7 @@ const defaultImageRender = md.renderer.rules.image || function (tokens, idx, opt
   return self.renderToken(tokens, idx, options)
 }
 
-export function resolveNoteAssetSrc(src, noteRelativeFolder = '') {
+function resolveNoteAssetSrc(src, noteRelativeFolder = '') {
   if (!src || typeof src !== 'string') return src
   const raw = src.trim()
   if (
@@ -113,7 +113,7 @@ export function resolveNoteAssetSrc(src, noteRelativeFolder = '') {
   return raw
 }
 
-export function parseImageSize(rawAlt) {
+function parseImageSize(rawAlt) {
   if (!rawAlt || !rawAlt.includes('|')) {
     return { alt: rawAlt, width: null, height: null, style: null }
   }

@@ -58,15 +58,6 @@ type authServerState struct {
 
 var activeAuthServer = &authServerState{}
 
-func getMachineID() string {
-	h, _ := os.Hostname()
-	u := os.Getenv("USERNAME")
-	if u == "" {
-		u = os.Getenv("USER")
-	}
-	return strings.TrimSpace(h + "::" + u)
-}
-
 func getNormalizedMachineID() string {
 	h, _ := os.Hostname()
 	u := os.Getenv("USERNAME")
@@ -199,10 +190,6 @@ func parseClerkSessionClaims(jwtStr string) (userID, email, plan, role string, i
 	}
 
 	return
-}
-
-func getSessionFilePath() (string, error) {
-	return runtime.ResolveSessionPath()
 }
 
 func (a *App) persistSession(userID, email string, isPro bool, verifiedAt int64) {

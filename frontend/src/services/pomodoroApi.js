@@ -49,14 +49,6 @@ export function setPomodoroVolume(volume) {
   return appBridge().PomodoroSetVolume(volume)
 }
 
-export function getPomodoroAudioState() {
-  return appBridge().PomodoroGetAudioState()
-}
-
-export function playPomodoroChime() {
-  return appBridge().PomodoroPlayChime()
-}
-
 // ── Profiles & Settings (Client + Bridge Fallback) ──────────────────────────
 
 const LOCAL_STORAGE_PROFILES_KEY = 'studyloop_pomodoro_profiles'
@@ -141,21 +133,6 @@ export async function savePomodoroProfile(profile) {
     }
   }
   return null
-}
-
-export function deletePomodoroProfile(id) {
-  try {
-    let profiles = []
-    const raw = localStorage.getItem(LOCAL_STORAGE_PROFILES_KEY)
-    if (raw) {
-      profiles = JSON.parse(raw) || []
-    }
-    profiles = profiles.filter((p) => p.id !== id)
-    localStorage.setItem(LOCAL_STORAGE_PROFILES_KEY, JSON.stringify(profiles))
-  } catch (err) {
-    console.error('[POMODORO_API] Failed to delete profile:', err)
-  }
-  return Promise.resolve(null)
 }
 
 export function getPomodoroSettings() {

@@ -40,10 +40,10 @@ func TestSubmitQuizAttemptFailedQuizInsertsRereadAndReturnsCountMetadata(t *test
 	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-fail", "topic-quiz-fail", "task-quiz-fail", 100)
 
-	resp := app.SubmitQuizAttempt("task-quiz-fail", []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection("task-quiz-fail", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	result := mustExtractQuizResult(t, resp)
 	if result.Passed {
 		t.Fatalf("expected failed quiz result")
@@ -89,10 +89,10 @@ func TestSubmitQuizAttemptAfterMaxReturnsManualReviewWithoutReread(t *testing.T)
 		t.Fatalf("commit seed attempts failed: %v", err)
 	}
 
-	resp := app.SubmitQuizAttempt("task-quiz-max", []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection("task-quiz-max", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	result := mustExtractQuizResult(t, resp)
 	if result.RereadTaskID != "" {
 		t.Fatalf("expected no reread task id after max automatic rereads, got %q", result.RereadTaskID)
@@ -144,18 +144,18 @@ func TestSubmitQuizAttemptRepeatedSubmissionReturnsErrTaskNotActiveAndNoDuplicat
 	app := newClassicTestApp(t)
 	mustInsertActiveQuizTask(t, "nb-quiz-repeat", "topic-quiz-repeat", "task-quiz-repeat", 100)
 
-	first := app.SubmitQuizAttempt("task-quiz-repeat", []models.QuizAnswer{
+	first := app.SubmitQuizAttemptWithReflection("task-quiz-repeat", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	if _, hasErr := first["error"]; hasErr {
 		t.Fatalf("expected first submit success, got error: %v", first["error"])
 	}
 
-	second := app.SubmitQuizAttempt("task-quiz-repeat", []models.QuizAnswer{
+	second := app.SubmitQuizAttemptWithReflection("task-quiz-repeat", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	if got := second["error"]; got == nil || !strings.Contains(fmt.Sprint(got), "ErrTaskNotActive") {
 		t.Fatalf("expected ErrTaskNotActive on repeated submit, got %#v", got)
 	}
@@ -187,10 +187,10 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 		t.Fatalf("commit seed tx failed: %v", err)
 	}
 
-	passResp := app.SubmitQuizAttempt("task-quiz-pass", []models.QuizAnswer{
+	passResp := app.SubmitQuizAttemptWithReflection("task-quiz-pass", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "A"},
 		{QuestionID: "quiz-q2", Selected: "B"},
-	})
+	}, "")
 	if _, hasErr := passResp["error"]; hasErr {
 		t.Fatalf("expected pass submit success, got error: %v", passResp["error"])
 	}
@@ -204,10 +204,10 @@ func TestSubmitQuizAttemptPassResetsAttemptsAndFutureFailureStartsAtOne(t *testi
 	}
 
 	mustInsertActiveQuizTask(t, "nb-quiz-pass-reset-2", "topic-quiz-pass-reset", "task-quiz-fail-after-reset", 100)
-	failResp := app.SubmitQuizAttempt("task-quiz-fail-after-reset", []models.QuizAnswer{
+	failResp := app.SubmitQuizAttemptWithReflection("task-quiz-fail-after-reset", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "B"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	if _, hasErr := failResp["error"]; hasErr {
 		t.Fatalf("expected fail submit success after reset, got error: %v", failResp["error"])
 	}
@@ -622,13 +622,13 @@ func TestCompleteSocraticRescueInsertsRequiz(t *testing.T) {
 	if err := testRepo.InsertStudyTask(task); err != nil {
 		t.Fatalf("failed to insert socratic task: %v", err)
 	}
-	res := app.CompleteSocraticRescue("task-socratic-test")
+	res := app.CompleteRescue("task-socratic-test")
 	if errVal, ok := res["error"]; ok && errVal != nil {
-		t.Fatalf("CompleteSocraticRescue failed: %v", errVal)
+		t.Fatalf("CompleteRescue failed: %v", errVal)
 	}
 	returnedQuizTaskID, ok := res["quiz_task_id"].(string)
 	if !ok || returnedQuizTaskID == "" {
-		t.Fatalf("expected completeSocraticRescue to return quiz_task_id")
+		t.Fatalf("expected completeRescue to return quiz_task_id")
 	}
 
 	socraticTask, err := testRepo.GetTaskByID("task-socratic-test")
@@ -703,9 +703,9 @@ func TestRequizPassGeneratesFlashcards(t *testing.T) {
 		t.Fatalf("failed to insert requiz task: %v", err)
 	}
 
-	resp := app.SubmitQuizAttempt("task-requiz-pass", []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection("task-requiz-pass", []models.QuizAnswer{
 		{QuestionID: "q1", Selected: "A"},
-	})
+	}, "")
 	if _, hasErr := resp["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", resp["error"])
 	}
@@ -753,9 +753,9 @@ func TestRequizFailMarksExternalHelp(t *testing.T) {
 		t.Fatalf("failed to insert requiz task: %v", err)
 	}
 
-	resp := app.SubmitQuizAttempt("task-requiz-fail", []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection("task-requiz-fail", []models.QuizAnswer{
 		{QuestionID: "q1", Selected: "B"},
-	})
+	}, "")
 	if _, hasErr := resp["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", resp["error"])
 	}
@@ -834,9 +834,9 @@ func TestRequizFailSeedsNextReadingTask(t *testing.T) {
 		t.Fatalf("failed to insert requiz task: %v", err)
 	}
 
-	resp := app.SubmitQuizAttempt("task-requiz-seq-ch1", []models.QuizAnswer{
+	resp := app.SubmitQuizAttemptWithReflection("task-requiz-seq-ch1", []models.QuizAnswer{
 		{QuestionID: "q1", Selected: "B"},
-	})
+	}, "")
 	if _, hasErr := resp["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", resp["error"])
 	}
@@ -867,15 +867,15 @@ func TestFSRSCalibrationEasyAndDoubleGood(t *testing.T) {
 	mustInsertActiveQuizTask(t, "nb-calibration-1", "topic-calibration-1", "task-quiz-ace", 100)
 	mustInsertMockChunk(t, "nb-calibration-1", "topic-calibration-1", "chunk-fallback", 3)
 
-	respAce := app.SubmitQuizAttempt("task-quiz-ace", []models.QuizAnswer{
+	respAce := app.SubmitQuizAttemptWithReflection("task-quiz-ace", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "A"},
 		{QuestionID: "quiz-q2", Selected: "B"},
-	})
+	}, "")
 	if _, hasErr := respAce["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", respAce["error"])
 	}
 
-	genResp1 := app.GenerateFlashcardsForQuizTask("task-quiz-ace")
+	genResp1 := app.GenerateFlashcards("task-quiz-ace")
 	if _, hasErr := genResp1["error"]; hasErr {
 		t.Fatalf("expected flashcard generation success, got error: %v", genResp1["error"])
 	}
@@ -903,15 +903,15 @@ func TestFSRSCalibrationEasyAndDoubleGood(t *testing.T) {
 	mustInsertActiveQuizTask(t, "nb-calibration-2", "topic-calibration-2", "task-quiz-pass", 50)
 	mustInsertMockChunk(t, "nb-calibration-2", "topic-calibration-2", "chunk-fallback", 3)
 
-	respPass := app.SubmitQuizAttempt("task-quiz-pass", []models.QuizAnswer{
+	respPass := app.SubmitQuizAttemptWithReflection("task-quiz-pass", []models.QuizAnswer{
 		{QuestionID: "quiz-q1", Selected: "A"},
 		{QuestionID: "quiz-q2", Selected: "C"},
-	})
+	}, "")
 	if _, hasErr := respPass["error"]; hasErr {
 		t.Fatalf("expected submit success, got error: %v", respPass["error"])
 	}
 
-	genResp2 := app.GenerateFlashcardsForQuizTask("task-quiz-pass")
+	genResp2 := app.GenerateFlashcards("task-quiz-pass")
 	if _, hasErr := genResp2["error"]; hasErr {
 		t.Fatalf("expected flashcard generation success, got error: %v", genResp2["error"])
 	}
@@ -1013,8 +1013,8 @@ func TestMilestoneExamTriggers(t *testing.T) {
 		if err := testRepo.InsertStudyTask(task); err != nil {
 			t.Fatalf("insert quiz task %d failed: %v", i, err)
 		}
-		_ = app.SubmitQuizAttempt(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
-		_ = app.GenerateFlashcardsForQuizTask(taskID)
+		_ = app.SubmitQuizAttemptWithReflection(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
+		_ = app.GenerateFlashcards(taskID)
 	}
 
 	// Verify no milestone yet
@@ -1037,8 +1037,8 @@ func TestMilestoneExamTriggers(t *testing.T) {
 	if err := testRepo.InsertStudyTask(task3); err != nil {
 		t.Fatalf("insert quiz task 3 failed: %v", err)
 	}
-	_ = app.SubmitQuizAttempt("task-ms-q3", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
-	_ = app.GenerateFlashcardsForQuizTask("task-ms-q3")
+	_ = app.SubmitQuizAttemptWithReflection("task-ms-q3", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
+	_ = app.GenerateFlashcards("task-ms-q3")
 
 	// Verify milestone exam was inserted for Chapter 1
 	msTasks, err := testRepo.GetAllPendingTasks()
@@ -1070,8 +1070,8 @@ func TestMilestoneExamTriggers(t *testing.T) {
 	if err := testRepo.InsertStudyTask(taskShort); err != nil {
 		t.Fatalf("insert short chapter quiz failed: %v", err)
 	}
-	_ = app.SubmitQuizAttempt("task-ms-short-q1", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
-	_ = app.GenerateFlashcardsForQuizTask("task-ms-short-q1")
+	_ = app.SubmitQuizAttemptWithReflection("task-ms-short-q1", []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
+	_ = app.GenerateFlashcards("task-ms-short-q1")
 
 	// Count milestones - should still be 1 (only the one from Chapter 1)
 	countAfterShort, _ := testRepo.CountTasksByTopicTypeAndStatus("", "MILESTONE_EXAM", "PENDING")
@@ -1114,14 +1114,14 @@ func TestMilestoneExamTriggers(t *testing.T) {
 		if err := testRepo.InsertStudyTask(task); err != nil {
 			t.Fatalf("insert ch3 task %d failed: %v", i, err)
 		}
-		_ = app.SubmitQuizAttempt(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}})
+		_ = app.SubmitQuizAttemptWithReflection(taskID, []models.QuizAnswer{{QuestionID: "q1", Selected: "A"}}, "")
 		if i == 2 {
 			// Corrupt the attempt's answers JSON so ComputeCorrectnessFlags fails
 			if _, err := testRepo.ExecForTest(`UPDATE quiz_attempts SET answers_json = 'corrupt-json' WHERE task_id = ?`, taskID); err != nil {
 				t.Fatalf("corrupt ch3 attempt 2 failed: %v", err)
 			}
 		}
-		_ = app.GenerateFlashcardsForQuizTask(taskID)
+		_ = app.GenerateFlashcards(taskID)
 	}
 
 	// Count milestones: still 1 because the corrupt attempt leaves only 2 valid quizzes (< 3)

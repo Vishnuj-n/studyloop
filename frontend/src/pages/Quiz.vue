@@ -602,11 +602,11 @@ import {
   submitQuizAttempt,
   getNotebooks,
   generateQuizForPageRange,
-  generateFlashcardsForQuizTask,
+  generateFlashcards,
   completeMilestoneExam,
   trackAnalyticsEvent,
   getUserSettings,
-  revertTopicToReadingFromQuiz,
+  returnToReading,
 } from '../services/appApi'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import MilestoneNoteReviewModal from '../components/MilestoneNoteReviewModal.vue'
@@ -989,7 +989,7 @@ async function handleContinue() {
     result.value.flashcards_generation_error = false
     result.value.flashcards_generation_message = ''
     try {
-      const genResult = await generateFlashcardsForQuizTask(result.value.task_id)
+      const genResult = await generateFlashcards(result.value.task_id)
       if (genResult?.error) {
         console.warn('[FLASHCARD_PIPELINE] Flashcard generation failed:', genResult.error)
         result.value.flashcards_generation_error = true
@@ -1060,7 +1060,7 @@ async function confirmCreateFlashcardsAndMove() {
   generatingFlashcards.value = true
   moveForwardError.value = ''
   try {
-    const genResult = await generateFlashcardsForQuizTask(quizTaskId)
+    const genResult = await generateFlashcards(quizTaskId)
     if (genResult?.error) {
       console.warn('[FLASHCARD_PIPELINE] Terminal move-forward flashcard generation failed:', genResult.error)
       moveForwardError.value = genResult.error
@@ -1217,7 +1217,7 @@ async function confirmRestartReading() {
   restartingReading.value = true
   restartReadingError.value = ''
   try {
-    const res = await revertTopicToReadingFromQuiz(quizTaskId)
+    const res = await returnToReading(quizTaskId)
     if (res?.error) {
       restartReadingError.value = res.error
       return

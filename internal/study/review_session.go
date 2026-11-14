@@ -111,7 +111,9 @@ func (s *StudyService) applyFlashcardReview(tx *sql.Tx, cardID string, ratingCod
 		nextState.ElapsedDays = elapsedDays
 	}
 	dueAt := now + int64(nextState.ScheduledDays)*24*60*60
-	if nextState.ScheduledDays == 0 {
+	if !nextFsrsCard.Due.IsZero() {
+		dueAt = nextFsrsCard.Due.Unix()
+	} else if nextState.ScheduledDays == 0 {
 		dueAt = now
 	}
 	stateAfterJSONBytes, err := json.Marshal(nextState)

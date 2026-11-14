@@ -78,19 +78,6 @@ func (a *App) PomodoroSetVolume(v int) {
 	}
 }
 
-func (a *App) PomodoroGetAudioState() domain.AudioStatePayload {
-	if a.pomoAudio != nil {
-		return a.pomoAudio.GetState()
-	}
-	return domain.AudioStatePayload{State: domain.AudioIdle}
-}
-
-func (a *App) PomodoroPlayChime() {
-	if a.pomoAudio != nil {
-		a.pomoAudio.PlayChime()
-	}
-}
-
 // ── Pomodoro Profile & Settings methods (bound to Wails JS) ────────────────────
 
 // ── Pomodoro Profile & Settings methods (bound to Wails JS) ────────────────────
@@ -186,41 +173,6 @@ func (a *App) PomodoroSaveProfile(p domain.Profile) error {
 		return nil
 	}
 	return repo.UpdateProfilePomoSettings(p.ID, p.DurationSec, p.BreakDurationSec, p.MusicPath, p.Shuffle)
-}
-
-func (a *App) PomodoroGetProfileByID(id string) *domain.Profile {
-	repo := a.getRepo()
-	if repo == nil {
-		p := domain.Profile{
-			ID:               "default",
-			Name:             "Standard Focus",
-			DurationSec:      25 * 60,
-			BreakDurationSec: 5 * 60,
-			IsDefault:        true,
-		}
-		return &p
-	}
-	prof, err := repo.GetProfileByID(id)
-	if err != nil || prof == nil {
-		return nil
-	}
-	dur := prof.PomoDurationSec
-	if dur <= 0 {
-		dur = 25 * 60
-	}
-	brk := prof.PomoBreakSec
-	if brk < 0 {
-		brk = 5 * 60
-	}
-	p := domain.Profile{
-		ID:               prof.ID,
-		Name:             prof.Name,
-		DurationSec:      dur,
-		BreakDurationSec: brk,
-		MusicPath:        prof.PomoMusicPath,
-		Shuffle:          prof.PomoShuffle,
-	}
-	return &p
 }
 
 func (a *App) PomodoroPickMusicFile() (string, error) {

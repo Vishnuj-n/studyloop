@@ -67,10 +67,10 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 	var s models.UserSettings
 	var activeProfileID sql.NullString
 	err := r.db.QueryRow(`
-		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(ask_profile_on_startup, 1), COALESCE(active_profile_id, ''), skip_to_reading_active, COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(preferred_language, 'english'), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(quiz_synthesis_mode, 'feynman'), COALESCE(rate_limit_strategy, 'STANDARD')
+		SELECT max_flashcards_per_session, COALESCE(study_start_time, '17:00'), COALESCE(study_end_time, '18:00'), COALESCE(study_slots_json, '[]'), COALESCE(reminders_enabled, 1), COALESCE(show_reward_notifications, 1), COALESCE(ask_profile_on_startup, 1), COALESCE(active_profile_id, ''), COALESCE(cloud_sync_url, ''), COALESCE(cloud_api_token, ''), COALESCE(theme, 'dark-gruvbox'), COALESCE(rag_enabled, 0), COALESCE(rag_notebook_chapter, 1), COALESCE(rag_entire_notebook, 1), COALESCE(rag_queue_study, 1), COALESCE(default_remedial_strategy, 'FAST'), COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(last_synced_at, 0), COALESCE(analytics_enabled, 0), COALESCE(anonymous_user_id, ''), COALESCE(target_session_words, 3000), COALESCE(min_session_words, 0), COALESCE(max_active_notebooks, 4), COALESCE(quiz_question_count, 8), COALESCE(quiz_passing_score, 70), COALESCE(tutor_style, 'socratic'), COALESCE(llm_prompt_logging, 0), COALESCE(log_level, 'INFO'), COALESCE(prompt_compression_mode, 'OVER_LIMIT'), COALESCE(prompt_compression_rate, 0.80), COALESCE(preferred_language, 'english'), COALESCE(auto_generate_study_notes, 0), COALESCE(notes_detail_level, 'briefing'), COALESCE(notes_model_tier, 'fast'), COALESCE(show_recap_before_reading, 1), COALESCE(quiz_synthesis_mode, 'feynman'), COALESCE(rate_limit_strategy, 'STANDARD')
 		FROM user_settings
 		WHERE id = 1
-	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &s.AskProfileOnStartup, &activeProfileID, &s.SkipToReadingActive, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.PreferredLanguage, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.ShowRecapBeforeReading, &s.QuizSynthesisMode, &s.RateLimitStrategy)
+	`).Scan(&s.MaxFlashcardsPerSession, &s.StudyStartTime, &s.StudyEndTime, &s.StudySlotsJSON, &s.RemindersEnabled, &s.ShowRewardNotifications, &s.AskProfileOnStartup, &activeProfileID, &s.CloudSyncURL, &s.CloudAPIToken, &s.Theme, &s.RAGEnabled, &s.RAGNotebookChapter, &s.RAGEntireNotebook, &s.RAGQueueStudy, &s.DefaultRemedialStrategy, &s.ClassroomCode, &s.StudentUsername, &s.LastSyncedAt, &s.AnalyticsEnabled, &s.AnonymousUserID, &s.TargetSessionWords, &s.MinSessionWords, &s.MaxActiveNotebooks, &s.QuizQuestionCount, &s.QuizPassingScore, &s.TutorStyle, &s.LLMPromptLogging, &s.LogLevel, &s.PromptCompressionMode, &s.PromptCompressionRate, &s.PreferredLanguage, &s.AutoGenerateStudyNotes, &s.NotesDetailLevel, &s.NotesModelTier, &s.ShowRecapBeforeReading, &s.QuizSynthesisMode, &s.RateLimitStrategy)
 	if err == sql.ErrNoRows {
 		s = models.UserSettings{
 			MaxFlashcardsPerSession: 30,
@@ -176,20 +176,19 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		var profClassroom, profUser, profToken, profTheme, profStrategy, profTutorStyle sql.NullString
 		var profTargetWords, profMinWords, profMaxFlashcards, profMaxActive sql.NullInt64
 		var profQuizCount, profQuizScore sql.NullInt64
-		var profSkipToReading sql.NullBool
 
 		err := r.db.QueryRow(`
 			SELECT COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
 			       theme, default_remedial_strategy, tutor_style,
 			       target_session_words, min_session_words, max_flashcards_per_session, max_active_notebooks,
-			       quiz_question_count, quiz_passing_score, skip_to_reading_active
+			       quiz_question_count, quiz_passing_score
 			FROM study_profiles
 			WHERE id = ?
 		`, s.ActiveProfileID).Scan(
 			&profClassroom, &profUser, &profToken,
 			&profTheme, &profStrategy, &profTutorStyle,
 			&profTargetWords, &profMinWords, &profMaxFlashcards, &profMaxActive,
-			&profQuizCount, &profQuizScore, &profSkipToReading,
+			&profQuizCount, &profQuizScore,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query active profile credentials and settings: %w", err)
@@ -223,9 +222,6 @@ func (r *Repository) GetUserSettings() (*models.UserSettings, error) {
 		}
 		if profQuizScore.Valid && profQuizScore.Int64 > 0 {
 			s.QuizPassingScore = int(profQuizScore.Int64)
-		}
-		if profSkipToReading.Valid {
-			s.SkipToReadingActive = profSkipToReading.Bool
 		}
 	}
 
@@ -315,8 +311,8 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 	defer func() { _ = tx.Rollback() }()
 
 	_, err = tx.Exec(`
-		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, ask_profile_on_startup, active_profile_id, skip_to_reading_active, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, preferred_language, auto_generate_study_notes, notes_detail_level, notes_model_tier, show_recap_before_reading, quiz_synthesis_mode, rate_limit_strategy)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO user_settings (id, max_flashcards_per_session, study_start_time, study_end_time, study_slots_json, reminders_enabled, show_reward_notifications, ask_profile_on_startup, active_profile_id, cloud_sync_url, cloud_api_token, theme, rag_enabled, rag_notebook_chapter, rag_entire_notebook, rag_queue_study, default_remedial_strategy, classroom_code, student_username, analytics_enabled, anonymous_user_id, target_session_words, min_session_words, max_active_notebooks, quiz_question_count, quiz_passing_score, tutor_style, llm_prompt_logging, log_level, prompt_compression_mode, prompt_compression_rate, preferred_language, auto_generate_study_notes, notes_detail_level, notes_model_tier, show_recap_before_reading, quiz_synthesis_mode, rate_limit_strategy)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			max_flashcards_per_session = excluded.max_flashcards_per_session,
 			study_start_time = excluded.study_start_time,
@@ -326,7 +322,6 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			show_reward_notifications = excluded.show_reward_notifications,
 			ask_profile_on_startup = excluded.ask_profile_on_startup,
 			active_profile_id = excluded.active_profile_id,
-			skip_to_reading_active = excluded.skip_to_reading_active,
 			cloud_sync_url = excluded.cloud_sync_url,
 			cloud_api_token = excluded.cloud_api_token,
 			theme = excluded.theme,
@@ -357,7 +352,7 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			quiz_synthesis_mode = excluded.quiz_synthesis_mode,
 			rate_limit_strategy = excluded.rate_limit_strategy,
 			updated_at = CURRENT_TIMESTAMP
-	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, s.AskProfileOnStartup, activeProfileID, s.SkipToReadingActive, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, prefLang, s.AutoGenerateStudyNotes, detailLevel, modelTier, s.ShowRecapBeforeReading, s.QuizSynthesisMode, rateLimitStrategy)
+	`, s.MaxFlashcardsPerSession, s.StudyStartTime, s.StudyEndTime, studySlots, s.RemindersEnabled, s.ShowRewardNotifications, s.AskProfileOnStartup, activeProfileID, s.CloudSyncURL, s.CloudAPIToken, theme, s.RAGEnabled, s.RAGNotebookChapter, s.RAGEntireNotebook, s.RAGQueueStudy, strategy, s.ClassroomCode, s.StudentUsername, s.AnalyticsEnabled, s.AnonymousUserID, targetWords, minWords, maxActive, quizCount, passingScore, tutorStyle, s.LLMPromptLogging, logLevel, mode, rate, prefLang, s.AutoGenerateStudyNotes, detailLevel, modelTier, s.ShowRecapBeforeReading, s.QuizSynthesisMode, rateLimitStrategy)
 	if err != nil {
 		return err
 	}
@@ -370,13 +365,12 @@ func (r *Repository) UpdateUserSettings(s models.UserSettings) error {
 			    theme = ?,
 			    max_flashcards_per_session = ?,
 			    max_active_notebooks = ?,
-			    skip_to_reading_active = ?,
 			    default_remedial_strategy = ?,
 			    quiz_question_count = ?,
 			    quiz_passing_score = ?,
 			    tutor_style = ?
 			WHERE id = ?
-		`, targetWords, minWords, theme, s.MaxFlashcardsPerSession, maxActive, s.SkipToReadingActive, strategy, quizCount, passingScore, tutorStyle, s.ActiveProfileID)
+		`, targetWords, minWords, theme, s.MaxFlashcardsPerSession, maxActive, strategy, quizCount, passingScore, tutorStyle, s.ActiveProfileID)
 		if err != nil {
 			return err
 		}
@@ -650,7 +644,7 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
 		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
 		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
-		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
+		       COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
 		       COALESCE(inherited_flashcard_profile_ids_json, '[]')
 		FROM study_profiles
 		ORDER BY created_at DESC
@@ -668,13 +662,12 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 	for rows.Next() {
 		var p models.StudyProfile
 		var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
-		var skipRead sql.NullBool
 		var inheritedJSON sql.NullString
 		if err := rows.Scan(
 			&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
 			&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
 			&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
-			&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+			&p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
 			&inheritedJSON,
 		); err != nil {
 			return nil, err
@@ -694,10 +687,6 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 		if maxActive.Valid {
 			v := int(maxActive.Int64)
 			p.MaxActiveNotebooks = &v
-		}
-		if skipRead.Valid {
-			v := skipRead.Bool
-			p.SkipToReadingActive = &v
 		}
 		if quizCount.Valid {
 			v := int(quizCount.Int64)
@@ -724,13 +713,12 @@ func (r *Repository) GetProfiles() ([]models.StudyProfile, error) {
 func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	var p models.StudyProfile
 	var targetWords, minWords, maxCards, maxActive, quizCount, quizScore sql.NullInt64
-	var skipRead sql.NullBool
 	var inheritedJSON sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, name, deadline_at, created_at, COALESCE(classroom_code, ''), COALESCE(student_username, ''), COALESCE(cloud_api_token, ''),
 		       COALESCE(pomo_duration_sec, 1500), COALESCE(pomo_break_sec, 300), COALESCE(pomo_music_path, ''), COALESCE(pomo_shuffle, 0),
 		       target_session_words, min_session_words, COALESCE(theme, ''), max_flashcards_per_session, max_active_notebooks,
-		       skip_to_reading_active, COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
+		       COALESCE(default_remedial_strategy, ''), quiz_question_count, quiz_passing_score, COALESCE(tutor_style, ''),
 		       COALESCE(inherited_flashcard_profile_ids_json, '[]')
 		FROM study_profiles
 		WHERE id = ?
@@ -738,7 +726,7 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 		&p.ID, &p.Name, &p.DeadlineAt, &p.CreatedAt, &p.ClassroomCode, &p.StudentUsername, &p.CloudAPIToken,
 		&p.PomoDurationSec, &p.PomoBreakSec, &p.PomoMusicPath, &p.PomoShuffle,
 		&targetWords, &minWords, &p.Theme, &maxCards, &maxActive,
-		&skipRead, &p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
+		&p.DefaultRemedialStrategy, &quizCount, &quizScore, &p.TutorStyle,
 		&inheritedJSON,
 	)
 	if err == sql.ErrNoRows {
@@ -762,10 +750,6 @@ func (r *Repository) GetProfileByID(id string) (*models.StudyProfile, error) {
 	if maxActive.Valid {
 		v := int(maxActive.Int64)
 		p.MaxActiveNotebooks = &v
-	}
-	if skipRead.Valid {
-		v := skipRead.Bool
-		p.SkipToReadingActive = &v
 	}
 	if quizCount.Valid {
 		v := int(quizCount.Int64)
@@ -808,14 +792,14 @@ func (r *Repository) CreateProfile(p models.StudyProfile) error {
 			id, name, deadline_at, classroom_code, student_username, cloud_api_token,
 			pomo_duration_sec, pomo_break_sec, pomo_music_path, pomo_shuffle,
 			target_session_words, min_session_words, theme, max_flashcards_per_session,
-			max_active_notebooks, skip_to_reading_active, default_remedial_strategy,
+			max_active_notebooks, default_remedial_strategy,
 			quiz_question_count, quiz_passing_score, tutor_style, inherited_flashcard_profile_ids_json
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, p.ID, p.Name, p.DeadlineAt, p.ClassroomCode, p.StudentUsername, p.CloudAPIToken,
 		dur, brk, p.PomoMusicPath, p.PomoShuffle,
 		p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
-		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
+		p.MaxActiveNotebooks, p.DefaultRemedialStrategy,
 		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, inheritedJSON)
 	return err
 }
@@ -841,7 +825,6 @@ func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 		    theme = ?,
 		    max_flashcards_per_session = ?,
 		    max_active_notebooks = ?,
-		    skip_to_reading_active = ?,
 		    default_remedial_strategy = ?,
 		    quiz_question_count = ?,
 		    quiz_passing_score = ?,
@@ -849,7 +832,7 @@ func (r *Repository) UpdateProfile(p models.StudyProfile) error {
 		    inherited_flashcard_profile_ids_json = ?
 		WHERE id = ?
 	`, p.Name, p.DeadlineAt, p.TargetSessionWords, p.MinSessionWords, p.Theme, p.MaxFlashcardsPerSession,
-		p.MaxActiveNotebooks, p.SkipToReadingActive, p.DefaultRemedialStrategy,
+		p.MaxActiveNotebooks, p.DefaultRemedialStrategy,
 		p.QuizQuestionCount, p.QuizPassingScore, p.TutorStyle, inheritedJSON, p.ID)
 	return err
 }

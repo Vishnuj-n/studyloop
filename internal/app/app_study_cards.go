@@ -213,10 +213,6 @@ func (a *App) GenerateQuizForPageRange(notebookID string, startPage, endPage int
 	return a.studyService.GenerateQuizForPageRange(notebookID, startPage, endPage)
 }
 
-func (a *App) SubmitQuizAttempt(taskID string, answers []models.QuizAnswer) map[string]interface{} {
-	return a.SubmitQuizAttemptWithReflection(taskID, answers, "")
-}
-
 func (a *App) SubmitQuizAttemptWithReflection(taskID string, answers []models.QuizAnswer, reflectionText string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -243,9 +239,9 @@ func (a *App) SubmitQuizAttemptWithReflection(taskID string, answers []models.Qu
 	}
 }
 
-// GenerateFlashcardsForQuizTask generates flashcards based on a passed quiz task.
+// GenerateFlashcards generates flashcards based on a passed quiz task.
 // Newly generated cards are future-dated and do not create an immediate review task.
-func (a *App) GenerateFlashcardsForQuizTask(taskID string) map[string]interface{} {
+func (a *App) GenerateFlashcards(taskID string) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -371,16 +367,6 @@ func (a *App) GenerateManualFlashcards(notebookID string, startPage, endPage int
 	return a.studyService.GenerateManualFlashcards(notebookID, startPage, endPage)
 }
 
-func (a *App) GenerateComprehensiveExam(notebookID string, startPage, endPage int) map[string]interface{} {
-	if _, errMap := requireRepo(a); errMap != nil {
-		return errMap
-	}
-	if a.studyService == nil {
-		return map[string]interface{}{"error": errStudyServiceNotInitialized}
-	}
-	return a.studyService.GenerateComprehensiveExam(notebookID, startPage, endPage)
-}
-
 func (a *App) GenerateVivaExam(notebookID string, startPage, endPage int, quizTaskID string) map[string]interface{} {
 	if _, errMap := requireRepo(a); errMap != nil {
 		return errMap
@@ -467,8 +453,8 @@ func (a *App) ToggleCardSuspension(cardID string, suspended bool) map[string]int
 	return map[string]interface{}{"ok": true, "card_id": cardID, "suspended": suspended}
 }
 
-// ToggleNotebookCardsSuspension updates suspension state for all flashcards in a notebook.
-func (a *App) ToggleNotebookCardsSuspension(notebookID string, suspended bool) map[string]interface{} {
+// ToggleNotebookCards updates suspension state for all flashcards in a notebook.
+func (a *App) ToggleNotebookCards(notebookID string, suspended bool) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
@@ -528,8 +514,8 @@ func (a *App) ScoreShortAnswer(questionID, userAnswer string) map[string]interfa
 }
 
 
-// CompleteSocraticRescue completes the socratic rescue session and inserts a re-quiz via Unified Transition Router.
-func (a *App) CompleteSocraticRescue(taskID string) map[string]interface{} {
+// CompleteRescue completes the socratic rescue session and inserts a re-quiz via Unified Transition Router.
+func (a *App) CompleteRescue(taskID string) map[string]interface{} {
 	if a.studyService == nil {
 		return map[string]interface{}{"error": errStudyServiceNotInitialized}
 	}

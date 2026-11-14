@@ -19,7 +19,7 @@ vi.mock('../services/appApi', () => ({
   getTopicStudyNoteSlots: vi.fn().mockResolvedValue({ slots: [] }),
   getFlashcardsDeckOverview: vi.fn().mockResolvedValue({ metrics: {}, notebooks: [] }),
   toggleCardSuspension: vi.fn().mockResolvedValue({ ok: true }),
-  toggleNotebookCardsSuspension: vi.fn().mockResolvedValue({ ok: true }),
+  toggleNotebookCards: vi.fn().mockResolvedValue({ ok: true }),
   deleteFlashcard: vi.fn().mockResolvedValue({ ok: true }),
 }))
 

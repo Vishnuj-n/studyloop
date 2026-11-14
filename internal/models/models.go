@@ -689,7 +689,6 @@ type StudyProfile struct {
 	Theme                  string `json:"theme,omitempty"`
 	MaxFlashcardsPerSession *int   `json:"max_flashcards_per_session,omitempty"`
 	MaxActiveNotebooks     *int   `json:"max_active_notebooks,omitempty"`
-	SkipToReadingActive    *bool  `json:"skip_to_reading_active,omitempty"`
 	DefaultRemedialStrategy string `json:"default_remedial_strategy,omitempty"`
 	QuizQuestionCount      *int   `json:"quiz_question_count,omitempty"`
 	QuizPassingScore       *int     `json:"quiz_passing_score,omitempty"`
@@ -708,7 +707,6 @@ type UserSettings struct {
 	ShowRewardNotifications bool   `json:"show_reward_notifications"`
 	AskProfileOnStartup     bool   `json:"ask_profile_on_startup"`
 	ActiveProfileID         string `json:"active_profile_id"`
-	SkipToReadingActive     bool   `json:"skip_to_reading_active"`
 	CloudSyncURL            string `json:"cloud_sync_url"`
 	CloudAPIToken           string `json:"cloud_api_token"`
 	Theme                   string `json:"theme"`

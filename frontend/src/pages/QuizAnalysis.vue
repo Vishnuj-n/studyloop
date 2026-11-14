@@ -522,8 +522,8 @@ import { useRoute, useRouter } from 'vue-router'
 import StudyPageLayout from '../components/StudyPageLayout.vue'
 import {
   analyzeQuizFailure,
-  generateFlashcardsForQuizTask,
-  GetTaskContext,
+  generateFlashcards,
+  getTaskContext,
 } from '../services/appApi'
 
 const route = useRoute()
@@ -570,7 +570,7 @@ onMounted(async () => {
   if (clusters.value.length === 0 && route.query.taskId) {
     taskID.value = String(route.query.taskId)
     try {
-      const ctx = await GetTaskContext(taskID.value)
+      const ctx = await getTaskContext(taskID.value)
       if (ctx?.task) {
         notebookID.value = ctx.task.notebook_id || ctx.notebook?.id || ''
         isMilestone.value = ctx.task.task_type === 'MILESTONE_EXAM'
@@ -794,7 +794,7 @@ async function handleExit(shouldGenerateFlashcards) {
 
   if (shouldGenerateFlashcards && flashcardsPending.value && taskID.value) {
     try {
-      const genResult = await generateFlashcardsForQuizTask(taskID.value)
+      const genResult = await generateFlashcards(taskID.value)
       if (genResult?.error) {
         exitError.value = genResult.error
         processingExit.value = false

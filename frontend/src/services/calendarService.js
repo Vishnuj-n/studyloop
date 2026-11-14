@@ -10,7 +10,7 @@
  */
 let retainedAudioCtx = null
 
-export function initAudioContext() {
+function initAudioContext() {
   if (!retainedAudioCtx) {
     const AudioContextClass = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
     if (AudioContextClass) {

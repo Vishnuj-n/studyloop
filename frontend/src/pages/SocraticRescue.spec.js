@@ -9,7 +9,7 @@ const routeQuery = ref({})
 // Mock services/appApi
 vi.mock('../services/appApi', () => ({
   getTopicSectionsContent: vi.fn(),
-  completeSocraticRescue: vi.fn(),
+  completeRescue: vi.fn(),
   getTaskContext: vi.fn(),
   activateTask: vi.fn(),
 }))
@@ -77,7 +77,7 @@ describe('SocraticRescue.vue Integration', () => {
 
   it('completes socratic rescue session when user clicks I completed the session', async () => {
     appApi.getTopicSectionsContent.mockResolvedValue({ content: '' })
-    appApi.completeSocraticRescue.mockResolvedValue({ error: null })
+    appApi.completeRescue.mockResolvedValue({ error: null })
 
     const wrapper = mount(SocraticRescue)
     await flushPromises()
@@ -86,7 +86,7 @@ describe('SocraticRescue.vue Integration', () => {
     await completeBtn.trigger('click')
     await flushPromises()
 
-    expect(appApi.completeSocraticRescue).toHaveBeenCalledWith('task-456')
+    expect(appApi.completeRescue).toHaveBeenCalledWith('task-456')
   })
 
   it('shows error if missing required query params', async () => {

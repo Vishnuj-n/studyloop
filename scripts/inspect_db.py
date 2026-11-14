@@ -62,7 +62,6 @@ def inspect_db(db_path):
         print(f"Target Session Words: {s.get('target_session_words')}")
         print(f"Min Session Words: {s.get('min_session_words')}")
         print(f"Max Flashcards/Session: {s.get('max_flashcards_per_session')}")
-        print(f"Skip to Reading Active: {bool(s.get('skip_to_reading_active'))}")
     else:
         print("[WARN] No user settings row found!")
 

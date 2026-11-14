@@ -335,13 +335,6 @@
         </div>
       </div>
     </div>
-
-    <SettingsToggle
-      v-model="settings.skip_to_reading_active"
-      :disabled="disabled"
-      title='Enable "Skip to Reading" (Escape Hatch)'
-      hint="Temporarily deprioritizes review backlogs, letting you read new material first. FSRS records remain safe."
-    />
   </article>
 </template>
 

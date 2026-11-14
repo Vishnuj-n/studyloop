@@ -718,8 +718,8 @@ import {
   getNotebookTopicTree,
   getNotesByNotebook,
   getTopicStudyNoteSlots,
-  generateTopicStudyNoteForRange,
-  updateTopicStudyNote,
+  generateStudyNoteForRange,
+  updateStudyNote,
   reorderTopicStudyNotes,
   saveNoteImage,
   markTopicReviewed as apiMarkTopicReviewed,
@@ -1413,7 +1413,7 @@ async function saveSlot(slot) {
   savingSlotKey.value = key
   errorMsg.value = ''
   try {
-    const res = await updateTopicStudyNote(
+    const res = await updateStudyNote(
       slot.topic_id,
       slot.start_page,
       slot.end_page,
@@ -1446,7 +1446,7 @@ async function generateSlot(slot) {
     // If currently editing this slot with unsaved text, auto-save first so backend preserves it
     if (editingSlotKey.value === key && editSlotBuffer.value.trim().length > 0) {
       try {
-        await updateTopicStudyNote(slot.topic_id, slot.start_page, slot.end_page, editSlotBuffer.value)
+        await updateStudyNote(slot.topic_id, slot.start_page, slot.end_page, editSlotBuffer.value)
       } catch (saveErr) {
         console.warn('[NOTES] Auto-save before generate failed:', saveErr)
       }
@@ -1454,7 +1454,7 @@ async function generateSlot(slot) {
     }
 
     const nbID = slot.notebook_id || activeTopic.value?.notebook_id || selectedNotebookID.value || ''
-    const res = await generateTopicStudyNoteForRange(
+    const res = await generateStudyNoteForRange(
       slot.topic_id,
       nbID,
       slot.start_page,
@@ -1567,7 +1567,7 @@ async function saveNewNote() {
   savingNewNote.value = true
   errorMsg.value = ''
   try {
-    const res = await updateTopicStudyNote(
+    const res = await updateStudyNote(
       selectedTopicID.value,
       newNoteStartPage.value || 0,
       newNoteEndPage.value || 0,

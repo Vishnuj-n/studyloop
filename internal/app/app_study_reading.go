@@ -414,14 +414,14 @@ func (a *App) RevertReadingTaskSession(taskID string) map[string]interface{} {
 	}
 }
 
-// RevertTopicToReadingFromQuiz is the user-facing "Restart Reading Session" action available on the
+// ReturnToReading is the user-facing "Restart Reading Session" action available on the
 // quiz result screen after a final rescue-quiz failure. Given the quiz task ID it:
 //  1. Looks up the quiz task to obtain topic_id and start_page.
 //  2. Finds the most recently completed READING / REREAD task for that topic range.
 //  3. Atomically reverts that reading task back to ACTIVE (resetting the topic cursor, purging the
 //     failed quiz / tutor / flashcard tasks, and deleting any quiz attempts for this range).
 //  4. Returns the reverted reading task ID so the frontend can navigate directly to /reader.
-func (a *App) RevertTopicToReadingFromQuiz(quizTaskID string) map[string]interface{} {
+func (a *App) ReturnToReading(quizTaskID string) map[string]interface{} {
 	repo, errMap := requireRepo(a)
 	if errMap != nil {
 		return errMap
