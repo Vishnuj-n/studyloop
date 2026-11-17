@@ -226,5 +226,40 @@ describe('Flashcards.vue Integration', () => {
       },
     })
   })
+
+  it('does not render config panel while loading queue session from taskId query', async () => {
+    appApi.getNotebooks.mockResolvedValue([{ id: 'nb-1', title: 'Calculus 101' }])
+    let resolveReviewSession
+    const reviewSessionPromise = new Promise((resolve) => {
+      resolveReviewSession = resolve
+    })
+    appApi.activateTask.mockResolvedValue({ ok: true })
+    appApi.getReviewSession.mockImplementation(() => reviewSessionPromise)
+    routeQuery.value = { taskId: 'task-review-due', notebookId: 'nb-1' }
+
+    const wrapper = mount(Flashcards)
+
+    // Synchronously check on initial mount before session resolves:
+    expect(wrapper.find('.config-panel').exists()).toBe(false)
+    expect(wrapper.find('.state-panel').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Loading review session')
+
+    // Resolve queue session
+    resolveReviewSession({
+      session: {
+        task: { id: 'task-review-due', notebook_id: 'nb-1' },
+        cards: [{ id: 'fc-due-1', prompt: 'What is FSRS?', answer: 'Free Spaced Repetition Scheduler' }],
+        next_pending_idx: 0,
+        remaining: 1,
+      },
+    })
+    await flushPromises()
+
+    // Config panel should still never be rendered; review session should be active
+    expect(wrapper.find('.config-panel').exists()).toBe(false)
+    expect(wrapper.find('.state-panel').exists()).toBe(false)
+    expect(wrapper.find('.review-session').exists()).toBe(true)
+    expect(wrapper.text()).toContain('What is FSRS?')
+  })
 })
 

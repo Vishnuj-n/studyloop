@@ -14,7 +14,8 @@
 
         <div class="form-group">
           <label for="profile-name">Profile Name</label>
-          <input id="profile-name" v-model="localName" type="text"
+          <input
+id="profile-name" v-model="localName" type="text"
             :placeholder="isEdit ? '' : 'e.g. UPSC, Semester Finals'" required />
         </div>
 
@@ -35,7 +36,8 @@
             </p>
           </div>
           <div class="inheritance-list">
-            <label v-for="prof in otherProfiles" :key="prof.id" class="inheritance-item"
+            <label
+v-for="prof in otherProfiles" :key="prof.id" class="inheritance-item"
               :class="{ selected: selectedInherited.includes(prof.id) }">
               <input v-model="selectedInherited" type="checkbox" class="inheritance-checkbox" :value="prof.id" />
               <span class="profile-name-bold">{{ prof.name }}</span>

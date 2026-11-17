@@ -74,6 +74,8 @@ https://github.com/user-attachments/assets/f6a4e039-4ac8-4096-91a1-471ca3e43237
 StudyLoop is built on a **Local-First, BYOK (Bring Your Own Key)** architecture:
 
 * **Your Data Stays on Your Machine:** All notes, PDFs, vector embeddings (`sqlite-vec`), FSRS flashcard schedules, and reading history live in local SQLite (`Studyloop.db`).
+* **Core Open Source:** The entire desktop shell, queue orchestrator, frontend, and backend architecture are open for review in this repository (with internal extension runtimes pre-packaged).
+* **Verified Clean Installer:** Scanned and verified clean against 70+ antivirus engines on [VirusTotal](https://www.virustotal.com/gui/file/53476f4477d45c11d36344b32cacca368847b751c83dc5184128bc57f41c49df) (0/71 detections).
 * **Local Embeddings:** Semantic vector search runs 100% locally via ONNX Runtime INT8 models on your CPU/GPU.
 * **Flexible AI Inference:** Connect any OpenAI-compatible provider (Groq, Google AI Studio, OpenRouter, OpenAI) or run completely local with **Ollama** or **LM Studio**. API keys are stored securely in your OS native keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service).
 * **Minimal Anonymous Heartbeat:** Sends a lightweight launch ping (`installation_id`, `platform`, `app_version`, `architecture`) on startup for OS support metrics. Detailed study analytics are strictly opt-in (Tier 2). See [PRIVACY.md](PRIVACY.md).
@@ -99,8 +101,10 @@ StudyLoop is built on a **Local-First, BYOK (Bring Your Own Key)** architecture:
 
 > **Important:** Always use the official installer rather than a standalone `.exe`. The installer provisions required runtime assets, vector extensions (`sqlite-vec`), embedding models, and local database directories necessary for full functionality.
 
-1. Download **[Studyloop-amd64-installer.exe](https://github.com/Vishnuj-n/studyloop/releases/download/v1.11.0/Studyloop-amd64-installer.exe)** (or visit [Releases](https://github.com/Vishnuj-n/studyloop/releases)).
+1. Download **[Studyloop-amd64-installer.exe](https://github.com/Vishnuj-n/studyloop/releases/download/v1.11.0/Studyloop-amd64-installer.exe)** (or visit [Releases](https://github.com/Vishnuj-n/studyloop/releases)).  
+   [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F71%20Clean-brightgreen?logo=virustotal)](https://www.virustotal.com/gui/file/53476f4477d45c11d36344b32cacca368847b751c83dc5184128bc57f41c49df)
 2. Run the installer and launch StudyLoop.
+   > **Note on Windows SmartScreen:** As an independent project without an enterprise code-signing certificate, Windows SmartScreen may show an *"Unknown Publisher / Windows protected your PC"* prompt. Click **More info → Run anyway** to proceed.
 3. Configure your AI provider in **Settings** (or during Onboarding):
    - **Cloud Providers (BYOK):** Google AI Studio (recommended), Groq, OpenRouter, or OpenAI (requires API key).
    - **Local AI (Ollama / LM Studio):** Select *Custom* / *Ollama* and set the Base URL (e.g., `http://localhost:11434/v1`). **Note:** Ollama does not require an API key; you can leave the API key field empty (or enter any placeholder like `ollama`), as StudyLoop's local provider will connect directly without requiring a cloud key.

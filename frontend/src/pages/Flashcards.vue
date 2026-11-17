@@ -43,8 +43,13 @@
 
       <!-- ── COMPREHENSIVE TAB ───────────────────── -->
       <section class="tab-content">
-      <!-- Config panel: page range -->
-      <div v-if="!reviewing" class="config-panel">
+      <!-- Loading queue session -->
+      <article v-if="loading && queueMode" class="state-panel">
+        <p class="state-text">Loading review session…</p>
+      </article>
+
+      <!-- Config panel: page range (manual practice mode) -->
+      <div v-else-if="!reviewing && !queueMode" class="config-panel">
         <p class="config-panel__hint">Enter the page range to extract flashcards from.</p>
         <div class="manual-notice">
           <svg
@@ -320,7 +325,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   activateTask,
@@ -346,12 +351,16 @@ import { useShortcuts } from '../composables/useShortcuts'
 const { showNotice, showError } = useToast()
 const route = useRoute()
 const router = useRouter()
+
+const initialTaskId = route.query.taskId ? String(route.query.taskId) : ''
+const initialNotebookId = route.query.notebookId ? String(route.query.notebookId) : ''
+
 const showDeckManager = ref(false)
 const notebooks = ref([])
-const selectedNotebookID = ref('')
+const selectedNotebookID = ref(initialNotebookId)
 const startPage = ref(1)
 const endPage = ref(10)
-const loading = ref(false)
+const loading = ref(Boolean(initialTaskId))
 const error = ref('')
 const cards = ref([])
 const reviewIndex = ref(0)
@@ -360,9 +369,9 @@ const flipped = ref(false)
 const isSubmittingReview = ref(false)
 const analyticsEnabled = ref(false)
 const anonymousUserID = ref('')
-const reviewTaskID = ref('')
+const reviewTaskID = ref(initialTaskId)
 const sessionRemaining = ref(0)
-const queueMode = computed(() => !!reviewTaskID.value)
+const queueMode = computed(() => Boolean(reviewTaskID.value))
 const showInfoTooltip = ref(false)
 
 const ratings = [
@@ -544,47 +553,61 @@ async function onDeckUpdated() {
 }
 
 onMounted(async () => {
-  // Keyboard shortcuts are registered declaratively via useShortcuts below
-  try {
-    const res = await getNotebooks()
-    notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
-  } catch {
-    error.value = 'Failed to load notebooks.'
-  }
-  try {
-    const tree = await getNotebookTopicTree()
-    const flattened = []
-    if (Array.isArray(tree)) {
-      for (const nb of tree) {
-        const nid = nb.notebook_id || nb.id || ''
-        if (Array.isArray(nb.topics)) {
-          for (const t of nb.topics) {
-            flattened.push({
-              topic_id: t.topic_id || t.id,
-              notebook_id: nid,
-              title: t.title,
-              start_page: Number(t.start_page) || 0,
-              end_page: Number(t.end_page) || 0,
-            })
+  // Kick off queue session loading immediately without waiting for metadata
+  const queuePromise = route.query.taskId
+    ? loadQueueSession(String(route.query.taskId), String(route.query.notebookId || ''))
+    : Promise.resolve()
+
+  const loadMetadata = async () => {
+    try {
+      const res = await getNotebooks()
+      notebooks.value = Array.isArray(res) ? res.filter((n) => !n.error) : []
+    } catch {
+      error.value = 'Failed to load notebooks.'
+    }
+    try {
+      const tree = await getNotebookTopicTree()
+      const flattened = []
+      if (Array.isArray(tree)) {
+        for (const nb of tree) {
+          const nid = nb.notebook_id || nb.id || ''
+          if (Array.isArray(nb.topics)) {
+            for (const t of nb.topics) {
+              flattened.push({
+                topic_id: t.topic_id || t.id,
+                notebook_id: nid,
+                title: t.title,
+                start_page: Number(t.start_page) || 0,
+                end_page: Number(t.end_page) || 0,
+              })
+            }
           }
         }
       }
+      availableTopics.value = flattened
+    } catch (err) {
+      console.error('Failed to load topic tree in Flashcards:', err)
     }
-    availableTopics.value = flattened
-  } catch (err) {
-    console.error('Failed to load topic tree in Flashcards:', err)
+    try {
+      const settings = await getUserSettings()
+      analyticsEnabled.value = settings?.analytics_enabled ?? false
+      anonymousUserID.value = settings?.anonymous_user_id ?? ''
+    } catch (err) {
+      console.error('Failed to load user settings in Flashcards:', err)
+    }
   }
-  try {
-    const settings = await getUserSettings()
-    analyticsEnabled.value = settings?.analytics_enabled ?? false
-    anonymousUserID.value = settings?.anonymous_user_id ?? ''
-  } catch (err) {
-    console.error('Failed to load user settings in Flashcards:', err)
-  }
-  if (route.query.taskId) {
-    await loadQueueSession(String(route.query.taskId), String(route.query.notebookId || ''))
-  }
+
+  await Promise.all([queuePromise, loadMetadata()])
 })
+
+watch(
+  () => route.query.taskId,
+  async (newTaskId) => {
+    if (newTaskId && newTaskId !== reviewTaskID.value) {
+      await loadQueueSession(String(newTaskId), String(route.query.notebookId || ''))
+    }
+  }
+)
 
 // Shortcut cleanup is automatic via useShortcuts lifecycle hooks
 
@@ -935,6 +958,19 @@ async function loadQueueSession(taskID, notebookID = '') {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.state-panel {
+  background: var(--surface-container-low);
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.state-text {
+  margin: 0;
+  font-size: 15px;
+  color: var(--muted-text);
 }
 
 .config-panel,
