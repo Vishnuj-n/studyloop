@@ -133,6 +133,14 @@
                     <option value="cheatsheet">Minimalist Cheatsheet</option>
                     <option value="feynman">Feynman (Intuition + Rules)</option>
                     <option value="detailed">Comprehensive Deep Dive</option>
+                    <!-- Custom variants from Prompt Studio -->
+                    <option
+                      v-for="v in notesPromptVariants.filter(x => !x.is_system)"
+                      :key="v.id"
+                      :value="v.id"
+                    >
+                      {{ v.name }}
+                    </option>
                   </select>
                 </div>
 
@@ -727,6 +735,7 @@ import {
   openNotesFolder,
   getStudyNotesSettings,
   setStudyNotesSettings,
+  getPromptVariants,
 } from '../services/appApi'
 import { renderMarkdown } from '../services/markdown'
 import { useDialog } from '../composables/useDialog'
@@ -758,8 +767,11 @@ const autoNotesEnabled = ref(false)
 const noteDetailLevel = ref('briefing')
 const showRecapEnabled = ref(true)
 const showNotesSettingsPopover = ref(false)
+const notesPromptVariants = ref([])
 
 function getDetailLevelLabel(val) {
+  const custom = notesPromptVariants.value.find(v => v.id === val)
+  if (custom) return custom.name
   switch (val) {
     case 'briefing':
       return 'Briefing Document'
@@ -775,7 +787,7 @@ function getDetailLevelLabel(val) {
     case 'detailed':
       return 'Deep Dive'
     default:
-      return 'Briefing Document'
+      return val || 'Briefing Document'
   }
 }
 
@@ -810,11 +822,17 @@ async function handleToggleShowRecap(targetVal) {
 
 async function loadNotesSettings() {
   try {
-    const res = await getStudyNotesSettings()
+    const [res, variantsRes] = await Promise.all([
+      getStudyNotesSettings(),
+      getPromptVariants('notes').catch(() => null),
+    ])
     if (res && !res.error) {
       autoNotesEnabled.value = Boolean(res.auto_generate_study_notes)
       noteDetailLevel.value = res.notes_detail_level || 'briefing'
       showRecapEnabled.value = res.show_recap_before_reading !== undefined ? Boolean(res.show_recap_before_reading) : true
+    }
+    if (variantsRes && Array.isArray(variantsRes.variants)) {
+      notesPromptVariants.value = variantsRes.variants
     }
   } catch (err) {
     console.error('[NOTES] Failed to load settings from SQLite:', err)
@@ -1202,10 +1220,11 @@ async function loadInitialData() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const [nbList, tree, notesRes] = await Promise.all([
+    // ponytail: unblock UI immediately with tree + settings. Let global notes disk scan stream in background.
+    const [nbList, tree] = await Promise.all([
       getNotebooks().catch(() => []),
       getNotebookTopicTree().catch(() => []),
-      getNotesByNotebook('').catch(() => ({ notes: [] })),
+      loadNotesSettings(),
     ])
 
     notebooks.value = Array.isArray(nbList) ? nbList : []
@@ -1218,19 +1237,6 @@ async function loadInitialData() {
       if (nid) defaultExpanded.add(nid)
     }
     expandedNotebooks.value = defaultExpanded
-
-    const nMap = {}
-    if (notesRes && Array.isArray(notesRes.notes)) {
-      for (const n of notesRes.notes) {
-        if (n.topic_id) {
-          if (!nMap[n.topic_id]) {
-            nMap[n.topic_id] = []
-          }
-          nMap[n.topic_id].push(n)
-        }
-      }
-    }
-    notesMap.value = nMap
 
     // Check query params for initial selection
     const queryTopic = route.query.topicId || route.query.topic_id
@@ -1258,10 +1264,29 @@ async function loadInitialData() {
     } else if (allTopics.value.length > 0 && !selectedTopicID.value) {
       selectTopic(allTopics.value[0])
     }
+
+    // Unblock the UI right away
+    loading.value = false
+
+    // Asynchronously populate note badges / counts without freezing UI
+    getNotesByNotebook('').then((notesRes) => {
+      if (!isComponentMounted) return
+      const nMap = {}
+      if (notesRes && Array.isArray(notesRes.notes)) {
+        for (const n of notesRes.notes) {
+          if (n.topic_id) {
+            if (!nMap[n.topic_id]) {
+              nMap[n.topic_id] = []
+            }
+            nMap[n.topic_id].push(n)
+          }
+        }
+      }
+      notesMap.value = nMap
+    }).catch(() => {})
   } catch (err) {
     console.error('[NOTES] Failed to load data:', err)
     errorMsg.value = 'Failed to load study notes data.'
-  } finally {
     loading.value = false
   }
 }
@@ -1681,7 +1706,6 @@ watch(
 onMounted(() => {
   isComponentMounted = true
   loadInitialData()
-  loadNotesSettings()
   window.addEventListener('settings-updated', handleExternalSettingsUpdated)
 })
 

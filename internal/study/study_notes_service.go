@@ -81,58 +81,81 @@ func ParseMarkdownNote(raw string, fallback models.TopicStudyNote) models.TopicS
 			body := strings.TrimSpace(rest[endIdx+4:])
 			note.Content = body
 
-			lines := strings.Split(frontmatter, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if line == "" || strings.HasPrefix(line, "#") {
-					continue
-				}
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) != 2 {
-					continue
-				}
-				key := strings.ToLower(strings.TrimSpace(parts[0]))
-				val := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
-
-				switch key {
-				case "id":
-					note.ID = val
-				case "topic_id":
-					note.TopicID = val
-				case "topic_title":
-					note.TopicTitle = utils.CleanTopicTitle(val)
-				case "notebook_id":
-					note.NotebookID = val
-				case "notebook_title":
-					note.NotebookTitle = val
-				case "start_page":
-					if p, err := strconv.Atoi(val); err == nil {
-						note.StartPage = p
-					}
-				case "end_page":
-					if p, err := strconv.Atoi(val); err == nil {
-						note.EndPage = p
-					}
-				case "order":
-					if ord, err := strconv.Atoi(val); err == nil {
-						note.Order = ord
-					}
-				case "last_reviewed_at":
-					if t, err := strconv.ParseInt(val, 10, 64); err == nil {
-						note.LastReviewedAt = t
-					}
-				case "created_at":
-					note.CreatedAt = val
-				case "updated_at":
-					note.UpdatedAt = val
-				}
-			}
+			parseFrontmatterFields(frontmatter, &note)
 			return note
 		}
 	}
 
 	note.Content = raw
 	return note
+}
+
+// ParseMarkdownMetadataOnly extracts only the YAML frontmatter and checks if body content exists without keeping full markdown content in memory.
+func ParseMarkdownMetadataOnly(raw string, fallback models.TopicStudyNote) (models.TopicStudyNote, bool) {
+	note := fallback
+	trimmed := strings.TrimSpace(raw)
+	if strings.HasPrefix(trimmed, "---") {
+		rest := strings.TrimPrefix(trimmed, "---")
+		endIdx := strings.Index(rest, "\n---")
+		if endIdx != -1 {
+			frontmatter := rest[:endIdx]
+			body := strings.TrimSpace(rest[endIdx+4:])
+			parseFrontmatterFields(frontmatter, &note)
+			hasContent := len(body) > 0
+			return note, hasContent
+		}
+	}
+	hasContent := len(trimmed) > 0
+	return note, hasContent
+}
+
+func parseFrontmatterFields(frontmatter string, note *models.TopicStudyNote) {
+	lines := strings.Split(frontmatter, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		val := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+
+		switch key {
+		case "id":
+			note.ID = val
+		case "topic_id":
+			note.TopicID = val
+		case "topic_title":
+			note.TopicTitle = utils.CleanTopicTitle(val)
+		case "notebook_id":
+			note.NotebookID = val
+		case "notebook_title":
+			note.NotebookTitle = val
+		case "start_page":
+			if p, err := strconv.Atoi(val); err == nil {
+				note.StartPage = p
+			}
+		case "end_page":
+			if p, err := strconv.Atoi(val); err == nil {
+				note.EndPage = p
+			}
+		case "order":
+			if ord, err := strconv.Atoi(val); err == nil {
+				note.Order = ord
+			}
+		case "last_reviewed_at":
+			if t, err := strconv.ParseInt(val, 10, 64); err == nil {
+				note.LastReviewedAt = t
+			}
+		case "created_at":
+			note.CreatedAt = val
+		case "updated_at":
+			note.UpdatedAt = val
+		}
+	}
 }
 
 // FormatMarkdownNote serializes a TopicStudyNote with standard YAML frontmatter and markdown body.
@@ -470,9 +493,20 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 	var prompt string
 	if s.promptService != nil {
 		// If notebook assignment exists or user has a custom active variant, use that variant.
-		// If on system default, select the preset template matching detailLevel.
+		// If on system default or detailLevel points to a specific preset/variant, resolve it.
 		categoryTmpl, _ := s.promptService.GetTemplate(PromptCategoryNotes, nbID)
 		matchedPreset := getPresetForDetailLevel(detailLevel)
+		// ponytail: check if detailLevel matches a custom variant ID from Prompt Studio
+		if matchedPreset == "" && s.repo != nil && strings.TrimSpace(detailLevel) != "" {
+			if vars, err := s.repo.GetPromptVariants(PromptCategoryNotes); err == nil {
+				for _, v := range vars {
+					if v.ID == detailLevel {
+						matchedPreset = v.Template
+						break
+					}
+				}
+			}
+		}
 		if matchedPreset != "" {
 			variants, _ := s.repo.GetPromptVariants(PromptCategoryNotes)
 			hasCustomActive := false
@@ -484,7 +518,7 @@ func (s *StudyService) GenerateTopicStudyNoteForRange(topicID, notebookID string
 			}
 			assignments, _ := s.repo.GetPromptAssignmentsForCategory(PromptCategoryNotes)
 			hasNotebookAssignment := nbID != "" && assignments != nil && assignments[nbID] != ""
-			if !hasCustomActive && !hasNotebookAssignment {
+			if (!hasCustomActive && !hasNotebookAssignment) || strings.TrimSpace(detailLevel) != "" {
 				categoryTmpl = matchedPreset
 			}
 		}
@@ -949,7 +983,9 @@ func (s *StudyService) GetNotesByNotebook(notebookID string) ([]models.TopicStud
 		fallback := models.TopicStudyNote{
 			FilePath: path,
 		}
-		note := ParseMarkdownNote(string(data), fallback)
+		// Performance optimization: When listing all notes across notebook(s) for sidebar metadata,
+		// avoid loading full markdown bodies into memory.
+		note, hasContent := ParseMarkdownMetadataOnly(string(data), fallback)
 		note.FilePath = path
 		if note.TopicTitle != "" {
 			note.TopicTitle = utils.CleanTopicTitle(note.TopicTitle)
@@ -959,7 +995,10 @@ func (s *StudyService) GetNotesByNotebook(notebookID string) ([]models.TopicStud
 				note.RelativeFolderPath = filepath.ToSlash(rel)
 			}
 		}
-		if strings.TrimSpace(note.Content) != "" {
+		if hasContent {
+			// Provide a lightweight non-empty sentinel so frontend checks like (n.content && n.content.trim().length > 0)
+			// accurately detect note existence without transmitting full markdown bodies over IPC.
+			note.Content = "[metadata_ready]"
 			notes = append(notes, note)
 		}
 		return nil

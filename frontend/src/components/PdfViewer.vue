@@ -55,6 +55,7 @@ const { doc } = usePdfDocument({
 })
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
+// ponytail: stable base width scaled by zoom avoids 2-3s PDF.js canvas re-renders on sidebar toggle
 const BASE_WIDTH = 800
 const PAGE_GAP = 20
 const BUFFER = 1 // render activePage ± BUFFER pages (1 above, current, 1 below = 3 active pages max)
@@ -73,10 +74,10 @@ const pageAspectRatio = ref(11 / 8.5)
 let scrollListenerActive = false
 
 // ─── Derived ────────────────────────────────────────────────────────────────────
-// ponytail: stable base width scaled by zoom avoids 2-3s PDF.js canvas re-renders on sidebar toggle
-const containerWidth = computed(() =>
-  Math.round(Math.max(200, BASE_WIDTH * props.zoomScale))
-)
+// ponytail: fixed raster width scaled solely by user zoom prop. Zero ResizeObserver recalculations.
+const containerWidth = computed(() => {
+  return Math.round(Math.max(200, BASE_WIDTH * props.zoomScale))
+})
 
 const pageSlotHeight = computed(() =>
   Math.round(containerWidth.value * pageAspectRatio.value)
@@ -155,21 +156,6 @@ function onPageRendered(pg) {
   emit('rendered', pg)
   if (!ready.value) {
     ready.value = true
-  }
-  // On first render of page 1, measure actual aspect ratio from canvas
-  if (pg <= 2) {
-    nextTick(() => {
-      const vp = viewportRef.value
-      if (!vp) return
-      const canvas = vp.querySelector(`[data-page="${pg}"] canvas`)
-      if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-        const measured = canvas.clientHeight / canvas.clientWidth
-        if (Math.abs(measured - pageAspectRatio.value) > 0.01) {
-          pageAspectRatio.value = measured
-          nextTick(() => jumpToPage(activePage.value))
-        }
-      }
-    })
   }
 }
 

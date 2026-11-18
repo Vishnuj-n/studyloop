@@ -324,6 +324,42 @@ func TestExtractUserNotesSection(t *testing.T) {
 	}
 }
 
+func TestParseMarkdownMetadataOnly(t *testing.T) {
+	raw := `---
+id: "note-123"
+topic_id: "topic-xyz"
+topic_title: "Clean Code"
+notebook_id: "nb-1"
+notebook_title: "Clean Architecture"
+start_page: 5
+end_page: 15
+last_reviewed_at: 1700000000
+---
+
+# Deep Dive Content
+This is heavy markdown content that shouldn't be loaded at startup for sidebar listing.
+`
+	fallback := models.TopicStudyNote{
+		FilePath: "dummy/path.md",
+	}
+	note, hasContent := ParseMarkdownMetadataOnly(raw, fallback)
+	if !hasContent {
+		t.Errorf("expected hasContent to be true")
+	}
+	if note.TopicID != "topic-xyz" {
+		t.Errorf("expected topic-xyz, got %s", note.TopicID)
+	}
+	if note.StartPage != 5 || note.EndPage != 15 {
+		t.Errorf("expected pages 5-15, got %d-%d", note.StartPage, note.EndPage)
+	}
+	if note.LastReviewedAt != 1700000000 {
+		t.Errorf("expected 1700000000, got %d", note.LastReviewedAt)
+	}
+	if note.Content != "" {
+		t.Errorf("expected note.Content to be empty in metadata-only mode, got %s", note.Content)
+	}
+}
+
 func TestReorderTopicStudyNotes(t *testing.T) {
 	tempDir := t.TempDir()
 	notesDir := filepath.Join(tempDir, "notes")

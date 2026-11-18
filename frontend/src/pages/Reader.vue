@@ -1,6 +1,6 @@
 <template>
-  <section class="page">
-    <header class="head">
+  <section class="page" :class="{ 'is-focus-mode': isReaderFocusMode }">
+    <header v-show="!isReaderFocusMode" class="head">
       <p class="eyebrow">Reader</p>
       <h1>{{ reader.topicTitle.value }}</h1>
       <p class="meta">
@@ -236,6 +236,15 @@
               <span class="reading-window-label">Reading Window:&nbsp;</span>Pages {{ referenceStartPage }}-{{ referenceEndPage }}
             </span>
             <button
+              class="secondary focus-mode-btn"
+              :class="{ active: isReaderFocusMode }"
+              :title="isReaderFocusMode ? 'Exit Full Focus Mode [Esc or F]' : 'Enter Full Focus Mode (Full PDF, no distractions) [F]'"
+              @click="toggleReaderFocus"
+            >
+              <BaseIcon :name="isReaderFocusMode ? 'minimize-2' : 'maximize-2'" size="15" />
+              <span>{{ isReaderFocusMode ? 'Exit Focus' : 'Focus' }}</span>
+            </button>
+            <button
               v-if="isTaskFlow"
               class="secondary skip-session-btn"
               :disabled="!resolvedTaskID || reader.loadingBundle.value || completingSession"
@@ -374,7 +383,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseIcon from '../components/BaseIcon.vue'
 import {
@@ -402,6 +411,7 @@ import AudioOverviewBar from '../components/AudioOverviewBar.vue'
 import PdfViewer from '../components/PdfViewer.vue'
 import PreviousSessionRecapModal from '../components/PreviousSessionRecapModal.vue'
 import { copyTextToClipboard } from '../utils/clipboard'
+import { isReaderFocusMode, toggleReaderFocusMode, exitReaderFocusMode } from '../composables/useReaderFocus'
 
 const { isExtensionActive } = useExtensions()
 const { confirm } = useDialog()
@@ -526,6 +536,15 @@ async function handleSimplify() {
 
 const route = useRoute()
 const router = useRouter()
+
+function toggleReaderFocus() {
+  toggleReaderFocusMode()
+  nextTick(() => {
+    if (pdfViewerRef.value?.jumpToPage && reader.currentPage.value) {
+      pdfViewerRef.value.jumpToPage(reader.currentPage.value)
+    }
+  })
+}
 
 // Get task ID from route (task flow only - manual flow deprecated)
 const routeTaskID = computed(() => {
@@ -684,6 +703,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  exitReaderFocusMode()
   window.removeEventListener('click', handleDocumentClick)
   clearCompressionPolling()
 })
@@ -1835,6 +1855,45 @@ button:disabled {
 .layout.collapsed .stage-actions-inline {
   display: flex;
 }
+.page.is-focus-mode {
+  height: 100vh;
+  gap: 0;
+}
+
+.page.is-focus-mode .stage {
+  border-radius: 0;
+  border: none;
+  padding: 10px 16px;
+}
+
+.focus-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.focus-mode-btn:hover {
+  background: var(--surface-container-highest);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.focus-mode-btn.active {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
 .layout.collapsed .more-actions-wrapper {
   display: none;
 }

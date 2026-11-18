@@ -1346,7 +1346,11 @@ func (a *App) GetProfileDailyPace(profileID string) map[string]interface{} {
 			requiredWeeklyPace = float64(remainingSessions) / (float64(daysRemaining) / 7.0)
 		}
 
-		if float64(sessionsPast7Days) < requiredWeeklyPace {
+		// If the user's scheduled routine windows fully cover the remaining sessions,
+		// they are structurally ON_TRACK regardless of past 7 days lull.
+		if remainingSessions <= remainingWindows {
+			feasibilityStatus = "ON_TRACK"
+		} else if float64(sessionsPast7Days) < requiredWeeklyPace {
 			feasibilityStatus = "AT_RISK"
 		} else {
 			feasibilityStatus = "ON_TRACK"

@@ -730,6 +730,10 @@ export function getPromptStudioTemplates() {
   return appBridge().GetPromptStudioTemplates()
 }
 
+export function getPromptVariants(category) {
+  return appBridge().GetPromptVariants(category)
+}
+
 export function savePromptVariant(variant) {
   return appBridge().SavePromptVariant(variant)
 }

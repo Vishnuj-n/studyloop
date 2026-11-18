@@ -127,7 +127,9 @@ export function useReaderBase(taskID) {
     return match?.title || ''
   })
 
-  const pdfVisible = computed(() => isPdf.value && notebookUrl.value !== '')
+  const pdfVisible = computed(
+    () => isPdf.value && notebookUrl.value !== '' && !loadingBundle.value && !!readerContext.value
+  )
 
   const effectiveMinPage = computed(() => navigationMinPage.value || topicStartPage.value || 1)
 

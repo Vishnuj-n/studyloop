@@ -16,6 +16,7 @@ import RateLimitBanner from './components/RateLimitBanner.vue'
 import ExtensionSetupToast from './components/ExtensionSetupToast.vue'
 import ExtensionSetupModal from './components/ExtensionSetupModal.vue'
 import { useExtensions } from './composables/useExtensions'
+import { isReaderFocusMode, exitReaderFocusMode } from './composables/useReaderFocus'
 import {
   getUserSettings,
   updateUserSettings,
@@ -478,7 +479,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'reader-focus-active': isReaderFocusMode && route.path === '/reader' }">
     <Sidebar v-if="route.path !== '/onboarding' && route.path !== '/select-profile'" />
 
     <main class="content-shell">
@@ -654,6 +655,15 @@ onUnmounted(() => {
   display: flex;
   background: var(--background);
   overflow: hidden;
+}
+
+/* ── Full Focus Mode when reading ── */
+.app-shell.reader-focus-active :deep(.sidebar) {
+  display: none !important;
+}
+
+.app-shell.reader-focus-active .content-shell {
+  padding: 0 !important;
 }
 
 .content-shell {
