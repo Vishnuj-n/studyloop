@@ -527,8 +527,8 @@ func (a *App) StartBrowserAuth(mode string) (map[string]interface{}, error) {
 		expectedState := activeAuthServer.stateNonce
 		activeAuthServer.mu.Unlock()
 
-		utils.Infof("[AUTH] GET /callback hit with full URL: %s | Query: %v | Headers: %v", req.URL.String(), req.URL.RawQuery, req.Header)
-		fmt.Printf("[AUTH] GET /callback hit with query: %s\n", req.URL.RawQuery)
+		utils.Infof("[AUTH] GET /callback hit (path=%s)", req.URL.Path)
+		fmt.Println("[AUTH] GET /callback hit")
 
 		if expectedState == "" || givenState != expectedState {
 			utils.Warnf("[AUTH] /callback rejected: state nonce mismatch. expected=%s, given=%s", expectedState, givenState)

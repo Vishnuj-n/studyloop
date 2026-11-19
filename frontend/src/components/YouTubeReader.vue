@@ -266,7 +266,13 @@ const captionTrackUrl = computed(() => {
   if (!props.transcriptContent) return ''
   const start = startSeconds.value || 0
   const end = endSeconds.value > start ? endSeconds.value : start + 600
-  const text = props.transcriptContent.replace(/<[^>]+>/g, '').replace(/[#*`_[\]]/g, '').trim()
+  let stripped = props.transcriptContent
+  let prev = ''
+  while (prev !== stripped) {
+    prev = stripped
+    stripped = stripped.replace(/<[^>]+>/g, '')
+  }
+  const text = stripped.replace(/[#*`_[\]]/g, '').trim()
   if (!text) return ''
 
   const words = text.split(/\s+/)

@@ -1,5 +1,51 @@
 <template>
   <div class="overview-page fade-in">
+    <!-- Welcome & Classroom Banner -->
+    <section class="card animate-fade-in welcome-banner" style="margin-bottom: 1.5rem; padding: 1.5rem 1.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1.25rem;">
+          <div class="teacher-avatar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="micro-label" style="letter-spacing: 0.08em; margin-bottom: 0.2rem;">TEACHER PORTAL</div>
+            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--ds-fg); display: flex; align-items: center; gap: 0.5rem;">
+              <span>Welcome back<span v-if="currentUsername">, <span style="color: var(--ds-primary);">{{ currentUsername }}</span></span>!</span>
+            </h2>
+            <p class="muted" style="margin: 0.35rem 0 0 0; font-size: 0.85rem;">
+              Managing workspace for classroom
+              <span class="classroom-pill" :title="'Classroom Code: ' + classroomCode">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                {{ classroomCode || 'NOT SET' }}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.6rem; align-items: center;">
+          <button class="btn-ghost" @click="copyClassCode" :title="'Click to copy classroom code ' + classroomCode">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>{{ copied ? 'Copied Code!' : 'Share Code' }}</span>
+          </button>
+          <RouterLink to="/students" class="btn" style="text-decoration: none;">
+            <span>View Students</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px;">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </RouterLink>
+        </div>
+      </div>
+    </section>
+
     <section class="stats-grid">
       <!-- Stat 1: Students Syncing -->
       <div class="stat-card animate-fade-in" style="animation-delay: 0ms">
@@ -132,8 +178,56 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import { useDashboard } from '../composables/useDashboard';
 
-const { stats, students } = useDashboard();
+const { stats, students, classroomCode, currentUsername } = useDashboard();
+const copied = ref(false);
+
+function copyClassCode() {
+  if (!classroomCode.value) return;
+  navigator.clipboard.writeText(classroomCode.value).then(() => {
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2500);
+  }).catch(() => {});
+}
 </script>
 
+<style scoped>
+.welcome-banner {
+  background: linear-gradient(135deg, var(--ds-surface) 0%, var(--ds-surface-hi) 100%);
+  border: 1px solid var(--ds-border-hi);
+  position: relative;
+  overflow: hidden;
+}
+
+.teacher-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--ds-primary-glow);
+  color: var(--ds-primary);
+  border: 1px solid var(--ds-primary-ring);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.classroom-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--ds-mono);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--ds-primary);
+  background: var(--ds-surface-hi);
+  border: 1px solid var(--ds-border-hi);
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  margin-left: 0.35rem;
+}
+</style>

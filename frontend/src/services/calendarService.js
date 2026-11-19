@@ -189,7 +189,10 @@ export function generateRoutineICS(slotsOrStart = '17:00', maybeEnd = '18:00') {
     const slotEnd = slot.end || '18:00'
     const { dtStart, dtEnd } = getEventDates(slotStart, slotEnd)
     const slotName = slot.name ? `📖 StudyLoop: ${slot.name}` : `📖 StudyLoop Study Session ${idx + 1}`
-    const uniqueUID = `studyloop-slot-${idx + 1}-${baseTime}-${Math.floor(Math.random() * 10000)}@studyloop.app`
+    const randomSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.floor(Math.random() * 10000)}`
+    const uniqueUID = `studyloop-slot-${idx + 1}-${baseTime}-${randomSuffix}@studyloop.app`
 
     icsLines.push(
       'BEGIN:VEVENT',

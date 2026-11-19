@@ -181,8 +181,8 @@ func TriggerCloudSync(repo *db.Repository) error {
 
 	utils.Debugf("[SYNC] Running classroom cloud sync to: %s", syncURL)
 
-	// Build slim notebook records — filename only, no local paths or internal IDs
-	notebooks, err := repo.GetNotebooks("", "")
+	// Build slim notebook records — scoped to the active classroom profile only
+	notebooks, err := repo.GetNotebooks("", settings.ActiveProfileID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch notebooks: %w", err)
 	}
@@ -201,8 +201,8 @@ func TriggerCloudSync(repo *db.Repository) error {
 		})
 	}
 
-	// Delta: only logs newer than the last successful sync
-	logs, err := repo.GetReviewLogsSinceWithFileInfo(settings.LastSyncedAt)
+	// Delta: only logs newer than the last successful sync scoped to the active profile
+	logs, err := repo.GetReviewLogsSinceWithFileInfo(settings.LastSyncedAt, settings.ActiveProfileID)
 	if err != nil {
 		utils.Warnf("[SYNC] failed to fetch delta review logs: %v", err)
 		return err
@@ -552,6 +552,11 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 }
 
 func downloadPDFToFile(downloadURL string, localPath string) error {
+	// ponytail: normalize Supabase storage URLs missing /storage/v1
+	if strings.Contains(downloadURL, ".supabase.co/object/sign/") {
+		downloadURL = strings.Replace(downloadURL, ".supabase.co/object/sign/", ".supabase.co/storage/v1/object/sign/", 1)
+	}
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", downloadURL, nil)
 	if err != nil {

@@ -535,20 +535,20 @@ function profileSubtitle(p) {
   align-items: flex-start;
   justify-content: center;
   padding-top: 15vh;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .palette-shell {
   width: min(560px, 92vw);
   border-radius: 14px;
   overflow: hidden;
-  background: var(--surface-elevated, #1e1e2e);
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
   box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.5),
-    0 4px 12px rgba(0, 0, 0, 0.3);
+    0 24px 64px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
 }
@@ -559,12 +559,12 @@ function profileSubtitle(p) {
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--outline-variant);
 }
 
 .palette-search-icon {
   flex-shrink: 0;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.4));
+  color: var(--muted-text);
 }
 
 .palette-search-input {
@@ -573,12 +573,13 @@ function profileSubtitle(p) {
   border: none;
   outline: none;
   font-size: 15px;
-  color: var(--on-surface, #e0e0e0);
-  caret-color: var(--primary, #7c9ef5);
+  color: var(--on-surface);
+  caret-color: var(--primary);
 }
 
 .palette-search-input::placeholder {
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.35));
+  color: var(--muted-text);
+  opacity: 0.75;
 }
 
 .palette-esc-hint {
@@ -587,9 +588,9 @@ function profileSubtitle(p) {
   border-radius: 5px;
   font-size: 11px;
   font-family: inherit;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.35));
-  background: var(--surface-variant, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  color: var(--muted-text);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
   user-select: none;
 }
 
@@ -608,7 +609,7 @@ function profileSubtitle(p) {
 }
 
 .palette-results::-webkit-scrollbar-thumb {
-  background: var(--outline-variant, rgba(255, 255, 255, 0.1));
+  background: var(--outline-variant);
   border-radius: 99px;
 }
 
@@ -617,7 +618,7 @@ function profileSubtitle(p) {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.4));
+  color: var(--muted-text);
   padding: 8px 12px 3px;
   user-select: none;
 }
@@ -635,11 +636,11 @@ function profileSubtitle(p) {
 
 .palette-item:hover,
 .palette-item--focused {
-  background: var(--surface-variant, rgba(255, 255, 255, 0.07));
+  background: var(--surface-container-low);
 }
 
 .palette-item--active {
-  background: var(--primary-container, rgba(124, 158, 245, 0.12));
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .palette-action-icon {
@@ -649,8 +650,8 @@ function profileSubtitle(p) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-variant, rgba(255, 255, 255, 0.06));
-  color: var(--primary, #7c9ef5);
+  background: var(--surface-container-low);
+  color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -658,8 +659,8 @@ function profileSubtitle(p) {
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 6px;
-  background: var(--surface-variant, rgba(255, 255, 255, 0.08));
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.6));
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
   font-weight: 500;
 }
 
@@ -681,7 +682,7 @@ function profileSubtitle(p) {
 .palette-item-name {
   font-size: 14px;
   font-weight: 500;
-  color: var(--on-surface, #e0e0e0);
+  color: var(--on-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -689,7 +690,7 @@ function profileSubtitle(p) {
 
 .palette-item-subtitle {
   font-size: 11px;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.45));
+  color: var(--on-surface-variant);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -706,8 +707,8 @@ function profileSubtitle(p) {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 99px;
-  background: var(--primary, #7c9ef5);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-weight: 600;
 }
 
@@ -716,15 +717,15 @@ function profileSubtitle(p) {
   padding: 2px 6px;
   border-radius: 5px;
   font-family: inherit;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.35));
-  background: var(--surface-variant, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.1));
+  color: var(--muted-text);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
 }
 
 .palette-empty {
   padding: 20px 12px;
   text-align: center;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.4));
+  color: var(--muted-text);
   font-size: 13px;
 }
 
@@ -733,7 +734,7 @@ function profileSubtitle(p) {
   display: flex;
   gap: 4px;
   padding: 8px;
-  border-top: 1px solid var(--outline-variant, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--outline-variant);
 }
 
 .palette-footer-btn {
@@ -746,7 +747,7 @@ function profileSubtitle(p) {
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: var(--on-surface-muted, rgba(255, 255, 255, 0.5));
+  color: var(--muted-text);
   font-size: 12px;
   cursor: pointer;
   transition:
@@ -755,8 +756,8 @@ function profileSubtitle(p) {
 }
 
 .palette-footer-btn:hover {
-  background: var(--surface-variant, rgba(255, 255, 255, 0.07));
-  color: var(--on-surface, #e0e0e0);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
 }
 
 /* ── Transition ──────────────────────────────────────────────── */
