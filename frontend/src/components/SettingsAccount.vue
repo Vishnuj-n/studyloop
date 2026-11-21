@@ -505,7 +505,7 @@ h2 {
 
 .plan-pill.pro-warning {
   background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  border: 1px solid rgba(245, 158, 11, 0.4); /* design-lint-ignore */
   color: #f59e0b;
 }
 

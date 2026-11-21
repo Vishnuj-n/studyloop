@@ -547,8 +547,8 @@ function profileSubtitle(p) {
   background: var(--surface-container-lowest);
   border: 1px solid var(--outline-variant);
   box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.4),
-    0 4px 16px rgba(0, 0, 0, 0.2);
+    0 20px 48px rgba(0, 0, 0, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
 }

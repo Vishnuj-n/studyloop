@@ -142,7 +142,7 @@ function proceedToExam() {
   border: 1px solid var(--outline-variant);
   border-radius: 18px;
   padding: 24px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), 0 0 25px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 25px rgba(99, 102, 241, 0.08);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -199,7 +199,7 @@ function proceedToExam() {
   padding: 4px 10px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--primary) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--primary);
   font-size: 11px;
   font-weight: 700;
@@ -263,7 +263,7 @@ function proceedToExam() {
   height: 36px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  border: 1px solid var(--outline-variant);
   color: var(--primary);
   display: flex;
   align-items: center;
@@ -298,7 +298,7 @@ function proceedToExam() {
   gap: 6px;
   padding: 7px 12px;
   background: color-mix(in srgb, var(--primary) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 8px;
   color: var(--primary);
   font-size: 0.825rem;
@@ -326,7 +326,7 @@ function proceedToExam() {
 
 .secondary-modal-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid transparent; /* design-lint-ignore */
   color: var(--muted-text);
   font-size: 0.875rem;
   font-weight: 600;

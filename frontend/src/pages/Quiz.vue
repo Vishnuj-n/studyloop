@@ -2173,7 +2173,7 @@ async function confirmRestartReading() {
   box-sizing: border-box;
   padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid transparent;
+  border: 1px solid transparent; /* design-lint-ignore */
   background: var(--surface-container-low);
   color: var(--on-surface);
   font-family: inherit;
@@ -2217,7 +2217,7 @@ async function confirmRestartReading() {
 .cal--solid {
   background: rgba(34, 197, 94, 0.15);
   color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  border: 1px solid rgba(34, 197, 94, 0.35); /* design-lint-ignore */
 }
 
 [data-theme^='dark'] .cal--solid {
@@ -2227,7 +2227,7 @@ async function confirmRestartReading() {
 .cal--partial {
   background: rgba(234, 179, 8, 0.15);
   color: #b45309;
-  border: 1px solid rgba(234, 179, 8, 0.35);
+  border: 1px solid rgba(234, 179, 8, 0.35); /* design-lint-ignore */
 }
 
 [data-theme^='dark'] .cal--partial {
@@ -2237,11 +2237,11 @@ async function confirmRestartReading() {
 .cal--misaligned {
   background: rgba(239, 68, 68, 0.15);
   color: #dc2626;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(239, 68, 68, 0.35); /* design-lint-ignore */
 }
 
 [data-theme^='dark'] .cal--misaligned {
-  color: #f87171;
+  color: var(--error, #ef4444);
 }
 
 .feynman-your-words {
@@ -2279,12 +2279,12 @@ async function confirmRestartReading() {
 
 .block--strengths {
   background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(34, 197, 94, 0.25); /* design-lint-ignore */
 }
 
 .block--gaps {
   background: rgba(234, 179, 8, 0.08);
-  border: 1px solid rgba(234, 179, 8, 0.25);
+  border: 1px solid rgba(234, 179, 8, 0.25); /* design-lint-ignore */
 }
 
 .feedback-heading {

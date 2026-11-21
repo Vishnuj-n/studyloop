@@ -425,7 +425,7 @@ function getInheritedProfileNames(profile) {
   font-weight: 600;
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -438,7 +438,7 @@ function getInheritedProfileNames(profile) {
   font-weight: 600;
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -469,7 +469,7 @@ function getInheritedProfileNames(profile) {
 .select-btn {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary);
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 5px 12px;
 }
 
@@ -484,7 +484,7 @@ function getInheritedProfileNames(profile) {
   gap: 5px;
   background: var(--primary);
   color: var(--on-primary);
-  border: 1px solid transparent;
+  border: 1px solid transparent; /* design-lint-ignore */
   padding: 5px 12px;
 }
 
@@ -583,7 +583,7 @@ function getInheritedProfileNames(profile) {
   font-weight: 600;
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-lowest));
-  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border: 1px solid var(--outline-variant);
   padding: 2px 8px;
   border-radius: 6px;
   white-space: nowrap;

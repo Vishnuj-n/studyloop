@@ -585,7 +585,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin-bottom: 4px;
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .select-header h1 {
@@ -619,7 +619,7 @@ onMounted(() => {
 .chrome-spinner {
   width: 38px;
   height: 38px;
-  border: 3px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  border: 3px solid color-mix(in srgb, var(--primary) 18%, transparent); /* design-lint-ignore */
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -644,7 +644,7 @@ onMounted(() => {
   min-height: 230px;
   padding: 28px 16px 20px;
   background: var(--surface-container-low);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 45%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 20px;
   display: flex;
   flex-direction: column;
@@ -728,7 +728,7 @@ onMounted(() => {
   font-weight: 700;
   color: var(--muted-text);
   background: color-mix(in srgb, var(--on-surface) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 50%, transparent);
+  border: 1px solid var(--outline-variant);
   border-radius: 6px;
   padding: 2px 6px;
   display: inline-block;
@@ -774,7 +774,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
 .profile-picker-card:hover .active-status-badge {
@@ -856,7 +856,7 @@ onMounted(() => {
 .exam-pill {
   background: color-mix(in srgb, var(--on-surface) 6%, transparent);
   color: var(--muted-text);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 40%, transparent);
+  border: 1px solid var(--outline-variant);
 }
 
 .exam-pill.due-soon {
@@ -869,19 +869,19 @@ onMounted(() => {
 .pace-pill.pace-ontrack {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid rgba(16, 185, 129, 0.25); /* design-lint-ignore */
 }
 
 .pace-pill.pace-ahead {
   background: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  border: 1px solid rgba(59, 130, 246, 0.25); /* design-lint-ignore */
 }
 
 .pace-pill.pace-behind {
   background: rgba(245, 158, 11, 0.1);
   color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(245, 158, 11, 0.25); /* design-lint-ignore */
 }
 
 /* Add Profile Card */
@@ -978,7 +978,7 @@ onMounted(() => {
   font-weight: 500;
   color: var(--on-surface);
   background: var(--surface-container-low);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 50%, transparent);
+  border: 1px solid var(--outline-variant);
   cursor: pointer;
   transition: all 0.16s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -996,7 +996,7 @@ onMounted(() => {
   font-weight: 500;
   color: var(--muted-text);
   background: var(--surface-container-low);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 40%, transparent);
+  border: 1px solid var(--outline-variant);
   cursor: pointer;
   transition: all 0.16s ease;
 }
