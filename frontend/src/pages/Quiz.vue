@@ -1228,13 +1228,14 @@ async function confirmRestartReading() {
       const targetNotebookId =
         res?.notebook_id ||
         result.value?.notebook_id ||
-        notebookID.value ||
+        taskMeta.value?.notebook_id ||
+        selectedNotebookID.value ||
         route.query.notebookId ||
         route.query.notebook_id
       const targetTopicId =
         res?.topic_id ||
         result.value?.topic_id ||
-        selectedTopicID.value ||
+        taskMeta.value?.topic_id ||
         route.query.topicId ||
         route.query.topic_id
       const targetStartPage = Number.parseInt(res?.start_page || result.value?.start_page || route.query.startPage || 0) || 0
