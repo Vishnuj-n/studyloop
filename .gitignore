@@ -37,5 +37,8 @@ cloud-dashboard/dist/
 # Repomix generated files and configuration
 repomix-output.*
 repomix-output-*
+repomix*.xml
+repomix*.txt
+repomix*.json
 .repomixignore
 unvibecode_results/

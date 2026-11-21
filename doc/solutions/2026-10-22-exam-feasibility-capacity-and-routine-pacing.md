@@ -47,8 +47,8 @@ The previous pacing forecast suffered from several usability and conceptual flaw
 4. **Feasibility States**:
    - `DEADLINE_PASSED`: When $\text{Days Remaining} \le 0$ and $\text{Remaining Sessions} > 0$.
    - `UNCOVERED_WORKLOAD`: When $\text{Remaining Sessions} > \text{Remaining Windows}$.
-   - `AT_RISK`: When workload fits in scheduled windows, but $\text{sessionsPast7Days} < \text{Required Weekly Pace}$.
-   - `ON_TRACK`: Workload fits in scheduled opportunities and matches historical weekly rhythm.
+   - `ON_TRACK`: Workload fits in scheduled routine windows ($\text{Remaining Sessions} \le \text{Remaining Windows}$), providing positive reinforcement when routine capacity covers the target.
+   - `AT_RISK`: When workload cannot fit within scheduled routine capacity and historical weekly pace is below required pace.
    - `NO_DATA`: Fewer than 2 completed reading sessions.
 5. **Self-Paced Backend Support**:
    - `UpdateProfile` and `UpdateProfileWithInheritance` now accept `""` or `"0"` for `deadlineStr`, persisting `current.DeadlineAt = 0` instead of failing with a parse error.

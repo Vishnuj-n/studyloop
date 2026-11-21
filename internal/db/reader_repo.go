@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -475,15 +476,23 @@ func (r *Repository) GetPageBoundaryCosineSimilarityTx(tx *sql.Tx, topicID strin
 		WHERE topic_id = ? AND page_num = ? 
 		ORDER BY id DESC LIMIT 1
 	`, topicID, pageA).Scan(&rowIDA)
+	if errA != nil {
+		if errors.Is(errA, sql.ErrNoRows) {
+			return 0.0, nil
+		}
+		return 0.0, fmt.Errorf("page boundary cosine similarity failed: %w", errA)
+	}
 
 	errB := tx.QueryRow(`
 		SELECT rowid FROM chunks 
 		WHERE topic_id = ? AND page_num = ? 
 		ORDER BY id ASC LIMIT 1
 	`, topicID, pageB).Scan(&rowIDB)
-
-	if errA != nil || errB != nil {
-		return 0.0, nil
+	if errB != nil {
+		if errors.Is(errB, sql.ErrNoRows) {
+			return 0.0, nil
+		}
+		return 0.0, fmt.Errorf("page boundary cosine similarity failed: %w", errB)
 	}
 
 	var distance float64
@@ -495,7 +504,10 @@ func (r *Repository) GetPageBoundaryCosineSimilarityTx(tx *sql.Tx, topicID strin
 	`
 	err := tx.QueryRow(query, rowIDB, rowIDA).Scan(&distance)
 	if err != nil {
-		return 0.0, nil // Safe fallback on error or missing vec extension
+		if errors.Is(err, sql.ErrNoRows) || isVectorUnavailableError(err) {
+			return 0.0, nil // Safe fallback on missing vectors or missing vec extension
+		}
+		return 0.0, fmt.Errorf("page boundary cosine similarity failed: %w", err)
 	}
 
 	similarity := 1.0 - distance

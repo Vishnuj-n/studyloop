@@ -23,17 +23,65 @@
         </div>
 
         <div class="form-group">
-          <label for="assign-file">Upload Local PDF File (Max 75MB)</label>
+          <label>Upload Local PDF File (Max 75MB)</label>
           <input
-            id="assign-file"
+            ref="fileInputRef"
             type="file"
             accept="application/pdf,.pdf"
             :disabled="uploadingPdf || publishing"
-            @change="handleFileUpload"
+            style="display: none;"
+            @change="onFileSelected"
           />
-          <span v-if="uploadingPdf" class="muted" style="font-size: 0.78rem; margin-top: 0.25rem; display: block;">
-            Uploading PDF to Supabase Storage...
-          </span>
+          <div
+            class="custom-file-dropzone"
+            :class="{ 'is-dragging': isDragging, 'is-uploading': uploadingPdf, 'has-file': !!selectedFileName }"
+            @click="triggerBrowse"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="onDrop"
+          >
+            <div class="file-dropzone-icon">
+              <svg v-if="uploadingPdf" class="spinner-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+              </svg>
+              <svg v-else-if="selectedFileName" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+
+            <div class="file-dropzone-info">
+              <template v-if="uploadingPdf">
+                <span class="file-title">Uploading to Supabase Storage...</span>
+                <span class="file-sub">Generating secure signed URL...</span>
+              </template>
+              <template v-else-if="selectedFileName">
+                <span class="file-title">{{ selectedFileName }}</span>
+                <span class="file-sub">{{ selectedFileSize ? formatBytes(selectedFileSize) : 'Ready' }} &bull; Click or drop another to replace</span>
+              </template>
+              <template v-else>
+                <span class="file-title">Choose a PDF file or drag & drop here</span>
+                <span class="file-sub">PDF up to 75MB &bull; Automatically creates secure signed download link</span>
+              </template>
+            </div>
+
+            <button
+              type="button"
+              class="btn-browse"
+              :disabled="uploadingPdf || publishing"
+              @click.stop="triggerBrowse"
+            >
+              {{ selectedFileName ? 'Change File' : 'Browse File' }}
+            </button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -111,8 +159,8 @@
                     Pages {{ asm.start_page || 1 }}–{{ asm.end_page || 'End' }}
                   </span>
                 </h4>
-                <a :href="asm.download_url" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: var(--ds-muted); text-decoration: none; word-break: break-all; display: block; margin-bottom: 0.25rem;" :title="asm.download_url">
-                  {{ asm.download_url }}
+                <a :href="formatPdfUrl(asm.download_url)" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: var(--ds-muted); text-decoration: none; word-break: break-all; display: block; margin-bottom: 0.25rem;" :title="formatPdfUrl(asm.download_url)">
+                  {{ formatPdfUrl(asm.download_url) }}
                 </a>
                 <div style="font-size: 0.7rem; color: var(--ds-muted); font-family: var(--ds-mono);">Published {{ formatDate(asm.created_at) }}</div>
               </div>
@@ -121,7 +169,7 @@
                 <button
                   class="btn-ghost"
                   style="font-size: 0.75rem; padding: 0.3rem 0.65rem;"
-                  @click="openPreview(asm.download_url, asm.start_page || 1, asm.title)"
+                  @click="openPreview(formatPdfUrl(asm.download_url), asm.start_page || 1)"
                 >
                   Preview PDF
                 </button>
@@ -140,22 +188,6 @@
       </div>
     </section>
 
-    <!-- Centered PDF Preview Modal -->
-    <Teleport to="body">
-      <div v-if="previewUrl || loadingPreview" class="modal-backdrop" @click.self="closePreview">
-        <div class="modal-card">
-          <div class="modal-head">
-            <span>📄 {{ previewTitle }}</span>
-            <button class="btn-ghost" style="font-size: 0.8rem; padding: 0.2rem 0.5rem;" @click="closePreview">✕ Close</button>
-          </div>
-          <div v-if="loadingPreview" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--ds-fg); gap: 1rem;">
-            <div class="loading-spinner"></div>
-            <span style="font-size: 0.85rem; color: var(--ds-muted);">Downloading PDF for preview...</span>
-          </div>
-          <iframe v-else-if="previewUrl" :src="previewUrl" class="modal-pdf" title="PDF Preview" sandbox="allow-scripts allow-same-origin"></iframe>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -163,45 +195,20 @@
 import { ref } from 'vue';
 import { useDashboard } from '../composables/useDashboard';
 
-const previewUrl = ref(null);
-const previewTitle = ref('');
-const loadingPreview = ref(false);
-let activeObjectUrl = null;
-
-async function openPreview(url, page = 1, title = 'PDF Preview') {
-  previewTitle.value = title;
-  loadingPreview.value = true;
-  
-  if (activeObjectUrl) {
-    URL.revokeObjectURL(activeObjectUrl);
-    activeObjectUrl = null;
+// ponytail: auto-repair missing /storage/v1 prefix on existing stored URLs
+function formatPdfUrl(url) {
+  if (!url) return '';
+  if (url.includes('.supabase.co/object/sign/')) {
+    return url.replace('.supabase.co/object/sign/', '.supabase.co/storage/v1/object/sign/');
   }
-  previewUrl.value = null;
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch file (HTTP ${res.status})`);
-    }
-    const blob = await res.blob();
-    const blobPdf = new Blob([blob], { type: 'application/pdf' });
-    activeObjectUrl = URL.createObjectURL(blobPdf);
-    previewUrl.value = `${activeObjectUrl}#page=${page}`;
-  } catch (err) {
-    console.error('Error fetching PDF for preview:', err);
-    alert(`Could not load PDF preview: ${err.message}. You can try downloading it directly by clicking its link.`);
-  } finally {
-    loadingPreview.value = false;
-  }
+  return url;
 }
 
-function closePreview() {
-  if (activeObjectUrl) {
-    URL.revokeObjectURL(activeObjectUrl);
-    activeObjectUrl = null;
-  }
-  previewUrl.value = null;
-  loadingPreview.value = false;
+// ponytail: native browser tab over broken iframe embed; avoids CORS and X-Frame-Options DENY
+function openPreview(url, page = 1) {
+  if (!url) return;
+  const target = formatPdfUrl(url);
+  window.open(`${target}#page=${page}`, '_blank', 'noopener,noreferrer');
 }
 
 const {
@@ -218,6 +225,42 @@ const {
   deleteAssignment,
   formatDate
 } = useDashboard();
+
+const fileInputRef = ref(null);
+const isDragging = ref(false);
+const selectedFileName = ref('');
+const selectedFileSize = ref(0);
+
+function triggerBrowse() {
+  if (uploadingPdf.value || publishing.value) return;
+  fileInputRef.value?.click();
+}
+
+async function onFileSelected(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  selectedFileName.value = file.name;
+  selectedFileSize.value = file.size;
+  await handleFileUpload(e);
+}
+
+async function onDrop(e) {
+  isDragging.value = false;
+  if (uploadingPdf.value || publishing.value) return;
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  selectedFileName.value = file.name;
+  selectedFileSize.value = file.size;
+  await handleFileUpload(file);
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  const kb = bytes / 1024;
+  if (kb < 1024) return kb.toFixed(1) + ' KB';
+  return (kb / 1024).toFixed(1) + ' MB';
+}
 </script>
 
 <style scoped>
@@ -249,6 +292,112 @@ const {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Custom PDF File Dropzone */
+.custom-file-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.15rem;
+  border-radius: 10px;
+  background: var(--ds-input-bg);
+  border: 1.5px dashed var(--ds-border-hi);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.custom-file-dropzone:hover {
+  border-color: var(--ds-primary);
+  background: var(--ds-surface-hi);
+}
+
+.custom-file-dropzone.is-dragging {
+  border-color: var(--ds-primary);
+  background: var(--ds-primary-glow);
+  box-shadow: 0 0 0 3px var(--ds-primary-ring);
+  transform: scale(1.005);
+}
+
+.custom-file-dropzone.has-file {
+  border-style: solid;
+  border-color: var(--ds-border-hi);
+}
+
+.custom-file-dropzone.is-uploading {
+  cursor: wait;
+  opacity: 0.85;
+}
+
+.file-dropzone-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: var(--ds-surface-hi);
+  color: var(--ds-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.custom-file-dropzone:hover .file-dropzone-icon {
+  background: var(--ds-primary-glow);
+  transform: scale(1.05);
+}
+
+.file-dropzone-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.file-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ds-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-sub {
+  font-size: 0.72rem;
+  color: var(--ds-muted);
+}
+
+.btn-browse {
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid var(--ds-border-hi);
+  background: var(--ds-surface-hi);
+  color: var(--ds-fg);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-browse:hover:not(:disabled) {
+  border-color: var(--ds-primary);
+  color: var(--ds-primary);
+  background: var(--ds-primary-glow);
+}
+
+.btn-browse:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner-icon {
+  animation: spin 0.8s linear infinite;
 }
 </style>
 

@@ -109,6 +109,19 @@ func (a *App) GetPromptStudioTemplates() map[string]interface{} {
 	}
 }
 
+// GetPromptVariants returns variants specifically for a given category.
+func (a *App) GetPromptVariants(category string) map[string]interface{} {
+	repo := a.getRepo()
+	if repo == nil {
+		return map[string]interface{}{"error": errDatabaseNotInitialized}
+	}
+	variants, err := repo.GetPromptVariants(category)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"ok": true, "category": category, "variants": variants}
+}
+
 // SetPromptNotebookAssignment assigns or unassigns a specific prompt variant to a notebook.
 func (a *App) SetPromptNotebookAssignment(notebookID, category, variantID string) map[string]interface{} {
 	repo := a.getRepo()

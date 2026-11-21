@@ -5,9 +5,9 @@ import sys
 import argparse
 
 # Regular expressions for extraction
-TEMPLATE_RE = re.compile(r'<template[^>]*>(.*)</template>', re.DOTALL)
-SCRIPT_RE = re.compile(r'<script[^>]*>(.*?)</script>', re.DOTALL)
-STYLE_RE = re.compile(r'<style([^>]*)>(.*?)</style>', re.DOTALL)
+TEMPLATE_RE = re.compile(r'<template[^>]*>(.*)</template\s*>', re.DOTALL | re.IGNORECASE)
+SCRIPT_RE = re.compile(r'<script[^>]*>(.*?)</script\s*>', re.DOTALL | re.IGNORECASE)
+STYLE_RE = re.compile(r'<style([^>]*)>(.*?)</style\s*>', re.DOTALL | re.IGNORECASE)
 
 # CSS parser helpers
 SELECTOR_CLEAN_RE = re.compile(r'::?[a-zA-Z0-9_-]+(?:\(.*?\))?')  # Remove pseudo-classes/elements like :hover, :not(...)

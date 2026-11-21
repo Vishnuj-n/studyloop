@@ -499,13 +499,14 @@ func (am *AssetManager) AcquireAssets(progressCallback func(status string, perce
 
 		// Second pass: extract all files
 		for _, f := range zipReader.File {
-			cleanPath := filepath.Clean(f.Name)
-			// Zip-slip protection
-			if strings.HasPrefix(cleanPath, "..") || strings.HasPrefix(cleanPath, "/") || strings.Contains(cleanPath, `\..`) {
+			dstPath := filepath.Join(am.targetDir, filepath.Clean(f.Name))
+
+			// Zip-slip protection: ensure destination is within targetDir
+			rel, err := filepath.Rel(am.targetDir, dstPath)
+			if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
 				return fmt.Errorf("invalid path in zip archive: %s", f.Name)
 			}
 
-			dstPath := filepath.Join(am.targetDir, f.Name)
 			if f.FileInfo().IsDir() {
 				_ = os.MkdirAll(dstPath, 0o755)
 				continue

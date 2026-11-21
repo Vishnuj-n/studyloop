@@ -615,7 +615,7 @@ function formatNumber(num) {
 .action-error-msg {
   padding: 8px 12px;
   background: color-mix(in srgb, var(--error, #e53935) 15%, transparent);
-  border: 1px solid var(--error, #e53935);
+  border: 1px solid var(--outline-variant);
   color: var(--error, #e53935);
   border-radius: 8px;
   font-size: 12px;

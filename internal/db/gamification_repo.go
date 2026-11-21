@@ -70,7 +70,7 @@ func ComputeTitleInfo(totalXP int) (currentTitle string, nextTitle string, nextT
 			} else {
 				maxXP = minXP + 30000
 				nextTitle = "Maximum Rank"
-				nextTitleXP = minXP
+				nextTitleXP = maxXP
 			}
 
 			xpSpan := maxXP - minXP
@@ -570,15 +570,9 @@ func (r *Repository) UnlockCosmetic(itemCode string, _ int) (*models.Gamificatio
 
 	price := def.Price
 
-	tx, err := r.db.Begin()
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	var coins int
 	var unlockedJSON string
-	err = tx.QueryRow(`SELECT coins, unlocked_cosmetics_json FROM user_gamification WHERE user_id = 1`).Scan(&coins, &unlockedJSON)
+	err := r.db.QueryRow(`SELECT coins, unlocked_cosmetics_json FROM user_gamification WHERE user_id = 1`).Scan(&coins, &unlockedJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read user gamification state: %w", err)
 	}
@@ -591,10 +585,15 @@ func (r *Repository) UnlockCosmetic(itemCode string, _ int) (*models.Gamificatio
 	for _, item := range unlockedList {
 		if item == itemCode {
 			// Already unlocked
-			_ = tx.Rollback()
 			return r.GetGamificationProfile()
 		}
 	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 
 	if price > 0 {
 		if coins < price {

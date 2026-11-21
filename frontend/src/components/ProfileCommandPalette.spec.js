@@ -175,4 +175,22 @@ describe('ProfileCommandPalette.vue', () => {
 
     wrapper.unmount()
   })
+
+  it('adapts styles to dynamic theme changes', async () => {
+    document.documentElement.setAttribute('data-theme', 'light-classic')
+    const wrapper = mount(ProfileCommandPalette, {
+      props: { modelValue: true },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const shell = document.body.querySelector('.palette-shell')
+    expect(shell).not.toBeNull()
+
+    // Switch theme attribute to dark-indigo
+    document.documentElement.setAttribute('data-theme', 'dark-indigo')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark-indigo')
+
+    wrapper.unmount()
+  })
 })

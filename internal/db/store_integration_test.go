@@ -118,6 +118,53 @@ func TestDeleteNotebookRemovesLinkedDataAndPreservesUnrelatedRows(t *testing.T) 
 	assertCountEquals(t, `SELECT COUNT(*) FROM chunk_vectors cv JOIN chunks c ON c.rowid = cv.rowid WHERE c.id = ?`, chunkKeepID, 1)
 }
 
+func TestDeleteNotebookPreservesSharedTopicData(t *testing.T) {
+	initDBForTest(t, true, 3)
+
+	nb1 := "nb-shared-1"
+	nb2 := "nb-shared-2"
+	sharedTopicID := "topic-shared-common"
+
+	seedTestNotebookWithTopic(t, nb1, sharedTopicID, "", 1, 1)
+	seedTestNotebookWithTopic(t, nb2, sharedTopicID, "", 1, 1)
+
+	// Insert cards, review logs, and progress for the shared topic
+	cardID := "card-shared-1"
+	if _, err := testRepo.db.Exec(`INSERT INTO fsrs_cards (id, topic_id, prompt, answer) VALUES (?, ?, 'Prompt 1', 'Answer 1')`, cardID, sharedTopicID); err != nil {
+		t.Fatalf("failed to insert fsrs_cards: %v", err)
+	}
+	if _, err := testRepo.db.Exec(`INSERT INTO fsrs_review_log (id, topic_id, activity_type, reference_id, rating, reviewed_at, scheduled_days, state_before_json, state_after_json) VALUES ('log-1', ?, 'flashcard', ?, 3, 1000, 1, '{}', '{}')`, sharedTopicID, cardID); err != nil {
+		t.Fatalf("failed to insert fsrs_review_log: %v", err)
+	}
+	if _, err := testRepo.db.Exec(`INSERT INTO topic_progress (topic_id, mastery_score) VALUES (?, 0.75)`, sharedTopicID); err != nil {
+		t.Fatalf("failed to insert topic_progress: %v", err)
+	}
+
+	// Delete notebook 1
+	if err := testRepo.DeleteNotebook(nb1); err != nil {
+		t.Fatalf("DeleteNotebook nb1 failed: %v", err)
+	}
+
+	// nb1 should be deleted, but shared topic and its data must remain intact because nb2 still links to it
+	assertCountEquals(t, `SELECT COUNT(*) FROM notebooks WHERE id = ?`, nb1, 0)
+	assertCountEquals(t, `SELECT COUNT(*) FROM notebooks WHERE id = ?`, nb2, 1)
+	assertCountEquals(t, `SELECT COUNT(*) FROM topics WHERE id = ?`, sharedTopicID, 1)
+	assertCountEquals(t, `SELECT COUNT(*) FROM fsrs_cards WHERE id = ?`, cardID, 1)
+	assertCountEquals(t, `SELECT COUNT(*) FROM fsrs_review_log WHERE id = 'log-1'`, "", 1)
+	assertCountEquals(t, `SELECT COUNT(*) FROM topic_progress WHERE topic_id = ?`, sharedTopicID, 1)
+	assertCountEquals(t, `SELECT COUNT(*) FROM notebook_topics WHERE notebook_id = ?`, nb2, 1)
+
+	// Now delete notebook 2 - since no other notebooks link to it, topic data should be cascade cleaned
+	if err := testRepo.DeleteNotebook(nb2); err != nil {
+		t.Fatalf("DeleteNotebook nb2 failed: %v", err)
+	}
+	assertCountEquals(t, `SELECT COUNT(*) FROM notebooks WHERE id = ?`, nb2, 0)
+	assertCountEquals(t, `SELECT COUNT(*) FROM fsrs_cards WHERE id = ?`, cardID, 0)
+	assertCountEquals(t, `SELECT COUNT(*) FROM fsrs_review_log WHERE id = 'log-1'`, "", 0)
+	assertCountEquals(t, `SELECT COUNT(*) FROM topic_progress WHERE topic_id = ?`, sharedTopicID, 0)
+	assertCountEquals(t, `SELECT COUNT(*) FROM topics WHERE id = ?`, sharedTopicID, 0)
+}
+
 func TestSearchVectorsForTopicScopesResultsByTopicID(t *testing.T) {
 	initDBForTest(t, true, 3)
 	if !distanceFunctionAvailable(t) {

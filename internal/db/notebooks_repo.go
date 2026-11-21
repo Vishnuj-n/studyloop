@@ -823,12 +823,14 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			}
 		}
 
-		// Gather all associated topic IDs for this notebook (via notebook_topics and generated IDs)
+		// Gather all associated topic IDs for this notebook (via notebook_topics, direct notebooks.topic_id, and generated IDs)
 		topicRows, err := tx.Query(`
 			SELECT topic_id FROM notebook_topics WHERE notebook_id = ?
 			UNION
+			SELECT topic_id FROM notebooks WHERE id = ? AND topic_id IS NOT NULL AND topic_id != ''
+			UNION
 			SELECT id FROM topics WHERE id LIKE ?
-		`, notebookID, "nb-"+notebookID+"-%")
+		`, notebookID, notebookID, "nb-"+notebookID+"-%")
 		if err != nil {
 			return err
 		}
@@ -848,11 +850,35 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 		}
 		_ = topicRows.Close()
 
-		// Delete review cards and logs for these topics
-		if len(associatedTopicIDs) > 0 {
-			tPlaceholders := make([]string, len(associatedTopicIDs))
-			tArgs := make([]interface{}, len(associatedTopicIDs))
-			for i, tID := range associatedTopicIDs {
+		// Delete notebook_topics links for this notebook first so topic exclusivity checks below
+		// will accurately reflect remaining notebook associations
+		if _, err := tx.Exec(`DELETE FROM notebook_topics WHERE notebook_id = ?`, notebookID); err != nil {
+			return err
+		}
+
+		// Determine which associated topics are exclusive to this notebook (not linked to any OTHER notebook)
+		exclusiveTopicIDs := make([]string, 0)
+		for _, topicID := range associatedTopicIDs {
+			var otherLinksCount int
+			err := tx.QueryRow(`
+				SELECT (
+					(SELECT COUNT(*) FROM notebook_topics WHERE notebook_id != ? AND topic_id = ?) +
+					(SELECT COUNT(*) FROM notebooks WHERE id != ? AND topic_id = ?)
+				)
+			`, notebookID, topicID, notebookID, topicID).Scan(&otherLinksCount)
+			if err != nil {
+				return err
+			}
+			if otherLinksCount == 0 {
+				exclusiveTopicIDs = append(exclusiveTopicIDs, topicID)
+			}
+		}
+
+		// Only cascade-delete review cards, review logs, and progress for topics exclusive to this notebook
+		if len(exclusiveTopicIDs) > 0 {
+			tPlaceholders := make([]string, len(exclusiveTopicIDs))
+			tArgs := make([]interface{}, len(exclusiveTopicIDs))
+			for i, tID := range exclusiveTopicIDs {
 				tPlaceholders[i] = "?"
 				tArgs[i] = tID
 			}
@@ -869,17 +895,13 @@ func (r *Repository) DeleteNotebook(notebookID string) error {
 			}
 		}
 
-		// Delete notebook_topics links
-		if _, err := tx.Exec(`DELETE FROM notebook_topics WHERE notebook_id = ?`, notebookID); err != nil {
-			return err
-		}
-
 		_, err = tx.Exec("DELETE FROM notebooks WHERE id = ?", notebookID)
 		if err != nil {
 			return err
 		}
 
-		for _, topicID := range associatedTopicIDs {
+		// Only clean up topic rows if exclusive and no remaining chunks
+		for _, topicID := range exclusiveTopicIDs {
 			var chunkCount int
 			if chunkCountErr := tx.QueryRow(`
 				SELECT COUNT(*) FROM chunks WHERE topic_id = ?

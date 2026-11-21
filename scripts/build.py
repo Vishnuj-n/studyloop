@@ -89,10 +89,10 @@ def main():
     cmd = ["wails", "build", "-nsis", "-ldflags", ldflags, *sys.argv[1:]]
 
     sanitized_cmd = [
-        arg.replace(f"ExtensionAuthKey={EXTENSION_SECRET_KEY}", "ExtensionAuthKey=***") if EXTENSION_SECRET_KEY else arg
-        for arg in cmd
+        "***" if "-ldflags" in arg or "ExtensionAuthKey" in arg else arg
+        for arg in ["wails", "build", "-nsis", *sys.argv[1:]]
     ]
-    print("\nExecuting:", " ".join(sanitized_cmd))
+    print("\nExecuting:", " ".join(sanitized_cmd), "(with injected build flags)")
 
     try:
         subprocess.run(cmd, check=True)

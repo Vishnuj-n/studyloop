@@ -636,8 +636,10 @@ func (r *Repository) GetReviewLogsSince(since int64) ([]models.FSRSReviewLog, er
 
 // GetReviewLogsSinceWithFileInfo returns review logs joined with chunk and notebook data
 // to provide file_hash and page_number for cloud sync.
-func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64) ([]models.SyncLogEntry, error) {
-	rows, err := r.db.Query(`
+// If profileID is non-empty, only returns logs for notebooks belonging to that profile
+// or linked via inherited_flashcard_profile_ids_json.
+func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64, profileID string) ([]models.SyncLogEntry, error) {
+	query := `
 		SELECT
 			r.id,
 			COALESCE(n.file_hash, '') AS file_hash,
@@ -655,8 +657,27 @@ func (r *Repository) GetReviewLogsSinceWithFileInfo(since int64) ([]models.SyncL
 		LEFT JOIN notebook_chunks nc ON nc.chunk_id = f.source_chunk_id
 		LEFT JOIN notebooks n ON n.id = nc.notebook_id
 		WHERE r.reviewed_at > ?
-		ORDER BY r.reviewed_at ASC, r.id ASC
-	`, since)
+	`
+	var args []interface{}
+	args = append(args, since)
+
+	profileID = strings.TrimSpace(profileID)
+	if profileID != "" {
+		allowedProfiles, err := r.GetAllowedFlashcardProfileIDs(profileID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get allowed profile IDs for sync: %w", err)
+		}
+		if len(allowedProfiles) > 0 {
+			query += fmt.Sprintf(` AND (n.profile_id IN (%s) OR n.profile_id IS NULL OR n.profile_id = '') `, buildInPlaceholders(len(allowedProfiles)))
+			for _, p := range allowedProfiles {
+				args = append(args, p)
+			}
+		}
+	}
+
+	query += ` ORDER BY r.reviewed_at ASC, r.id ASC `
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -737,6 +758,7 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 	notebookMap := make(map[string]*models.NotebookDeckGroup)
 	notebookOrder := make([]string, 0)
 	topicMap := make(map[string]map[string]*models.DeckTopicGroup)
+	seenCardIDs := make(map[string]bool)
 
 	for rows.Next() {
 		var card models.DeckCardDetail
@@ -762,25 +784,30 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			}
 		}
 
-		metrics.TotalCards++
-		if card.Suspended {
-			metrics.SuspendedCards++
-		} else {
-			metrics.ActiveCards++
-			if card.DueAt <= nowUnix {
-				metrics.DueToday++
+		// Only increment global DeckMetrics once per unique card ID, even if the card's topic
+		// is linked to multiple notebooks via notebook_topic_links.
+		if !seenCardIDs[card.ID] {
+			seenCardIDs[card.ID] = true
+			metrics.TotalCards++
+			if card.Suspended {
+				metrics.SuspendedCards++
+			} else {
+				metrics.ActiveCards++
+				if card.DueAt <= nowUnix {
+					metrics.DueToday++
+				}
 			}
-		}
 
-		// Retention breakdown
-		if card.Reps == 0 || card.StateCode == 0 {
-			metrics.NewCards++
-		} else if card.Stability < 21.0 {
-			metrics.LearningCards++
-		} else if card.Stability < 60.0 {
-			metrics.YoungCards++
-		} else {
-			metrics.MatureCards++
+			// Retention breakdown
+			if card.Reps == 0 || card.StateCode == 0 {
+				metrics.NewCards++
+			} else if card.Stability < 21.0 {
+				metrics.LearningCards++
+			} else if card.Stability < 60.0 {
+				metrics.YoungCards++
+			} else {
+				metrics.MatureCards++
+			}
 		}
 
 		// Grouping

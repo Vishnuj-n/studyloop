@@ -5,6 +5,7 @@ const supabaseKey = ref(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
 const apiBaseUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8080');
 const sessionToken = ref('');
 const classroomCode = ref('');
+const currentUsername = ref('');
 const showSetup = ref(true);
 const connecting = ref(false);
 const setupError = ref('');
@@ -22,7 +23,28 @@ const students = ref([]);
 const assignments = ref([]);
 const expandedStudents = reactive({});
 
-const toastMessage = ref('');
+const toast = reactive({
+  show: false,
+  message: '',
+  type: 'success', // 'success' | 'error' | 'info'
+  timer: null
+});
+
+function showToast(msg, type = 'success') {
+  if (toast.timer) clearTimeout(toast.timer);
+  toast.message = msg;
+  toast.type = type;
+  toast.show = true;
+  toast.timer = setTimeout(() => {
+    toast.show = false;
+  }, 4000);
+}
+
+function dismissToast() {
+  if (toast.timer) clearTimeout(toast.timer);
+  toast.show = false;
+}
+
 const lastSyncedAt = ref(null);
 const syncTimeAgo = ref('just now');
 let pollInterval = null;
@@ -38,15 +60,6 @@ const newStartPage = ref('');
 const newEndPage = ref('');
 const publishing = ref(false);
 const uploadingPdf = ref(false);
-
-function showToast(msg) {
-  toastMessage.value = msg;
-  setTimeout(() => {
-    if (toastMessage.value === msg) {
-      toastMessage.value = '';
-    }
-  }, 3500);
-}
 
 function updateSyncTimeAgo() {
   if (!lastSyncedAt.value) {
@@ -175,21 +188,26 @@ async function loginTeacher(router) {
 
     const tokenVal = loginData.session_token || loginData.token || (loginData.user && loginData.user.id);
     const classCodeVal = loginData.classroom_code || (loginData.user && loginData.user.classroom_code);
-    const unameVal = loginData.username || (loginData.user && loginData.user.username);
+    const unameVal = loginData.username || (loginData.user && loginData.user.username) || loginUsername.value.trim();
 
     sessionToken.value = tokenVal;
     classroomCode.value = classCodeVal;
+    currentUsername.value = unameVal;
 
     if (rememberMe.value) {
       localStorage.setItem('session_token', tokenVal);
       localStorage.setItem('classroom_code', classCodeVal);
+      localStorage.setItem('teacher_username', unameVal);
       sessionStorage.removeItem('session_token');
       sessionStorage.removeItem('classroom_code');
+      sessionStorage.removeItem('teacher_username');
     } else {
       sessionStorage.setItem('session_token', tokenVal);
       sessionStorage.setItem('classroom_code', classCodeVal);
+      sessionStorage.setItem('teacher_username', unameVal);
       localStorage.removeItem('session_token');
       localStorage.removeItem('classroom_code');
+      localStorage.removeItem('teacher_username');
     }
 
     showSetup.value = false;
@@ -212,10 +230,13 @@ function logoutTeacher(router) {
   stopPolling();
   sessionToken.value = '';
   classroomCode.value = '';
+  currentUsername.value = '';
   sessionStorage.removeItem('session_token');
   sessionStorage.removeItem('classroom_code');
+  sessionStorage.removeItem('teacher_username');
   localStorage.removeItem('session_token');
   localStorage.removeItem('classroom_code');
+  localStorage.removeItem('teacher_username');
   showSetup.value = true;
   if (router) {
     router.push('/login');
@@ -440,7 +461,14 @@ async function fetchAssignments() {
     let list = null;
     if (apiBaseUrl.value) {
       try {
-        const res = await fetch(`${apiBaseUrl.value}/api/assignments?classroom_code=${classroomCode.value}`);
+        const headers = {};
+        if (sessionToken.value) {
+          headers['x-session-token'] = sessionToken.value;
+          headers['Authorization'] = `Bearer ${sessionToken.value}`;
+        }
+        const res = await fetch(`${apiBaseUrl.value}/api/assignments?classroom_code=${classroomCode.value}`, {
+          headers
+        });
         if (res.ok) {
           list = await res.json();
         }
@@ -471,13 +499,13 @@ async function fetchAssignments() {
   }
 }
 
-async function handleFileUpload(event) {
-  const file = event.target.files[0];
+async function handleFileUpload(fileOrEvent) {
+  const file = fileOrEvent?.target ? fileOrEvent.target.files?.[0] : fileOrEvent;
   if (!file) return;
 
   if (file.size > 75 * 1024 * 1024) {
-    error.value = 'PDF upload failed: File size exceeds 75MB limit.';
-    event.target.value = '';
+    showToast('PDF upload failed: File size exceeds 75MB limit.', 'error');
+    if (fileOrEvent?.target) fileOrEvent.target.value = '';
     return;
   }
 
@@ -485,13 +513,13 @@ async function handleFileUpload(event) {
     const headerBuf = await file.slice(0, 4).arrayBuffer();
     const header = new Uint8Array(headerBuf);
     if (header[0] !== 0x25 || header[1] !== 0x50 || header[2] !== 0x44 || header[3] !== 0x46) {
-      error.value = 'PDF upload failed: Selected file is not a valid PDF.';
-      event.target.value = '';
+      showToast('PDF upload failed: Selected file is not a valid PDF.', 'error');
+      if (fileOrEvent?.target) fileOrEvent.target.value = '';
       return;
     }
   } catch (err) {
-    error.value = 'Failed to read PDF file header.';
-    event.target.value = '';
+    showToast('Failed to read PDF file header.', 'error');
+    if (fileOrEvent?.target) fileOrEvent.target.value = '';
     return;
   }
 
@@ -535,14 +563,18 @@ async function handleFileUpload(event) {
 
     const signData = await signRes.json();
     const signedPath = signData.signedURL || signData.signedUrl || '';
+    // ponytail: ensure /storage/v1 prefix exists on relative signedPath returned by Supabase
+    const relativePath = signedPath.startsWith('/storage/v1')
+      ? signedPath
+      : `/storage/v1${signedPath.startsWith('/') ? '' : '/'}${signedPath}`;
     newUrl.value = signedPath.startsWith('http')
       ? signedPath
-      : `${supabaseUrl.value}${signedPath.startsWith('/') ? '' : '/'}${signedPath}`;
+      : `${supabaseUrl.value}${relativePath}`;
     showToast('PDF uploaded and signed URL created!');
   } catch (err) {
     console.error('PDF upload error:', err);
-    error.value = `Failed to upload PDF: ${err.message}`;
-    event.target.value = '';
+    showToast(`Failed to upload PDF: ${err.message}`, 'error');
+    if (fileOrEvent?.target) fileOrEvent.target.value = '';
   } finally {
     uploadingPdf.value = false;
   }
@@ -738,6 +770,7 @@ function formatRelativeTime(timestamp) {
 function initSession() {
   const token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
   const cls = localStorage.getItem('classroom_code') || sessionStorage.getItem('classroom_code');
+  const uname = localStorage.getItem('teacher_username') || sessionStorage.getItem('teacher_username') || '';
 
   if (!supabaseUrl.value || !supabaseKey.value) {
     setupError.value = 'Configuration error: Supabase URL or Anon Key is missing.';
@@ -748,6 +781,7 @@ function initSession() {
   if (token && cls) {
     sessionToken.value = token;
     classroomCode.value = cls;
+    currentUsername.value = uname;
     showSetup.value = false;
     fetchData();
     startPolling();
@@ -766,6 +800,7 @@ export function useDashboard() {
     supabaseKey,
     sessionToken,
     classroomCode,
+    currentUsername,
     showSetup,
     connecting,
     setupError,
@@ -781,7 +816,10 @@ export function useDashboard() {
     students,
     assignments,
     expandedStudents,
-    toastMessage,
+    toast,
+    toastMessage: computed(() => toast.message),
+    showToast,
+    dismissToast,
     lastSyncedAt,
     syncTimeAgo,
     searchQuery,

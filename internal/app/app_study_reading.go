@@ -464,6 +464,7 @@ func (a *App) ReturnToReading(quizTaskID string) map[string]interface{} {
 	return map[string]interface{}{
 		"ok":               true,
 		"reading_task_id":  readingTaskID,
+		"notebook_id":      qTask.NotebookID,
 		"topic_id":         qTask.TopicID,
 		"start_page":       qTask.StartPage,
 		"message":          "Reading session restarted. You can now re-read from the beginning of this topic.",

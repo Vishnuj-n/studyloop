@@ -283,3 +283,68 @@ func TestGamificationStoreAutoReconcilesFromSQL(t *testing.T) {
 	}
 }
 
+func TestComputeTitleInfo_MaxRank(t *testing.T) {
+	// XP at max rank tier (TitleTiers[len-1].MinXP is 90000)
+	currentTitle, nextTitle, nextTitleXP, currentTitleMinXP, level := ComputeTitleInfo(95000)
+	if currentTitle != "The Mythic Sage II" {
+		t.Errorf("expected currentTitle 'The Mythic Sage II', got %q", currentTitle)
+	}
+	if nextTitle != "Maximum Rank" {
+		t.Errorf("expected nextTitle 'Maximum Rank', got %q", nextTitle)
+	}
+	if nextTitleXP != 120000 {
+		t.Errorf("expected nextTitleXP 120000, got %d", nextTitleXP)
+	}
+	if currentTitleMinXP != 90000 {
+		t.Errorf("expected currentTitleMinXP 90000, got %d", currentTitleMinXP)
+	}
+	if nextTitleXP <= currentTitleMinXP {
+		t.Errorf("expected nextTitleXP (%d) > currentTitleMinXP (%d) to prevent division by zero", nextTitleXP, currentTitleMinXP)
+	}
+	if level != 100 {
+		t.Errorf("expected level 100, got %d", level)
+	}
+}
+
+func TestUnlockCosmetic_AlreadyUnlocked(t *testing.T) {
+	tempDB := "test_cosmetic_unlocked.db"
+	_ = os.Remove(tempDB)
+	defer func() { _ = os.Remove(tempDB) }()
+
+	repo, err := Init(tempDB, "")
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	// "dark-gruvbox" is already unlocked by default in user_gamification
+	prof, err := repo.UnlockCosmetic("dark-gruvbox", 0)
+	if err != nil {
+		t.Fatalf("UnlockCosmetic on default unlocked cosmetic failed: %v", err)
+	}
+	if prof == nil {
+		t.Fatalf("expected profile, got nil")
+	}
+
+	// Add coins and unlock a paid cosmetic "dark-emerald" (75 coins)
+	_, _, err = repo.AddXPAndCoins(0, 200)
+	if err != nil {
+		t.Fatalf("AddXPAndCoins failed: %v", err)
+	}
+
+	profAfterFirstUnlock, err := repo.UnlockCosmetic("dark-emerald", 75)
+	if err != nil {
+		t.Fatalf("first UnlockCosmetic failed: %v", err)
+	}
+	coinsAfterFirst := profAfterFirstUnlock.Coins
+
+	// Second unlock for the same item should be a no-op: coins shouldn't change
+	profAfterSecondUnlock, err := repo.UnlockCosmetic("dark-emerald", 75)
+	if err != nil {
+		t.Fatalf("second UnlockCosmetic failed: %v", err)
+	}
+	if profAfterSecondUnlock.Coins != coinsAfterFirst {
+		t.Errorf("coins changed on already unlocked cosmetic: had %d, now %d", coinsAfterFirst, profAfterSecondUnlock.Coins)
+	}
+}
+
