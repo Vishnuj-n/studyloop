@@ -2,8 +2,10 @@ package db
 
 import (
 	"ai-tutor/internal/models"
+	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -385,6 +387,66 @@ func TestActivatePendingReadingTaskAlignsTopicCursor(t *testing.T) {
 	}
 	if task.CurrentPage != 68 {
 		t.Fatalf("expected task CurrentPage to be aligned to startPage 68, got %d", task.CurrentPage)
+	}
+
+	// Verify topic cursor did NOT move backward from 82 to 68
+	var cursor int
+	if err := testRepo.db.QueryRow(`SELECT current_page_cursor FROM topics WHERE id = ?`, topicID).Scan(&cursor); err != nil {
+		t.Fatalf("query topic cursor failed: %v", err)
+	}
+	if cursor != 82 {
+		t.Fatalf("expected topics.current_page_cursor to stay at 82 when start_page < current_page_cursor, got %d", cursor)
+	}
+
+	// Verify that when start_page > current_page_cursor (e.g. cursor at 82, task at 90), it advances to 90
+	taskAdvanceID := "task-pending-90-100"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         taskAdvanceID,
+		NotebookID: nbID,
+		TopicID:    topicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+		StartPage:  90,
+		EndPage:    100,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask reading failed: %v", err)
+	}
+	if err := testRepo.ActivateTask(taskAdvanceID); err != nil {
+		t.Fatalf("ActivateTask failed: %v", err)
+	}
+	if err := testRepo.db.QueryRow(`SELECT current_page_cursor FROM topics WHERE id = ?`, topicID).Scan(&cursor); err != nil {
+		t.Fatalf("query topic cursor failed: %v", err)
+	}
+	if cursor != 90 {
+		t.Fatalf("expected topics.current_page_cursor to advance to 90 when start_page > current_page_cursor, got %d", cursor)
+	}
+
+	// Verify that when starting from 0, it advances
+	nbZeroID := "nb-zero-cursor"
+	topicZeroID := "topic-zero-cursor"
+	seedTestNotebookWithTopic(t, nbZeroID, topicZeroID, "", 1, 50)
+	taskZeroID := "task-zero-cursor-10"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         taskZeroID,
+		NotebookID: nbZeroID,
+		TopicID:    topicZeroID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		Priority:   1,
+		StartPage:  10,
+		EndPage:    20,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask reading failed: %v", err)
+	}
+	if err := testRepo.ActivateTask(taskZeroID); err != nil {
+		t.Fatalf("ActivateTask failed: %v", err)
+	}
+	if err := testRepo.db.QueryRow(`SELECT current_page_cursor FROM topics WHERE id = ?`, topicZeroID).Scan(&cursor); err != nil {
+		t.Fatalf("query topic cursor failed: %v", err)
+	}
+	if cursor != 10 {
+		t.Fatalf("expected topics.current_page_cursor to advance from 0 to 10, got %d", cursor)
 	}
 }
 
@@ -1498,4 +1560,132 @@ func TestGetChunksForTopicPageRange_CrossNotebookIsolation(t *testing.T) {
 		t.Fatalf("CRITICAL SECURITY / ISOLATION BUG: GetChunksForTopicPageRange leaked %d chunks from other notebooks for topic with 0 chunks: %+v", len(chunks), chunks)
 	}
 }
+
+func TestReconcileReadingTasksPrunesOrphanTasks(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	nbID := "nb-orphan-reconcile"
+	validTopicID := "topic-valid"
+	seedTestNotebookWithTopic(t, nbID, validTopicID, "", 1, 20)
+
+	// Create another topic that belongs to another notebook (not linked in notebook_topics for nbID)
+	unlinkedTopicID := "topic-unlinked"
+	seedTestNotebookWithTopic(t, "nb-other-notebook", unlinkedTopicID, "", 1, 20)
+
+	// Valid pending task
+	validTaskID := "task-valid-pending"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         validTaskID,
+		NotebookID: nbID,
+		TopicID:    validTopicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		StartPage:  1,
+		EndPage:    10,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask validTask failed: %v", err)
+	}
+
+	// Orphan pending task with an unlinked topic_id (not in notebook_topics for nbID)
+	orphanTaskID := "task-orphan-unlinked"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         orphanTaskID,
+		NotebookID: nbID,
+		TopicID:    unlinkedTopicID,
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		StartPage:  1,
+		EndPage:    5,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask orphanTask failed: %v", err)
+	}
+
+	// Orphan pending task with empty topic_id
+	emptyTopicTaskID := "task-orphan-empty-topic"
+	if err := testRepo.InsertStudyTask(models.StudyQueueTask{
+		ID:         emptyTopicTaskID,
+		NotebookID: nbID,
+		TopicID:    "",
+		TaskType:   models.StudyTaskTypeReading,
+		Status:     models.StudyTaskStatusPending,
+		StartPage:  1,
+		EndPage:    5,
+	}); err != nil {
+		t.Fatalf("InsertStudyTask emptyTopicTask failed: %v", err)
+	}
+
+	// Reconcile
+	if err := testRepo.ReconcileReadingTasksForNotebook(nbID); err != nil {
+		t.Fatalf("ReconcileReadingTasksForNotebook failed: %v", err)
+	}
+
+	// Valid task must still exist
+	if _, err := testRepo.GetTaskByID(validTaskID); err != nil {
+		t.Fatalf("expected valid task to remain, got err: %v", err)
+	}
+
+	// Orphan tasks must be pruned
+	if _, err := testRepo.GetTaskByID(orphanTaskID); !errors.Is(err, ErrTaskNotFound) {
+		t.Fatalf("expected orphan task with unlinked topic to be deleted, got: %v", err)
+	}
+	if _, err := testRepo.GetTaskByID(emptyTopicTaskID); !errors.Is(err, ErrTaskNotFound) {
+		t.Fatalf("expected orphan task with empty topic to be deleted, got: %v", err)
+	}
+}
+
+func TestPageBoundaryCosineSimilarity(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	nbID := "nb-cos-sim"
+	topicID := "topic-cos-sim"
+	seedTestNotebookWithTopic(t, nbID, topicID, "", 1, 10)
+
+	// 1. Benign: No chunks exist for page 1 or 2 -> returns (0.0, nil)
+	err := testRepo.withTx(func(tx *sql.Tx) error {
+		sim, err := testRepo.GetPageBoundaryCosineSimilarityTx(tx, topicID, 1, 2)
+		if err != nil {
+			t.Fatalf("expected nil error on missing chunks, got: %v", err)
+		}
+		if sim != 0.0 {
+			t.Fatalf("expected 0.0 similarity on missing chunks, got: %f", sim)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("withTx failed: %v", err)
+	}
+
+	// 2. Benign: Chunks exist for page 1 and page 2, but no vectors exist in chunk_vectors -> returns (0.0, nil)
+	seedTopicChunks(t, nbID, topicID, 1, 1, 100)
+	seedTopicChunks(t, nbID, topicID, 2, 2, 100)
+	err = testRepo.withTx(func(tx *sql.Tx) error {
+		sim, err := testRepo.GetPageBoundaryCosineSimilarityTx(tx, topicID, 1, 2)
+		if err != nil {
+			t.Fatalf("expected nil error on missing vector data, got: %v", err)
+		}
+		if sim != 0.0 {
+			t.Fatalf("expected 0.0 similarity on missing vector data, got: %f", sim)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("withTx failed: %v", err)
+	}
+
+	// 3. Error: Real query failure returns error
+	tx, err := testRepo.db.Begin()
+	if err != nil {
+		t.Fatalf("Begin tx failed: %v", err)
+	}
+	_ = tx.Rollback() // Tx is closed; querying it will fail with sql.ErrTxDone
+
+	sim, err := testRepo.GetPageBoundaryCosineSimilarityTx(tx, topicID, 1, 2)
+	if err == nil {
+		t.Fatalf("expected query failure error on closed tx, got nil (sim: %f)", sim)
+	}
+	if !strings.Contains(err.Error(), "page boundary cosine similarity failed") {
+		t.Fatalf("expected error message to contain 'page boundary cosine similarity failed', got: %v", err)
+	}
+}
+
 

@@ -101,8 +101,8 @@ func (r *Repository) ActivateTaskTx(tx *sql.Tx, taskID string) error {
 				if _, err := tx.Exec(`
 				UPDATE topics
 				SET current_page_cursor = ?, updated_at = CURRENT_TIMESTAMP
-				WHERE id = ?
-			`, startPage, topicID); err != nil {
+				WHERE id = ? AND current_page_cursor < ?
+			`, startPage, topicID, startPage); err != nil {
 					utils.Warnf("[QUEUE] ActivateTaskTx failed to align topic page cursor taskID=%s topicID=%s startPage=%d err=%v", taskID, topicID, startPage, err)
 				}
 			}
@@ -855,6 +855,7 @@ func (r *Repository) ensurePendingReadingTaskForNotebookInternal(notebookID stri
 
 				sim, simErr := r.GetPageBoundaryCosineSimilarityTx(tx, topicID, endPage, nextPage)
 				if simErr != nil {
+					utils.Warnf("[SEMANTIC_EXTENSION] GetPageBoundaryCosineSimilarityTx failed topicID=%s pageA=%d pageB=%d: %v", topicID, endPage, nextPage, simErr)
 					stopReason = "query_err"
 					break
 				}
@@ -906,14 +907,8 @@ func (r *Repository) ReconcileReadingTasksForNotebook(notebookID string) error {
 	return r.withTx(func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`
 		UPDATE study_queue
-		SET topic_id = (
-			SELECT nt.topic_id FROM notebook_topics nt
-			WHERE nt.notebook_id = study_queue.notebook_id
-				AND nt.topic_id = study_queue.topic_id
-			LIMIT 1
-		),
-		start_page = CASE WHEN start_page IS NULL OR start_page <= 0 THEN COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE start_page END,
-		end_page = CASE WHEN end_page IS NULL OR end_page <= 0 THEN COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE end_page END
+		SET start_page = CASE WHEN start_page IS NULL OR start_page <= 0 THEN COALESCE((SELECT start_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE start_page END,
+			end_page = CASE WHEN end_page IS NULL OR end_page <= 0 THEN COALESCE((SELECT end_page FROM topics WHERE id = study_queue.topic_id), 0) ELSE end_page END
 		WHERE notebook_id = ?
 			AND task_type IN ('READING', 'REREAD')
 			AND status IN ('PENDING', 'ACTIVE')
