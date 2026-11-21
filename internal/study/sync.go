@@ -553,9 +553,7 @@ func downloadAndRegisterNotebook(repo *db.Repository, nb AssignedNotebook) error
 
 func downloadPDFToFile(downloadURL string, localPath string) error {
 	// ponytail: normalize Supabase storage URLs missing /storage/v1
-	if strings.Contains(downloadURL, ".supabase.co/object/sign/") {
-		downloadURL = strings.Replace(downloadURL, ".supabase.co/object/sign/", ".supabase.co/storage/v1/object/sign/", 1)
-	}
+	downloadURL = strings.Replace(downloadURL, ".supabase.co/object/sign/", ".supabase.co/storage/v1/object/sign/", 1)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", downloadURL, nil)
