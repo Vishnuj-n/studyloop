@@ -166,6 +166,15 @@ func TestLegacyDatabaseMigration(t *testing.T) {
 			t.Errorf("Column %s.%s missing or unqueryable after migration: %v", check.table, check.column, err)
 		}
 	}
+
+	var notesDetailLevel string
+	err = db.QueryRow("SELECT notes_detail_level FROM user_settings WHERE id = 1").Scan(&notesDetailLevel)
+	if err != nil {
+		t.Fatalf("failed to query notes_detail_level from user_settings: %v", err)
+	}
+	if notesDetailLevel != "briefing" {
+		t.Errorf("expected notes_detail_level to be 'briefing', got %q", notesDetailLevel)
+	}
 }
 
 // TestSchemaParityFreshVsUpgraded guarantees 100% column parity between a freshly created
@@ -398,5 +407,105 @@ func TestSchemaParityFreshVsUpgraded(t *testing.T) {
 				t.Errorf("Table %s: column %s exists in fresh DB but MISSING in upgraded DB!", tbl, c)
 			}
 		}
+	}
+}
+
+// TestDedupeFsrsCards verifies that when upgrading a legacy database that contains duplicate
+// (topic_id, prompt) rows in fsrs_cards, dedupeFsrsCards keeps the earliest row by created_at/id,
+// removes duplicates, and successfully applies the unique index idx_fsrs_cards_topic_prompt.
+func TestDedupeFsrsCards(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "dedupe_fsrs_test.db")
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open sqlite3 db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Create minimal legacy schema with fsrs_cards without unique index
+	setup := []string{
+		`CREATE TABLE topics (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			status TEXT DEFAULT 'reading',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE fsrs_cards (
+			id TEXT PRIMARY KEY,
+			topic_id TEXT NOT NULL,
+			prompt TEXT NOT NULL,
+			answer TEXT NOT NULL,
+			state_json TEXT,
+			due_at INTEGER,
+			suspended BOOLEAN DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`INSERT INTO topics (id, title) VALUES ('t1', 'Topic 1')`,
+		// Seed duplicates: card-1 (earlier) and card-2 (later) with identical (topic_id, prompt)
+		`INSERT INTO fsrs_cards (id, topic_id, prompt, answer, created_at) VALUES ('card-1', 't1', 'Duplicate Prompt', 'Answer 1', '2026-01-01 10:00:00')`,
+		`INSERT INTO fsrs_cards (id, topic_id, prompt, answer, created_at) VALUES ('card-2', 't1', 'Duplicate Prompt', 'Answer 2', '2026-01-01 11:00:00')`,
+		// Another duplicate pair with reversed insert order / timestamps to test sorting by created_at, id
+		`INSERT INTO fsrs_cards (id, topic_id, prompt, answer, created_at) VALUES ('card-4', 't1', 'Another Duplicate', 'Answer 4', '2026-01-01 12:00:00')`,
+		`INSERT INTO fsrs_cards (id, topic_id, prompt, answer, created_at) VALUES ('card-3', 't1', 'Another Duplicate', 'Answer 3', '2026-01-01 09:00:00')`,
+		// Non-duplicate card
+		`INSERT INTO fsrs_cards (id, topic_id, prompt, answer, created_at) VALUES ('card-unique', 't1', 'Unique Prompt', 'Answer Unique', '2026-01-01 13:00:00')`,
+	}
+
+	for _, stmt := range setup {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("setup statement failed: %v", err)
+		}
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("failed to begin tx: %v", err)
+	}
+
+	if err := InitSchema(tx); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("InitSchema failed on db with duplicate fsrs_cards: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("failed to commit tx: %v", err)
+	}
+
+	// Verify duplicate rows are removed and earliest rows are retained
+	rows, err := db.Query("SELECT id, topic_id, prompt FROM fsrs_cards ORDER BY id ASC")
+	if err != nil {
+		t.Fatalf("failed to query fsrs_cards: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var remainingIDs []string
+	for rows.Next() {
+		var id, topicID, prompt string
+		if err := rows.Scan(&id, &topicID, &prompt); err != nil {
+			t.Fatalf("failed to scan row: %v", err)
+		}
+		remainingIDs = append(remainingIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows iteration err: %v", err)
+	}
+
+	expectedIDs := []string{"card-1", "card-3", "card-unique"}
+	if len(remainingIDs) != len(expectedIDs) {
+		t.Fatalf("expected %d cards remaining, got %d (%v)", len(expectedIDs), len(remainingIDs), remainingIDs)
+	}
+	for i, exp := range expectedIDs {
+		if remainingIDs[i] != exp {
+			t.Errorf("at index %d: expected id %s, got %s", i, exp, remainingIDs[i])
+		}
+	}
+
+	// Verify that the unique index prevents inserting duplicate (topic_id, prompt)
+	_, err = db.Exec(`INSERT INTO fsrs_cards (id, topic_id, prompt, answer) VALUES ('card-fail', 't1', 'Duplicate Prompt', 'Should fail')`)
+	if err == nil {
+		t.Errorf("expected unique constraint violation on idx_fsrs_cards_topic_prompt, got nil")
 	}
 }

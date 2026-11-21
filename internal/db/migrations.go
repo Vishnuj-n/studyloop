@@ -48,7 +48,7 @@ var alterStatements = []struct {
 	{"user_settings", "prompt_compression_rate", "ALTER TABLE user_settings ADD COLUMN prompt_compression_rate REAL NOT NULL DEFAULT 0.80"},
 	{"user_settings", "preferred_language", "ALTER TABLE user_settings ADD COLUMN preferred_language TEXT NOT NULL DEFAULT 'english'"},
 	{"user_settings", "auto_generate_study_notes", "ALTER TABLE user_settings ADD COLUMN auto_generate_study_notes BOOLEAN DEFAULT 0"},
-	{"user_settings", "notes_detail_level", "ALTER TABLE user_settings ADD COLUMN notes_detail_level TEXT NOT NULL DEFAULT 'exec_summary'"},
+	{"user_settings", "notes_detail_level", "ALTER TABLE user_settings ADD COLUMN notes_detail_level TEXT NOT NULL DEFAULT 'briefing'"},
 	{"user_settings", "notes_model_tier", "ALTER TABLE user_settings ADD COLUMN notes_model_tier TEXT NOT NULL DEFAULT 'fast'"},
 	{"user_settings", "show_recap_before_reading", "ALTER TABLE user_settings ADD COLUMN show_recap_before_reading BOOLEAN DEFAULT 1"},
 	{"user_settings", "quiz_synthesis_mode", "ALTER TABLE user_settings ADD COLUMN quiz_synthesis_mode TEXT NOT NULL DEFAULT 'feynman'"},
@@ -123,7 +123,12 @@ func RunMigrations(tx *sql.Tx) error {
 		return err
 	}
 
-	// 2. Apply alter statements for missing columns
+	// 2. Deduplicate fsrs_cards for older databases before creating unique index
+	if err := dedupeFsrsCards(tx); err != nil {
+		return err
+	}
+
+	// 3. Apply alter statements for missing columns
 	for _, alter := range alterStatements {
 		exists, err := columnExists(tx, alter.Table, alter.Column)
 		if err != nil {
@@ -197,6 +202,57 @@ func dedupeNotebookChunks(tx *sql.Tx) error {
 	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_notebook_chunk_unique ON notebook_chunks(notebook_id, chunk_id)`); err != nil {
 		if !strings.Contains(strings.ToLower(err.Error()), "already exists") {
 			return fmt.Errorf("failed to create unique index on notebook_chunks: %w", err)
+		}
+	}
+	return nil
+}
+
+func dedupeFsrsCards(tx *sql.Tx) error {
+	var count int
+	err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='fsrs_cards'`).Scan(&count)
+	if err != nil || count == 0 {
+		return nil
+	}
+
+	rows, err := tx.Query(`
+		SELECT id, topic_id, prompt
+		FROM fsrs_cards
+		ORDER BY topic_id, prompt, created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to query fsrs_cards for dedupe: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	seen := make(map[string]bool)
+	var idsToDelete []string
+	for rows.Next() {
+		var id, topicID, prompt string
+		if err := rows.Scan(&id, &topicID, &prompt); err != nil {
+			return fmt.Errorf("failed to scan fsrs_cards dedupe row id=%s topic_id=%s: %w", id, topicID, err)
+		}
+		key := topicID + "::" + prompt
+		if seen[key] {
+			idsToDelete = append(idsToDelete, id)
+			continue
+		}
+		seen[key] = true
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed while iterating fsrs_cards dedupe rows: %w", err)
+	}
+
+	for _, id := range idsToDelete {
+		if _, err := tx.Exec(`DELETE FROM fsrs_cards WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("failed to delete duplicate fsrs_cards row id=%s: %w", id, err)
+		}
+	}
+
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_fsrs_cards_topic_prompt ON fsrs_cards(topic_id, prompt)`); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			return fmt.Errorf("failed to create unique index on fsrs_cards: %w", err)
 		}
 	}
 	return nil
