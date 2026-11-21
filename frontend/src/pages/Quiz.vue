@@ -1225,7 +1225,29 @@ async function confirmRestartReading() {
     const readingTaskId = res?.reading_task_id || ''
     showRestartReadingModal.value = false
     if (readingTaskId) {
-      router.push(`/reader?taskId=${readingTaskId}`)
+      const targetNotebookId =
+        res?.notebook_id ||
+        result.value?.notebook_id ||
+        notebookID.value ||
+        route.query.notebookId ||
+        route.query.notebook_id
+      const targetTopicId =
+        res?.topic_id ||
+        result.value?.topic_id ||
+        selectedTopicID.value ||
+        route.query.topicId ||
+        route.query.topic_id
+      const targetStartPage = Number.parseInt(res?.start_page || result.value?.start_page || route.query.startPage || 0) || 0
+
+      router.push({
+        path: '/reader',
+        query: {
+          taskId: readingTaskId,
+          notebookId: targetNotebookId || undefined,
+          topicId: targetTopicId || undefined,
+          startPage: targetStartPage > 0 ? targetStartPage : undefined,
+        },
+      })
     } else {
       router.push('/dashboard')
     }
@@ -2171,9 +2193,9 @@ async function confirmRestartReading() {
 .feynman-feedback-card {
   margin: 20px 0;
   padding: 18px 20px;
-  border-radius: 8px;
-  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  background: var(--surface-container-high, var(--surface-container));
+  border: 1px solid var(--outline-variant);
 }
 
 .feynman-feedback-header {
@@ -2194,93 +2216,114 @@ async function confirmRestartReading() {
 
 .cal--solid {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+[data-theme^='dark'] .cal--solid {
+  color: #4ade80;
 }
 
 .cal--partial {
   background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #b45309;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+[data-theme^='dark'] .cal--partial {
+  color: #facc15;
 }
 
 .cal--misaligned {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme^='dark'] .cal--misaligned {
+  color: #f87171;
 }
 
 .feynman-your-words {
   margin-bottom: 14px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: var(--bg-surface, rgba(0, 0, 0, 0.15));
-  border-left: 2px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface-container-low, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--outline-variant);
+  border-left: 3px solid var(--primary);
 }
 
 .feynman-words-label {
   display: block;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-muted, #888);
+  color: var(--on-surface-variant);
   margin-bottom: 4px;
 }
 
 .feynman-words-quote {
   font-size: 13.5px;
   font-style: italic;
-  color: var(--text-normal, #ddd);
+  color: var(--on-surface);
   margin: 0;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .feynman-feedback-block {
   margin-bottom: 12px;
-  padding: 10px 14px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
 }
 
 .block--strengths {
-  background: rgba(34, 197, 94, 0.06);
-  border: 1px solid rgba(34, 197, 94, 0.15);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
 .block--gaps {
-  background: rgba(234, 179, 8, 0.06);
-  border: 1px solid rgba(234, 179, 8, 0.15);
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.25);
 }
 
 .feedback-heading {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   margin: 0 0 6px 0;
 }
 
 .block--strengths .feedback-heading {
-  color: #22c55e;
+  color: #16a34a;
+}
+
+[data-theme^='dark'] .block--strengths .feedback-heading {
+  color: #4ade80;
 }
 
 .block--gaps .feedback-heading {
-  color: #eab308;
+  color: #b45309;
+}
+
+[data-theme^='dark'] .block--gaps .feedback-heading {
+  color: #facc15;
 }
 
 .feedback-list {
   margin: 0;
   padding-left: 18px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--text-normal, #ddd);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--on-surface);
 }
 
 .feynman-summary-text {
-  font-size: 13px;
-  color: var(--text-muted, #aaa);
-  margin: 8px 0 0 0;
-  line-height: 1.4;
+  font-size: 13.5px;
+  color: var(--on-surface);
+  margin: 10px 0 0 0;
+  line-height: 1.5;
 }
 </style>

@@ -576,6 +576,59 @@ describe('Reader.vue Integration', () => {
       })
     )
   })
+
+  it('initializes successfully when only taskId is present in route query', async () => {
+    appApi.getUserSettings.mockResolvedValue({
+      rag_enabled: true,
+      auto_generate_study_notes: false,
+      show_recap_before_reading: false,
+    })
+
+    appApi.initializeReadingSession.mockResolvedValue({
+      ok: true,
+      task: {
+        id: 'task-read-reverted-1',
+        notebook_id: 'nb-1',
+        topic_id: 'topic-1',
+        start_page: 10,
+        end_page: 15,
+        current_page: 10,
+        status: 'ACTIVE',
+      },
+      page_bounds: {
+        start_page: 10,
+        end_page: 15,
+        current_page: 10,
+      },
+      navigation: {
+        can_go_prev: false,
+        can_go_next: true,
+      },
+      bundle: {
+        file_type: 'pdf',
+        notebook_url: 'http://localhost/test.pdf',
+        page_count: 20,
+        topic_title: 'Intro to AI',
+        sections: [],
+      },
+    })
+
+    routeQuery.value = {
+      taskId: 'task-read-reverted-1',
+    }
+
+    const wrapper = mount(Reader)
+    await flushPromises()
+
+    expect(wrapper.find('.fatal-error').exists()).toBe(false)
+    expect(appApi.initializeReadingSession).toHaveBeenCalledWith(
+      'task-read-reverted-1',
+      '',
+      '',
+      0,
+      0
+    )
+  })
 })
 
 

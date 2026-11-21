@@ -222,10 +222,8 @@ export function useReaderBase(taskID) {
       const startPage = query.startPage ?? query.start_page ?? 0
       const endPage = query.endPage ?? query.end_page ?? 0
 
-      if (!notebookId || !topicId) {
-        globalError.value = 'Missing notebookId or topicId for reading session'
-        return null
-      }
+      // Note: notebookId and topicId are optional hints; the backend hydrates canonical truth
+      // from effectiveTaskID in SQLite. Only validate bounds if both values are explicitly specified.
       // In backend-authoritative session model, 0 means "unspecified / hydrate from DB session state"
       // Reject only: negative values, or invalid ordering when both are specified
       if (startPage < 0 || endPage < 0) {
