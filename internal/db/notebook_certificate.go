@@ -2,9 +2,12 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"ai-tutor/internal/models"
 )
 
 // NotebookCertificateStats contains all verifiable aggregated stats for a completed notebook.
@@ -95,26 +98,41 @@ func (r *Repository) GetNotebookCertificateStats(notebookID string) (*NotebookCe
 	}
 
 	// 5. Count Flashcards Mastered & Review Logs for this notebook's topics
-	var masteredCount int
+	// Mastered flashcards are mature cards (reps > 0, stateCode != 0, stability >= 60.0),
+	// consistent with GetAllFlashcardsDeckOverview maturity criteria.
 	var reviewLogsCount int
-	err = r.db.QueryRow(`
-		SELECT 
-			COUNT(DISTINCT fc.id),
-			COALESCE((
-				SELECT COUNT(r.id)
-				FROM fsrs_review_log r
-				WHERE r.activity_type = 'flashcard' AND r.reference_id IN (
-					SELECT id FROM fsrs_cards WHERE topic_id = n.topic_id 
-					OR topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = n.id)
-				)
-			), 0)
+	_ = r.db.QueryRow(`
+		SELECT COUNT(r.id)
+		FROM fsrs_review_log r
+		WHERE r.activity_type = 'flashcard' AND r.reference_id IN (
+			SELECT id FROM fsrs_cards WHERE topic_id = (SELECT topic_id FROM notebooks WHERE id = ?)
+			OR topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = ?)
+		)
+	`, notebookID, notebookID).Scan(&reviewLogsCount)
+	targetNb.TotalReviewsCount = reviewLogsCount
+
+	fcRows, fcErr := r.db.Query(`
+		SELECT fc.state_json
 		FROM fsrs_cards fc
 		JOIN notebooks n ON (fc.topic_id = n.topic_id OR fc.topic_id IN (SELECT topic_id FROM notebook_topics WHERE notebook_id = n.id))
 		WHERE n.id = ? AND fc.suspended = 0
-	`, notebookID).Scan(&masteredCount, &reviewLogsCount)
-	if err == nil {
+	`, notebookID)
+	if fcErr == nil {
+		defer fcRows.Close()
+		masteredCount := 0
+		for fcRows.Next() {
+			var stateJSON string
+			if scanErr := fcRows.Scan(&stateJSON); scanErr == nil && stateJSON != "" {
+				var state models.FlashcardState
+				if jsonErr := json.Unmarshal([]byte(stateJSON), &state); jsonErr == nil {
+					// Matches GetAllFlashcardsDeckOverview definition of mature/mastered
+					if state.Reps > 0 && state.StateCode != 0 && state.Stability >= 60.0 {
+						masteredCount++
+					}
+				}
+			}
+		}
 		targetNb.FlashcardsMastered = masteredCount
-		targetNb.TotalReviewsCount = reviewLogsCount
 	}
 
 	// 6. Estimate Study Minutes (reading completions, quizzes, reviews)

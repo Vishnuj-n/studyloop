@@ -589,3 +589,62 @@ func TestGetAllFlashcardsDeckOverviewAndActions(t *testing.T) {
 	}
 }
 
+func TestGetAllFlashcardsDeckOverviewDeduplicatesSharedTopicCards(t *testing.T) {
+	initDBForTest(t, false, 0)
+
+	sharedTopic := "topic-shared-deck"
+	nb1 := "nb-shared-deck-1"
+	nb2 := "nb-shared-deck-2"
+
+	if err := testRepo.EnsureTopic(sharedTopic, "Shared Deck Topic"); err != nil {
+		t.Fatalf("EnsureTopic failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(nb1, "Notebook 1", "/tmp/1.pdf", "pdf", sharedTopic, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook nb1 failed: %v", err)
+	}
+	if err := testRepo.CreateNotebook(nb2, "Notebook 2", "/tmp/2.pdf", "pdf", sharedTopic, "", 10, ""); err != nil {
+		t.Fatalf("CreateNotebook nb2 failed: %v", err)
+	}
+	// Also explicitly link both in notebook_topics
+	if _, err := testRepo.db.Exec(`INSERT INTO notebook_topics (notebook_id, topic_id) VALUES (?, ?), (?, ?)`, nb1, sharedTopic, nb2, sharedTopic); err != nil {
+		t.Fatalf("failed to insert notebook_topics: %v", err)
+	}
+
+	cards := []models.Flashcard{
+		{ID: "card-s1", TopicID: sharedTopic, Prompt: "Shared 1", Answer: "Ans 1", DueAt: 100, Suspended: false},
+		{ID: "card-s2", TopicID: sharedTopic, Prompt: "Shared 2", Answer: "Ans 2", DueAt: 100, Suspended: false},
+		{ID: "card-s3", TopicID: sharedTopic, Prompt: "Shared 3", Answer: "Ans 3", DueAt: 9999999999, Suspended: true},
+	}
+	states := map[string]models.FlashcardState{
+		"card-s1": {Stability: 10.0, Reps: 1, StateCode: 1},
+		"card-s2": {Stability: 75.0, Reps: 6, StateCode: 2},
+		"card-s3": {Stability: 90.0, Reps: 10, StateCode: 2},
+	}
+	if err := testRepo.CreateFlashcards(sharedTopic, cards, states); err != nil {
+		t.Fatalf("CreateFlashcards failed: %v", err)
+	}
+
+	overview, err := testRepo.GetAllFlashcardsDeckOverview("")
+	if err != nil {
+		t.Fatalf("GetAllFlashcardsDeckOverview failed: %v", err)
+	}
+
+	// Because topic is linked to 2 notebooks, without deduplication TotalCards would be 6.
+	// With deduplication, TotalCards must equal 3.
+	if overview.Metrics.TotalCards != 3 {
+		t.Errorf("expected overview.Metrics.TotalCards = 3, got %d", overview.Metrics.TotalCards)
+	}
+	if overview.Metrics.ActiveCards != 2 {
+		t.Errorf("expected overview.Metrics.ActiveCards = 2, got %d", overview.Metrics.ActiveCards)
+	}
+	if overview.Metrics.SuspendedCards != 1 {
+		t.Errorf("expected overview.Metrics.SuspendedCards = 1, got %d", overview.Metrics.SuspendedCards)
+	}
+	if overview.Metrics.DueToday != 2 {
+		t.Errorf("expected overview.Metrics.DueToday = 2, got %d", overview.Metrics.DueToday)
+	}
+	if overview.Metrics.MatureCards != 2 {
+		t.Errorf("expected overview.Metrics.MatureCards = 2 (card-s2 and card-s3 with stability >= 60), got %d", overview.Metrics.MatureCards)
+	}
+}
+

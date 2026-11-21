@@ -758,6 +758,7 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 	notebookMap := make(map[string]*models.NotebookDeckGroup)
 	notebookOrder := make([]string, 0)
 	topicMap := make(map[string]map[string]*models.DeckTopicGroup)
+	seenCardIDs := make(map[string]bool)
 
 	for rows.Next() {
 		var card models.DeckCardDetail
@@ -783,25 +784,30 @@ func (r *Repository) GetAllFlashcardsDeckOverview(profileID string) (*models.Dec
 			}
 		}
 
-		metrics.TotalCards++
-		if card.Suspended {
-			metrics.SuspendedCards++
-		} else {
-			metrics.ActiveCards++
-			if card.DueAt <= nowUnix {
-				metrics.DueToday++
+		// Only increment global DeckMetrics once per unique card ID, even if the card's topic
+		// is linked to multiple notebooks via notebook_topic_links.
+		if !seenCardIDs[card.ID] {
+			seenCardIDs[card.ID] = true
+			metrics.TotalCards++
+			if card.Suspended {
+				metrics.SuspendedCards++
+			} else {
+				metrics.ActiveCards++
+				if card.DueAt <= nowUnix {
+					metrics.DueToday++
+				}
 			}
-		}
 
-		// Retention breakdown
-		if card.Reps == 0 || card.StateCode == 0 {
-			metrics.NewCards++
-		} else if card.Stability < 21.0 {
-			metrics.LearningCards++
-		} else if card.Stability < 60.0 {
-			metrics.YoungCards++
-		} else {
-			metrics.MatureCards++
+			// Retention breakdown
+			if card.Reps == 0 || card.StateCode == 0 {
+				metrics.NewCards++
+			} else if card.Stability < 21.0 {
+				metrics.LearningCards++
+			} else if card.Stability < 60.0 {
+				metrics.YoungCards++
+			} else {
+				metrics.MatureCards++
+			}
 		}
 
 		// Grouping
