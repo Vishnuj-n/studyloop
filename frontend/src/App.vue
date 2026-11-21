@@ -16,7 +16,7 @@ import RateLimitBanner from './components/RateLimitBanner.vue'
 import ExtensionSetupToast from './components/ExtensionSetupToast.vue'
 import ExtensionSetupModal from './components/ExtensionSetupModal.vue'
 import { useExtensions } from './composables/useExtensions'
-import { isReaderFocusMode, exitReaderFocusMode } from './composables/useReaderFocus'
+import { isReaderFocusMode } from './composables/useReaderFocus'
 import {
   getUserSettings,
   updateUserSettings,
